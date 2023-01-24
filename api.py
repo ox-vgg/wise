@@ -23,12 +23,12 @@ def create_app(config: Optional[APIConfig] = None):
     async def shutdown():
         pass
 
-    return app
+    return app, config
 
 
 def main():
-    app = create_app()
-    uvicorn.run(app, port=8000, log_level="info")
+    app, config = create_app()
+    uvicorn.run(app, port=config.port, log_level="info")
 
 
 if __name__ == "__main__":
