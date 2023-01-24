@@ -121,12 +121,12 @@ def get_image_info(p: Path, basedir: Optional[Path] = None):
         if not iptc:
             return iminfo
 
-        encoding = iptc.get((2, 183), b"utf-8").decode()
+        encoding = (iptc.get((2, 183)) or b"utf-8").decode()
 
         encoding = ENCODING_MAP.get(encoding, "utf-8")
 
-        iminfo.title = iptc.get((2, 85), iminfo.title.encode()).decode(encoding)
-        iminfo.copyright = iptc.get((2, 116), b"").decode(encoding)
-        iminfo.caption = iptc.get((2, 120), b"").decode(encoding)
+        iminfo.title = (iptc.get((2, 85)) or iminfo.title.encode()).decode(encoding)
+        iminfo.copyright = (iptc.get((2, 116)) or b"").decode(encoding)
+        iminfo.caption = (iptc.get((2, 120)) or b"").decode(encoding)
 
         return iminfo
