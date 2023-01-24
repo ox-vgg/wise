@@ -36,6 +36,7 @@ def get_search_router(config: APIConfig):
     _, extract_text_features = setup_clip(model_name)
 
     search_fn = partial(search_dataset, index)
+    _prefix = config.query_prefix.strip()
 
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
     async def search(
@@ -49,7 +50,8 @@ def get_search_router(config: APIConfig):
                 400, {"message": "Must be called with search query term"}
             )
 
-        text_features = extract_text_features(q)
+        prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
+        text_features = extract_text_features(prefixed_queries)
         dist, ids = search_fn(text_features, top_k=top_k)
 
         response = {

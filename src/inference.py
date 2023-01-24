@@ -74,7 +74,7 @@ def setup_clip(model_name: str = "ViT-B/32"):
     def extract_text_features(
         queries: List[str],
     ) -> np.ndarray:
-        text_tokens = clip.tokenize([f"This is a photo of a {x}" for x in queries])
+        text_tokens = clip.tokenize(queries)
         if IS_CUDA:
             text_tokens = text_tokens.cuda()
 

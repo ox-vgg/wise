@@ -106,6 +106,9 @@ def search(
         help="Extracted features .npy file",
     ),
     top_k: int = typer.Option(3, help="Top-k results to retrieve"),
+    prefix: str = typer.Option(
+        "This is a photo of a", help="Prefix to attach to all queries"
+    ),
     queries: List[str] = typer.Argument(..., help="Queries"),
 ):
     parsed_queries = parse_query_parameter(queries)
@@ -123,7 +126,10 @@ def search(
 
     # Convert query to embedding
     _, extract_text_features = setup_clip(model_name)
-    text_features = extract_text_features(parsed_queries)
+
+    prefixed_queries = [f"{prefix.strip()} {x.strip()}".strip() for x in parsed_queries]
+    print("Processing queries:\n", prefixed_queries)
+    text_features = extract_text_features(prefixed_queries)
 
     dist, ids = search_dataset(index, text_features, top_k=top_k)
 

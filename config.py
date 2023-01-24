@@ -9,3 +9,4 @@ class APIConfig(BaseSettings):
     dataset: Path = Path("dataset.h5")
     top_k: int = 10
     precision: int = 3
+    query_prefix: str = "This is a photo of a"
