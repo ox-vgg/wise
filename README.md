@@ -1,11 +1,15 @@
-# CLIP + FAISS
+# WISE
 
-Repo to put together OpenAI Clip and FAISS library together for a text based
-image retrieval demo.
+WISE - WISE Image Search Engine
+
+WISE is an open-source image search engine for efficiently searching through large
+collections of images. WISE uses various algorithms and models developed in the field
+of computer vision and search & retrieval to allow the user to select the best
+method for their purpose.
 
 ## Pre-requisites
 
-(Tested on Debian 11 distro )
+(Tested on Debian 11 distro, but should work on all platforms)
 
 - conda (You can install miniconda - [instructions](https://docs.conda.io/en/latest/miniconda.html))
 
@@ -18,33 +22,43 @@ conda env create -f environment.yml
 conda activate clip-faiss
 ```
 
-## CLI
+## Steps to search a collection of images using text queries
 
-A Typer based CLI can be used to extract features and do a quick search
+To search a collection of images using text, we use the OpenAI CLIP model.
+
+To perform a search we must first extract the features from the dataset by processing the images
+and then provide the search query.
 
 ### Extract features
 
-Use CLIP visual model to extract 512 embedding from images in a directory.
-The features will be written an HDF5 File (with dataset 'features' with shape - N x 512, and filenames in attrs['files'])
+Image features are extracted once using the CLIP visual model.
+The features are written to an HDF5 file. This file is described here (TODO)
+
+To extract features from the image collection, we use the following command
 
 ```bash
 python3 app.py extract-features IMAGE_DIR DATASET.h5
 ```
 
+(Optional Arguments - TODO)
+
 ### Search
 
-Query word embeddings are obtained from CLIP text model and searched against
-the extracted features
+Once the features are extracted, we can re-use them for every search query.
+Query word embeddings are obtained from CLIP text model and then searched against
+the extracted features.
 
 ```bash
 python3 app.py search --dataset DATASET.h5 QUERY1 QUERY2 [...]
 ```
 
-## Web Demo
+(Optional Arguments, Output description - TODO)
 
-A FAST API + HTML / CSS / JS app to make queries against the extracted features.
+### Web Interface
 
-### Serve
+A web interface is also provided to make queries against the collection.
+
+To load the interface,
 
 ```bash
 ln -s IMAGES_DIR public/images
