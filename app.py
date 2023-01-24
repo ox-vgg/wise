@@ -1,6 +1,6 @@
 import enum
 from pathlib import Path
-from typing import List
+from typing import List, Union
 import typer
 from src.ioutils import write_dataset, read_dataset
 from src.inference import setup_clip, AVAILABLE_MODELS
@@ -19,6 +19,35 @@ class _CLIPModel(str, enum.Enum):
 
 
 CLIPModel = _CLIPModel("CLIPModel", {x: x for x in AVAILABLE_MODELS})
+
+
+def parse_query_parameter(queries: List[str]) -> Union[List[str], Path]:
+    """
+    Parse the passed search queries and return based on conditions
+    - If 2 or more -> Consider it as list of string queries
+    - If 1 and is completely made of alphabets -> Consider as string query
+    - If 1 and is a directory / file -> Consider as path
+    - Else invalid -> raise typer.BadParameter
+    """
+    if len(queries) == 0:
+        raise typer.BadParameter("Query cannot be empty")
+
+    if len(queries) > 1:
+        # This is a list, so consider it as list of multiple string queries
+        return queries
+
+    # queries has 1 element
+    query = queries[0]
+
+    if query.replace(" ", "").isalpha():
+        return queries
+
+    qpath = Path(query)
+
+    if qpath.is_dir() or qpath.is_file():
+        return qpath
+
+    raise typer.BadParameter("Unknown query parameter, expected List[str] | Path")
 
 
 @app.command()
@@ -79,8 +108,13 @@ def search(
     top_k: int = typer.Option(3, help="Top-k results to retrieve"),
     queries: List[str] = typer.Argument(..., help="Queries"),
 ):
-    if len(queries) == 0:
-        raise typer.BadParameter("Query cannot be empty")
+    parsed_queries = parse_query_parameter(queries)
+
+    if not (
+        isinstance(parsed_queries, list)
+        and all(isinstance(x, str) for x in parsed_queries)
+    ):
+        raise NotImplementedError
 
     features, files, model_name = read_dataset(dataset)
 
@@ -89,7 +123,7 @@ def search(
 
     # Convert query to embedding
     _, extract_text_features = setup_clip(model_name)
-    text_features = extract_text_features(queries)
+    text_features = extract_text_features(parsed_queries)
 
     dist, ids = search_dataset(index, text_features, top_k=top_k)
 
