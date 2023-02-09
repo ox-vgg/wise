@@ -11,8 +11,8 @@ def build_search_index(features: np.ndarray) -> faiss.IndexFlatIP:
     return index
 
 
-def search_dataset(index: faiss.IndexFlatIP, text_features: np.ndarray, top_k: int = 3):
+def search_dataset(index: faiss.IndexFlatIP, features: np.ndarray, top_k: int = 3):
 
-    dist, ids = index.search(x=text_features, k=top_k)
+    dist, ids = index.search(x=features, k=top_k)
 
     return dist, ids

@@ -101,7 +101,7 @@ def search(
         ...,
         exists=True,
         file_okay=True,
-        dir_okay=False,
+        dir_okay=True,
         readable=True,
         help="Extracted features .npy file",
     ),
@@ -113,10 +113,13 @@ def search(
 ):
     parsed_queries = parse_query_parameter(queries)
 
-    if not (
-        isinstance(parsed_queries, list)
-        and all(isinstance(x, str) for x in parsed_queries)
-    ):
+
+    if isinstance(parsed_queries, list) and all(isinstance(x, str) for x in parsed_queries):
+        query_type = 'NATURAL_LANGUAGE_QUERY'
+    elif isinstance(parsed_queries, Path):
+        query_type = 'IMAGE_QUERY'
+        # TODO check if the path is an image path or directory path
+    else:
         raise NotImplementedError
 
     features, files, model_name = read_dataset(dataset)
@@ -125,14 +128,18 @@ def search(
     index = build_search_index(features)
 
     # Convert query to embedding
-    _, extract_text_features = setup_clip(model_name)
+    extract_image_features, extract_text_features = setup_clip(model_name)
 
-    prefixed_queries = [f"{prefix.strip()} {x.strip()}".strip() for x in parsed_queries]
-    print("Processing queries:\n", prefixed_queries)
-    text_features = extract_text_features(prefixed_queries)
+    if query_type == 'NATURAL_LANGUAGE_QUERY':
+        prefixed_queries = [f"{prefix.strip()} {x.strip()}".strip() for x in parsed_queries]
+        print("Processing queries:\n", prefixed_queries)
+        query_features = extract_text_features(prefixed_queries)
+    elif query_type == 'IMAGE_QUERY':
+        print("Processing image query")
+        query_features = extract_image_features(parsed_queries)
+        query_features = next(query_features)
 
-    dist, ids = search_dataset(index, text_features, top_k=top_k)
-
+    dist, ids = search_dataset(index, query_features, top_k=top_k)
     print(dist, [[Path(files[x]).name for x in top_ids] for top_ids in ids])
 
 
