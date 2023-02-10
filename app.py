@@ -101,15 +101,15 @@ def search(
         ...,
         exists=True,
         file_okay=True,
-        dir_okay=True,
+        dir_okay=False,
         readable=True,
         help="Extracted features .npy file",
     ),
-    top_k: int = typer.Option(3, help="Top-k results to retrieve"),
+    top_k: int = typer.Option(5, help="Top-k results to retrieve"),
     prefix: str = typer.Option(
-        "This is a photo of a", help="Prefix to attach to all queries"
+        "This is a photo of a", help="Prefix to attach to all natural language queries"
     ),
-    queries: List[str] = typer.Argument(..., help="Queries"),
+    queries: List[str] = typer.Argument(..., help="Search query/queries. Can be a text (natural language) query, a path to an image, or a path to a directory of images"),
 ):
     parsed_queries = parse_query_parameter(queries)
 
