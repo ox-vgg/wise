@@ -85,3 +85,12 @@ def setup_clip(model_name: str = "ViT-B/32"):
             return output.cpu().numpy()
 
     return extract_image_features, extract_text_features
+
+class LinearBinaryClassifier(torch.nn.Module):
+    def __init__(self, embedding_dim: int):
+        super().__init__()
+        self.linear = torch.nn.Linear(embedding_dim, 1)
+        self.sigmoid =  torch.nn.Sigmoid()
+        
+    def forward(self, x):
+        return self.sigmoid(self.linear(x))
