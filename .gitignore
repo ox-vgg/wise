@@ -2,6 +2,8 @@
 
 # data folder
 images/
+public/images
+public/thumbs
 *.h5
 *.npy
 
