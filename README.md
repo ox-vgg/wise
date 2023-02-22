@@ -59,7 +59,7 @@ python3 app.py search --dataset DATASET.h5 QUERY1 QUERY2 [...]
 (Optional Arguments, Output description - TODO)
 
 #### Visual similarity search
-You can search for images that are similar to a given query image by passing the path to the query image as follows:
+You can search for images that are similar to a given query image by passing the filepath (or HTTP URL) to the query image as follows:
 ```bash
 python3 app.py search --dataset DATASET.h5 /path/to/query/image.jpg [...]
 ```

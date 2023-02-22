@@ -8,3 +8,7 @@ class ImageInfo(BaseModel):
     title: str = ""
     caption: str = ""
     copyright: str = ""
+
+
+class URL(str):
+   pass

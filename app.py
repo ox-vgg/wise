@@ -4,6 +4,8 @@ from typing import List, Union
 import typer
 from src.ioutils import write_dataset, read_dataset
 from src.inference import setup_clip, AVAILABLE_MODELS, LinearBinaryClassifier
+from src.schemas import URL
+import urllib
 import torch
 import numpy as np
 import os
@@ -42,6 +44,10 @@ def parse_query_parameter(queries: List[str]) -> Union[List[str], Path]:
 
     # queries has 1 element
     query = queries[0]
+
+    # query is url
+    if query.startswith(('http://', 'https://')):
+        return URL(query)
 
     if query.replace(" ", "").isalpha():
         return queries
@@ -176,8 +182,14 @@ def search(
 
     if isinstance(parsed_queries, list) and all(isinstance(x, str) for x in parsed_queries):
         query_type = 'NATURAL_LANGUAGE_QUERY'
-    elif isinstance(parsed_queries, Path):
-        if os.path.isfile(parsed_queries):
+    elif isinstance(parsed_queries, Path) or isinstance(parsed_queries, URL):
+        if isinstance(parsed_queries, URL):
+            print('Downloading', parsed_queries, 'to file')
+            filename = Path(urllib.parse.unquote(parsed_queries).split('?')[0]).name
+            torch.hub.download_url_to_file(parsed_queries, filename)
+            parsed_queries = Path(filename)
+            query_type = 'IMAGE_QUERY'
+        elif os.path.isfile(parsed_queries):
             query_type = 'IMAGE_QUERY'
         elif os.path.isdir(parsed_queries):
             query_type = 'IMAGE_CLASSIFICATION_QUERY'
