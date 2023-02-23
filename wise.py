@@ -10,6 +10,7 @@
 ## wise search --like /Pictures/mydog.jpg --in /data/images
 ## wise search --like /Pictures/dogs/german-shephard/ --in /data/images
 
+
 import os
 import argparse
 from pathlib import Path
@@ -66,7 +67,18 @@ def init(args):
     return
 
 
+def serve(args):
+    # example:
+    # wise serve --id wikimedia --address 0.0.0.0 --port 8080
+    # clean up config
+
+    print("TODO: serving frontend")
+    return
+
+
 def test(args):
+    # example:
+    # wise test ox5k --images /dataset/ox5k/images/ --gnd-truth /data/ox5k/annotations/
     print("TODO: running tests")
     return
 
@@ -135,9 +147,11 @@ if __name__ == "__main__":
             print(
                 "search command requires one of the following: --query, --for, --like"
             )
-    elif args.command == "test":
-        test(args)
     elif args.command == "init":
         init(args)
+    elif args.command == "serve":
+        serve(args)
+    elif args.command == "test":
+        test(args)
     else:
         print("unknown command " + args.command)
