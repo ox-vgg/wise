@@ -27,6 +27,7 @@ dependencies:
   - pip:
       - git+https://github.com/openai/CLIP.git
       - pydantic
+      - python-multipart==0.0.5
 
 variables:
   PYTHONNOUSERSITE: 1
