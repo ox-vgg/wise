@@ -1,8 +1,9 @@
 from functools import partial
 from pathlib import Path
 from typing import Dict, List
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, File
 from pydantic import BaseModel, validator
+import io
 
 from config import APIConfig
 
@@ -33,7 +34,7 @@ def get_search_router(config: APIConfig):
     features, index, model_name, files, extract_image_features, extract_text_features = prepare_search(config.dataset)
 
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
-    async def search(
+    async def natural_language_search(
         q: List[str] = Query(
             default=[],
         ),
@@ -57,6 +58,27 @@ def get_search_router(config: APIConfig):
                 for kid, _id in enumerate(ids[qid])
             ]
             for qid in range(len(q))
+        }
+        return response
+
+    @router.post("/search", response_model=Dict[str, List[SearchResponse]])
+    async def image_search(
+        q: bytes = File(),
+        top_k: int = Query(config.top_k, gt=0, le=min(200, len(files))),
+    ):
+        img_bytesio = io.BytesIO(q)
+        dist, ids = similarity_based_query(index, extract_image_features, extract_text_features, top_k, config.query_prefix, img_bytesio, query_type="IMAGE_QUERY")
+
+        response = {
+            'image': [
+                SearchResponse(
+                    thumbnail=f"thumbs/{files[_id]}",
+                    link=f"images/{files[_id]}",
+                    distance=dist[0][kid],
+                    info=get_image_info(images_dir / files[_id], images_dir),
+                )
+                for kid, _id in enumerate(ids[0])
+            ]
         }
         return response
 

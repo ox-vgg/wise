@@ -2,6 +2,7 @@ import itertools
 from pathlib import Path
 from typing import Generator, List, Union
 from PIL import Image
+from io import BytesIO
 import numpy as np
 import torch
 import clip
@@ -47,7 +48,7 @@ def setup_clip(model_name: str = "ViT-B/32"):
         .repeat(1, input_dim, input_dim)
     )
 
-    def _preprocess(p: Path):
+    def _preprocess(p: Union[Path, BytesIO]):
         try:
             with Image.open(p) as im:
                 return preprocess(im)
@@ -56,9 +57,9 @@ def setup_clip(model_name: str = "ViT-B/32"):
             return mean_tensor
 
     def extract_image_features(
-        images: Union[Path, List[Path]], batch_size: int = 1
+        images: Union[Path, BytesIO, List[Path]], batch_size: int = 1
     ) -> Generator[np.ndarray, None, None]:
-        _files = [images] if isinstance(images, Path) else images
+        _files = [images] if (isinstance(images, Path) or isinstance(images, BytesIO)) else images
         with torch.no_grad():
             for batch in batched(_files, batch_size):
                 _input = torch.stack([_preprocess(p) for p in batch], dim=0)
