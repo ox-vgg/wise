@@ -9,7 +9,7 @@ from config import APIConfig
 from src.schemas import ImageInfo
 from src.ioutils import read_dataset, get_image_info
 from src.inference import setup_clip
-from src.search import build_search_index, search_dataset
+from src.search import build_search_index, prepare_search, similarity_based_query
 
 
 def get_search_router(config: APIConfig):
@@ -27,32 +27,24 @@ def get_search_router(config: APIConfig):
         def round_distance(cls, v):
             return round(v, config.precision)
 
-    features, files, model_name = read_dataset(config.dataset)
     images_dir = config.images_dir
-
-    index = build_search_index(features)
-
-    num_files = len(files)
-    _, extract_text_features = setup_clip(model_name)
-
-    search_fn = partial(search_dataset, index)
     _prefix = config.query_prefix.strip()
+    
+    features, index, model_name, files, extract_image_features, extract_text_features = prepare_search(config.dataset)
 
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
     async def search(
         q: List[str] = Query(
             default=[],
         ),
-        top_k: int = Query(config.top_k, gt=0, le=min(25, num_files)),
+        top_k: int = Query(config.top_k, gt=0, le=min(200, len(files))),
     ):
         if len(q) == 0:
             raise HTTPException(
                 400, {"message": "Must be called with search query term"}
             )
 
-        prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
-        text_features = extract_text_features(prefixed_queries)
-        dist, ids = search_fn(text_features, top_k=top_k)
+        dist, ids = similarity_based_query(index, extract_image_features, extract_text_features, top_k, config.query_prefix, q, query_type="NATURAL_LANGUAGE_QUERY")
 
         response = {
             q[qid]: [
