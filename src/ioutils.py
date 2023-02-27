@@ -1,13 +1,82 @@
 import typing
-from typing import List, Literal, Optional, Generator, Tuple, cast
+from typing import List, Literal, Optional, Generator, Tuple, cast, Callable
 from contextlib import contextmanager
 from pathlib import Path
+import tarfile
 import numpy as np
 import h5py
 from PIL import Image, IptcImagePlugin
 from tqdm import tqdm
+import webdataset as wds
 
-from .schemas import ImageInfo
+from .data_models import ImageInfo, ImageMetadata
+
+
+def is_valid_image(p: Path):
+
+    try:
+        with Image.open(p) as im:
+            im.verify()
+            return True
+    except Exception:
+        return False
+
+
+def is_valid_webdataset_tarfile(p: str):
+    if tarfile.is_tarfile(p) == False:
+        return False
+
+    try:
+        next(iter(wds.WebDataset(p).to_tuple("__key__", "jpg;jpeg", "json")))
+        return True
+    except Exception as e:
+        print(f"{p} is not a valid data source - {e}")
+        return False
+
+
+# Create iterator over images in folder
+def get_valid_images_from_folder(folder: Path):
+    image_files = (x for x in folder.rglob("*") if x.is_file() and is_valid_image(x))
+    for image in image_files:
+        with Image.open(image) as im:
+            w, h = im.size
+            format = im.format or "UNKNOWN"
+            # Load the image into memory to prevent seeking after generator ends
+            im.load()
+            metadata = ImageMetadata(
+                path=str(image.relative_to(folder)),
+                size_in_bytes=image.stat().st_size,
+                format=format,
+                width=w,
+                height=h,
+                source_uri=image.absolute().as_uri(),
+                metadata={},
+            )
+            yield im, metadata
+
+
+# Create iterator over images in webdataset
+def get_valid_images_from_webdataset(url: str):
+    ds = wds.WebDataset(url).decode("pil")
+    for sample in ds:
+        k = sample["__key__"]
+        im_key = next((a for a in ["jpg", "jpeg"] if a in sample), None)
+        if im_key is None:
+            continue
+
+        im: Image.Image = sample[im_key]
+        w, h = im.size
+        im.load()
+        metadata = sample.get("json", {})
+        yield im, ImageMetadata(
+            path=f"{url}#{k}.{im_key}",
+            size_in_bytes=-1,
+            format="jpeg",
+            width=w,
+            height=h,
+            source_uri=metadata.get("url", f"{url}#{k}.{im_key}"),
+            metadata={},
+        )
 
 
 @contextmanager

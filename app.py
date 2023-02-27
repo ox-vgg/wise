@@ -1,14 +1,18 @@
 import enum
+import itertools
 from pathlib import Path
-from typing import List, Union
+import typing
+from typing import List, Union, Tuple, Literal
 import typer
 from src.ioutils import write_dataset
 from src.inference import setup_clip, AVAILABLE_MODELS
-from src.schemas import URL
 import urllib
 from torch.hub import download_url_to_file
 import numpy as np
 import os
+from PIL import Image
+import braceexpand
+from src.data_models import URL
 
 from src.search import (
     build_search_index,
@@ -26,6 +30,39 @@ class _CLIPModel(str, enum.Enum):
 
 
 CLIPModel = _CLIPModel("CLIPModel", {x: x for x in AVAILABLE_MODELS})
+
+
+def parse_webdataset_url(wds_url: str):
+    # - split at comma
+    splits = wds_url.split(",")
+
+    # - strip leading / trailing space
+    stripped = map(lambda x: x.strip(), splits)
+
+    # - apply braceexpand
+    expanded = map(lambda x: braceexpand.braceexpand(x), stripped)
+
+    return list(itertools.chain.from_iterable(expanded))
+
+
+# Split input arguments into respective category of folders and webdataset urls
+def parse_and_validate_input_datasets(input_dataset: List[str]):
+    # At least one input must be passed
+    if len(input_dataset) == 0:
+        raise typer.BadParameter("Input dataset cannot be empty")
+
+    # Now we have a list[Folder | WebDataset]
+    processed = []
+    for dataset in input_dataset:
+        if (p := Path(dataset)).is_dir():
+            processed.append(p)
+        else:
+            processed.extend(parse_webdataset_url(dataset))
+
+    # - deduplicate
+    processed = list(dict.fromkeys(processed))
+
+    return processed
 
 
 def parse_query_parameter(queries: List[str]) -> Union[List[str], Path]:
