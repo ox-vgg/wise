@@ -169,6 +169,7 @@
             list="topk_list"
             name="search_topk"
           />
+          <input type="file" id="search_file_input">
           <div id="search_loader" class="search__loader gone"></div>
         </fieldset>
         <span id="search_error"></span>
@@ -180,41 +181,11 @@
         </section>
       </div>
     </main>
-    <footer>
-      <em>Tip: Hover on search result for name of file / distance. </em>
-      <h5>Built with</h5>
-      <ul>
-        <li>
-          <a
-            href="https://github.com/openai/CLIP/tree/main"
-            target="_blank"
-            rel="noopener noreferrer"
-            >CLIP</a
-          >
-        </li>
-        <li>
-          <a
-            href="https://github.com/facebookresearch/faiss"
-            target="_blank"
-            rel="noopener noreferrer"
-            >FAISS</a
-          >
-        </li>
-        <li>
-          <a
-            href="https://fastapi.tiangolo.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            >FastAPI</a
-          >
-        </li>
-        <li><a href="#">Full list</a></li>
-      </ul>
-    </footer>
   </body>
   <script>
     const search_el = document.getElementById("search");
     const search_box = document.getElementById("search_input");
+    const search_file_input = document.getElementById("search_file_input");
     const search_loader = document.getElementById("search_loader");
     const search_error = document.getElementById("search_error");
     const search_topk = document.getElementById("search_topk");
@@ -362,5 +333,58 @@
       debounced_search();
     };
     search_box.oninput = search_topk.onchange = oninput;
+
+    const search_with_file = async (selectedFile, top_k) => {
+      var formData = new FormData()
+      formData.append('q', selectedFile)
+      
+      const params = new URLSearchParams();
+      params.append("top_k", top_k);
+
+      search_loader.classList.remove("gone");
+
+      const res = await fetch(`../search?${params.toString()}`, {
+        method: "POST",
+        body: formData
+      });
+      search_loader.classList.add("gone");
+
+      if (!res.ok) {
+        const content_type = res.headers.get("content-type");
+        let message = `${res.status} (${res.statusText})`;
+        if (content_type && content_type.includes("application/json")) {
+          const { detail } = await res.json();
+          if ("message" in detail) {
+            message = `${message} - ${detail["message"]}`;
+          } else if (Array.isArray(detail)) {
+            let err_message = "";
+            detail.forEach(({ loc, msg }) => {
+              err_message += `${loc.join("->")} - ${msg},`;
+            });
+            message = `${message} - (${err_message})`;
+          }
+        }
+        throw new Error(message);
+      }
+      return res.json();
+    }
+
+    search_file_input.onchange = async () => {
+      const top_k_str = search_topk.value.trim();
+      const top_k = Number.parseFloat(top_k_str === "" ? "10" : top_k_str) || 10;
+
+      const selectedFile = search_file_input.files[0];
+      console.log(selectedFile);
+
+      try {
+        const res = await search_with_file(selectedFile, top_k);
+        update_result(res['image']);
+      } catch (err) {
+        if (err instanceof DOMException) {
+        } else {
+          search_error.textContent = `${err}`;
+        }
+      }
+    }
   </script>
 </html>
