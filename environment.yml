@@ -7,6 +7,7 @@ channels:
   - defaults
 
 dependencies:
+  - braceexpand=0.1.5
   - cuda-toolkit=11.6.0
   - python=3.10.6
   - pip=22.3.0
@@ -24,6 +25,7 @@ dependencies:
   - h5py=3.7.0
   - fastapi=0.85.1
   - uvicorn-standard=0.19.0
+  - webdataset=0.2.26
   - pip:
       - git+https://github.com/openai/CLIP.git
       - pydantic
