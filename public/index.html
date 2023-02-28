@@ -3,7 +3,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CLIP FAISS demo</title>
+    <title>WISE Image Search Engine</title>
     <style>
       * {
         box-sizing: border-box;
@@ -29,6 +29,9 @@
       header {
         grid-area: header;
         padding: 1rem;
+      }
+      h2, h3, h4 {
+        margin: 0;
       }
       main {
         grid-area: body;
@@ -126,7 +129,7 @@
         <img class="img-wrapper__img" />
         <div class="img-wrapper__caption">
           <p>Cars</p>
-          <p>Distance: <span></span></p>
+          <!-- <p>Distance: <span></span></p> -->
         </div>
       </div>
     </template>
@@ -143,7 +146,7 @@
       <option value="10"></option>
     </datalist>
     <header>
-      <h2>CLIP FAISS Demo</h2>
+      <h2>WISE Image Search Engine</h2>
     </header>
     <main>
       <h4>Search</h4>
@@ -160,9 +163,9 @@
             type="number"
             class="search__topk"
             id="search_topk"
-            value="10"
+            value="50"
             min="1"
-            max="25"
+            max="100"
             list="topk_list"
             name="search_topk"
           />
