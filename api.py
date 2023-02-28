@@ -7,12 +7,11 @@ from config import APIConfig
 from routes import get_search_router
 
 
-def create_app(config: Optional[APIConfig] = None):
-    config = config or APIConfig()
+def create_app(config: APIConfig):
     app = FastAPI()
     app.state.config = config
-    app.mount("/public/thumbs", StaticFiles(directory=config.thumbs_dir), name="thumbs")
-    app.mount("/public/images", StaticFiles(directory=config.images_dir), name="images")
+    # TODO Mount dataset source directories as static
+    # and return URL accordingly
     app.mount("/public", StaticFiles(directory="public"), name="public")
 
     @app.on_event("startup")
@@ -23,11 +22,12 @@ def create_app(config: Optional[APIConfig] = None):
     async def shutdown():
         pass
 
-    return app, config
+    return app
 
 
-def main():
-    app, config = create_app()
+def main(project_id: Optional[str] = None):
+    config = APIConfig(project_id=project_id)
+    app = create_app(config)
     uvicorn.run(app, port=config.port, log_level="info")
 
 
