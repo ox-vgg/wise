@@ -1,6 +1,5 @@
-import itertools
 from pathlib import Path
-from typing import Generator, List, Union
+from typing import List, Union
 from PIL import Image
 from io import BytesIO
 import numpy as np
@@ -29,15 +28,6 @@ def _load_clip(model_name: str):
     return model, preprocess
 
 
-def batched(iterable, n: int):
-    it = iter(iterable)
-    while True:
-        batch = list(itertools.islice(it, n))
-        if not batch:
-            return
-        yield batch
-
-
 def setup_clip(model_name: str = "ViT-B/32"):
 
     model, preprocess = _load_clip(model_name)
@@ -56,42 +46,48 @@ def setup_clip(model_name: str = "ViT-B/32"):
             print(f"warning: failed to process {p} - {e}")
             return mean_tensor
 
-    def extract_image_features(
-        images: Union[Path, BytesIO, List[Path]], batch_size: int = 1
-    ) -> Generator[np.ndarray, None, None]:
-        _files = [images] if (isinstance(images, Path) or isinstance(images, BytesIO)) else images
+    def extract_image_features(images: List[Image.Image]) -> np.ndarray:
         with torch.no_grad():
-            for batch in batched(_files, batch_size):
-                _input = torch.stack([_preprocess(p) for p in batch], dim=0)
 
-                if IS_CUDA:
-                    _input = _input.cuda()
+            _input = torch.stack([preprocess(im) for im in images], dim=0)
 
-                output = model.encode_image(_input).float()
-                output /= torch.linalg.norm(output, dim=-1, keepdims=True)
+            if IS_CUDA:
+                _input = _input.cuda()
 
-                yield output.cpu().numpy()
+            output = model.encode_image(_input).float()
+            output /= torch.linalg.norm(output, dim=-1, keepdims=True)
+
+            if IS_CUDA:
+                output = output.cpu()
+
+            return output.numpy()
 
     def extract_text_features(
         queries: List[str],
     ) -> np.ndarray:
-        text_tokens = clip.tokenize(queries)
-        if IS_CUDA:
-            text_tokens = text_tokens.cuda()
 
         with torch.no_grad():
+
+            text_tokens = clip.tokenize(queries)
+            if IS_CUDA:
+                text_tokens = text_tokens.cuda()
+
             output = model.encode_text(text_tokens).float()
             output /= torch.linalg.norm(output, dim=-1, keepdims=True)
 
-            return output.cpu().numpy()
+            if IS_CUDA:
+                output = output.cpu()
+
+            return output.numpy()
 
     return extract_image_features, extract_text_features
+
 
 class LinearBinaryClassifier(torch.nn.Module):
     def __init__(self, embedding_dim: int):
         super().__init__()
         self.linear = torch.nn.Linear(embedding_dim, 1)
-        self.sigmoid =  torch.nn.Sigmoid()
-        
+        self.sigmoid = torch.nn.Sigmoid()
+
     def forward(self, x):
         return self.sigmoid(self.linear(x))

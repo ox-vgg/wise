@@ -1,5 +1,18 @@
+import enum
+import io
 import typing
-from typing import List, Literal, Optional, Generator, Tuple, cast, Callable
+from typing import (
+    List,
+    Literal,
+    Optional,
+    Generator,
+    Tuple,
+    cast,
+    Callable,
+    Iterator,
+    Any,
+)
+from base64 import b64encode
 from contextlib import contextmanager
 from pathlib import Path
 import tarfile
@@ -8,7 +21,7 @@ import h5py
 from PIL import Image, IptcImagePlugin
 from tqdm import tqdm
 import webdataset as wds
-
+from .utils import argsort
 from .data_models import ImageInfo, ImageMetadata
 
 
@@ -79,28 +92,73 @@ def get_valid_images_from_webdataset(url: str):
         )
 
 
+def does_hdf5_file_exists(path: Path, **kwargs) -> bool:
+    try:
+        with _get_features_dataset(path, mode="r", **kwargs) as _:
+            return True
+    except FileNotFoundError as e:
+        print(f"FileNotFound {path} - {e}")
+        return False
+
+
+class H5_ENCODING(str, enum.Enum):
+    ARRAY = "array"
+    BYTES = "ascii"
+    STRING = "utf-8"
+
+    @classmethod
+    def _missing_(cls, value: object) -> Any:
+        return H5_ENCODING.ARRAY
+
+
+def _get_h5_dataset(f: h5py.File, key, **kwargs):
+    if not f.mode == "r":
+        # Write mode
+        if key not in f:
+            f.create_dataset(key, **kwargs)
+    return typing.cast(h5py.Dataset, f[key])
+
+
 @contextmanager
-def _get_dataset(
-    path: Path, mode: Literal["r", "w"] = "r", n_dim: Optional[int] = None
+def _get_thumbs_dataset(path: Path, *, mode: Literal["r", "w", "a"] = "r", **kwargs):
+    with h5py.File(path, mode=mode, **kwargs) as f:
+        # Get h5 dataset with key in read mode, create if not exists in write mode
+        # Parameters are used only in write mode, no effect in read mode
+        yield _get_h5_dataset(
+            f,
+            "thumbnails",
+            shape=(0,),
+            dtype=h5py.vlen_dtype(np.dtype("uint8")),
+            maxshape=(None,),
+        )
+
+
+@contextmanager
+def _get_features_dataset(
+    path: Path,
+    *,
+    mode: Literal["r", "w", "a"] = "r",
+    n_dim: Optional[int] = None,
+    **kwargs,
 ) -> Generator[Tuple[h5py.Dataset, h5py.Dataset], None, None]:
-    with h5py.File(path, mode) as f:
+    with h5py.File(path, mode, **kwargs) as f:
         if mode != "r":
             # Write enabled
             if n_dim is None:
                 raise ValueError("n_dim cannot be None in write mode")
-            if "features" not in f:
-                f.create_dataset("features", shape=(0, n_dim), maxshape=(None, n_dim))
 
-            if "files" not in f:
-                dt = h5py.string_dtype(encoding="utf-8")
-                f.create_dataset("files", shape=(0,), dtype=dt, maxshape=(None,))
-
-        yield typing.cast(h5py.Dataset, f["features"]), typing.cast(
-            h5py.Dataset, f["files"]
+        yield _get_h5_dataset(
+            f, "features", shape=(0, n_dim), maxshape=(None, n_dim)
+        ), _get_h5_dataset(
+            f,
+            "files",
+            shape=(0,),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+            maxshape=(None,),
         )
 
 
-def _write_array_to_dataset(dataset: h5py.Dataset, arr: np.ndarray):
+def _append_array_to_dataset(dataset: h5py.Dataset, arr: np.ndarray):
     shape_diff = len(dataset.shape) - len(arr.shape)
     if shape_diff > 1:
         raise ValueError(
@@ -121,48 +179,157 @@ def _write_array_to_dataset(dataset: h5py.Dataset, arr: np.ndarray):
     dataset[-b:, ...] = iarr
 
 
-def read_dataset(dataset: Path) -> Tuple[np.ndarray, List[str], str]:
-    with _get_dataset(dataset, "r") as (ds, fs):
+def _dataset_iterator(ds: h5py.Dataset, batch_size: int = 1024):
+    data_len = ds.len()
+    dtype = H5_ENCODING(ds.dtype).name
+
+    s_idx, e_idx = 0, 0
+    while s_idx < data_len:
+        e_idx = s_idx + batch_size
+
+        if dtype == H5_ENCODING.STRING:
+            yield [x.decode("utf-8") for x in ds[s_idx:e_idx]]
+        elif dtype == H5_ENCODING.BYTES:
+            yield ds[s_idx:e_idx, ...].tolist()
+        else:
+            yield ds[s_idx:e_idx, ...]
+
+        s_idx = e_idx
+
+
+def get_dataset_reader(
+    dataset: Path,
+    *,
+    batch_size: int = 1024,
+    **kwargs,
+) -> Tuple[str, int, Callable[[], Generator[Tuple[np.ndarray, List[str]], None, None]]]:
+    def _reader():
+        with _get_features_dataset(dataset, mode="r", **kwargs) as (ds, fs):
+            features_iterator = typing.cast(
+                Generator[np.ndarray, None, None],
+                _dataset_iterator(ds, batch_size=batch_size),
+            )
+            file_ids_iterator = typing.cast(
+                Generator[List[str], None, None],
+                _dataset_iterator(fs, batch_size=batch_size),
+            )
+            yield from zip(features_iterator, file_ids_iterator)
+
+    with _get_features_dataset(dataset, mode="r", **kwargs) as (ds, _):
         model_name: str = cast(str, ds.attrs["model"])
-        files = [x.decode("utf-8") for x in fs[:]]
-        features: np.ndarray = ds[:, ...]
-        print(f"Read ({features.shape}) features (model: {model_name})")
-        return features, files, model_name
+        return model_name, ds.len(), _reader
+
+
+def generate_thumbnail(im: Image.Image):
+    """
+    Generate thumbnail image and returns bytes
+    Modifies Image in-place, make sure to pass copy if needed
+    """
+    with io.BytesIO() as buf:
+        im.thumbnail((192, 192), resample=Image.BILINEAR)
+        im.save(buf, format="JPEG", quality=90)
+        return buf.getvalue()
+
+
+BASE64JPEGPREFIX = b"data:image/jpeg;charset=utf-8;base64,"
+
+
+@contextmanager
+def get_thumbs_reader(dataset: Path, **kwargs):
+
+    with _get_thumbs_dataset(dataset, mode="r", **kwargs) as ds:
+
+        def reader(indices: List[int]):
+            sort_indices = argsort(indices)
+            sorted_indices = [indices[i] for i in sort_indices]
+            unsort_indices = argsort(sort_indices)
+
+            # Fetch thumbnails from hdf5 dataset
+            thumbnails_arr: List[List[int]] = ds[sorted_indices, ...].tolist()
+
+            # Unsort the result + convert to base64 -> this will now be in original indices order
+            return [
+                (BASE64JPEGPREFIX + b64encode(bytes(thumbnails_arr[i]))).decode("utf-8")
+                for i in unsort_indices
+            ]
+
+        yield reader
+
+
+@contextmanager
+def get_thumbs_writer(
+    dataset: Path,
+    *,
+    mode: Literal["w", "a"] = "w",
+    **kwargs,
+):
+    with _get_thumbs_dataset(dataset, mode=mode, **kwargs) as ts:
+
+        def writer(images: List[Image.Image]):
+            # Generate thumbnail and write to h5
+            _append_array_to_dataset(
+                ts,
+                np.array(
+                    [
+                        np.frombuffer(generate_thumbnail(im), dtype=np.uint8)
+                        for im in images
+                    ],
+                    dtype=object,
+                ),
+            )
+
+        yield writer
 
 
 def write_dataset(
     dataset: Path,
-    features: Generator[np.ndarray, None, None],
-    file_names: List[Path],
+    inputs: Generator[Tuple[np.ndarray, List[str]], None, None],
     model_name: str,
+    *,
+    mode: Literal["w", "a"] = "w",
+    write_size: int = 1024,
+    **kwargs,
 ):
     """
-    Features is a 2D array of shape (len(file_names), n_dim)
+    Features is a 2D array of shape (len(file_ids), n_dim)
     """
 
     # Read first array from generator to get shape
-    arr = next(features)
+    arr, file_ids = next(inputs)
     n_dim = arr.shape[-1]
 
-    with _get_dataset(dataset, "w", n_dim=n_dim) as (ds, fs), tqdm(
-        total=len(file_names)
-    ) as pbar:
+    with _get_features_dataset(dataset, n_dim=n_dim, mode=mode, **kwargs) as (
+        ds,
+        fs,
+    ), tqdm() as pbar:
+        if ds.shape[-1] != n_dim:
+            raise ValueError("Feature dimension mismatch")
+
+        if ds.attrs.get("model", model_name) != model_name:
+            raise ValueError("Model name mismatch")
 
         ds.attrs["model"] = model_name
 
-        # Write the first array
-        _write_array_to_dataset(ds, arr)
-        pbar.update(arr.shape[0])
-
         # Write remaining arrays
-        for _arr in features:
-            _write_array_to_dataset(ds, _arr)
-            pbar.update(_arr.shape[0])
+        buf_arr = arr
+        buf_file_ids = file_ids
+        for _arr, _file_ids in inputs:
+            if buf_arr.shape[0] > write_size:
+                _append_array_to_dataset(ds, buf_arr)
+                _append_array_to_dataset(fs, np.array(buf_file_ids))
+                pbar.update(buf_arr.shape[0])
 
-        print("writing file names")
-        _write_array_to_dataset(fs, np.array([str(x) for x in file_names]))
+                buf_arr = _arr
+                buf_file_ids = _file_ids
+            else:
+                buf_arr = np.concatenate((buf_arr, _arr), axis=0)
+                buf_file_ids.extend(_file_ids)
 
-        print(f"Done - wrote features ({model_name}) with shape: {ds.shape}")
+        _append_array_to_dataset(ds, buf_arr)
+        _append_array_to_dataset(fs, np.array(buf_file_ids))
+        pbar.update(buf_arr.shape[0])
+
+        print(f"Done - wrote features (for {model_name}) with shape: {ds.shape}")
 
     pass
 

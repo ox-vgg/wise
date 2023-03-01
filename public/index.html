@@ -30,7 +30,9 @@
         grid-area: header;
         padding: 1rem;
       }
-      h2, h3, h4 {
+      h2,
+      h3,
+      h4 {
         margin: 0;
       }
       main {
@@ -94,7 +96,7 @@
         gap: 16px;
       }
       .img-wrapper {
-        height: 256px;
+        height: 128px;
         display: flex;
         flex-flow: column nowrap;
         position: relative;
@@ -169,7 +171,7 @@
             list="topk_list"
             name="search_topk"
           />
-          <input type="file" id="search_file_input">
+          <input type="file" id="search_file_input" />
           <div id="search_loader" class="search__loader gone"></div>
         </fieldset>
         <span id="search_error"></span>
@@ -200,12 +202,12 @@
         return;
       }
 
-      search_result.forEach(({ link, name, distance }) => {
+      search_result.forEach(({ link, name, distance, thumbnail }) => {
         const result_el = result_template.content.cloneNode(true);
 
         const img = result_el.querySelector(".img-wrapper__img");
         if (img) {
-          img.src = link;
+          img.src = thumbnail || link;
         }
 
         const name_el = result_el.querySelector(
@@ -335,9 +337,9 @@
     search_box.oninput = search_topk.onchange = oninput;
 
     const search_with_file = async (selectedFile, top_k) => {
-      var formData = new FormData()
-      formData.append('q', selectedFile)
-      
+      var formData = new FormData();
+      formData.append("q", selectedFile);
+
       const params = new URLSearchParams();
       params.append("top_k", top_k);
 
@@ -345,7 +347,7 @@
 
       const res = await fetch(`../search?${params.toString()}`, {
         method: "POST",
-        body: formData
+        body: formData,
       });
       search_loader.classList.add("gone");
 
@@ -367,24 +369,25 @@
         throw new Error(message);
       }
       return res.json();
-    }
+    };
 
     search_file_input.onchange = async () => {
       const top_k_str = search_topk.value.trim();
-      const top_k = Number.parseFloat(top_k_str === "" ? "10" : top_k_str) || 10;
+      const top_k =
+        Number.parseFloat(top_k_str === "" ? "10" : top_k_str) || 10;
 
       const selectedFile = search_file_input.files[0];
       console.log(selectedFile);
 
       try {
         const res = await search_with_file(selectedFile, top_k);
-        update_result(res['image']);
+        update_result(res["image"]);
       } catch (err) {
         if (err instanceof DOMException) {
         } else {
           search_error.textContent = `${err}`;
         }
       }
-    }
+    };
   </script>
 </html>
