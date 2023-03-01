@@ -25,6 +25,10 @@ from .utils import argsort
 from .data_models import ImageInfo, ImageMetadata
 
 
+class EmptyDatasetException(Exception):
+    pass
+
+
 def is_valid_image(p: Path):
 
     try:
@@ -35,16 +39,21 @@ def is_valid_image(p: Path):
         return False
 
 
-def is_valid_webdataset_tarfile(p: str):
-    if tarfile.is_tarfile(p) == False:
-        return False
-
+def is_valid_webdataset_source(p: str):
     try:
         next(iter(wds.WebDataset(p).to_tuple("__key__", "jpg;jpeg", "json")))
         return True
     except Exception as e:
         print(f"{p} is not a valid data source - {e}")
         return False
+
+
+def get_valid_webdataset_tar_from_folder(folder: Path):
+    return (
+        str(x)
+        for x in folder.rglob("*")
+        if x.is_file() and tarfile.is_tarfile(x) and is_valid_webdataset_source(str(x))
+    )
 
 
 # Create iterator over images in folder
@@ -295,7 +304,12 @@ def write_dataset(
     """
 
     # Read first array from generator to get shape
-    arr, file_ids = next(inputs)
+    _input = next(inputs, None)
+    if _input is None:
+        # Nothing to write
+        raise EmptyDatasetException()
+
+    arr, file_ids = _input
     n_dim = arr.shape[-1]
 
     with _get_features_dataset(dataset, n_dim=n_dim, mode=mode, **kwargs) as (

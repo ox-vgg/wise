@@ -18,6 +18,8 @@ from src.ioutils import (
     get_thumbs_writer,
     get_valid_images_from_folder,
     get_valid_images_from_webdataset,
+    is_valid_webdataset_source,
+    get_valid_webdataset_tar_from_folder,
 )
 
 import numpy as np
@@ -38,6 +40,7 @@ from src.projects import (
     get_wise_features_dataset_path,
     get_wise_thumbs_dataset_path,
 )
+from src.exceptions import EmptyDatasetException
 from api import main
 
 
@@ -61,13 +64,7 @@ def parse_webdataset_url(wds_url: str):
     # - apply braceexpand
     expanded = map(lambda x: braceexpand.braceexpand(x), stripped)
 
-    # check if the files exist
-    tar_filelist = list(itertools.chain.from_iterable(expanded))
-    for tar_filename in tar_filelist:
-        if not Path(tar_filename).is_file():
-            raise typer.BadParameter("Webdataset source is missing: %s" % (tar_filename))
-
-    return tar_filelist
+    return list(itertools.chain.from_iterable(expanded))
 
 
 def get_dataset_iterator(dataset: Dataset):
@@ -96,16 +93,31 @@ def parse_and_validate_input_datasets(input_dataset: List[str]):
         raise typer.BadParameter("Input dataset cannot be empty")
 
     # Now we have a list[Folder | WebDataset]
-    processed = []
+    processed: List[Union[Path, str]] = []
     for dataset in input_dataset:
         if (p := Path(dataset)).is_dir():
+            # dataset is a directory
             processed.append(p)
+
+            # Extend with all valid webdataset tar files found inside folder
+            processed.extend(get_valid_webdataset_tar_from_folder(p))
         else:
+            # We don't know what it is, we will try reading it with webdataset
             processed.extend(parse_webdataset_url(dataset))
 
     # - deduplicate
+    num_sources = len(processed)
     processed = list(dict.fromkeys(processed))
 
+    if len(processed) != num_sources:
+        print("Found duplicate sources. Considering only one of them")
+
+    # - raise error on invalid URLs
+    for p in processed:
+        if not isinstance(p, Path) and not is_valid_webdataset_source(p):
+            raise typer.BadParameter(
+                f"Invalid source - {p} is not a valid WebDataset Source"
+            )
     return processed
 
 
@@ -198,45 +210,52 @@ def init(
             dataset_engine = db.init_project(get_wise_project_db_uri(project_id))
             with get_thumbs_writer(
                 save_thumbs, mode="w", driver="family"
-            ) as thumbs_writer, dataset_engine.begin() as conn:
+            ) as thumbs_writer, dataset_engine.connect() as conn:
                 # Generator to transform images and metadata into required shape, write thumbnails
                 def process(dataset_iterator):
                     for batch in batched(dataset_iterator, batch_size):
-
                         images, metadata = zip(*batch)
                         features = extract_features(images)
-                        metadata = [MetadataRepo.create(conn, data=x) for x in metadata]
+                        thumbs_writer(images)
+                        with conn.begin():
+                            metadata = [
+                                MetadataRepo.create(conn, data=x) for x in metadata
+                            ]
                         metadata = list(
                             map(
                                 lambda x: str(x.id) if x.id is not None else x.path,
                                 metadata,
                             )
                         )
-                        thumbs_writer(images)
 
                         yield features, metadata
 
                 for dataset in input_datasets:
                     # Add dataset to table and get dataset id
-
                     payload = DatasetCreate(
                         location=str(dataset),
                         type=DatasetType.IMAGE_DIR
                         if isinstance(dataset, Path)
                         else DatasetType.WEBDATASET,
                     )
-                    dataset_obj = DatasetRepo.create(
-                        conn,
-                        data=payload,
-                    )
-                    write_dataset(
-                        save_features,
-                        process(get_dataset_iterator(dataset_obj)),
-                        model_name,
-                        write_size=1024,
-                        mode="a",
-                        driver="family",  # writes 2 gb files
-                    )
+                    with conn.begin():
+                        dataset_obj = DatasetRepo.create(
+                            conn,
+                            data=payload,
+                        )
+                    try:
+                        write_dataset(
+                            save_features,
+                            process(get_dataset_iterator(dataset_obj)),
+                            model_name,
+                            write_size=1024,
+                            mode="a",
+                            driver="family",  # writes 2 gb files
+                        )
+                    except EmptyDatasetException:
+                        with conn.begin():
+                            DatasetRepo.delete(conn, dataset_obj.id)
+
     except Exception as e:
         print(e)
         project_folder = get_wise_project_folder(project_id)
