@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from typing import Dict, List
 import io
 from PIL import Image
@@ -10,10 +11,11 @@ from src.projects import (
     get_wise_db_uri,
     get_wise_features_dataset_path,
     get_wise_project_db_uri,
+    get_wise_thumbs_dataset_path,
 )
 from src.repository import WiseProjectsRepo, MetadataRepo
 from src.data_models import ImageInfo
-from src.ioutils import get_dataset_reader
+from src.ioutils import get_dataset_reader, get_thumbs_reader
 from src.inference import setup_clip
 from src.search import brute_force_search
 
@@ -26,9 +28,6 @@ def get_search_router(config: APIConfig):
     if config.project_id is None:
         raise typer.BadParameter("project id is missing!")
 
-    router = APIRouter(
-        tags=["search"],
-    )
     engine = db.init(get_wise_db_uri())
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, config.project_id)
@@ -52,11 +51,11 @@ def get_search_router(config: APIConfig):
         def round_distance(cls, v):
             return round(v, config.precision)
 
-    def make_response(queries, dist, ids, get_metadata_fn):
+    def make_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn):
         return {
             _q: [
                 SearchResponse(
-                    thumbnail=f"{_metadata.source_uri}",
+                    thumbnail=_thumb,
                     link=f"{_metadata.source_uri}",
                     distance=_dist,
                     info=ImageInfo(
@@ -65,12 +64,13 @@ def get_search_router(config: APIConfig):
                         height=_metadata.height,
                     ),
                 )
-                for _dist, _metadata in zip(
+                for _dist, _metadata, _thumb in zip(
                     top_dist,
                     map(
                         lambda _id: get_metadata_fn(_id),
                         top_ids,
                     ),
+                    get_thumbs_fn(top_ids),
                 )
             ]
             for _q, top_dist, top_ids in zip(queries, dist, ids)
@@ -80,6 +80,14 @@ def get_search_router(config: APIConfig):
     model_name, num_files, reader = get_dataset_reader(image_features, driver="family")
     extract_image_features, extract_text_features = setup_clip(model_name)
     project_engine = db.init_project(get_wise_project_db_uri(project_id))
+    thumbs = get_wise_thumbs_dataset_path(project_id)
+    router_cm = ExitStack()
+    thumbs_reader = router_cm.enter_context(get_thumbs_reader(thumbs, driver="family"))
+
+    router = APIRouter(
+        tags=["search"],
+        on_shutdown=[lambda: print("shutting down") and router_cm.close()],
+    )
 
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
     async def natural_language_search(
@@ -107,7 +115,7 @@ def get_search_router(config: APIConfig):
                     raise RuntimeError()
                 return m
 
-            response = make_response(q, dist, ids, get_metadata)
+            response = make_response(q, dist, ids, get_metadata, thumbs_reader)
 
         return response
 
@@ -130,7 +138,7 @@ def get_search_router(config: APIConfig):
                     raise RuntimeError()
                 return m
 
-            response = make_response(["image"], dist, ids, get_metadata)
+            response = make_response(["image"], dist, ids, get_metadata, thumbs_reader)
         return response
 
     return router
