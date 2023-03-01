@@ -1,5 +1,10 @@
 import itertools
 
+
+def argsort(seq):
+    return sorted(range(len(seq)), key=seq.__getitem__)
+
+
 def batched(iterable, n: int):
     it = iter(iterable)
     while True:

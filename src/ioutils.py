@@ -12,6 +12,7 @@ from typing import (
     Iterator,
     Any,
 )
+from base64 import b64encode
 from contextlib import contextmanager
 from pathlib import Path
 import tarfile
@@ -20,7 +21,7 @@ import h5py
 from PIL import Image, IptcImagePlugin
 from tqdm import tqdm
 import webdataset as wds
-
+from .utils import argsort
 from .data_models import ImageInfo, ImageMetadata
 
 
@@ -157,7 +158,7 @@ def _get_features_dataset(
         )
 
 
-def _write_array_to_dataset(dataset: h5py.Dataset, arr: np.ndarray):
+def _append_array_to_dataset(dataset: h5py.Dataset, arr: np.ndarray):
     shape_diff = len(dataset.shape) - len(arr.shape)
     if shape_diff > 1:
         raise ValueError(
@@ -230,6 +231,31 @@ def generate_thumbnail(im: Image.Image):
         return buf.getvalue()
 
 
+BASE64JPEGPREFIX = b"data:image/jpeg;charset=utf-8;base64,"
+
+
+@contextmanager
+def get_thumbs_reader(dataset: Path, **kwargs):
+
+    with _get_thumbs_dataset(dataset, mode="r", **kwargs) as ds:
+
+        def reader(indices: List[int]):
+            sort_indices = argsort(indices)
+            sorted_indices = [indices[i] for i in sort_indices]
+            unsort_indices = argsort(sort_indices)
+
+            # Fetch thumbnails from hdf5 dataset
+            thumbnails_arr: List[List[int]] = ds[sorted_indices, ...].tolist()
+
+            # Unsort the result + convert to base64 -> this will now be in original indices order
+            return [
+                (BASE64JPEGPREFIX + b64encode(bytes(thumbnails_arr[i]))).decode("utf-8")
+                for i in unsort_indices
+            ]
+
+        yield reader
+
+
 @contextmanager
 def get_thumbs_writer(
     dataset: Path,
@@ -241,7 +267,7 @@ def get_thumbs_writer(
 
         def writer(images: List[Image.Image]):
             # Generate thumbnail and write to h5
-            _write_array_to_dataset(
+            _append_array_to_dataset(
                 ts,
                 np.array(
                     [
@@ -289,8 +315,8 @@ def write_dataset(
         buf_file_ids = file_ids
         for _arr, _file_ids in inputs:
             if buf_arr.shape[0] > write_size:
-                _write_array_to_dataset(ds, buf_arr)
-                _write_array_to_dataset(fs, np.array(buf_file_ids))
+                _append_array_to_dataset(ds, buf_arr)
+                _append_array_to_dataset(fs, np.array(buf_file_ids))
                 pbar.update(buf_arr.shape[0])
 
                 buf_arr = _arr
@@ -299,8 +325,8 @@ def write_dataset(
                 buf_arr = np.concatenate((buf_arr, _arr), axis=0)
                 buf_file_ids.extend(_file_ids)
 
-        _write_array_to_dataset(ds, buf_arr)
-        _write_array_to_dataset(fs, np.array(buf_file_ids))
+        _append_array_to_dataset(ds, buf_arr)
+        _append_array_to_dataset(fs, np.array(buf_file_ids))
         pbar.update(buf_arr.shape[0])
 
         print(f"Done - wrote features (for {model_name}) with shape: {ds.shape}")
