@@ -4,13 +4,12 @@ from pathlib import Path
 
 import shutil
 import typing
-from typing import List, Union, Tuple, Literal
+from typing import List, Union, Tuple, Literal, Optional
 from tempfile import NamedTemporaryFile
 
 import typer
 from src.ioutils import write_dataset
 from src.inference import setup_clip, AVAILABLE_MODELS
-import urllib
 from torch.hub import download_url_to_file
 
 from src.ioutils import (
@@ -40,11 +39,9 @@ from src.projects import (
     get_wise_thumbs_dataset_path,
 )
 from api import main
-from config import APIConfig
 
 
 app = typer.Typer()
-config = APIConfig()
 
 
 class _CLIPModel(str, enum.Enum):
@@ -348,7 +345,7 @@ def search(
 
 @app.command()
 def serve(
-    project_id: str = typer.Argument(..., help="Name of the project"),
+    project_id: Optional[str] = typer.Argument(None, help="Name of the project"),
 ):
     main(project_id)
 

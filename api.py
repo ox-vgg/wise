@@ -26,7 +26,9 @@ def create_app(config: APIConfig):
 
 
 def main(project_id: Optional[str] = None):
-    config = APIConfig(project_id=project_id)
+    options = {"project_id": project_id} if project_id else {}
+    config = APIConfig.parse_obj(options)  # type: ignore
+
     app = create_app(config)
     uvicorn.run(app, port=config.port, log_level="info")
 

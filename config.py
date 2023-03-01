@@ -7,4 +7,4 @@ class APIConfig(BaseSettings):
     top_k: int = 10
     precision: int = 3
     query_prefix: str = "This is a photo of a"
-    project_id: Optional[str] = None
+    project_id: str
