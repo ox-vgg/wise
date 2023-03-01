@@ -26,7 +26,7 @@ metadata_table = sa.Table(
     sa.Column("format", sa.String(5), nullable=False),
     sa.Column("width", sa.Integer, default=-1, nullable=False),
     sa.Column("height", sa.Integer, default=-1, nullable=False),
-    sa.Column("source_uri", sa.Unicode(4096), nullable=False),
+    sa.Column("source_uri", sa.Unicode(4096), nullable=True),
     sa.Column("metadata", sa.JSON, nullable=False, default={}),
 )
 

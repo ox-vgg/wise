@@ -22,6 +22,8 @@ import h5py
 from PIL import Image, IptcImagePlugin
 from tqdm import tqdm
 import webdataset as wds
+import httpx
+
 from .utils import argsort
 from .data_models import ImageInfo, ImageMetadata
 
@@ -30,6 +32,17 @@ logger = logging.getLogger(__name__)
 
 class EmptyDatasetException(Exception):
     pass
+
+
+def is_valid_uri(uri: str):
+    try:
+        with httpx.stream("HEAD", uri) as r:
+            r.raise_for_status()
+            logger.info(f'"{uri}" - {r.headers}')
+            return True
+    except Exception as e:
+        logger.warning(f'Request to URI "{uri}" failed - {e}')
+        return False
 
 
 def is_valid_image(p: Path):
@@ -59,6 +72,14 @@ def get_valid_webdataset_tar_from_folder(folder: Path):
     )
 
 
+def get_file_from_tar(location: Path, key: str):
+    with tarfile.open(location, "r") as t:
+        buf = t.extractfile(key)
+        if buf:
+            yield from buf
+    return None
+
+
 # Create iterator over images in folder
 def get_valid_images_from_folder(folder: Path):
     image_files = (x for x in folder.rglob("*") if x.is_file() and is_valid_image(x))
@@ -74,7 +95,7 @@ def get_valid_images_from_folder(folder: Path):
                 format=format,
                 width=w,
                 height=h,
-                source_uri=image.absolute().as_uri(),
+                source_uri=None,
                 metadata={},
             )
             yield im, metadata
@@ -96,10 +117,10 @@ def get_valid_images_from_webdataset(url: str):
         yield im, ImageMetadata(
             path=f"{url}#{k}.{im_key}",
             size_in_bytes=-1,
-            format="jpeg",
+            format="JPEG",
             width=w,
             height=h,
-            source_uri=metadata.get("url", f"{url}#{k}.{im_key}"),
+            source_uri=metadata.get("url", None),
             metadata={},
         )
 

@@ -32,6 +32,8 @@ dependencies:
       - git+https://github.com/openai/CLIP.git
       - pydantic
       - python-multipart==0.0.5
+      - httpx[http2]
+      - httpx[cli]
 
 variables:
   PYTHONNOUSERSITE: 1

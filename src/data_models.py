@@ -49,7 +49,7 @@ class ImageMetadata(BaseModel):
     format: str
     width: int = -1
     height: int = -1
-    source_uri: str
+    source_uri: Optional[str] = None
     metadata: Dict[str, Any]  # TODO: tighter type
 
     class Config:

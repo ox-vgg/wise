@@ -253,11 +253,19 @@ def init(
 
                 for dataset in input_datasets:
                     # Add dataset to table and get dataset id
-                    payload = DatasetCreate(
-                        location=str(dataset),
-                        type=DatasetType.IMAGE_DIR
+                    payload = (
+                        DatasetCreate(
+                            location=str(dataset.resolve()), type=DatasetType.IMAGE_DIR
+                        )
                         if isinstance(dataset, Path)
-                        else DatasetType.WEBDATASET,
+                        else DatasetCreate(
+                            location=(
+                                str(x.resolve())
+                                if (x := Path(dataset)).is_file()
+                                else dataset
+                            ),
+                            type=DatasetType.WEBDATASET,
+                        )
                     )
                     with conn.begin():
                         dataset_obj = DatasetRepo.create(
@@ -277,8 +285,8 @@ def init(
                         with conn.begin():
                             DatasetRepo.delete(conn, dataset_obj.id)
 
-    except Exception as e:
-        logger.exception(e)
+    except Exception:
+        logger.exception(f"Initialising project {project_id} failed!")
         project_folder = get_wise_project_folder(project_id)
         if project_folder.is_dir():
             shutil.rmtree(project_folder)
