@@ -61,7 +61,13 @@ def parse_webdataset_url(wds_url: str):
     # - apply braceexpand
     expanded = map(lambda x: braceexpand.braceexpand(x), stripped)
 
-    return list(itertools.chain.from_iterable(expanded))
+    # check if the files exist
+    tar_filelist = list(itertools.chain.from_iterable(expanded))
+    for tar_filename in tar_filelist:
+        if not Path(tar_filename).is_file():
+            raise typer.BadParameter("Webdataset source is missing: %s" % (tar_filename))
+
+    return tar_filelist
 
 
 def get_dataset_iterator(dataset: Dataset):
