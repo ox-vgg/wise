@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import List, Union
 from PIL import Image
@@ -10,6 +11,8 @@ IS_CUDA = torch.cuda.is_available()
 
 AVAILABLE_MODELS = clip.available_models()
 
+logger = logging.getLogger(__name__)
+
 
 def _load_clip(model_name: str):
 
@@ -17,13 +20,13 @@ def _load_clip(model_name: str):
         raise ValueError(
             f"Unknown model - {model_name}, available models: {AVAILABLE_MODELS}"
         )
-    print(f"Loading CLIP (model: {model_name})...")
+    logger.info(f"Loading CLIP (model: {model_name})...")
     model, preprocess = clip.load(model_name)
 
     if IS_CUDA:
         model.cuda()
     model.eval()
-    print("Loaded")
+    logger.info("Loaded")
 
     return model, preprocess
 
@@ -43,7 +46,7 @@ def setup_clip(model_name: str = "ViT-B/32"):
             with Image.open(p) as im:
                 return preprocess(im)
         except Exception as e:
-            print(f"warning: failed to process {p} - {e}")
+            logger.warning(f"warning: failed to process {p} - {e}")
             return mean_tensor
 
     def extract_image_features(images: List[Image.Image]) -> np.ndarray:

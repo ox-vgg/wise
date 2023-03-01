@@ -1,5 +1,6 @@
 import enum
 import io
+import logging
 import typing
 from typing import (
     List,
@@ -24,6 +25,8 @@ import webdataset as wds
 from .utils import argsort
 from .data_models import ImageInfo, ImageMetadata
 
+logger = logging.getLogger(__name__)
+
 
 class EmptyDatasetException(Exception):
     pass
@@ -44,7 +47,7 @@ def is_valid_webdataset_source(p: str):
         next(iter(wds.WebDataset(p).to_tuple("__key__", "jpg;jpeg", "json")))
         return True
     except Exception as e:
-        print(f"{p} is not a valid data source - {e}")
+        logger.warning(f"{p} is not a valid data source - {e}")
         return False
 
 
@@ -106,7 +109,7 @@ def does_hdf5_file_exists(path: Path, **kwargs) -> bool:
         with _get_features_dataset(path, mode="r", **kwargs) as _:
             return True
     except FileNotFoundError as e:
-        print(f"FileNotFound {path} - {e}")
+        logger.warning(f"FileNotFound {path} - {e}")
         return False
 
 
@@ -343,7 +346,7 @@ def write_dataset(
         _append_array_to_dataset(fs, np.array(buf_file_ids))
         pbar.update(buf_arr.shape[0])
 
-        print(f"Done - wrote features (for {model_name}) with shape: {ds.shape}")
+        logger.info(f"Done - wrote features (for {model_name}) with shape: {ds.shape}")
 
     pass
 

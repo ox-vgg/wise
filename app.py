@@ -7,6 +7,8 @@ import typing
 from typing import List, Union, Tuple, Literal, Optional
 from tempfile import NamedTemporaryFile
 
+import logging
+
 import typer
 from src.ioutils import write_dataset
 from src.inference import setup_clip, AVAILABLE_MODELS
@@ -45,6 +47,23 @@ from api import main
 
 
 app = typer.Typer()
+app_state = {"verbose": True}
+logger = logging.getLogger()
+
+
+@app.callback()
+def base(verbose: bool = False):
+    """
+    WISE CLI
+    Search through collections of images with Text / Image
+    """
+    app_state["verbose"] = verbose
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
+    )
+    global logger
+    logger = logging.getLogger()
 
 
 class _CLIPModel(str, enum.Enum):
@@ -191,7 +210,7 @@ def init(
 
     # Try creating project id, it will fail if not unique.
     # TODO Translate the exception
-    engine = db.init(get_wise_db_uri())
+    engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
     try:
         with engine.begin() as conn:
             WiseProjectsRepo.create(conn, data=Project(id=project_id))
@@ -207,7 +226,9 @@ def init(
             save_thumbs = get_wise_thumbs_dataset_path(project_id)
             model_name = model.value
             extract_features, _ = setup_clip(model_name)
-            dataset_engine = db.init_project(get_wise_project_db_uri(project_id))
+            dataset_engine = db.init_project(
+                get_wise_project_db_uri(project_id), echo=app_state["verbose"]
+            )
             with get_thumbs_writer(
                 save_thumbs, mode="w", driver="family"
             ) as thumbs_writer, dataset_engine.connect() as conn:
@@ -257,7 +278,7 @@ def init(
                             DatasetRepo.delete(conn, dataset_obj.id)
 
     except Exception as e:
-        print(e)
+        logger.exception(e)
         project_folder = get_wise_project_folder(project_id)
         if project_folder.is_dir():
             shutil.rmtree(project_folder)
@@ -278,7 +299,7 @@ def search(
     ),
 ):
     query_type, parsed_queries = parse_query_parameter(queries)
-    engine = db.init(get_wise_db_uri())
+    engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, project_id)
         if project is None:
@@ -352,7 +373,9 @@ def search(
         print(scores, [[file_ids[x] for x in top_ids] for top_ids in ids])
 
     if ids is not None:
-        project_engine = db.init_project(get_wise_project_db_uri(project_id))
+        project_engine = db.init_project(
+            get_wise_project_db_uri(project_id), echo=app_state["verbose"]
+        )
         with project_engine.connect() as conn:
             for query, result_ids in zip(
                 (
