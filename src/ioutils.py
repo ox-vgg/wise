@@ -20,7 +20,6 @@ import tarfile
 import numpy as np
 import h5py
 from PIL import Image, IptcImagePlugin
-from tqdm import tqdm
 import webdataset as wds
 import httpx
 
@@ -314,32 +313,23 @@ def get_thumbs_writer(
         yield writer
 
 
-def write_dataset(
+@contextmanager
+def get_features_writer(
     dataset: Path,
-    inputs: Generator[Tuple[np.ndarray, List[str]], None, None],
+    n_dim: int,
     model_name: str,
     *,
     mode: Literal["w", "a"] = "w",
-    write_size: int = 1024,
     **kwargs,
 ):
     """
     Features is a 2D array of shape (len(file_ids), n_dim)
     """
 
-    # Read first array from generator to get shape
-    _input = next(inputs, None)
-    if _input is None:
-        # Nothing to write
-        raise EmptyDatasetException()
-
-    arr, file_ids = _input
-    n_dim = arr.shape[-1]
-
     with _get_features_dataset(dataset, n_dim=n_dim, mode=mode, **kwargs) as (
         ds,
         fs,
-    ), tqdm() as pbar:
+    ):
         if ds.shape[-1] != n_dim:
             raise ValueError("Feature dimension mismatch")
 
@@ -348,28 +338,11 @@ def write_dataset(
 
         ds.attrs["model"] = model_name
 
-        # Write remaining arrays
-        buf_arr = arr
-        buf_file_ids = file_ids
-        for _arr, _file_ids in inputs:
-            if buf_arr.shape[0] > write_size:
-                _append_array_to_dataset(ds, buf_arr)
-                _append_array_to_dataset(fs, np.array(buf_file_ids))
-                pbar.update(buf_arr.shape[0])
+        def writer(features: np.ndarray, ids: List[str]):
+            _append_array_to_dataset(ds, features)
+            _append_array_to_dataset(fs, np.array(ids))
 
-                buf_arr = _arr
-                buf_file_ids = _file_ids
-            else:
-                buf_arr = np.concatenate((buf_arr, _arr), axis=0)
-                buf_file_ids.extend(_file_ids)
-
-        _append_array_to_dataset(ds, buf_arr)
-        _append_array_to_dataset(fs, np.array(buf_file_ids))
-        pbar.update(buf_arr.shape[0])
-
-        logger.info(f"Done - wrote features (for {model_name}) with shape: {ds.shape}")
-
-    pass
+        yield (writer, ds.len())
 
 
 ENCODING_MAP = {

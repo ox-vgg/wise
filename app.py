@@ -10,12 +10,12 @@ from tempfile import NamedTemporaryFile
 import logging
 
 import typer
-from src.ioutils import write_dataset
+
 from src.inference import setup_clip, AVAILABLE_MODELS
 from torch.hub import download_url_to_file
 
 from src.ioutils import (
-    write_dataset,
+    get_features_writer,
     get_dataset_reader,
     get_thumbs_writer,
     get_valid_images_from_folder,
@@ -27,8 +27,17 @@ from src.ioutils import (
 import numpy as np
 from PIL import Image
 import braceexpand
+from tqdm import tqdm
 from src import db
-from src.data_models import Dataset, DatasetType, URL, QueryType, Project, DatasetCreate
+from src.data_models import (
+    Dataset,
+    DatasetType,
+    URL,
+    QueryType,
+    Project,
+    DatasetCreate,
+    ImageMetadata,
+)
 from src.inference import setup_clip, AVAILABLE_MODELS
 from src.utils import batched
 from src.search import brute_force_search, classification_based_query
@@ -36,7 +45,6 @@ from src.repository import WiseProjectsRepo, DatasetRepo, MetadataRepo
 from src.projects import (
     get_wise_db_uri,
     get_wise_project_db_uri,
-    get_wise_folder,
     get_wise_project_folder,
     create_wise_project_tree,
     get_wise_features_dataset_path,
@@ -233,30 +241,42 @@ def init(
         )
         save_thumbs = get_wise_thumbs_dataset_path(project_id)
         model_name = model.value
-        extract_features, _ = setup_clip(model_name)
+        ndim, extract_features, _ = setup_clip(model_name)
         dataset_engine = db.init_project(
             get_wise_project_db_uri(project_id), echo=app_state["verbose"]
         )
         with get_thumbs_writer(
             save_thumbs, mode="w", driver="family"
-        ) as thumbs_writer, dataset_engine.connect() as conn:
+        ) as thumbs_writer, get_features_writer(
+            save_features, ndim, model_name, mode="a", driver="family"
+        ) as (
+            features_writer,
+            num_features,
+        ), dataset_engine.connect() as conn, tqdm() as pbar:
+
             # Generator to transform images and metadata into required shape, write thumbnails
-            def process(dataset_iterator):
+            def process(dataset_iterator, offset: int = 0):
+                num_records = offset
                 for batch in batched(dataset_iterator, batch_size):
                     images, metadata = zip(*batch)
                     features = extract_features(images)
                     thumbs_writer(images)
+
+                    rcount = len(batch)
+                    row_ids = [num_records + i for i in range(rcount)]
                     with conn.begin():
-                        metadata = [MetadataRepo.create(conn, data=x) for x in metadata]
-                    metadata = list(
-                        map(
-                            lambda x: str(x.id) if x.id is not None else x.path,
-                            metadata,
-                        )
-                    )
+                        metadata = [
+                            MetadataRepo.create(conn, data=x.copy(update={"id": i}))
+                            for i, x in zip(row_ids, metadata)
+                        ]
 
-                    yield features, metadata
+                    features_writer(features, [str(x) for x in row_ids])
+                    num_records += rcount
+                    pbar.update(rcount)
 
+                return num_records
+
+            count_ = num_features
             for dataset in input_datasets:
                 # Add dataset to table and get dataset id
                 payload = (
@@ -279,13 +299,8 @@ def init(
                         data=payload,
                     )
                 try:
-                    write_dataset(
-                        save_features,
-                        process(get_dataset_iterator(dataset_obj)),
-                        model_name,
-                        write_size=1024,
-                        mode="a",
-                        driver="family",  # writes 2 gb files
+                    count_ = process(
+                        get_dataset_iterator(dataset_obj, handle_failed_sample), count_
                     )
                 except EmptyDatasetException:
                     with conn.begin():
@@ -341,7 +356,7 @@ def search(
         "images",
     )
     model_name, num_files, reader = get_dataset_reader(image_features, driver="family")
-    extract_image_features, extract_text_features = setup_clip(model_name)
+    _, extract_image_features, extract_text_features = setup_clip(model_name)
     file_ids = []
 
     def get_features():

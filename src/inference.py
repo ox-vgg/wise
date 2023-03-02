@@ -35,6 +35,7 @@ def setup_clip(model_name: str = "ViT-B/32"):
 
     model, preprocess = _load_clip(model_name)
     input_dim = model.visual.input_resolution
+    output_dim = model.visual.output_dim
     mean_tensor = (
         torch.Tensor([0.48145466, 0.4578275, 0.40821073])
         .reshape(3, 1, 1)
@@ -83,7 +84,7 @@ def setup_clip(model_name: str = "ViT-B/32"):
 
             return output.numpy()
 
-    return extract_image_features, extract_text_features
+    return output_dim, extract_image_features, extract_text_features
 
 
 class LinearBinaryClassifier(torch.nn.Module):

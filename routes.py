@@ -173,7 +173,7 @@ def get_search_router(config: APIConfig):
 
     _prefix = config.query_prefix.strip()
     model_name, num_files, reader = get_dataset_reader(image_features, driver="family")
-    extract_image_features, extract_text_features = setup_clip(model_name)
+    _, extract_image_features, extract_text_features = setup_clip(model_name)
     project_engine = db.init_project(get_wise_project_db_uri(project_id))
     thumbs = get_wise_thumbs_dataset_path(project_id)
     router_cm = ExitStack()
