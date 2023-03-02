@@ -203,14 +203,6 @@ def init(
     sources: List[str] = typer.Option(
         ..., "--source", help="List[DirPath | WebDataset compatible URL]"
     ),
-    store_in: Optional[Path] = typer.Option(
-        None,
-        writable=True,
-        exists=True,
-        dir_okay=True,
-        file_okay=False,
-        help="Directory to save the output files to",
-    ),
     project_id: str = typer.Argument(..., help="Name of the project"),
 ):
     # Setup
@@ -219,99 +211,85 @@ def init(
     # Try creating project id, it will fail if not unique.
     # TODO Translate the exception
     engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
-    with engine.begin() as conn:
-        WiseProjectsRepo.create(conn, data=Project(id=project_id))
-
     try:
-        # Create project tree, get paths to the HDF5 files
-        create_wise_project_tree(project_id, store_in)
+        with engine.begin() as conn:
+            WiseProjectsRepo.create(conn, data=Project(id=project_id))
 
-        save_features = get_wise_features_dataset_path(
-            project_id,
-            "features",
-            "images",
-        )
-        save_thumbs = get_wise_thumbs_dataset_path(project_id)
-        model_name = model.value
-        extract_features, _ = setup_clip(model_name)
-        dataset_engine = db.init_project(
-            get_wise_project_db_uri(project_id), echo=app_state["verbose"]
-        )
-        with get_thumbs_writer(
-            save_thumbs, mode="w", driver="family"
-        ) as thumbs_writer, dataset_engine.connect() as conn:
-            # Generator to transform images and metadata into required shape, write thumbnails
-            def process(dataset_iterator):
-                for batch in batched(dataset_iterator, batch_size):
-                    images, metadata = zip(*batch)
-                    features = extract_features(images)
-                    thumbs_writer(images)
-                    with conn.begin():
-                        metadata = [MetadataRepo.create(conn, data=x) for x in metadata]
-                    metadata = list(
-                        map(
-                            lambda x: str(x.id) if x.id is not None else x.path,
-                            metadata,
+            # Create project tree, get paths to the HDF5 files
+            create_wise_project_tree(project_id)
+
+            save_features = get_wise_features_dataset_path(
+                project_id,
+                "features",
+                "images",
+            )
+            save_thumbs = get_wise_thumbs_dataset_path(project_id)
+            model_name = model.value
+            extract_features, _ = setup_clip(model_name)
+            dataset_engine = db.init_project(
+                get_wise_project_db_uri(project_id), echo=app_state["verbose"]
+            )
+            with get_thumbs_writer(
+                save_thumbs, mode="w", driver="family"
+            ) as thumbs_writer, dataset_engine.connect() as conn:
+                # Generator to transform images and metadata into required shape, write thumbnails
+                def process(dataset_iterator):
+                    for batch in batched(dataset_iterator, batch_size):
+                        images, metadata = zip(*batch)
+                        features = extract_features(images)
+                        thumbs_writer(images)
+                        with conn.begin():
+                            metadata = [
+                                MetadataRepo.create(conn, data=x) for x in metadata
+                            ]
+                        metadata = list(
+                            map(
+                                lambda x: str(x.id) if x.id is not None else x.path,
+                                metadata,
+                            )
+                        )
+
+                        yield features, metadata
+
+                for dataset in input_datasets:
+                    # Add dataset to table and get dataset id
+                    payload = (
+                        DatasetCreate(
+                            location=str(dataset.resolve()), type=DatasetType.IMAGE_DIR
+                        )
+                        if isinstance(dataset, Path)
+                        else DatasetCreate(
+                            location=(
+                                str(x.resolve())
+                                if (x := Path(dataset)).is_file()
+                                else dataset
+                            ),
+                            type=DatasetType.WEBDATASET,
                         )
                     )
-
-                    yield features, metadata
-
-            for dataset in input_datasets:
-                # Add dataset to table and get dataset id
-                payload = (
-                    DatasetCreate(
-                        location=str(dataset.resolve()), type=DatasetType.IMAGE_DIR
-                    )
-                    if isinstance(dataset, Path)
-                    else DatasetCreate(
-                        location=(
-                            str(x.resolve())
-                            if (x := Path(dataset)).is_file()
-                            else dataset
-                        ),
-                        type=DatasetType.WEBDATASET,
-                    )
-                )
-                with conn.begin():
-                    dataset_obj = DatasetRepo.create(
-                        conn,
-                        data=payload,
-                    )
-                try:
-                    write_dataset(
-                        save_features,
-                        process(get_dataset_iterator(dataset_obj)),
-                        model_name,
-                        write_size=1024,
-                        mode="a",
-                        driver="family",  # writes 2 gb files
-                    )
-                except EmptyDatasetException:
                     with conn.begin():
-                        DatasetRepo.delete(conn, dataset_obj.id)
+                        dataset_obj = DatasetRepo.create(
+                            conn,
+                            data=payload,
+                        )
+                    try:
+                        write_dataset(
+                            save_features,
+                            process(get_dataset_iterator(dataset_obj)),
+                            model_name,
+                            write_size=1024,
+                            mode="a",
+                            driver="family",  # writes 2 gb files
+                        )
+                    except EmptyDatasetException:
+                        with conn.begin():
+                            DatasetRepo.delete(conn, dataset_obj.id)
 
     except Exception:
         logger.exception(f"Initialising project {project_id} failed!")
-        with engine.begin() as conn:
-            WiseProjectsRepo.delete(conn, project_id)
-
         project_folder = get_wise_project_folder(project_id)
         if project_folder.is_dir():
-            # A valid directory - could be a link
-            if project_folder.is_symlink():
-                # Remove what the link points to
-                shutil.rmtree(project_folder.resolve())
-
-                # remove the link
-                project_folder.unlink()
-            else:
-                # remove the directory tree
-                shutil.rmtree(project_folder)
-        else:
-            # Dangling symlink
-            project_folder.unlink()
-
+            shutil.rmtree(project_folder)
     typer.Exit(0)
 
 
