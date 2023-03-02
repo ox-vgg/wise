@@ -82,5 +82,4 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         conn.execute(sa.delete(self._table).where(self._table.c.id == id))
 
     def delete_all(self, conn: sa.Connection):
-        result = conn.execute(sa.delete(self._table))
-        print("count", result.rowcount)
+        conn.execute(sa.delete(self._table))

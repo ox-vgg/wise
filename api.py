@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from config import APIConfig
-from routes import get_search_router
+from routes import get_search_router, get_image_router
 
 
 def create_app(config: APIConfig):
@@ -16,7 +16,9 @@ def create_app(config: APIConfig):
 
     @app.on_event("startup")
     async def startup():
+
         app.include_router(get_search_router(config))
+        app.include_router(get_image_router(config))
 
     @app.on_event("shutdown")
     async def shutdown():

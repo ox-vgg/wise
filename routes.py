@@ -1,10 +1,20 @@
 from contextlib import ExitStack
 from typing import Dict, List
 import io
+import logging
+from pathlib import Path
+import tarfile
 from PIL import Image
 from fastapi import APIRouter, HTTPException, Query, File
+from fastapi.responses import (
+    FileResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from pydantic import BaseModel, validator
 import typer
+
 from config import APIConfig
 from src import db
 from src.projects import (
@@ -13,15 +23,100 @@ from src.projects import (
     get_wise_project_db_uri,
     get_wise_thumbs_dataset_path,
 )
-from src.repository import WiseProjectsRepo, MetadataRepo
-from src.data_models import ImageInfo
-from src.ioutils import get_dataset_reader, get_thumbs_reader
+from src.repository import WiseProjectsRepo, MetadataRepo, DatasetRepo
+from src.data_models import ImageInfo, DatasetType, Dataset
+from src.ioutils import (
+    get_dataset_reader,
+    get_thumbs_reader,
+    is_valid_uri,
+    get_file_from_tar,
+)
 from src.inference import setup_clip
 from src.search import brute_force_search
+
+logger = logging.getLogger(__name__)
 
 
 def raise_(ex):
     raise ex
+
+
+def get_image_router(config: APIConfig):
+
+    if config.project_id is None:
+        raise typer.BadParameter("project id is missing!")
+
+    engine = db.init(get_wise_db_uri())
+    with engine.connect() as conn:
+        project = WiseProjectsRepo.get(conn, config.project_id)
+        if project is None:
+            raise typer.BadParameter(f"Project {config.project_id} not found!")
+
+    project_id = project.id
+    router = APIRouter(
+        prefix=f"/images/{project_id}",
+        tags=["images"],
+    )
+
+    project_engine = db.init_project(get_wise_project_db_uri(project_id))
+
+    @router.get(
+        "/{image_id}",
+        response_class=FileResponse,
+        responses={404: {"content": "text/plain"}, 302: {}},
+    )
+    def get_image(image_id: int):
+        with project_engine.connect() as conn:
+            metadata = MetadataRepo.get(conn, image_id)
+            if metadata is None:
+                return PlainTextResponse(
+                    status_code=404, content=f"{image_id} not found!"
+                )
+            # Send the source_uri if present, or try to read from source
+            # we read from
+            # Maybe do a HEAD request to check existence before redirect
+            # so that we can try to serve the file from disk if present?
+            if metadata.source_uri and is_valid_uri(metadata.source_uri):
+                return RedirectResponse(metadata.source_uri, status_code=302)
+
+            # Look up the dataset table and find the location and type
+            dataset = DatasetRepo.get(conn, metadata.dataset_id)
+            if dataset is None:
+                return PlainTextResponse(
+                    status_code=404, content=f"{image_id} not found!"
+                )
+
+            location = Path(dataset.location)
+
+            # Handle case where we read the image from disk, but it may not be there
+            if dataset.type == DatasetType.IMAGE_DIR:
+                # metadata.source_uri will be None, so we have to search for it on disk
+                file_path = location / metadata.path
+                if file_path.is_file():
+                    return FileResponse(
+                        file_path, media_type=f"image/{metadata.format.lower()}"
+                    )
+                return PlainTextResponse(
+                    status_code=404, content=f"{image_id} not found!"
+                )
+
+            # Try to extract from local file if present
+            if not location.is_file() or not tarfile.is_tarfile(location):
+                return PlainTextResponse(
+                    status_code=404, content=f"{image_id} not found!"
+                )
+            try:
+                file_iter = get_file_from_tar(location, metadata.path.lstrip("#"))
+                return StreamingResponse(
+                    file_iter, media_type=f"image/{metadata.format.lower()}"
+                )
+            except Exception as e:
+                logger.exception(f"Exception when reading image {image_id}")
+                return PlainTextResponse(
+                    status_code=404, content=f"{image_id} not found!"
+                )
+
+    return router
 
 
 def get_search_router(config: APIConfig):
@@ -56,7 +151,7 @@ def get_search_router(config: APIConfig):
             _q: [
                 SearchResponse(
                     thumbnail=_thumb,
-                    link=f"{_metadata.source_uri}",
+                    link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{project_id}/{_metadata.id}'}",
                     distance=_dist,
                     info=ImageInfo(
                         filename=_metadata.path,
