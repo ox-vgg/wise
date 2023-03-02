@@ -1,3 +1,4 @@
+import logging
 from typing import Iterator
 import numpy as np
 import torch
@@ -7,13 +8,15 @@ from faiss.contrib.exhaustive_search import knn
 
 from src.inference import LinearBinaryClassifier
 
+logger = logging.getLogger(__name__)
+
 
 def build_search_index(features: np.ndarray) -> faiss.IndexFlatIP:
     n_dim = features.shape[-1]
-    print(f"Building faiss index ({n_dim})")
+    logger.info(f"Building faiss index ({n_dim})")
     index = faiss.IndexFlatIP(n_dim)
     index.add(features)
-    print(f"Index built.")
+    logger.info(f"Index built.")
     return index
 
 
@@ -72,7 +75,7 @@ def classification_based_query(
     optimizer = torch.optim.SGD(linear_classifier.parameters(), lr=5)
 
     # Train classifier
-    print("Training classifier")
+    logger.info("Training classifier")
     for i in tqdm(range(num_training_iterations)):
         negative_features = features[
             np.random.randint(features.shape[0], size=32), :
@@ -90,9 +93,9 @@ def classification_based_query(
         loss = criterion(logits, labels)
         loss.backward()
         optimizer.step()
-        print(f"Step {i+1}/{num_training_iterations} - loss: {loss.item():.5f}")
+        logger.info(f"Step {i+1}/{num_training_iterations} - loss: {loss.item():.5f}")
 
-    print("Computing scores using classifier")
+    logger.info("Computing scores using classifier")
     # Use the classifier to compute a score (between 0-1) for all images in the dataset
     with torch.no_grad():
         scores = linear_classifier(torch.tensor(features, dtype=torch.float32))
