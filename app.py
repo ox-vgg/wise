@@ -2,9 +2,8 @@ import enum
 import itertools
 from pathlib import Path
 
-import shutil
 import typing
-from typing import List, Union, Tuple, Literal, Optional
+from typing import List, Union, Tuple, Literal, Optional, Dict, Any, Callable
 from tempfile import NamedTemporaryFile
 
 import logging
@@ -15,19 +14,24 @@ from src.inference import setup_clip, AVAILABLE_MODELS
 from torch.hub import download_url_to_file
 
 from src.ioutils import (
-    get_features_writer,
-    get_dataset_reader,
-    get_thumbs_writer,
+    H5Datasets,
+    get_model_name,
+    get_counts,
+    get_h5iterator,
+    get_h5writer,
+    generate_thumbnail,
     get_valid_images_from_folder,
     get_valid_images_from_webdataset,
     is_valid_webdataset_source,
     get_valid_webdataset_tar_from_folder,
+    concat_h5datasets,
 )
 
 import numpy as np
 from PIL import Image
 import braceexpand
 from tqdm import tqdm
+import webdataset as wds
 from src import db
 from src.data_models import (
     Dataset,
@@ -46,12 +50,13 @@ from src.projects import (
     get_wise_db_uri,
     get_wise_project_db_uri,
     get_wise_project_folder,
+    get_wise_project_h5dataset,
+    get_wise_project_virtual_h5dataset,
+    delete_wise_project_h5dataset,
     create_wise_project_tree,
-    get_wise_features_dataset_path,
-    get_wise_thumbs_dataset_path,
+    delete_wise_project_tree,
 )
 from src.exceptions import EmptyDatasetException
-from api import main
 
 
 app = typer.Typer()
@@ -94,27 +99,43 @@ def parse_webdataset_url(wds_url: str):
     return list(itertools.chain.from_iterable(expanded))
 
 
-def get_dataset_iterator(dataset: Dataset):
+def get_dataset_iterator(
+    dataset: Dataset, handle_failed_sample=Callable[[Dict[str, Any]], None]
+):
+    def update_id(metadata: ImageMetadata):
+        return metadata.copy(update={"dataset_id": dataset.id})
+
+    def update_path(metadata: ImageMetadata):
+        return metadata.copy(
+            update={"path": metadata.path.replace(dataset.location, "")}
+        )
+
     if dataset.type == DatasetType.WEBDATASET:
-        for im, metadata in get_valid_images_from_webdataset(dataset.location):
-            # add dataset id
-            metadata.dataset_id = dataset.id
-
-            # remove location from path
-            metadata.path = metadata.path.replace(dataset.location, "")
-
-            yield im, metadata
+        yield from map(
+            lambda x: (x[0], update_path(update_id(x[1]))),
+            get_valid_images_from_webdataset(dataset.location, handle_failed_sample),
+        )
 
     elif dataset.type == DatasetType.IMAGE_DIR:
-        for im, metadata in get_valid_images_from_folder(Path(dataset.location)):
-            # add dataset id
-            metadata.dataset_id = dataset.id
+        yield from map(
+            lambda x: (x[0], update_id(x[1])),
+            get_valid_images_from_folder(Path(dataset.location), handle_failed_sample),
+        )
 
-            yield im, metadata
+    else:
+        raise NotImplementedError
 
 
 # Split input arguments into respective category of folders and webdataset urls
 def parse_and_validate_input_datasets(input_dataset: List[str]):
+    """
+    Validates user input for data sources
+
+    Should contain either a directory / webdataset url
+
+    If a directory is provided, all valid webdataset tar files
+    inside are selected recursively as sources.
+    """
     # At least one input must be passed
     if len(input_dataset) == 0:
         raise typer.BadParameter("Input dataset cannot be empty")
@@ -219,113 +240,202 @@ def init(
         file_okay=False,
         help="Directory to save the output files to",
     ),
+    continue_on_error: bool = typer.Option(
+        False, help="Continue processing when encountered with errors if possible"
+    ),
     project_id: str = typer.Argument(..., help="Name of the project"),
 ):
+    """
+    Initialise WISE Project
+
+    - Create project
+    - For each data source, extract features, thumbnails and metadata
+      and store it
+    - Failed samples are written to wise_failedsamples_{project_id}.tar
+    - If a dataset write fails, the associate files are deleted
+    - If continue on error is True, other data sources will be processed
+    - Any other exception, the project is not created.
+    """
     # Setup
+    # Validates the input sources and converts them into a list
+    # containing directories, valid webdatset tar files in those directories
+    # and parses other strings as webdataset urls and checks if it can be opened
     input_datasets = parse_and_validate_input_datasets(sources)
+
+    _sources = "\n\t".join(sources)
+    logger.info(f"Processsing data sources - {_sources}")
 
     # Try creating project id, it will fail if not unique.
     # TODO Translate the exception
     engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
+
     with engine.begin() as conn:
         WiseProjectsRepo.create(conn, data=Project(id=project_id))
 
+    failed_datasources = []
     try:
         # Create project tree, get paths to the HDF5 files
-        create_wise_project_tree(project_id, store_in)
-
-        save_features = get_wise_features_dataset_path(
-            project_id,
-            "features",
-            "images",
-        )
-        save_thumbs = get_wise_thumbs_dataset_path(project_id)
-        model_name = model.value
-        ndim, extract_features, _ = setup_clip(model_name)
+        project_folder = create_wise_project_tree(project_id, store_in)
         dataset_engine = db.init_project(
             get_wise_project_db_uri(project_id), echo=app_state["verbose"]
         )
-        with get_thumbs_writer(
-            save_thumbs, mode="w", driver="family"
-        ) as thumbs_writer, get_features_writer(
-            save_features, ndim, model_name, mode="a", driver="family"
-        ) as (
-            features_writer,
-            num_features,
-        ), dataset_engine.connect() as conn, tqdm() as pbar:
+        model_name = model.value
+        n_dim, extract_features, _ = setup_clip(model_name)
 
-            # Generator to transform images and metadata into required shape, write thumbnails
-            def process(dataset_iterator, offset: int = 0):
-                num_records = offset
+        def create_virtual_dataset():
+            with dataset_engine.connect() as conn:
+                datasets = DatasetRepo.list(conn)
+
+                # Get all dataset sources
+                dataset_sources = [
+                    get_wise_project_h5dataset(project_id, str(x.id)) for x in datasets
+                ]
+
+            output = get_wise_project_virtual_h5dataset(project_id)
+            concat_h5datasets(dataset_sources, n_dim, output)
+
+        # Function to transform images and metadata into required formats
+        def process(batch: List[Tuple[Image.Image, ImageMetadata]]):
+            images, metadata = zip(*batch)
+            features = extract_features(images)
+            thumbs = [generate_thumbnail(x) for x in images]
+
+            return metadata, features, thumbs
+
+        def create_dataset(dataset: Union[Path, str]):
+            # Add dataset to table and get dataset id
+            payload = (
+                DatasetCreate(
+                    location=str(dataset.resolve()), type=DatasetType.IMAGE_DIR
+                )
+                if isinstance(dataset, Path)
+                else DatasetCreate(
+                    location=(
+                        str(x.resolve()) if (x := Path(dataset)).is_file() else dataset
+                    ),
+                    type=DatasetType.WEBDATASET,
+                )
+            )
+            with dataset_engine.begin() as conn:
+                dataset_obj = DatasetRepo.create(
+                    conn,
+                    data=payload,
+                )
+                return dataset_obj
+
+        # Function to handle data source
+        # Iterate -> Batch -> Transform -> Write
+        def handle_dataset(
+            dataset: Dataset, offset: int = 0, error_handler=lambda sample: None
+        ):
+            # Get dataset path
+            features_path = get_wise_project_h5dataset(project_id, str(dataset.id))
+
+            # Get dataset iterator
+            dataset_iterator = get_dataset_iterator(dataset, error_handler)
+
+            # Keep track of records written in this dataset
+            count_ = 0
+            with dataset_engine.connect() as conn, get_h5writer(
+                features_path,
+                list(H5Datasets),
+                model_name=model_name,
+                n_dim=n_dim,
+                mode="w",
+            ) as writer_fn, tqdm() as pbar:
                 for batch in batched(dataset_iterator, batch_size):
-                    images, metadata = zip(*batch)
-                    features = extract_features(images)
-                    thumbs_writer(images)
+                    metadata, features, thumbs = process(batch)
 
-                    rcount = len(batch)
-                    row_ids = [num_records + i for i in range(rcount)]
+                    row_count = len(batch)
+                    h5_row_ids = [count_ + i for i in range(row_count)]
+
                     with conn.begin():
                         metadata = [
-                            MetadataRepo.create(conn, data=x.copy(update={"id": i}))
-                            for i, x in zip(row_ids, metadata)
+                            MetadataRepo.create(
+                                conn,
+                                data=x.copy(
+                                    update={
+                                        "dataset_row": row_id,
+                                        "id": offset + row_id,
+                                    }
+                                ),
+                            )
+                            for row_id, x in zip(h5_row_ids, metadata)
                         ]
 
-                    features_writer(features, [str(x) for x in row_ids])
-                    num_records += rcount
-                    pbar.update(rcount)
+                        metadata_row_ids = [str(offset + x) for x in h5_row_ids]
+                        writer_fn(features, metadata_row_ids, thumbs)
+                    count_ += row_count
 
-                return num_records
+                    # Udpate progress bar
+                    pbar.update(row_count)
+            # Return updated offset
+            return offset + count_
 
-            count_ = num_features
+        failures_path = f"wise_failedsamples_{project_id}.tar"
+
+        with dataset_engine.connect() as conn, wds.TarWriter(
+            failures_path, encoder=False
+        ) as sink:
+
+            def handle_failed_sample(sample: Dict[str, Any]):
+                sink.write(sample)
+
+            count_ = 0
             for dataset in input_datasets:
-                # Add dataset to table and get dataset id
-                payload = (
-                    DatasetCreate(
-                        location=str(dataset.resolve()), type=DatasetType.IMAGE_DIR
-                    )
-                    if isinstance(dataset, Path)
-                    else DatasetCreate(
-                        location=(
-                            str(x.resolve())
-                            if (x := Path(dataset)).is_file()
-                            else dataset
-                        ),
-                        type=DatasetType.WEBDATASET,
-                    )
-                )
-                with conn.begin():
-                    dataset_obj = DatasetRepo.create(
-                        conn,
-                        data=payload,
-                    )
+                logger.info(f"Processing - {dataset}")
+                dataset_obj = None
                 try:
-                    count_ = process(
-                        get_dataset_iterator(dataset_obj, handle_failed_sample), count_
-                    )
-                except EmptyDatasetException:
-                    with conn.begin():
-                        DatasetRepo.delete(conn, dataset_obj.id)
+                    # Add data source to table
+                    dataset_obj = create_dataset(dataset)
 
+                    # Process each item in data source and write to table + hdf5
+                    count_ = handle_dataset(
+                        dataset_obj, offset=count_, error_handler=handle_failed_sample
+                    )
+
+                except Exception as e:
+                    logger.error(
+                        f'Error while processing data source "{dataset}" - {e}'
+                    )
+                    # Delete the data source, truncate h5, and add to failed summary.
+                    if dataset_obj:
+                        # Delete dataset
+                        delete_wise_project_h5dataset(project_id, str(dataset_obj.id))
+
+                        # Delete the Dataset -> Which deletes all metadata
+                        # Later, we can just continue from where we left off instead of deleting.
+                        with conn.begin():
+                            DatasetRepo.delete(conn, dataset_obj.id)
+
+                        failed_datasources.append(dataset)
+                    if not continue_on_error:
+                        raise e
+
+            logger.info("Creating Virtual Dataset across all sources")
+            create_virtual_dataset()
+            logger.info("Done")
     except Exception:
         logger.exception(f"Initialising project {project_id} failed!")
+        delete_project = typer.confirm("Delete associated project files?", default=True)
+        if not delete_project:
+            logger.error(
+                f'Files for "{project_id}" left in {get_wise_project_folder(project_id)}'
+            )
+            return typer.Exit(1)
+
         with engine.begin() as conn:
             WiseProjectsRepo.delete(conn, project_id)
 
-        project_folder = get_wise_project_folder(project_id)
-        if project_folder.is_dir():
-            # A valid directory - could be a link
-            if project_folder.is_symlink():
-                # Remove what the link points to
-                shutil.rmtree(project_folder.resolve())
+        delete_wise_project_tree(project_id)
 
-                # remove the link
-                project_folder.unlink()
-            else:
-                # remove the directory tree
-                shutil.rmtree(project_folder)
-        else:
-            # Dangling symlink
-            project_folder.unlink()
+        return typer.Exit(1)
+
+    if failed_datasources:
+        logger.error(
+            f'Project "{project_id}" was created, but the following data sources failed'
+        )
+        logger.error("\n\t".join(failed_datasources))
 
     typer.Exit(0)
 
@@ -350,23 +460,20 @@ def search(
         if project is None:
             raise typer.BadParameter(f"Project {project_id} not found!")
 
-    image_features = get_wise_features_dataset_path(
-        project_id,
-        "features",
-        "images",
-    )
-    model_name, num_files, reader = get_dataset_reader(image_features, driver="family")
+    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    model_name = get_model_name(vds_path)
+    counts = get_counts(vds_path)
+
+    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
+    num_files = counts[H5Datasets.FEATURES]
+
+    reader = get_h5iterator(vds_path)
+    all_features = lambda: reader(H5Datasets.FEATURES)
+
     _, extract_image_features, extract_text_features = setup_clip(model_name)
-    file_ids = []
-
-    def get_features():
-        for feature, _file_ids in reader():
-            file_ids.extend(_file_ids)
-            yield feature
-
     top_k = min(top_k, num_files)
 
-    ids = None
+    dist, ids = None, None
     if (
         query_type == QueryType.IMAGE_QUERY
         or query_type == QueryType.NATURAL_LANGUAGE_QUERY
@@ -396,13 +503,14 @@ def search(
             else:
                 raise NotImplementedError
 
-        dist, ids = brute_force_search(get_features(), query_features, top_k)
-        print(dist, [[file_ids[x] for x in top_ids] for top_ids in ids])
+        dist, ids = brute_force_search(all_features(), query_features, top_k)
+
     else:
         # Classification query
         def process(query_images_folder: Path):
             for batch in batched(
-                get_valid_images_from_folder(query_images_folder), batch_size
+                get_valid_images_from_folder(query_images_folder, lambda _: None),
+                batch_size,
             ):
 
                 images, _ = zip(*batch)
@@ -413,33 +521,37 @@ def search(
         parsed_queries = typing.cast(Path, parsed_queries)
         query_image_features = np.concatenate(list(process(parsed_queries)), axis=0)
         # TODO Classification query loads all arrays into memory. need to refactor
-        features = np.concatenate(list(get_features()), axis=0)
-        scores, ids = classification_based_query(features, query_image_features, top_k)
-        print(scores, [[file_ids[x] for x in top_ids] for top_ids in ids])
+        features = np.concatenate(list(all_features()), axis=0)
+        dist, ids = classification_based_query(features, query_image_features, top_k)
 
     if ids is not None:
         project_engine = db.init_project(
             get_wise_project_db_uri(project_id), echo=app_state["verbose"]
         )
         with project_engine.connect() as conn:
-            for query, result_ids in zip(
+            for query, result_dist, result_ids in zip(
                 (
                     parsed_queries
                     if isinstance(parsed_queries, list)
                     else [parsed_queries]
                 ),
+                dist,
                 ids,
             ):
-                print(query)
-                for k in result_ids:
+                print(
+                    query,
+                )
+                for d, k in zip(result_dist, result_ids):
                     # Sqlite row id when not set explicitly starts at 1
-                    print(MetadataRepo.get(conn, int(k + 1)))
+                    print(f"Dist: {d:.5f}", MetadataRepo.get(conn, int(k)))
 
 
 @app.command()
 def serve(
     project_id: Optional[str] = typer.Argument(None, help="Name of the project"),
 ):
+    from api import main
+
     main(project_id)
 
 

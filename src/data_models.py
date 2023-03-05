@@ -44,6 +44,7 @@ class Dataset(BaseDataset):
 class ImageMetadata(BaseModel):
     id: Optional[int] = None
     dataset_id: int = -1
+    dataset_row: Optional[int] = None
     path: str
     size_in_bytes: int
     format: str

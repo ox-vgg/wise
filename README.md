@@ -5,6 +5,7 @@
 WISE (WISE Image Search Engine) is an open-source image search engine for efficiently searching through large
 collections of images. WISE uses various algorithms and models developed in the field
 of computer vision and search & retrieval to allow the user to perform searches in different ways:
+
 - natural language (text) queries (find images that match a given keyword like "bus" or a detailed description like "green double-decker bus at intersection")
 - visual similarity search (find images that look like a given query image)
 - image classification queries (find images with content similar to a set of query images)
@@ -49,6 +50,7 @@ python3 app.py extract-features IMAGE_DIR DATASET.h5
 Once the features are extracted, we can re-use them for every search query.
 
 #### Natural language (text) query
+
 Query word embeddings are obtained from CLIP language model and then searched against
 the extracted features.
 
@@ -59,7 +61,9 @@ python3 app.py search --dataset DATASET.h5 QUERY1 QUERY2 [...]
 (Optional Arguments, Output description - TODO)
 
 #### Visual similarity search
+
 You can search for images that are similar to a given query image by passing the filepath (or HTTP URL) to the query image as follows:
+
 ```bash
 python3 app.py search --dataset DATASET.h5 /path/to/query/image.jpg [...]
 ```
@@ -67,7 +71,9 @@ python3 app.py search --dataset DATASET.h5 /path/to/query/image.jpg [...]
 (Optional Arguments, Output description - TODO)
 
 #### Image classification query
+
 To perform an image classification query, simply pass the path to a directory containing a set of query images. This trains a binary classification model on the images in the directory provided, and uses it to retrieve the images from the dataset that have the highest score from the classifier.
+
 ```bash
 python3 app.py search --dataset DATASET.h5 /path/to/query/directory [...]
 ```
@@ -89,3 +95,12 @@ DATASET="DATASET.h5" python3 app.py serve
 ```
 
 You can now open http://localhost:8000/public/index.html to view the demo.
+
+## Testing
+
+To run the tests
+
+```
+conda activate wise
+python -m pytest -s tests
+```
