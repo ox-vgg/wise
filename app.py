@@ -550,9 +550,9 @@ def search(
 def serve(
     project_id: Optional[str] = typer.Argument(None, help="Name of the project"),
 ):
-    from api import main
+    from api import serve
 
-    main(project_id)
+    serve(project_id)
 
 
 if __name__ == "__main__":
