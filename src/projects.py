@@ -13,7 +13,10 @@ def get_wise_folder() -> Path:
 
     # Create a .wise folder if it doesn't exist
     wise_folder = home_folder / ".wise"
+    wise_projects_folder = wise_folder / "projects"
+
     wise_folder.mkdir(exist_ok=True)
+    wise_projects_folder.mkdir(exist_ok=True)
 
     # Return
     return wise_folder
@@ -38,8 +41,34 @@ def get_wise_project_folder(project_id: str) -> Path:
 def get_wise_project_index_folder(project_id: str) -> Path:
     return get_wise_project_folder(project_id) / "index"
 
-def get_wise_project_virtual_h5dataset(project_id: str) -> Path:
-    return get_wise_project_folder(project_id) / f"{project_id}.h5"
+
+def update_wise_project_virtual_h5dataset(project_id: str, version: int):
+    latest = _get_wise_project_virtual_h5dataset(project_id)
+
+    # Older versions of the app may write it to a file, and may not have the
+    # 'versions' directory
+    if latest.is_file() and not latest.is_symlink():
+        # Move it as version 0 and link to new version
+        _old_path = _get_wise_project_virtual_h5dataset(project_id, 0)
+        _old_path.parent.mkdir(exist_ok=True)
+        latest.rename(_old_path)
+
+    latest.unlink(missing_ok=True)
+    latest.symlink_to(_get_wise_project_virtual_h5dataset(project_id, version))
+
+    return latest.resolve()
+
+
+def get_wise_project_latest_virtual_h5dataset(project_id):
+    return _get_wise_project_virtual_h5dataset(project_id).resolve()
+
+
+def _get_wise_project_virtual_h5dataset(
+    project_id: str, version: Optional[int] = None
+) -> Path:
+    if version is None:
+        return get_wise_project_folder(project_id) / f"{project_id}.h5"
+    return get_wise_project_folder(project_id) / "versions" / f"v{version}.h5"
 
 
 def get_wise_project_h5dataset(project_id: str, dataset_id: str):
@@ -57,6 +86,7 @@ def create_wise_project_tree(project_id: str, destination_dir: Optional[Path] = 
 
     # Create folder structure to hold the data
     # - data/[DATASET-ID.zfill(5)].h5
+    # - versions/[v1, v2, v3,...].h5
     # - index/
     #   - {...}/
     #       - train.index
@@ -78,7 +108,7 @@ def create_wise_project_tree(project_id: str, destination_dir: Optional[Path] = 
         base_dir.symlink_to(project_dir, target_is_directory=True)
 
     # Make the data, index tree
-    for x in ["data", "index"]:
+    for x in ["data", "index", "versions"]:
         (base_dir / x).mkdir(parents=True, exist_ok=True)
 
     return base_dir

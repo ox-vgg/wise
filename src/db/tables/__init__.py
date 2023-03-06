@@ -6,6 +6,7 @@ project_table = sa.Table(
     "projects",
     wise_metadata_obj,
     sa.Column("id", sa.Unicode(256), primary_key=True),
+    sa.Column("version", sa.Integer, nullable=False, server_default="0"),
 )
 
 dataset_table = sa.Table(

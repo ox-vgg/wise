@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, List, Iterable, Any, Type, Optional
+from typing import TypeVar, Generic, Iterable, Any, Type, Optional
 
 from pydantic import BaseModel
 import sqlalchemy as sa

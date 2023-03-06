@@ -355,6 +355,12 @@ def generate_thumbnail(im: Image.Image):
         return buf.getvalue()
 
 
+def get_shapes(dataset: Path, **kwargs):
+    _names = list(H5Datasets)
+    with _get_dataset(dataset, _names, mode="r", **kwargs) as ds_arr:
+        return {x: y.shape for x, y in zip(_names, ds_arr)}
+
+
 def get_counts(dataset: Path, **kwargs):
     """
     Returns the counts of all datasets as
@@ -495,10 +501,11 @@ def get_h5writer(
         yield writer
 
 
-def concat_h5datasets(sources, features_dim: int, output: Path, **kwargs):
+def concat_h5datasets(sources, output: Path, **kwargs):
     # Find number of rows across datasets
     total = {}
     model_name = None
+    features_dim = None
 
     # Make sure we have the same model name across sources
     for s in sources:
@@ -506,6 +513,17 @@ def concat_h5datasets(sources, features_dim: int, output: Path, **kwargs):
             model_name = get_model_name(s, **kwargs)
         elif model_name != get_model_name(s, **kwargs):
             raise ValueError("Expected model_name to be same in all data sources")
+
+        if features_dim is None:
+            features_dim = get_shapes(s, **kwargs).get(
+                H5Datasets.FEATURES, (None, None)
+            )[1]
+
+        elif (
+            features_dim
+            != get_shapes(s, **kwargs).get(H5Datasets.FEATURES, (None, None))[1]
+        ):
+            raise ValueError("All feature arrays in source to have same shape!")
 
         counts = get_counts(s, **kwargs)
         for k, v in counts.items():

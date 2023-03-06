@@ -52,8 +52,9 @@ from src.projects import (
     get_wise_project_db_uri,
     get_wise_project_folder,
     get_wise_project_h5dataset,
-    get_wise_project_virtual_h5dataset,
     get_wise_project_index_folder,
+    get_wise_project_latest_virtual_h5dataset,
+    update_wise_project_virtual_h5dataset,
     delete_wise_project_h5dataset,
     create_wise_project_tree,
     delete_wise_project_tree,
@@ -91,6 +92,16 @@ CLIPModel = _CLIPModel("CLIPModel", {x: x for x in AVAILABLE_MODELS})
 
 
 def parse_webdataset_url(wds_url: str):
+    """
+    Parses the user input of webdataset urls
+    and splits them into individual URLs if needed
+
+    Example
+    - a/{001..010}.tar -> [a/001.tar, a/002.tar, ....]
+    - a.tar,b.tar -> [a.tar, b.tar]
+    - a/{001..010}.tar,b.tar -> [a/001.tar, a/002.tar, ..., a/010.tar, b.tar]
+    """
+
     # - split at comma
     splits = wds_url.split(",")
 
@@ -106,6 +117,13 @@ def parse_webdataset_url(wds_url: str):
 def get_dataset_iterator(
     dataset: Dataset, handle_failed_sample=Callable[[Dict[str, Any]], None]
 ):
+    """
+    Returns an iterator over the datasource
+    Each sample is a tuple[Image, ImageMetadata]
+
+    Failed samples are passed to the handle_failed_sample function
+    """
+
     def update_id(metadata: ImageMetadata):
         return metadata.copy(update={"dataset_id": dataset.id})
 
@@ -226,9 +244,26 @@ def overwrite():
     pass
 
 
-def _create_virtual_dataset(project_id: str, n_dim: int, sources: List[Path]):
-    output = get_wise_project_virtual_h5dataset(project_id)
-    concat_h5datasets(sources, n_dim, output)
+def _create_virtual_dataset(project: Project, sources: List[Path]):
+    project_id = project.id
+    old_version = project.version or 0
+
+    next_version = 1 + old_version
+    output = update_wise_project_virtual_h5dataset(project_id, next_version)
+
+    try:
+        concat_h5datasets(sources, output)
+    except Exception as e:
+        logger.error(f"Error creating virtual dataset from sources - {e}")
+        logger.error("Rolling back...")
+
+        # Delete the file if it was created
+        output.unlink(missing_ok=True)
+
+        # Update the symlink back to old version
+        update_wise_project_virtual_h5dataset(project_id, old_version)
+        raise e
+    return next_version
 
 
 # Function to transform images and metadata into required formats
@@ -258,9 +293,10 @@ def _convert_input_source_to_dataset(input_source: Union[str, Path]):
 
 def add_dataset(
     dataset: Dataset,
-    conn,
     process_fn,
     writer_fn,
+    *,
+    db_engine,
     offset: int = 0,
     batch_size: int = 1,
     error_handler=lambda sample: None,
@@ -271,7 +307,7 @@ def add_dataset(
 
     # Keep track of records written in this dataset
     count_ = 0
-    with tqdm() as pbar:
+    with tqdm() as pbar, db_engine.connect() as conn:
         for batch in batched(dataset_iterator, batch_size):
             metadata, features, thumbs = process_fn(batch)
 
@@ -303,98 +339,94 @@ def add_dataset(
 
 
 def _update(
-    project_id: str,
+    project: Project,
     input_datasets: List[Union[str, Path]],
     model_name: str,
+    *,
+    db_engine,
     mode: Literal["init", "update"] = "init",
     batch_size: int = 1,
     handle_failed_sample=lambda sample: None,
     continue_on_error: bool = False,
 ):
+    """
+    Appends new data sources to project
+
+    Creates a Virtual Dataset with the project's data sources
+    at the end for unified access
+    """
+    project_id = project.id
 
     n_dim, extract_features, _ = setup_clip(model_name)
     process_fn = functools.partial(_process, extract_features)
 
-    dataset_engine = db.init_project(
-        get_wise_project_db_uri(project_id), echo=app_state["verbose"]
-    )
-
     count_: int = 0
     if mode == "update":
-        vds_path = get_wise_project_virtual_h5dataset(project_id)
+        vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
         count_ = get_counts(vds_path)[H5Datasets.FEATURES]
 
-    failed_datasources = []
+    added_datasets = []
+    failed_sources = []
+    _exception = None
 
-    try:
-        for dataset in input_datasets:
-            logger.info(f"Processing - {dataset}")
-            dataset_obj = None
-            try:
-                # Add data source to table
-                with dataset_engine.begin() as conn:
-                    dataset_obj = DatasetRepo.create(
-                        conn,
-                        data=_convert_input_source_to_dataset(dataset),
-                    )
+    _input_datasets = iter(input_datasets)
 
-                # Get dataset path
-                features_path = get_wise_project_h5dataset(
-                    project_id, str(dataset_obj.id)
+    for dataset in _input_datasets:
+        logger.info(f"Processing - {dataset}")
+        dataset_obj = None
+        try:
+            # Add data source to table
+            with db_engine.begin() as conn:
+                dataset_obj = DatasetRepo.create(
+                    conn,
+                    data=_convert_input_source_to_dataset(dataset),
                 )
 
-                # Get writer fn
-                with get_h5writer(
-                    features_path,
-                    list(H5Datasets),
-                    model_name=model_name,
-                    n_dim=n_dim,
-                    mode="w",
-                ) as writer_fn, dataset_engine.connect() as conn:
-                    # Process each item in data source and write to table + hdf5
-                    count_ = add_dataset(
-                        dataset_obj,
-                        conn,
-                        process_fn,
-                        writer_fn,
-                        offset=count_,
-                        batch_size=batch_size,
-                        error_handler=handle_failed_sample,
-                    )
+            # Get dataset path
+            features_path = get_wise_project_h5dataset(project_id, str(dataset_obj.id))
 
-            except Exception as e:
-                logger.error(f'Error while processing data source "{dataset}" - {e}')
-                # Delete the h5 datasets, table entry, and add to failed summary.
-                if dataset_obj:
-                    # Delete dataset
-                    delete_wise_project_h5dataset(project_id, str(dataset_obj.id))
+            # Get writer fn
+            with get_h5writer(
+                features_path,
+                list(H5Datasets),
+                model_name=model_name,
+                n_dim=n_dim,
+                mode="w",
+            ) as writer_fn:
+                # Process each item in data source and write to table + hdf5
+                count_ = add_dataset(
+                    dataset_obj,
+                    process_fn,
+                    writer_fn,
+                    db_engine=db_engine,
+                    offset=count_,
+                    batch_size=batch_size,
+                    error_handler=handle_failed_sample,
+                )
+            added_datasets.append(features_path)
+        except (KeyboardInterrupt, Exception) as e:
+            logger.error(f'Error while processing data source "{dataset}" - {e}')
+            # Delete the h5 datasets, table entry, and add to failed summary.
+            if dataset_obj:
+                # Delete dataset
+                delete_wise_project_h5dataset(project_id, str(dataset_obj.id))
 
-                    # Delete the Dataset -> Which deletes all metadata
-                    # Later, we can just continue from where we left off instead of deleting.
-                    with dataset_engine.begin() as conn:
-                        DatasetRepo.delete(conn, dataset_obj.id)
+                # Delete the Dataset -> Which deletes all metadata
+                # Later, we can just continue from where we left off instead of deleting.
+                with db_engine.begin() as conn:
+                    DatasetRepo.delete(conn, dataset_obj.id)
 
-                    failed_datasources.append(dataset)
-                if not continue_on_error:
-                    raise e
-    finally:
-        # TODO
-        # How to ensure this step succeeds?
-        #
-        logger.info("Creating Virtual Dataset across sources")
-        with dataset_engine.connect() as conn:
-            datasets = DatasetRepo.list(conn)
+            failed_sources.append(dataset)
+            if isinstance(e, KeyboardInterrupt) or (not continue_on_error):
+                _exception = e
+                failed_sources.extend(_input_datasets)
+                break
 
-            # Get all dataset sources
-            dataset_sources = [
-                get_wise_project_h5dataset(project_id, str(x.id)) for x in datasets
-            ]
-            logger.info(dataset_sources)
-            # Create virtual dataset
-            _create_virtual_dataset(project_id, n_dim, dataset_sources)
-        logger.info("Done")
+    # init mode, re-raise the exception and clear out the project tree
+    if _exception:
+        raise _exception
 
-    return failed_datasources
+    return added_datasets, failed_sources
 
 
 @app.command()
@@ -443,54 +475,85 @@ def init(
     # Try creating project id, it will fail if not unique.
     # TODO Translate the exception
     with engine.begin() as conn:
-        WiseProjectsRepo.create(conn, data=Project(id=project_id))
+        project = WiseProjectsRepo.create(conn, data=Project(id=project_id))
 
     model_name = model.value
     failures_path = f"wise_init_failedsamples_{project_id}.tar"
     failed_datasources = []
+    dataset_engine = None
 
     try:
         # Create project tree, get paths to the HDF5 files
         create_wise_project_tree(project_id, store_in)
+
+        dataset_engine = db.init_project(
+            get_wise_project_db_uri(project_id), echo=app_state["verbose"]
+        )
 
         with wds.TarWriter(failures_path, encoder=False) as sink:
 
             def handle_failed_sample(sample: Dict[str, Any]):
                 sink.write(sample)
 
-            failed_datasources = _update(
-                project_id,
+            added, failed_datasources = _update(
+                project,
                 input_datasets,
                 model_name,
+                db_engine=dataset_engine,
                 mode="init",
                 batch_size=batch_size,
                 handle_failed_sample=handle_failed_sample,
                 continue_on_error=continue_on_error,
             )
 
-    except Exception:
+            if len(added) > 0:
+                logger.info("Creating Virtual dataset...")
+                with engine.begin() as conn:
+                    new_version = _create_virtual_dataset(project, added)
+                    WiseProjectsRepo.update(
+                        conn,
+                        project_id,
+                        data=project.copy(update={"version": new_version}),
+                    )
+                logger.info("Done")
+
+            if failed_datasources:
+                logger.error(
+                    f'Project "{project_id}" was created, but the following data sources failed'
+                )
+                logger.error("\n\t".join(failed_datasources))
+                logger.error(
+                    "Call the update command after fixing the datasource for errors"
+                )
+
+    except (KeyboardInterrupt, Exception):
         logger.exception(f"Initialising project {project_id} failed!")
         delete_project = typer.confirm("Delete associated project files?", default=True)
-        if not delete_project:
-            logger.error(
-                f'Files for "{project_id}" left in {get_wise_project_folder(project_id)}'
-            )
-            return typer.Exit(1)
+        if delete_project:
+            with engine.begin() as conn:
+                WiseProjectsRepo.delete(conn, project_id)
 
-        with engine.begin() as conn:
-            WiseProjectsRepo.delete(conn, project_id)
+            delete_wise_project_tree(project_id)
 
-        delete_wise_project_tree(project_id)
+            raise typer.Exit(1)
 
-        return typer.Exit(1)
-
-    if failed_datasources:
+        if dataset_engine:
+            logger.info("Creating virtual dataset...")
+            with dataset_engine.connect() as conn:
+                datasets = [
+                    get_wise_project_h5dataset(project_id, str(x.id))
+                    for x in DatasetRepo.list(conn)
+                ]
+            with engine.begin() as conn:
+                new_version = _create_virtual_dataset(project, datasets)
+                WiseProjectsRepo.update(
+                    conn, project_id, data=project.copy(update={"version": new_version})
+                )
+            logger.info("Done")
         logger.error(
-            f'Project "{project_id}" was created, but the following data sources failed'
+            f'Files for "{project_id}" left in {get_wise_project_folder(project_id)}'
         )
-        logger.error("\n\t".join(failed_datasources))
-
-    typer.Exit(0)
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -533,12 +596,16 @@ def update(
         if not project:
             raise typer.BadParameter(f"Project {project_id} not found!")
 
-    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    dataset_engine = db.init_project(
+        get_wise_project_db_uri(project_id), echo=app_state["verbose"]
+    )
+
+    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = get_model_name(vds_path)
 
     failures_path = f"wise_update_failedsamples_{project_id}.tar"
+    added = []
     failed_datasources = []
-
     try:
 
         with wds.TarWriter(failures_path, encoder=False) as sink:
@@ -546,28 +613,39 @@ def update(
             def handle_failed_sample(sample: Dict[str, Any]):
                 sink.write(sample)
 
-            failed_datasources = _update(
-                project_id,
+            _, failed_datasources = _update(
+                project,
                 input_datasets,
                 model_name,
+                db_engine=dataset_engine,
                 mode="update",
                 batch_size=batch_size,
                 handle_failed_sample=handle_failed_sample,
                 continue_on_error=continue_on_error,
             )
-
+            if failed_datasources:
+                logger.error(
+                    f'Project "{project_id}" was updated, but the following data sources failed'
+                )
+                logger.error("\n\t".join(failed_datasources))
     except Exception:
         logger.exception(f"Updating project {project_id} failed!")
-        return typer.Exit(1)
+        raise typer.Exit(1)
 
-    if failed_datasources:
-        logger.error(
-            f'Project "{project_id}" was updated, but the following data sources failed'
-        )
-        logger.error("\n\t".join(failed_datasources))
-
-    typer.Exit(0)
-    pass
+    finally:
+        # Recreate the new version
+        logger.info("Creating Virtual Dataset...")
+        with dataset_engine.connect() as conn:
+            datasets = [
+                get_wise_project_h5dataset(project_id, str(x.id))
+                for x in DatasetRepo.list(conn)
+            ]
+        with engine.begin() as conn:
+            new_version = _create_virtual_dataset(project, datasets)
+            WiseProjectsRepo.update(
+                conn, project_id, data=project.copy(update={"version": new_version})
+            )
+        logger.info("Done")
 
 
 @app.command()
@@ -612,7 +690,7 @@ def search(
         if project is None:
             raise typer.BadParameter(f"Project {project_id} not found!")
 
-    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = get_model_name(vds_path)
     counts = get_counts(vds_path)
 
@@ -706,7 +784,8 @@ def serve(
         exists=True,
         dir_okay=True,
         file_okay=False,
-        help="static HTML assets related to the user interface are served from this folder")
+        help="static HTML assets related to the user interface are served from this folder",
+    ),
 ):
     from api import serve
 
@@ -720,11 +799,13 @@ def index(
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, project_id)
         if project is None:
-            raise typer.BadParameter(f"Project {config.project_id} not found!")
+            raise typer.BadParameter(f"Project {project_id} not found!")
 
-    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = get_model_name(vds_path)
-    n_dim, _, _ = setup_clip(model_name) # TODO: is there a simpler way to obtain feature dimension?
+    n_dim, _, _ = setup_clip(
+        model_name
+    )  # TODO: is there a simpler way to obtain feature dimension?
 
     counts = get_counts(vds_path)
     assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
@@ -736,12 +817,13 @@ def index(
     for batch in reader(H5Datasets.FEATURES):
         nbatch = batch.shape[0]
         index_flat.add(batch)
-        print('Adding batch %d' % (offset))
+        print("Adding batch %d" % (offset))
         offset = offset + 1
-        
-    index_fn = get_wise_project_index_folder(project_id) / 'Flat-IP.faiss'
-    print('Saving faiss index to %s' % (index_fn))
+
+    index_fn = get_wise_project_index_folder(project_id) / "Flat-IP.faiss"
+    print("Saving faiss index to %s" % (index_fn))
     faiss.write_index(index_flat, str(index_fn))
+
 
 if __name__ == "__main__":
     app()
