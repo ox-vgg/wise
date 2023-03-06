@@ -1,4 +1,5 @@
 import enum
+import functools
 import itertools
 from pathlib import Path
 
@@ -75,8 +76,9 @@ def base(verbose: bool = False):
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
     )
-    global logger
+    global logger, engine
     logger = logging.getLogger()
+    engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
 
 
 class _CLIPModel(str, enum.Enum):
@@ -222,6 +224,177 @@ def overwrite():
     pass
 
 
+def _create_virtual_dataset(project_id: str, n_dim: int, sources: List[Path]):
+    output = get_wise_project_virtual_h5dataset(project_id)
+    concat_h5datasets(sources, n_dim, output)
+
+
+# Function to transform images and metadata into required formats
+def _process(extract_features, batch: List[Tuple[Image.Image, ImageMetadata]]):
+    images, metadata = zip(*batch)
+    features = extract_features(images)
+    thumbs = [generate_thumbnail(x) for x in images]
+
+    return metadata, features, thumbs
+
+
+# Function to convert input source to DatasetModel
+def _convert_input_source_to_dataset(input_source: Union[str, Path]):
+    return (
+        DatasetCreate(location=str(input_source.resolve()), type=DatasetType.IMAGE_DIR)
+        if isinstance(input_source, Path)
+        else DatasetCreate(
+            location=(
+                str(x.resolve())
+                if (x := Path(input_source)).is_file()
+                else input_source
+            ),
+            type=DatasetType.WEBDATASET,
+        )
+    )
+
+
+def add_dataset(
+    dataset: Dataset,
+    conn,
+    process_fn,
+    writer_fn,
+    offset: int = 0,
+    batch_size: int = 1,
+    error_handler=lambda sample: None,
+):
+
+    # Get dataset iterator
+    dataset_iterator = get_dataset_iterator(dataset, error_handler)
+
+    # Keep track of records written in this dataset
+    count_ = 0
+    with tqdm() as pbar:
+        for batch in batched(dataset_iterator, batch_size):
+            metadata, features, thumbs = process_fn(batch)
+
+            row_count = len(batch)
+            h5_row_ids = [count_ + i for i in range(row_count)]
+
+            with conn.begin():
+                metadata = [
+                    MetadataRepo.create(
+                        conn,
+                        data=x.copy(
+                            update={
+                                "dataset_row": row_id,
+                                "id": offset + row_id,
+                            }
+                        ),
+                    )
+                    for row_id, x in zip(h5_row_ids, metadata)
+                ]
+
+                metadata_row_ids = [str(offset + x) for x in h5_row_ids]
+                writer_fn(features, metadata_row_ids, thumbs)
+            count_ += row_count
+
+            # Udpate progress bar
+            pbar.update(row_count)
+    # Return updated offset
+    return offset + count_
+
+
+def _update(
+    project_id: str,
+    input_datasets: List[Union[str, Path]],
+    model_name: str,
+    mode: Literal["init", "update"] = "init",
+    batch_size: int = 1,
+    handle_failed_sample=lambda sample: None,
+    continue_on_error: bool = False,
+):
+
+    n_dim, extract_features, _ = setup_clip(model_name)
+    process_fn = functools.partial(_process, extract_features)
+
+    dataset_engine = db.init_project(
+        get_wise_project_db_uri(project_id), echo=app_state["verbose"]
+    )
+
+    count_: int = 0
+    if mode == "update":
+        vds_path = get_wise_project_virtual_h5dataset(project_id)
+        count_ = get_counts(vds_path)[H5Datasets.FEATURES]
+
+    failed_datasources = []
+
+    try:
+        for dataset in input_datasets:
+            logger.info(f"Processing - {dataset}")
+            dataset_obj = None
+            try:
+                # Add data source to table
+                with dataset_engine.begin() as conn:
+                    dataset_obj = DatasetRepo.create(
+                        conn,
+                        data=_convert_input_source_to_dataset(dataset),
+                    )
+
+                # Get dataset path
+                features_path = get_wise_project_h5dataset(
+                    project_id, str(dataset_obj.id)
+                )
+
+                # Get writer fn
+                with get_h5writer(
+                    features_path,
+                    list(H5Datasets),
+                    model_name=model_name,
+                    n_dim=n_dim,
+                    mode="w",
+                ) as writer_fn, dataset_engine.connect() as conn:
+                    # Process each item in data source and write to table + hdf5
+                    count_ = add_dataset(
+                        dataset_obj,
+                        conn,
+                        process_fn,
+                        writer_fn,
+                        offset=count_,
+                        batch_size=batch_size,
+                        error_handler=handle_failed_sample,
+                    )
+
+            except Exception as e:
+                logger.error(f'Error while processing data source "{dataset}" - {e}')
+                # Delete the h5 datasets, table entry, and add to failed summary.
+                if dataset_obj:
+                    # Delete dataset
+                    delete_wise_project_h5dataset(project_id, str(dataset_obj.id))
+
+                    # Delete the Dataset -> Which deletes all metadata
+                    # Later, we can just continue from where we left off instead of deleting.
+                    with dataset_engine.begin() as conn:
+                        DatasetRepo.delete(conn, dataset_obj.id)
+
+                    failed_datasources.append(dataset)
+                if not continue_on_error:
+                    raise e
+    finally:
+        # TODO
+        # How to ensure this step succeeds?
+        #
+        logger.info("Creating Virtual Dataset across sources")
+        with dataset_engine.connect() as conn:
+            datasets = DatasetRepo.list(conn)
+
+            # Get all dataset sources
+            dataset_sources = [
+                get_wise_project_h5dataset(project_id, str(x.id)) for x in datasets
+            ]
+            logger.info(dataset_sources)
+            # Create virtual dataset
+            _create_virtual_dataset(project_id, n_dim, dataset_sources)
+        logger.info("Done")
+
+    return failed_datasources
+
+
 @app.command()
 def init(
     batch_size: int = typer.Option(
@@ -267,154 +440,32 @@ def init(
 
     # Try creating project id, it will fail if not unique.
     # TODO Translate the exception
-    engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
-
     with engine.begin() as conn:
         WiseProjectsRepo.create(conn, data=Project(id=project_id))
 
+    model_name = model.value
+    failures_path = f"wise_init_failedsamples_{project_id}.tar"
     failed_datasources = []
+
     try:
         # Create project tree, get paths to the HDF5 files
-        project_folder = create_wise_project_tree(project_id, store_in)
-        dataset_engine = db.init_project(
-            get_wise_project_db_uri(project_id), echo=app_state["verbose"]
-        )
-        model_name = model.value
-        n_dim, extract_features, _ = setup_clip(model_name)
+        create_wise_project_tree(project_id, store_in)
 
-        def create_virtual_dataset():
-            with dataset_engine.connect() as conn:
-                datasets = DatasetRepo.list(conn)
-
-                # Get all dataset sources
-                dataset_sources = [
-                    get_wise_project_h5dataset(project_id, str(x.id)) for x in datasets
-                ]
-
-            output = get_wise_project_virtual_h5dataset(project_id)
-            concat_h5datasets(dataset_sources, n_dim, output)
-
-        # Function to transform images and metadata into required formats
-        def process(batch: List[Tuple[Image.Image, ImageMetadata]]):
-            images, metadata = zip(*batch)
-            features = extract_features(images)
-            thumbs = [generate_thumbnail(x) for x in images]
-
-            return metadata, features, thumbs
-
-        def create_dataset(dataset: Union[Path, str]):
-            # Add dataset to table and get dataset id
-            payload = (
-                DatasetCreate(
-                    location=str(dataset.resolve()), type=DatasetType.IMAGE_DIR
-                )
-                if isinstance(dataset, Path)
-                else DatasetCreate(
-                    location=(
-                        str(x.resolve()) if (x := Path(dataset)).is_file() else dataset
-                    ),
-                    type=DatasetType.WEBDATASET,
-                )
-            )
-            with dataset_engine.begin() as conn:
-                dataset_obj = DatasetRepo.create(
-                    conn,
-                    data=payload,
-                )
-                return dataset_obj
-
-        # Function to handle data source
-        # Iterate -> Batch -> Transform -> Write
-        def handle_dataset(
-            dataset: Dataset, offset: int = 0, error_handler=lambda sample: None
-        ):
-            # Get dataset path
-            features_path = get_wise_project_h5dataset(project_id, str(dataset.id))
-
-            # Get dataset iterator
-            dataset_iterator = get_dataset_iterator(dataset, error_handler)
-
-            # Keep track of records written in this dataset
-            count_ = 0
-            with dataset_engine.connect() as conn, get_h5writer(
-                features_path,
-                list(H5Datasets),
-                model_name=model_name,
-                n_dim=n_dim,
-                mode="w",
-            ) as writer_fn, tqdm() as pbar:
-                for batch in batched(dataset_iterator, batch_size):
-                    metadata, features, thumbs = process(batch)
-
-                    row_count = len(batch)
-                    h5_row_ids = [count_ + i for i in range(row_count)]
-
-                    with conn.begin():
-                        metadata = [
-                            MetadataRepo.create(
-                                conn,
-                                data=x.copy(
-                                    update={
-                                        "dataset_row": row_id,
-                                        "id": offset + row_id,
-                                    }
-                                ),
-                            )
-                            for row_id, x in zip(h5_row_ids, metadata)
-                        ]
-
-                        metadata_row_ids = [str(offset + x) for x in h5_row_ids]
-                        writer_fn(features, metadata_row_ids, thumbs)
-                    count_ += row_count
-
-                    # Udpate progress bar
-                    pbar.update(row_count)
-            # Return updated offset
-            return offset + count_
-
-        failures_path = f"wise_failedsamples_{project_id}.tar"
-
-        with dataset_engine.connect() as conn, wds.TarWriter(
-            failures_path, encoder=False
-        ) as sink:
+        with wds.TarWriter(failures_path, encoder=False) as sink:
 
             def handle_failed_sample(sample: Dict[str, Any]):
                 sink.write(sample)
 
-            count_ = 0
-            for dataset in input_datasets:
-                logger.info(f"Processing - {dataset}")
-                dataset_obj = None
-                try:
-                    # Add data source to table
-                    dataset_obj = create_dataset(dataset)
+            failed_datasources = _update(
+                project_id,
+                input_datasets,
+                model_name,
+                mode="init",
+                batch_size=batch_size,
+                handle_failed_sample=handle_failed_sample,
+                continue_on_error=continue_on_error,
+            )
 
-                    # Process each item in data source and write to table + hdf5
-                    count_ = handle_dataset(
-                        dataset_obj, offset=count_, error_handler=handle_failed_sample
-                    )
-
-                except Exception as e:
-                    logger.error(
-                        f'Error while processing data source "{dataset}" - {e}'
-                    )
-                    # Delete the data source, truncate h5, and add to failed summary.
-                    if dataset_obj:
-                        # Delete dataset
-                        delete_wise_project_h5dataset(project_id, str(dataset_obj.id))
-
-                        # Delete the Dataset -> Which deletes all metadata
-                        # Later, we can just continue from where we left off instead of deleting.
-                        with conn.begin():
-                            DatasetRepo.delete(conn, dataset_obj.id)
-
-                        failed_datasources.append(dataset)
-                    if not continue_on_error:
-                        raise e
-
-            logger.info("Creating Virtual Dataset across all sources")
-            create_virtual_dataset()
-            logger.info("Done")
     except Exception:
         logger.exception(f"Initialising project {project_id} failed!")
         delete_project = typer.confirm("Delete associated project files?", default=True)
@@ -438,6 +489,83 @@ def init(
         logger.error("\n\t".join(failed_datasources))
 
     typer.Exit(0)
+
+
+@app.command()
+def update(
+    batch_size: int = typer.Option(
+        1,
+        help="Batch size that would fit your RAM/GPURAM",
+    ),
+    sources: List[str] = typer.Option(
+        ..., "--source", help="List[DirPath | WebDataset compatible URL]"
+    ),
+    continue_on_error: bool = typer.Option(
+        False, help="Continue processing when encountered with errors if possible"
+    ),
+    project_id: str = typer.Argument(..., help="Name of the project"),
+):
+    """
+    Update WISE Project
+
+    - For each data source, extract the features, thumbnails and metadata
+      of images and append it to the project dataset
+    - Failed samples are written to wise_failed_update_{project_id}.tar
+    - If writing fails while processing a data source, the associated files are deleted
+    - If continue on error is True, other data sources will be processed
+    - Any other exception, the project is rolled back to initial state.
+    """
+    # Setup
+    # Validates the input sources and converts them into a list
+    # containing directories, valid webdatset tar files in those directories
+    # and parses other strings as webdataset urls and checks if it can be opened
+    input_datasets = parse_and_validate_input_datasets(sources)
+
+    _sources = "\n\t".join(sources)
+    logger.info(f"Processsing data sources - {_sources}")
+
+    # Try creating project id, it will fail if not unique.
+    # TODO Translate the exception
+    with engine.begin() as conn:
+        project = WiseProjectsRepo.get(conn, project_id)
+        if not project:
+            raise typer.BadParameter(f"Project {project_id} not found!")
+
+    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    model_name = get_model_name(vds_path)
+
+    failures_path = f"wise_update_failedsamples_{project_id}.tar"
+    failed_datasources = []
+
+    try:
+
+        with wds.TarWriter(failures_path, encoder=False) as sink:
+
+            def handle_failed_sample(sample: Dict[str, Any]):
+                sink.write(sample)
+
+            failed_datasources = _update(
+                project_id,
+                input_datasets,
+                model_name,
+                mode="update",
+                batch_size=batch_size,
+                handle_failed_sample=handle_failed_sample,
+                continue_on_error=continue_on_error,
+            )
+
+    except Exception:
+        logger.exception(f"Updating project {project_id} failed!")
+        return typer.Exit(1)
+
+    if failed_datasources:
+        logger.error(
+            f'Project "{project_id}" was updated, but the following data sources failed'
+        )
+        logger.error("\n\t".join(failed_datasources))
+
+    typer.Exit(0)
+    pass
 
 
 @app.command()
