@@ -257,7 +257,7 @@
 
       controller = new AbortController();
       const signal = controller.signal;
-      const res = await fetch(`../search?${params.toString()}`, {
+      const res = await fetch(`search?${params.toString()}`, {
         method: "GET",
         signal,
       });
@@ -345,7 +345,7 @@
 
       search_loader.classList.remove("gone");
 
-      const res = await fetch(`../search?${params.toString()}`, {
+      const res = await fetch(`search?${params.toString()}`, {
         method: "POST",
         body: formData,
       });

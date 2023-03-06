@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+import itertools
 from typing import Dict, List
 import io
 import logging
@@ -7,6 +8,7 @@ import tarfile
 from PIL import Image
 from fastapi import APIRouter, HTTPException, Query, File
 from fastapi.responses import (
+    Response,
     FileResponse,
     PlainTextResponse,
     RedirectResponse,
@@ -19,20 +21,23 @@ from config import APIConfig
 from src import db
 from src.projects import (
     get_wise_db_uri,
-    get_wise_features_dataset_path,
+    get_wise_project_virtual_h5dataset,
     get_wise_project_db_uri,
-    get_wise_thumbs_dataset_path,
 )
 from src.repository import WiseProjectsRepo, MetadataRepo, DatasetRepo
-from src.data_models import ImageInfo, DatasetType, Dataset
+from src.data_models import ImageInfo, ImageMetadata, DatasetType, Dataset
 from src.ioutils import (
-    get_dataset_reader,
-    get_thumbs_reader,
+    H5Datasets,
+    get_h5iterator,
+    get_h5reader,
+    get_model_name,
+    get_counts,
     is_valid_uri,
     get_file_from_tar,
 )
 from src.inference import setup_clip
 from src.search import brute_force_search
+from src.utils import convert_uint8array_to_base64
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +46,7 @@ def raise_(ex):
     raise ex
 
 
-def get_image_router(config: APIConfig):
-
+def get_project_router(config: APIConfig):
     if config.project_id is None:
         raise typer.BadParameter("project id is missing!")
 
@@ -53,15 +57,38 @@ def get_image_router(config: APIConfig):
             raise typer.BadParameter(f"Project {config.project_id} not found!")
 
     project_id = project.id
-    router = APIRouter(
-        prefix=f"/images/{project_id}",
-        tags=["images"],
-    )
+    router = APIRouter(prefix=f"/{project_id}", tags=[f"{project_id}"])
+    router.include_router(_get_project_data_router(config))
+    router.include_router(_get_search_router(config))
 
+    return router
+
+
+def _get_project_data_router(config: APIConfig):
+    """
+    Returns a router with API routes for reading the project data
+
+    Provides
+    - /images/{_id} -> Access the original image from URL / disk
+    - /thumbs/{_id} -> Read the thumbnail as bytes from dataset
+    - /metadata/{_id} -> Read the metadata associated with the specific sample
+    - /info -> Read the project level metadata
+    """
+
+    project_id = config.project_id
+    vds_path = get_wise_project_virtual_h5dataset(project_id)
+
+    router_cm = ExitStack()
+    router = APIRouter(
+        on_shutdown=[lambda: print("shutting down") and router_cm.close()],
+    )
+    thumbs_reader = router_cm.enter_context(
+        get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
+    )
     project_engine = db.init_project(get_wise_project_db_uri(project_id))
 
     @router.get(
-        "/{image_id}",
+        "/images/{image_id}",
         response_class=FileResponse,
         responses={404: {"content": "text/plain"}, 302: {}},
     )
@@ -116,25 +143,53 @@ def get_image_router(config: APIConfig):
                     status_code=404, content=f"{image_id} not found!"
                 )
 
+    @router.get(
+        "/thumbs/{_id}",
+        response_class=Response,
+        responses={200: {"content": "image/jpeg"}, 404: {"content": "text/plain"}},
+    )
+    def get_thumbnail(_id: int):
+        try:
+            return Response(
+                content=bytes(thumbs_reader([_id])[0]),
+                media_type="image/jpeg",
+                status_code=200,
+            )
+        except IndexError:
+            return PlainTextResponse(status_code=404, content=f"{_id} not found!")
+        except Exception as e:
+            logger.error(f"Failed to get thumbnail {_id}, {e}")
+            raise HTTPException(status_code=500)
+
+    @router.get(
+        "/metadata/{_id}",
+        response_model=ImageMetadata,
+        response_model_exclude=set(["id", "dataset_id", "dataset_row"]),
+        responses={200: {"content": "application/json"}},
+    )
+    def get_metadata(_id: int):
+        with project_engine.connect() as conn:
+            metadata = MetadataRepo.get(conn, _id)
+            if metadata is None:
+                raise HTTPException(status_code=404, detail=f"Metadata not found!")
+            return metadata
+
+    @router.get("/info")
+    def get_info():
+        model_name = get_model_name(vds_path)
+        counts = get_counts(vds_path)
+        return {
+            "id": project_id,
+            "model": model_name,
+            "num_images": counts[H5Datasets.FEATURES],
+        }
+
     return router
 
 
-def get_search_router(config: APIConfig):
-    if config.project_id is None:
-        raise typer.BadParameter("project id is missing!")
+def _get_search_router(config: APIConfig):
 
-    engine = db.init(get_wise_db_uri())
-    with engine.connect() as conn:
-        project = WiseProjectsRepo.get(conn, config.project_id)
-        if project is None:
-            raise typer.BadParameter(f"Project {config.project_id} not found!")
-
-    project_id = project.id
-    image_features = get_wise_features_dataset_path(
-        project_id,
-        "features",
-        "images",
-    )
+    project_id = config.project_id
 
     class SearchResponse(BaseModel):
         link: str
@@ -150,8 +205,8 @@ def get_search_router(config: APIConfig):
         return {
             _q: [
                 SearchResponse(
-                    thumbnail=_thumb,
-                    link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{project_id}/{_metadata.id}'}",
+                    thumbnail=convert_uint8array_to_base64(_thumb),
+                    link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
                     distance=_dist,
                     info=ImageInfo(
                         filename=_metadata.path,
@@ -172,15 +227,31 @@ def get_search_router(config: APIConfig):
         }
 
     _prefix = config.query_prefix.strip()
-    model_name, num_files, reader = get_dataset_reader(image_features, driver="family")
-    extract_image_features, extract_text_features = setup_clip(model_name)
     project_engine = db.init_project(get_wise_project_db_uri(project_id))
-    thumbs = get_wise_thumbs_dataset_path(project_id)
+
+    # TODO Big assumption - all datasets were written with same model name
+    # Should Read / Write to project db instead
+
+    # Get model name
+    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    model_name = get_model_name(vds_path)
+
+    # Get counts
+    counts = get_counts(vds_path)
+    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
+    num_files = counts[H5Datasets.FEATURES]
+
+    reader = get_h5iterator(vds_path)
+    all_features = lambda: reader(H5Datasets.FEATURES)
+
+    _, extract_image_features, extract_text_features = setup_clip(model_name)
+
     router_cm = ExitStack()
-    thumbs_reader = router_cm.enter_context(get_thumbs_reader(thumbs, driver="family"))
+    thumbs_reader = router_cm.enter_context(
+        get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
+    )
 
     router = APIRouter(
-        tags=["search"],
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
 
@@ -189,23 +260,22 @@ def get_search_router(config: APIConfig):
         q: List[str] = Query(
             default=[],
         ),
-        top_k: int = Query(config.top_k, gt=0, le=min(200, num_files)),
+        top_k: int = Query(config.top_k, gt=0, le=100),
     ):
         if len(q) == 0:
             raise HTTPException(
                 400, {"message": "Must be called with search query term"}
             )
 
+        top_k = min(top_k, num_files)
         prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
         text_features = extract_text_features(prefixed_queries)
-        dist, ids = brute_force_search(
-            (x for x, _ in reader()), text_features, top_k=top_k
-        )
+        dist, ids = brute_force_search(all_features(), text_features, top_k=top_k)
 
         with project_engine.connect() as conn:
 
             def get_metadata(_id):
-                m = MetadataRepo.get(conn, int(_id) + 1)
+                m = MetadataRepo.get(conn, int(_id))
                 if m is None:
                     raise RuntimeError()
                 return m
@@ -217,18 +287,17 @@ def get_search_router(config: APIConfig):
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
     async def image_search(
         q: bytes = File(),
-        top_k: int = Query(config.top_k, gt=0, le=min(200, num_files)),
+        top_k: int = Query(config.top_k, gt=0, le=100),
     ):
+        top_k = min(top_k, num_files)
         with Image.open(io.BytesIO(q)) as im:
             query_features = extract_image_features([im])
-            dist, ids = brute_force_search(
-                (x for x, _ in reader()), query_features, top_k=top_k
-            )
+            dist, ids = brute_force_search(all_features(), query_features, top_k=top_k)
 
         with project_engine.connect() as conn:
 
             def get_metadata(_id):
-                m = MetadataRepo.get(conn, int(_id) + 1)
+                m = MetadataRepo.get(conn, int(_id))
                 if m is None:
                     raise RuntimeError()
                 return m

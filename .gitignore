@@ -6,6 +6,8 @@ public/images
 public/thumbs
 *.h5
 *.npy
+*.tar
+*.db
 
 # generated output
 output/
