@@ -569,6 +569,30 @@ def update(
 
 
 @app.command()
+def delete(
+    project_id: str = typer.Argument(..., help="Name of the project"),
+):
+    """
+    Delete the project and associated files
+    """
+    with engine.begin() as conn:
+        project = WiseProjectsRepo.get(conn, project_id)
+        if not project:
+            raise typer.BadParameter(f"Project {project_id} not found!")
+
+        delete_project = typer.confirm(
+            "Please type the project name again to confirm", abort=True
+        )
+        if delete_project != project_id:
+            logger.error(f"Not deleting {project_id}")
+            raise typer.Abort()
+
+        delete_wise_project_tree(project_id)
+        with engine.begin() as conn:
+            WiseProjectsRepo.delete(conn, project_id)
+
+
+@app.command()
 def search(
     project_id: str = typer.Argument(..., help="Name of the project"),
     top_k: int = typer.Option(5, help="Top-k results to retrieve"),
