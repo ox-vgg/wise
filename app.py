@@ -580,9 +580,7 @@ def delete(
         if not project:
             raise typer.BadParameter(f"Project {project_id} not found!")
 
-        delete_project = typer.confirm(
-            "Please type the project name again to confirm", abort=True
-        )
+        delete_project = typer.prompt("Please type the project name again to confirm")
         if delete_project != project_id:
             logger.error(f"Not deleting {project_id}")
             raise typer.Abort()
