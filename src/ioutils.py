@@ -75,7 +75,7 @@ def is_valid_webdataset_source(p: str):
 def get_valid_webdataset_tar_from_folder(folder: Path):
     return (
         str(x)
-        for x in folder.rglob("*")
+        for x in folder.rglob("*.tar")
         if x.is_file() and tarfile.is_tarfile(x) and is_valid_webdataset_source(str(x))
     )
 
