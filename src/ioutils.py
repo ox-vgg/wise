@@ -461,7 +461,7 @@ def get_h5writer(
             )
 
     with _get_dataset(dataset, _names, mode=mode, n_dim=n_dim, **kwargs) as ds_arr:
-        _encoding_fns = (ENCODING_FNS[_get_dataset_type(_ds)] for _ds in ds_arr)
+        _encoding_fns = list(ENCODING_FNS[_get_dataset_type(_ds)] for _ds in ds_arr)
 
         num_datasets = len(ds_arr)
 
@@ -530,7 +530,7 @@ def concat_h5datasets(sources, features_dim: int, output: Path, **kwargs):
             for d, ds in zip(datasets, ds_arr):
                 vsource = h5py.VirtualSource(ds)
                 layouts[d][SIDX:EIDX, ...] = vsource
-            EIDX = SIDX
+            SIDX = EIDX
 
     with h5py.File(output, "w", libver="latest") as f:
         for _k, _layout in layouts.items():

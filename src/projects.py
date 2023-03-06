@@ -34,11 +34,13 @@ def get_wise_project_folder(project_id: str) -> Path:
     wise_folder = get_wise_folder()
     return wise_folder / "projects" / project_id
 
+
 def get_wise_project_virtual_h5dataset(project_id: str) -> Path:
-    return get_wise_project_folder(project_id) / f'{project_id}.h5'
+    return get_wise_project_folder(project_id) / f"{project_id}.h5"
+
 
 def get_wise_project_h5dataset(project_id: str, dataset_id: str):
-    return get_wise_project_folder(project_id) / f"{dataset_id.zfill(5)}.h5"
+    return get_wise_project_folder(project_id) / "data" / f"{dataset_id.zfill(5)}.h5"
 
 
 def delete_wise_project_h5dataset(
