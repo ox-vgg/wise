@@ -10,17 +10,15 @@ from .routes import get_project_router
 def create_app(config: APIConfig):
     app = FastAPI()
     app.state.config = config
-    # TODO Mount dataset source directories as static
-    # and return URL accordingly
-    app.mount(
-        f"/{config.project_id}/",
-        StaticFiles(directory="public", html=True),
-        name="assets",
-    )
 
     @app.on_event("startup")
     async def startup():
         app.include_router(get_project_router(config))
+        app.mount(
+            f"/{config.project_id}/",
+            StaticFiles(directory="public", html=True),
+            name="assets",
+        )
 
     @app.on_event("shutdown")
     async def shutdown():
