@@ -35,6 +35,9 @@ def get_wise_project_folder(project_id: str) -> Path:
     return wise_folder / "projects" / project_id
 
 
+def get_wise_project_index_folder(project_id: str) -> Path:
+    return get_wise_project_folder(project_id) / "index"
+
 def get_wise_project_virtual_h5dataset(project_id: str) -> Path:
     return get_wise_project_folder(project_id) / f"{project_id}.h5"
 
