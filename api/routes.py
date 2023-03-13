@@ -21,7 +21,7 @@ from config import APIConfig
 from src import db
 from src.projects import (
     get_wise_db_uri,
-    get_wise_project_virtual_h5dataset,
+    get_wise_project_latest_virtual_h5dataset,
     get_wise_project_db_uri,
 )
 from src.repository import WiseProjectsRepo, MetadataRepo, DatasetRepo
@@ -76,7 +76,7 @@ def _get_project_data_router(config: APIConfig):
     """
 
     project_id = config.project_id
-    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
 
     router_cm = ExitStack()
     router = APIRouter(
@@ -233,7 +233,7 @@ def _get_search_router(config: APIConfig):
     # Should Read / Write to project db instead
 
     # Get model name
-    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = get_model_name(vds_path)
 
     # Get counts

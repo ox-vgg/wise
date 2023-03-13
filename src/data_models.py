@@ -59,6 +59,7 @@ class ImageMetadata(BaseModel):
 
 class Project(BaseModel):
     id: str
+    version: Optional[int] = None
 
     class Config:
         orm_mode = True
