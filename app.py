@@ -53,12 +53,14 @@ from src.projects import (
     get_wise_project_folder,
     get_wise_project_h5dataset,
     get_wise_project_virtual_h5dataset,
+    get_wise_project_index_folder,
     delete_wise_project_h5dataset,
     create_wise_project_tree,
     delete_wise_project_tree,
 )
 from src.exceptions import EmptyDatasetException
 
+import faiss
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -699,11 +701,47 @@ def search(
 @app.command()
 def serve(
     project_id: Optional[str] = typer.Argument(None, help="Name of the project"),
+    theme_asset_dir: Path = typer.Option(
+        ...,
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+        help="static HTML assets related to the user interface are served from this folder")
 ):
     from api import serve
 
-    serve(project_id)
+    serve(project_id, theme_asset_dir)
 
+
+@app.command()
+def index(
+    project_id: str = typer.Argument(..., help="Name of the project"),
+):
+    with engine.connect() as conn:
+        project = WiseProjectsRepo.get(conn, project_id)
+        if project is None:
+            raise typer.BadParameter(f"Project {config.project_id} not found!")
+
+    vds_path = get_wise_project_virtual_h5dataset(project_id)
+    model_name = get_model_name(vds_path)
+    n_dim, _, _ = setup_clip(model_name) # TODO: is there a simpler way to obtain feature dimension?
+
+    counts = get_counts(vds_path)
+    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
+    num_files = counts[H5Datasets.FEATURES]
+
+    index_flat = faiss.IndexFlatIP(n_dim)
+    reader = get_h5iterator(vds_path)
+    offset = 0
+    for batch in reader(H5Datasets.FEATURES):
+        nbatch = batch.shape[0]
+        index_flat.add(batch)
+        print('Adding batch %d' % (offset))
+        offset = offset + 1
+        
+    index_fn = get_wise_project_index_folder(project_id) / 'Flat-IP.faiss'
+    print('Saving faiss index to %s' % (index_fn))
+    faiss.write_index(index_flat, str(index_fn))
 
 if __name__ == "__main__":
     app()

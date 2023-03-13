@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>WISE</title>
+    <meta name="author" content="Abhishek Dutta">
+    <meta name="description" content="WISE Image Search Engine">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=1">
+    <link rel="stylesheet" type="text/css" href="wise.css">
+  </head>
+  <body>
+    <header id="wise_panel">
+      <div class="logo">
+	<img title="Wikipedia Image Search Engine (WISE)" class="wise-logo" src="img/wise-logo.png">
+      </div>
+
+      <div class="top">
+	<div class="search">
+	  <input id="search_keyword" type="text" placeholder="enter search keywords (e.g. a red car)">
+	  <button onclick="submit_search_query()">Search</button>
+	  <button disabled>Upload & Search</button>
+	</div>
+
+	<div class="top_toolbar">
+	  <span id="navinfo1"></span>
+	  <span id="navinfo2"></span>
+	  <button onclick="show_prev_page()" title="Previous">&larr;</button>
+	  <button onclick="show_next_page()" title="Next">&rarr;</button>
+	</div>
+      </div>
+      <div id="toolbar">Here, you can search nearly 22% of the 78 million images in Wikipedia. Try searching, for example, using <span class="text_button" onclick="search_for('beatles press conference')">beatles press conference</span> or <span class="text_button" onclick="search_for('empty streets in India')">empty streets in India</span>.</div>
+    </header>
+
+    <section id="content">
+      <div id="imgrid" class="imgrid"></div>
+    </section>
+
+    <script src="wise.js"></script>
+    <script>
+      const search_keyword_input = document.getElementById('search_keyword');
+      search_keyword_input.addEventListener('keydown', function(e) {
+	  if(e.key === 'Enter') {
+	      submit_search_query();
+	      e.preventDefault();
+	  }
+      });
+      init_home_page();
+    </script>
+  </body>
+</html>
