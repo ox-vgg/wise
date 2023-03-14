@@ -22,6 +22,7 @@ from src import db
 from src.projects import (
     get_wise_db_uri,
     get_wise_project_latest_virtual_h5dataset,
+    get_wise_project_index_folder,
     get_wise_project_db_uri,
 )
 from src.repository import WiseProjectsRepo, MetadataRepo, DatasetRepo
@@ -36,8 +37,10 @@ from src.ioutils import (
     get_file_from_tar,
 )
 from src.inference import setup_clip
-from src.search import brute_force_search
+#from src.search import search_index
 from src.utils import convert_uint8array_to_base64
+
+import faiss
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,7 @@ def raise_(ex):
     raise ex
 
 
-def get_project_router(config: APIConfig):
+def get_project_router(config: APIConfig, index_type: str):
     if config.project_id is None:
         raise typer.BadParameter("project id is missing!")
 
@@ -59,7 +62,7 @@ def get_project_router(config: APIConfig):
     project_id = project.id
     router = APIRouter(prefix=f"/{project_id}", tags=[f"{project_id}"])
     router.include_router(_get_project_data_router(config))
-    router.include_router(_get_search_router(config))
+    router.include_router(_get_search_router(config, index_type))
 
     return router
 
@@ -187,7 +190,7 @@ def _get_project_data_router(config: APIConfig):
     return router
 
 
-def _get_search_router(config: APIConfig):
+def _get_search_router(config: APIConfig, index_type: str):
 
     project_id = config.project_id
 
@@ -236,6 +239,11 @@ def _get_search_router(config: APIConfig):
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = get_model_name(vds_path)
 
+    # init the index search
+    index_fn = get_wise_project_index_folder(project_id) / str(index_type + '.faiss')
+    print('Loading faiss index from %s' % (index_fn))
+    index = faiss.read_index(str(index_fn))
+
     # Get counts
     counts = get_counts(vds_path)
     assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
@@ -270,7 +278,7 @@ def _get_search_router(config: APIConfig):
         top_k = min(top_k, num_files)
         prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
         text_features = extract_text_features(prefixed_queries)
-        dist, ids = brute_force_search(all_features(), text_features, top_k=top_k)
+        dist, ids = index.search(text_features, top_k)
 
         with project_engine.connect() as conn:
 
@@ -292,7 +300,7 @@ def _get_search_router(config: APIConfig):
         top_k = min(top_k, num_files)
         with Image.open(io.BytesIO(q)) as im:
             query_features = extract_image_features([im])
-            dist, ids = brute_force_search(all_features(), query_features, top_k=top_k)
+            dist, ids = index.search(all_features(), query_features, top_k=top_k)
 
         with project_engine.connect() as conn:
 

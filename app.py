@@ -62,6 +62,7 @@ from src.projects import (
 from src.exceptions import EmptyDatasetException
 
 import faiss
+from enum import Enum
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -775,6 +776,9 @@ def search(
                     # Sqlite row id when not set explicitly starts at 1
                     print(f"Dist: {d:.5f}", MetadataRepo.get(conn, int(k)))
 
+class IndexType(str, Enum):
+    IndexFlatIP = "IndexFlatIP"
+    IndexIVFFlat = "IndexIVFFlat"
 
 @app.command()
 def serve(
@@ -786,44 +790,81 @@ def serve(
         file_okay=False,
         help="static HTML assets related to the user interface are served from this folder",
     ),
+    index_type: IndexType = typer.Option(IndexType.IndexFlatIP, help="the faiss index to use for serving")
 ):
     from api import serve
 
-    serve(project_id, theme_asset_dir)
+    index_fn = get_wise_project_index_folder(project_id) / str(index_type + '.faiss')
+    if not index_fn.exists():
+        raise typer.BadParameter(f"Index not found at {index_fn}. Use the 'index' command to create an index.")
 
+    serve(project_id, theme_asset_dir, index_type.value)
 
 @app.command()
 def index(
     project_id: str = typer.Argument(..., help="Name of the project"),
+    index_type: IndexType = typer.Option(IndexType.IndexFlatIP, help="the faiss index name")
 ):
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, project_id)
-        if project is None:
-            raise typer.BadParameter(f"Project {project_id} not found!")
+    if project is None:
+        raise typer.BadParameter(f"Project {project_id} not found!")
 
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = get_model_name(vds_path)
-    n_dim, _, _ = setup_clip(
-        model_name
-    )  # TODO: is there a simpler way to obtain feature dimension?
+    n_dim, _, _ = setup_clip(model_name)  # TODO: is there a simpler way to obtain feature dimension?
 
     counts = get_counts(vds_path)
     assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
     num_files = counts[H5Datasets.FEATURES]
 
-    index_flat = faiss.IndexFlatIP(n_dim)
-    reader = get_h5iterator(vds_path)
-    offset = 0
-    for batch in reader(H5Datasets.FEATURES):
-        nbatch = batch.shape[0]
-        index_flat.add(batch)
-        print("Adding batch %d" % (offset))
-        offset = offset + 1
+    faiss_index = None
+    if(index_type == IndexType.IndexFlatIP):
+        faiss_index = faiss.IndexFlatIP(n_dim)
+        reader = get_h5iterator(vds_path)
+        offset = 0
+        for batch in reader(H5Datasets.FEATURES):
+            nbatch = batch.shape[0]
+            faiss_index.add(batch)
+            print('Adding batch %d' % (offset))
+            offset = offset + 1
+        index_fn = get_wise_project_index_folder(project_id) / str('%s.faiss' % (index_type.value))
+    if(index_type == IndexType.IndexIVFFlat):
+        voronoi_cell_count = 100
+        train_batch_count = 1000
+        quantizer = faiss.IndexFlatIP(n_dim)
+        faiss_index = faiss.IndexIVFFlat(quantizer, n_dim, voronoi_cell_count)
+        reader = get_h5iterator(vds_path)
+        train_features = None
+        batch_size = 0
 
-    index_fn = get_wise_project_index_folder(project_id) / "Flat-IP.faiss"
-    print("Saving faiss index to %s" % (index_fn))
-    faiss.write_index(index_flat, str(index_fn))
+        print('Collecting features for training ...')
+        offset = 0
+        for batch in reader(H5Datasets.FEATURES):
+            print('%d, ' % (offset), end='')
+            if train_features is None:
+                batch_size = batch.shape[0]
+                train_features = np.ndarray((batch_size*train_batch_count, batch.shape[1]), dtype=np.float32)
+            train_features[offset*batch_size : (offset+1)*batch_size, ] = batch
+            offset = offset + 1
+            if offset >= train_batch_count:
+                break
+        print('done')
+        assert not faiss_index.is_trained
+        faiss_index.train(train_features)
+        assert faiss_index.is_trained
+        del train_features
 
+        print('Indexing features ...')
+        offset = 0
+        for batch in reader(H5Datasets.FEATURES):
+            print('%d, ' % (offset), end='')
+            faiss_index.add(batch)
+            offset = offset + 1
+        print('done')
+        index_fn = get_wise_project_index_folder(project_id) / str('%s.faiss' % (index_type.value))
+    print('Saving faiss index to %s' % (index_fn))
+    faiss.write_index(faiss_index, str(index_fn))
 
 if __name__ == "__main__":
     app()
