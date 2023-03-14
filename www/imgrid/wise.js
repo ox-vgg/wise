@@ -6,7 +6,9 @@ Date   : 2023-03-13
 */
 
 const wise_data = {};
-const PAGE_IMG_COUNT = 40;
+const PAGE_IMG_COUNT = 30;
+const SEARCH_RESULT_COUNT = 20;
+const MAX_SEARCH_RESULT = 1000;
 
 // html containers
 const imgrid_container = document.getElementById('imgrid');
@@ -23,6 +25,8 @@ const UI_MODE = {
 var wise_home_rand_img_index_list = [];
 var wise_home_from_findex = -1;
 var wise_home_to_findex = -1;
+var wise_result_start_findex = -1;
+var wise_result_end_findex = -1;
 var wise_current_ui_mode = UI_MODE.BROWSE_IMAGES;
 var wise_total_page_count = -1;
 
@@ -35,6 +39,8 @@ function init_home_page() {
 }
 
 function load_featured_image_grid() {
+    wise_current_ui_mode = UI_MODE.BROWSE_IMAGES;
+
     fetch("info", {
 	method: 'GET'
     })
@@ -45,7 +51,7 @@ function load_featured_image_grid() {
 
 	    // get total page count
 	    navinfo1.innerHTML = 'Showing selected images.';
-	    navinfo2.innerHTML = 'Use arrow keys (or buttons) to navigate ' + wise_data['info']['num_images'] + ' images.';
+	    navinfo2.innerHTML = 'Use arrow keys (or buttons) to navigate ' + wise_data['info']['num_images'].toLocaleString('en', {useGrouping:true}) + ' images.';
 	    imgrid_container.innerHTML = '';
 	    wise_home_rand_img_index_list = [];
 	    for(var i=0; i<PAGE_IMG_COUNT; ++i) {
@@ -85,7 +91,16 @@ function show_next_page() {
 	}
 	show_images(wise_home_from_findex, wise_home_to_findex)
     } else {
-	// TODO: handle search results page pagination
+	if(wise_result_start_findex < MAX_SEARCH_RESULT && wise_result_end_findex < MAX_SEARCH_RESULT) {
+	    wise_result_start_findex = wise_result_end_findex;
+	    wise_result_end_findex = wise_result_end_findex + SEARCH_RESULT_COUNT;
+	    if(wise_result_end_findex >= MAX_SEARCH_RESULT) {
+		wise_result_end_findex = MAX_SEARCH_RESULT;
+	    }
+	    subsequent_search_query(wise_result_start_findex, wise_result_end_findex);
+	} else {
+	    toolbar.innerHTML = 'No more search results are available';
+	}
     }
 }
 
@@ -104,7 +119,16 @@ function show_prev_page() {
 	}
 	show_images(wise_home_from_findex, wise_home_to_findex)
     } else {
-	// TODO: handle search results page pagination
+	if(wise_result_start_findex > 0) {
+	    wise_result_end_findex = wise_result_start_findex;
+	    wise_result_start_findex = wise_result_start_findex - SEARCH_RESULT_COUNT;
+	    if(wise_result_start_findex < 0) {
+		wise_result_start_findex = 0;
+	    }
+	    subsequent_search_query(wise_result_start_findex, wise_result_end_findex);
+	} else {
+	    toolbar.innerHTML = 'Already in the first page of the search results!';
+	}
     }
 }
 
@@ -121,7 +145,7 @@ function show_images(from_findex, to_findex) {
 
 	imgrid_container.appendChild(a);
     }
-    navinfo2.innerHTML = 'from ' + from_findex + ' to ' + to_findex + ' of ' + wise_data['info']['num_images'] + ' images.'    
+    navinfo2.innerHTML = 'from ' + from_findex + ' to ' + to_findex + ' of ' + wise_data['info']['num_images'].toLocaleString('en', {useGrouping:true}) + ' images.'
 }
 
 //
@@ -129,17 +153,16 @@ function show_images(from_findex, to_findex) {
 //
 function search_for(query) {
     document.getElementById('search_keyword').value = query;
-    submit_search_query();
+    submit_initial_search_query();
 }
 
-function submit_search_query() {
+function submit_initial_search_query() {
     const search_keyword = document.getElementById('search_keyword').value;
-    const topk = 100;
+    wise_result_start_findex = 0;
+    wise_result_end_findex = SEARCH_RESULT_COUNT;
+    const search_endpoint = 'search?q=' + search_keyword + '&from=' + wise_result_start_findex + '&to=' + wise_result_end_findex;
 
-    const search_endpoint = 'search?q=' + search_keyword + '&top_k=' + topk;
-    console.log(search_endpoint)
-
-    toolbar.innerHTML = 'Searching for <strong>' + search_keyword + '</strong> in ' + wise_data['info']['num_images'] + ' Wikipedia images <div class="spinner"></div>';
+    toolbar.innerHTML = 'Searching for <strong>' + search_keyword + '</strong> in ' + wise_data['info']['num_images'].toLocaleString('en', {useGrouping:true}) + ' Wikipedia images <div class="spinner"></div>';
 
     const time0 = performance.now();
     fetch(search_endpoint, {
@@ -153,14 +176,33 @@ function submit_search_query() {
 	});
 }
 
+function subsequent_search_query(start, end) {
+    const search_keyword = document.getElementById('search_keyword').value;
+    const search_endpoint = 'search?q=' + search_keyword + '&start=' + start + '&end=' + end;
+
+    toolbar.innerHTML = 'Continuing search for <strong>' + search_keyword + '</strong> in ' + wise_data['info']['num_images'].toLocaleString('en', {useGrouping:true}) + ' Wikipedia images <div class="spinner"></div>';
+
+    const time0 = performance.now();
+    fetch(search_endpoint, {
+	method: 'GET'
+    })
+	.then( (response) => response.json() )
+	.then( (search_result) => {
+	    const time1 = performance.now();
+	    const search_time = time1 - time0;
+	    show_search_result(search_result, search_time);
+	});
+
+}
+
 function show_search_result(response, search_time) {
     imgrid_container.innerHTML = '';
+    wise_current_ui_mode = UI_MODE.SHOW_RESULTS;
+
     const search_keyword = Object.keys(response)[0];
     const results = response[search_keyword];
 
     toolbar.innerHTML = 'Search completed in ' + (search_time/1000).toFixed(1) + ' sec.'
-    navinfo1.innerHTML = 'Showing ' + results.length + ' top matches.';
-    navinfo2.innerHTML = 'Go back to <span onclick="load_featured_image_grid()" class="text_button">Home</span>';
     for(var i=0; i<results.length; ++i) {
 	const img = document.createElement('img');
 	img.src = results[i]['thumbnail'];
@@ -173,9 +215,8 @@ function show_search_result(response, search_time) {
 	caption.innerHTML = '<a href="' + img_link + '">' + img_filename + '</a>';
 
 	const figure = document.createElement('figure');
-	score = (1.0 - results[i]['distance']) * 100;
 	figure.appendChild(img);
-	figure.setAttribute('title', 'File: ' + img_filename + ' | Score = ' + score.toFixed(1));
+	figure.setAttribute('title', 'File: ' + img_filename + ' | Distance = ' + results[i]['distance'].toFixed(2));
 
 	const a = document.createElement('a');
 	a.setAttribute('href', 'https://commons.wikimedia.org/wiki/File:' + img_filename);
@@ -185,4 +226,6 @@ function show_search_result(response, search_time) {
 	//figure.appendChild(caption);
 	imgrid_container.appendChild(a);
     }
+    navinfo1.innerHTML = 'Showing search results from ' + wise_result_start_findex + ' to ' + wise_result_end_findex + '.';
+    navinfo2.innerHTML = 'Go back to <span onclick="load_featured_image_grid()" class="text_button">Home</span>';
 }

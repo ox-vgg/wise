@@ -239,10 +239,12 @@ def _get_search_router(config: APIConfig, index_type: str):
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = get_model_name(vds_path)
 
-    # init the index search
+    # load the feature search index
     index_fn = get_wise_project_index_folder(project_id) / str(index_type + '.faiss')
     print('Loading faiss index from %s' % (index_fn))
     index = faiss.read_index(str(index_fn))
+    if index.nprobe:
+        index.nprobe = 3
 
     # Get counts
     counts = get_counts(vds_path)
@@ -268,18 +270,27 @@ def _get_search_router(config: APIConfig, index_type: str):
         q: List[str] = Query(
             default=[],
         ),
-        top_k: int = Query(config.top_k, gt=0, le=100),
+        start: int = Query(0, gt=-1, le=980),
+        end: int = Query(20, gt=0, le=1000),
     ):
         if len(q) == 0:
             raise HTTPException(
-                400, {"message": "Must be called with search query term"}
+                400, {"message": "missing search query"}
             )
 
-        top_k = min(top_k, num_files)
+        end = min(end, num_files)
+        if start > end:
+            raise HTTPException(
+                400, {"message": "'start' cannot be greater than 'end'"}
+            )
+        if (end - start) > 50:
+            raise HTTPException(
+                400, {"message": "cannot return more than 50 results at a time"}
+            )
         prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
         text_features = extract_text_features(prefixed_queries)
-        dist, ids = index.search(text_features, top_k)
 
+        dist, ids = index.search(text_features, end + 1)
         with project_engine.connect() as conn:
 
             def get_metadata(_id):
@@ -288,7 +299,7 @@ def _get_search_router(config: APIConfig, index_type: str):
                     raise RuntimeError()
                 return m
 
-            response = make_response(q, dist, ids, get_metadata, thumbs_reader)
+            response = make_response(q, dist[[0], start:end], ids[[0], start:end], get_metadata, thumbs_reader)
 
         return response
 
