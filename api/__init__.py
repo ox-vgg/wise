@@ -34,4 +34,4 @@ def serve(project_id: str, theme_asset_dir: Path, index_type: str):
     config = APIConfig.parse_obj(options)  # type: ignore
 
     app = create_app(config, theme_asset_dir, index_type)
-    uvicorn.run(app, port=config.port, log_level="info")
+    uvicorn.run(app, host=config.hostname, port=config.port, log_level="info")
