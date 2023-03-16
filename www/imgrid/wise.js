@@ -33,9 +33,10 @@ var wise_total_page_count = -1;
 //
 // Home Page
 //
-
+const TOOLBAR_INFO = 'Try searching, for example, using <span class="text_button" onclick="search_for(\'bees feeding on flower\')">bees feeding on flower</span> or <span class="text_button" onclick="search_for(\'car on empty street in snow\')">car on empty street in snow</span> or <span class="text_button" onclick="search_for(\'horse in river\')">horse in river</span>.'
 function init_home_page() {
     load_featured_image_grid();
+    document.getElementById('toolbar').innerHTML = TOOLBAR_INFO;
 }
 
 function load_featured_image_grid() {
@@ -47,7 +48,10 @@ function load_featured_image_grid() {
 	.then((response) => response.json())
 	.then((project_info) => {
 	    wise_data['info'] = project_info;
-	    console.log(project_info);
+
+	    // initialise the toolbar with info
+	    const img_count_percent = ((wise_data['info']['num_images'] / 78000000) * 100).toFixed(1);
+	    document.getElementById('toolbar').innerHTML = 'Here, you can search nearly ' + img_count_percent + '% of the 78 million images in Wikipedia.' + TOOLBAR_INFO;
 
 	    // get total page count
 	    navinfo1.innerHTML = 'Showing selected images.';

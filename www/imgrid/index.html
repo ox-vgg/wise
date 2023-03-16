@@ -7,6 +7,7 @@
     <meta name="description" content="WISE Image Search Engine">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=1">
     <link rel="stylesheet" type="text/css" href="wise.css">
+    <link rel="icon" type="image/x-icon" href="img/favicon.ico">
   </head>
   <body>
     <header id="wise_panel">
@@ -18,7 +19,7 @@
 	<div class="search">
 	  <input id="search_keyword" type="text" placeholder="enter search keywords (e.g. a red car)">
 	  <button onclick="submit_initial_search_query()">Search</button>
-	  <button disabled>Upload & Search</button>
+	  <button title="Coming soon" disabled>Upload & Search</button>
 	</div>
 
 	<div class="top_toolbar">
@@ -28,7 +29,7 @@
 	  <button onclick="show_next_page()" title="Next">&rarr;</button>
 	</div>
       </div>
-      <div id="toolbar">Here, you can search nearly 22% of the 78 million images in Wikipedia. Try searching, for example, using <span class="text_button" onclick="search_for('bees')">bees</span> or <span class="text_button" onclick="search_for('green tea')">green tea</span> or <span class="text_button" onclick="search_for('beatles press conference')">beatles press conference</span> or <span class="text_button" onclick="search_for('empty streets in India')">empty streets in India</span>.</div>
+      <div id="toolbar"></div>
     </header>
 
     <section id="content">
