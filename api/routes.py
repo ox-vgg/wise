@@ -243,7 +243,7 @@ def _get_search_router(config: APIConfig, index_type: str):
     index_fn = get_wise_project_index_folder(project_id) / str(index_type + '.faiss')
     print('Loading faiss index from %s' % (index_fn))
     index = faiss.read_index(str(index_fn))
-    if index.nprobe:
+    if hasattr(index, 'nprobe'):
         index.nprobe = 3
 
     # Get counts
