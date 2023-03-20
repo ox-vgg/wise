@@ -164,7 +164,7 @@ function submit_initial_search_query() {
     const search_keyword = document.getElementById('search_keyword').value;
     wise_result_start_findex = 0;
     wise_result_end_findex = SEARCH_RESULT_COUNT;
-    const search_endpoint = 'search?q=' + search_keyword + '&from=' + wise_result_start_findex + '&to=' + wise_result_end_findex;
+    const search_endpoint = 'search?q=' + search_keyword + '&start=' + wise_result_start_findex + '&end=' + wise_result_end_findex;
 
     toolbar.innerHTML = 'Searching for <strong>' + search_keyword + '</strong> in ' + wise_data['info']['num_images'].toLocaleString('en', {useGrouping:true}) + ' Wikipedia images <div class="spinner"></div>';
 
