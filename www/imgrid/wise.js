@@ -209,25 +209,18 @@ function show_search_result(response, search_time) {
     toolbar.innerHTML = 'Search completed in ' + (search_time/1000).toFixed(1) + ' sec.'
     for(var i=0; i<results.length; ++i) {
 	const img = document.createElement('img');
-	img.src = results[i]['thumbnail'];
-	//img.src = results[i]['link'];
-
 	const img_link = results[i]['link'];
 	const img_link_tok = img_link.split('/');
 	const img_filename = img_link_tok[ img_link_tok.length - 2 ];
-	const caption = document.createElement('figcaption');
-	caption.innerHTML = '<a href="' + img_link + '">' + img_filename + '</a>';
 
-	const figure = document.createElement('figure');
-	figure.appendChild(img);
-	figure.setAttribute('title', 'File: ' + img_filename + ' | Distance = ' + results[i]['distance'].toFixed(2));
+	img.src = results[i]['thumbnail'];
+	img.setAttribute('title', 'File: ' + img_filename + ' | Distance = ' + results[i]['distance'].toFixed(2));
 
 	const a = document.createElement('a');
 	a.setAttribute('href', 'https://commons.wikimedia.org/wiki/File:' + img_filename);
 	a.setAttribute('target', '_blank');
-	a.appendChild(figure)
+	a.appendChild(img)
 	
-	//figure.appendChild(caption);
 	imgrid_container.appendChild(a);
     }
     navinfo1.innerHTML = 'Showing search results from ' + wise_result_start_findex + ' to ' + wise_result_end_findex + '.';
