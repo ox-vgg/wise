@@ -1,3 +1,5 @@
+import logging
+
 from typing import Optional
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -8,14 +10,17 @@ from .routes import get_project_router
 
 from pathlib import Path
 
-def create_app(config: APIConfig, theme_asset_dir, index_type):
+logger = logging.getLogger(__name__)
+
+
+def create_app(config: APIConfig, theme_asset_dir: Path):
     app = FastAPI()
     app.state.config = config
 
     @app.on_event("startup")
     async def startup():
-        app.include_router(get_project_router(config, index_type))
-        print('Loading html user interface from %s' % (str(theme_asset_dir)))
+        app.include_router(get_project_router(config))
+        logger.info(f"Loading html user interface from {theme_asset_dir}")
         app.mount(
             f"/{config.project_id}/",
             StaticFiles(directory=theme_asset_dir, html=True),
@@ -29,9 +34,12 @@ def create_app(config: APIConfig, theme_asset_dir, index_type):
     return app
 
 
-def serve(project_id: str, theme_asset_dir: Path, index_type: str):
+def serve(project_id: str, theme_asset_dir: Path, index_type: Optional[str] = None):
     options = {"project_id": project_id} if project_id else {}
+    if index_type:
+        options.update({"index_type": index_type})
+
     config = APIConfig.parse_obj(options)  # type: ignore
 
-    app = create_app(config, theme_asset_dir, index_type)
+    app = create_app(config, theme_asset_dir)
     uvicorn.run(app, host=config.hostname, port=config.port, log_level="info")

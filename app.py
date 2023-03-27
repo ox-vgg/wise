@@ -810,7 +810,7 @@ def search(
 
 @app.command()
 def serve(
-    project_id: Optional[str] = typer.Argument(None, help="Name of the project"),
+    project_id: str = typer.Argument(None, help="Name of the project"),
     theme_asset_dir: Path = typer.Option(
         ...,
         exists=True,
@@ -818,15 +818,24 @@ def serve(
         file_okay=False,
         help="static HTML assets related to the user interface are served from this folder",
     ),
-    index_type: IndexType = typer.Option(IndexType.IndexFlatIP, help="the faiss index to use for serving")
+    index_type: Optional[IndexType] = typer.Option(
+        None, help="the faiss index to use for serving"
+    ),
 ):
     from api import serve
 
-    index_fn = get_wise_project_index_folder(project_id) / str(index_type + '.faiss')
-    if not index_fn.exists():
-        raise typer.BadParameter(f"Index not found at {index_fn}. Use the 'index' command to create an index.")
+    if index_type:
+        index_filename = (
+            get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
+        )
+        if not index_filename.exists():
+            raise typer.BadParameter(
+                f"Index not found at {index_filename}. Use the 'index' command to create an index."
+            )
+    # If index_type is None, it will be read from the config
 
-    serve(project_id, theme_asset_dir, index_type.value)
+    serve(project_id, theme_asset_dir, index_type.value if index_type else None)
+
 
 @app.command()
 def index(
