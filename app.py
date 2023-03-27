@@ -1,6 +1,7 @@
 import enum
 import functools
 import itertools
+import math
 from pathlib import Path
 
 import typing
@@ -17,6 +18,7 @@ from torch.hub import download_url_to_file
 from src.ioutils import (
     H5Datasets,
     get_model_name,
+    get_shapes,
     get_counts,
     get_h5iterator,
     get_h5writer,
@@ -45,7 +47,13 @@ from src.data_models import (
 )
 from src.inference import setup_clip, AVAILABLE_MODELS
 from src.utils import batched
-from src.search import brute_force_search, classification_based_query
+from src.search import (
+    IndexType,
+    write_index,
+    get_index,
+    brute_force_search,
+    classification_based_query,
+)
 from src.repository import WiseProjectsRepo, DatasetRepo, MetadataRepo
 from src.projects import (
     get_wise_db_uri,
@@ -59,10 +67,6 @@ from src.projects import (
     create_wise_project_tree,
     delete_wise_project_tree,
 )
-from src.exceptions import EmptyDatasetException
-
-import faiss
-from enum import Enum
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -803,9 +807,6 @@ def search(
                     # Sqlite row id when not set explicitly starts at 1
                     print(f"Dist: {d:.5f}", MetadataRepo.get(conn, int(k)))
 
-class IndexType(str, Enum):
-    IndexFlatIP = "IndexFlatIP"
-    IndexIVFFlat = "IndexIVFFlat"
 
 @app.command()
 def serve(
@@ -830,68 +831,70 @@ def serve(
 @app.command()
 def index(
     project_id: str = typer.Argument(..., help="Name of the project"),
-    index_type: IndexType = typer.Option(IndexType.IndexFlatIP, help="the faiss index name")
+    index_type: IndexType = typer.Option(
+        IndexType.IndexFlatIP, help="the faiss index name"
+    ),
+    using: FEATURES = typer.Option(
+        FEATURES.IMAGE, help="Specify the feature set to build the index with"
+    ),
 ):
+    """
+    Creates / Updates the current search index for the project
+    """
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, project_id)
     if project is None:
         raise typer.BadParameter(f"Project {project_id} not found!")
 
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
-    model_name = get_model_name(vds_path)
-    n_dim, _, _ = setup_clip(model_name)  # TODO: is there a simpler way to obtain feature dimension?
+    n_dim = get_shapes(vds_path)[H5Datasets.IMAGE_FEATURES][1]
 
     counts = get_counts(vds_path)
-    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
-    num_files = counts[H5Datasets.FEATURES]
+    assert (
+        counts[H5Datasets.IMAGE_FEATURES]
+        == counts[H5Datasets.METADATA_FEATURES]
+        == counts[H5Datasets.IDS]
+    )
+    num_files = counts[H5Datasets.IMAGE_FEATURES]
+    read_batch_size = 1024
+    reader = get_h5iterator(vds_path, batch_size=read_batch_size)
+    features_set = (
+        H5Datasets.IMAGE_FEATURES
+        if using == FEATURES.IMAGE
+        else H5Datasets.METADATA_FEATURES
+    )
+    all_features = lambda: reader(features_set)
+    cell_count = 10 * round(math.sqrt(num_files))
+    faiss_index = get_index(index_type, n_dim, cell_count)
 
-    faiss_index = None
-    if(index_type == IndexType.IndexFlatIP):
-        faiss_index = faiss.IndexFlatIP(n_dim)
-        reader = get_h5iterator(vds_path)
-        offset = 0
-        for batch in reader(H5Datasets.FEATURES):
-            nbatch = batch.shape[0]
-            faiss_index.add(batch)
-            print('Adding batch %d' % (offset))
-            offset = offset + 1
-        index_fn = get_wise_project_index_folder(project_id) / str('%s.faiss' % (index_type.value))
-    if(index_type == IndexType.IndexIVFFlat):
-        voronoi_cell_count = 100
-        train_batch_count = 1000
-        quantizer = faiss.IndexFlatIP(n_dim)
-        faiss_index = faiss.IndexIVFFlat(quantizer, n_dim, voronoi_cell_count)
-        reader = get_h5iterator(vds_path)
-        train_features = None
-        batch_size = 0
-
-        print('Collecting features for training ...')
-        offset = 0
-        for batch in reader(H5Datasets.FEATURES):
-            print('%d, ' % (offset), end='')
-            if train_features is None:
-                batch_size = batch.shape[0]
-                train_features = np.ndarray((batch_size*train_batch_count, batch.shape[1]), dtype=np.float32)
-            train_features[offset*batch_size : (offset+1)*batch_size, ] = batch
-            offset = offset + 1
-            if offset >= train_batch_count:
-                break
-        print('done')
+    if index_type == IndexType.IndexIVFFlat:
+        # Train stage
+        train_count = min(num_files, 100 * cell_count)
+        num_batches = math.ceil(train_count / read_batch_size)
+        train_features = functools.reduce(
+            lambda a, x: np.concatenate((a, x)),
+            itertools.islice(all_features(), num_batches),
+        )
         assert not faiss_index.is_trained
+        logger.info("Finding clusters from samples...")
         faiss_index.train(train_features)
         assert faiss_index.is_trained
+        logger.info("Done")
+
         del train_features
 
-        print('Indexing features ...')
-        offset = 0
-        for batch in reader(H5Datasets.FEATURES):
-            print('%d, ' % (offset), end='')
+    with tqdm(total=num_files) as pbar:
+        for batch in all_features():
             faiss_index.add(batch)
-            offset = offset + 1
-        print('done')
-        index_fn = get_wise_project_index_folder(project_id) / str('%s.faiss' % (index_type.value))
-    print('Saving faiss index to %s' % (index_fn))
-    faiss.write_index(faiss_index, str(index_fn))
+            pbar.update(batch.shape[0])
+
+    index_filename = (
+        get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
+    )
+    logger.info(f"Saving faiss index to {index_filename}...")
+    write_index(faiss_index, index_filename)
+    logger.info("Done!")
+
 
 if __name__ == "__main__":
     app()

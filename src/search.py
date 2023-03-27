@@ -1,4 +1,6 @@
+import enum
 import logging
+from pathlib import Path
 from typing import Iterator
 import numpy as np
 import torch
@@ -9,6 +11,28 @@ from faiss.contrib.exhaustive_search import knn
 from src.inference import LinearBinaryClassifier
 
 logger = logging.getLogger(__name__)
+
+
+class IndexType(str, enum.Enum):
+    IndexFlatIP = "IndexFlatIP"
+    IndexIVFFlat = "IndexIVFFlat"
+
+
+def write_index(index, path: Path):
+    faiss.write_index(index, str(path))
+
+
+def read_index(path: Path):
+    return faiss.read_index(str(path))
+
+
+def get_index(type: IndexType, n_dim: int, *args):
+    index = faiss.IndexFlatIP(n_dim)
+    if type == IndexType.IndexIVFFlat:
+        quantizer = index
+        index = faiss.IndexIVFFlat(quantizer, n_dim, *args)
+
+    return index
 
 
 def build_search_index(features: np.ndarray) -> faiss.IndexFlatIP:
