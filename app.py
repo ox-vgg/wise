@@ -680,12 +680,21 @@ def delete(
             WiseProjectsRepo.delete(conn, project_id)
 
 
+class FEATURES(str, enum.Enum):
+    IMAGE = "image_features"
+    METADATA = "metadata_features"
+
+
 @app.command()
 def search(
     project_id: str = typer.Argument(..., help="Name of the project"),
     top_k: int = typer.Option(5, help="Top-k results to retrieve"),
     prefix: str = typer.Option(
         "This is a photo of a", help="Prefix to attach to all natural language queries"
+    ),
+    using: FEATURES = typer.Option(
+        FEATURES.IMAGE,
+        help="Select whether image or metadata features must be used for search",
     ),
     batch_size: int = typer.Option(1, help="Batch size to extract features"),
     queries: List[str] = typer.Argument(
@@ -704,11 +713,19 @@ def search(
     model_name = get_model_name(vds_path)
     counts = get_counts(vds_path)
 
-    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
-    num_files = counts[H5Datasets.FEATURES]
+    assert (
+        counts[H5Datasets.IMAGE_FEATURES]
+        == counts[H5Datasets.METADATA_FEATURES]
+        == counts[H5Datasets.IDS]
+    )
+    num_files = counts[H5Datasets.IMAGE_FEATURES]
 
     reader = get_h5iterator(vds_path)
-    all_features = lambda: reader(H5Datasets.FEATURES)
+    all_features = lambda: reader(
+        H5Datasets.IMAGE_FEATURES
+        if using == FEATURES.IMAGE
+        else H5Datasets.METADATA_FEATURES
+    )
 
     _, extract_image_features, extract_text_features = setup_clip(model_name)
     top_k = min(top_k, num_files)
@@ -745,8 +762,9 @@ def search(
 
         dist, ids = brute_force_search(all_features(), query_features, top_k)
 
+    # Classification query
     else:
-        # Classification query
+
         def process(query_images_folder: Path):
             for batch in batched(
                 get_valid_images_from_folder(query_images_folder, lambda _: None),
