@@ -665,6 +665,7 @@ def update(
 @app.command()
 def delete(
     project_id: str = typer.Argument(..., help="Name of the project"),
+    force: bool = typer.Option(False, "-f", help="Force delete"),
 ):
     """
     Delete the project and associated files
@@ -674,7 +675,11 @@ def delete(
         if not project:
             raise typer.BadParameter(f"Project {project_id} not found!")
 
-        delete_project = typer.prompt("Please type the project name again to confirm")
+        delete_project = (
+            project_id
+            if force
+            else typer.prompt("Please type the project name again to confirm")
+        )
         if delete_project != project_id:
             logger.error(f"Not deleting {project_id}")
             raise typer.Abort()
