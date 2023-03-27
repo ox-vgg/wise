@@ -268,12 +268,19 @@ def _create_virtual_dataset(project: Project, sources: List[Path]):
 
 
 # Function to transform images and metadata into required formats
-def _process(extract_features, batch: List[Tuple[Image.Image, ImageMetadata]]):
+def _process(
+    extract_image_features,
+    extract_text_features,
+    batch: List[Tuple[Image.Image, ImageMetadata]],
+):
     images, metadata = zip(*batch)
-    features = extract_features(images)
+    image_features = extract_image_features(images)
+    metadata_features = extract_text_features(
+        [x.metadata.get("description", "") for x in metadata]
+    )
     thumbs = [generate_thumbnail(x) for x in images]
 
-    return metadata, features, thumbs
+    return metadata, image_features, metadata_features, thumbs
 
 
 # Function to convert input source to DatasetModel
@@ -310,7 +317,7 @@ def add_dataset(
     count_ = 0
     with tqdm() as pbar, db_engine.connect() as conn:
         for batch in batched(dataset_iterator, batch_size):
-            metadata, features, thumbs = process_fn(batch)
+            metadata, image_features, metadata_features, thumbs = process_fn(batch)
 
             row_count = len(batch)
             h5_row_ids = [count_ + i for i in range(row_count)]
@@ -330,7 +337,7 @@ def add_dataset(
                 ]
 
                 metadata_row_ids = [str(offset + x) for x in h5_row_ids]
-                writer_fn(features, metadata_row_ids, thumbs)
+                writer_fn(image_features, metadata_features, metadata_row_ids, thumbs)
             count_ += row_count
 
             # Udpate progress bar
@@ -358,13 +365,15 @@ def _update(
     """
     project_id = project.id
 
-    n_dim, extract_features, _ = setup_clip(model_name)
-    process_fn = functools.partial(_process, extract_features)
+    n_dim, extract_image_features, extract_text_features = setup_clip(model_name)
+    process_fn = functools.partial(
+        _process, extract_image_features, extract_text_features
+    )
 
     count_: int = 0
     if mode == "update":
         vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
-        count_ = get_counts(vds_path)[H5Datasets.FEATURES]
+        count_ = get_counts(vds_path)[H5Datasets.IMAGE_FEATURES]
 
     added_datasets = []
     failed_sources = []

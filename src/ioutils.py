@@ -37,7 +37,8 @@ class EmptyDatasetException(Exception):
 
 
 class H5Datasets(str, enum.Enum):
-    FEATURES = "features"
+    IMAGE_FEATURES = "features/image"
+    METADATA_FEATURES = "features/metadata"
     IDS = "ids"
     THUMBNAILS = "thumbnails"
 
@@ -100,14 +101,16 @@ def get_valid_images_from_folder(
                 format = im.format or "UNKNOWN"
                 # Load the image into memory to prevent seeking after generator ends
                 im.load()
+                relative_path = image.relative_to(folder)
+
                 metadata = ImageMetadata(
-                    path=str(image.relative_to(folder)),
+                    path=str(relative_path),
                     size_in_bytes=image.stat().st_size,
                     format=format,
                     width=w,
                     height=h,
                     source_uri=None,
-                    metadata={},
+                    metadata={"description": relative_path.stem},
                 )
                 yield im, metadata
         except Exception as e:
@@ -152,7 +155,7 @@ def get_valid_images_from_webdataset(url: str, error_handler):
                     width=w,
                     height=h,
                     source_uri=metadata.get("url", None),
-                    metadata={},
+                    metadata={"description": metadata.get("description", "")},
                 )
         except Exception as e:
             logging.error(f"Error {url}#{k}.{im_key} - ({e.__class__.__name__}){e}")
@@ -210,7 +213,7 @@ def _get_initial_shape_and_dtype_for_dataset(
     shape = (0,)
     maxshape = (None,)
 
-    if name == H5Datasets.FEATURES:
+    if name in [H5Datasets.IMAGE_FEATURES, H5Datasets.METADATA_FEATURES]:
         return {"shape": (0, n_dim), "dtype": np.float32, "maxshape": (None, n_dim)}
 
     if name == H5Datasets.THUMBNAILS:
@@ -228,6 +231,10 @@ def _get_initial_shape_and_dtype_for_dataset(
         }
 
     raise NotImplementedError()
+
+
+def _is_features_dataset(name: H5Datasets):
+    return name in [H5Datasets.IMAGE_FEATURES, H5Datasets.METADATA_FEATURES]
 
 
 @overload
@@ -276,8 +283,10 @@ def _get_dataset(
 
     if mode != "r":
         # Write enabled
-        if H5Datasets.FEATURES in _names and n_dim is None:
-            raise ValueError("n_dim cannot be None for 'features' in write mode")
+        if any(_is_features_dataset(x) for x in _names) and n_dim is None:
+            raise ValueError(
+                "n_dim cannot be None for image / metadata features in write mode"
+            )
 
     with h5py.File(path, mode=mode, **kwargs) as f:
         if isinstance(name, list):
@@ -377,7 +386,7 @@ def get_model_name(dataset: Path, **kwargs):
     """
     Returns the model name stored on the FEATURES datasets
     """
-    with _get_dataset(dataset, H5Datasets.FEATURES, mode="r", **kwargs) as ds:
+    with _get_dataset(dataset, H5Datasets.IMAGE_FEATURES, mode="r", **kwargs) as ds:
         return ds.attrs.get("model", None)
 
 
@@ -460,7 +469,8 @@ def get_h5writer(
     if not set(H5Datasets).issuperset(set(_names)):
         raise ValueError(f"Only {[x.name for x in H5Datasets]} are allowed")
 
-    if H5Datasets.FEATURES in _names:
+    is_features_dataset_requested = any(_is_features_dataset(x) for x in _names)
+    if is_features_dataset_requested:
         if model_name is None:
             raise ValueError(
                 "Model Name must be provided when writing to features dataset"
@@ -471,16 +481,21 @@ def get_h5writer(
 
         num_datasets = len(ds_arr)
 
-        if H5Datasets.FEATURES in _names:
-            _features_ds = ds_arr[_names.index(H5Datasets.FEATURES)]
+        if is_features_dataset_requested:
+            all_features_ds = [
+                ds_arr[i] for i, x in enumerate(_names) if _is_features_dataset(x)
+            ]
 
-            if _features_ds.shape[-1] != n_dim:
+            if any(x.shape[-1] != n_dim for x in all_features_ds):
                 raise ValueError("Feature dimension mismatch")
 
-            if _features_ds.attrs.get("model", model_name) != model_name:
+            if any(
+                x.attrs.get("model", model_name) != model_name for x in all_features_ds
+            ):
                 raise ValueError("Model name mismatch")
 
-            _features_ds.attrs["model"] = model_name
+            for _features_ds in all_features_ds:
+                _features_ds.attrs["model"] = model_name
 
         def writer(*args):
             if len(args) != num_datasets:
@@ -516,12 +531,12 @@ def concat_h5datasets(sources, output: Path, **kwargs):
 
         if features_dim is None:
             features_dim = get_shapes(s, **kwargs).get(
-                H5Datasets.FEATURES, (None, None)
+                H5Datasets.IMAGE_FEATURES, (None, None)
             )[1]
 
         elif (
             features_dim
-            != get_shapes(s, **kwargs).get(H5Datasets.FEATURES, (None, None))[1]
+            != get_shapes(s, **kwargs).get(H5Datasets.IMAGE_FEATURES, (None, None))[1]
         ):
             raise ValueError("All feature arrays in source to have same shape!")
 
@@ -553,7 +568,7 @@ def concat_h5datasets(sources, output: Path, **kwargs):
     with h5py.File(output, "w", libver="latest") as f:
         for _k, _layout in layouts.items():
             vds = f.create_virtual_dataset(_k, _layout)
-            if _k == H5Datasets.FEATURES:
+            if _k == H5Datasets.IMAGE_FEATURES:
                 vds.attrs["model"] = model_name
 
 
