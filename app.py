@@ -1,6 +1,7 @@
 import enum
 import functools
 import itertools
+import math
 from pathlib import Path
 
 import typing
@@ -17,6 +18,7 @@ from torch.hub import download_url_to_file
 from src.ioutils import (
     H5Datasets,
     get_model_name,
+    get_shapes,
     get_counts,
     get_h5iterator,
     get_h5writer,
@@ -45,7 +47,13 @@ from src.data_models import (
 )
 from src.inference import setup_clip, AVAILABLE_MODELS
 from src.utils import batched
-from src.search import brute_force_search, classification_based_query
+from src.search import (
+    IndexType,
+    write_index,
+    get_index,
+    brute_force_search,
+    classification_based_query,
+)
 from src.repository import WiseProjectsRepo, DatasetRepo, MetadataRepo
 from src.projects import (
     get_wise_db_uri,
@@ -59,10 +67,6 @@ from src.projects import (
     create_wise_project_tree,
     delete_wise_project_tree,
 )
-from src.exceptions import EmptyDatasetException
-
-import faiss
-from enum import Enum
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -268,12 +272,19 @@ def _create_virtual_dataset(project: Project, sources: List[Path]):
 
 
 # Function to transform images and metadata into required formats
-def _process(extract_features, batch: List[Tuple[Image.Image, ImageMetadata]]):
+def _process(
+    extract_image_features,
+    extract_text_features,
+    batch: List[Tuple[Image.Image, ImageMetadata]],
+):
     images, metadata = zip(*batch)
-    features = extract_features(images)
+    image_features = extract_image_features(images)
+    metadata_features = extract_text_features(
+        [x.metadata.get("description", "") for x in metadata]
+    )
     thumbs = [generate_thumbnail(x) for x in images]
 
-    return metadata, features, thumbs
+    return metadata, image_features, metadata_features, thumbs
 
 
 # Function to convert input source to DatasetModel
@@ -310,7 +321,7 @@ def add_dataset(
     count_ = 0
     with tqdm() as pbar, db_engine.connect() as conn:
         for batch in batched(dataset_iterator, batch_size):
-            metadata, features, thumbs = process_fn(batch)
+            metadata, image_features, metadata_features, thumbs = process_fn(batch)
 
             row_count = len(batch)
             h5_row_ids = [count_ + i for i in range(row_count)]
@@ -330,7 +341,7 @@ def add_dataset(
                 ]
 
                 metadata_row_ids = [str(offset + x) for x in h5_row_ids]
-                writer_fn(features, metadata_row_ids, thumbs)
+                writer_fn(image_features, metadata_features, metadata_row_ids, thumbs)
             count_ += row_count
 
             # Udpate progress bar
@@ -358,13 +369,15 @@ def _update(
     """
     project_id = project.id
 
-    n_dim, extract_features, _ = setup_clip(model_name)
-    process_fn = functools.partial(_process, extract_features)
+    n_dim, extract_image_features, extract_text_features = setup_clip(model_name)
+    process_fn = functools.partial(
+        _process, extract_image_features, extract_text_features
+    )
 
     count_: int = 0
     if mode == "update":
         vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
-        count_ = get_counts(vds_path)[H5Datasets.FEATURES]
+        count_ = get_counts(vds_path)[H5Datasets.IMAGE_FEATURES]
 
     added_datasets = []
     failed_sources = []
@@ -671,12 +684,21 @@ def delete(
             WiseProjectsRepo.delete(conn, project_id)
 
 
+class FEATURES(str, enum.Enum):
+    IMAGE = "image_features"
+    METADATA = "metadata_features"
+
+
 @app.command()
 def search(
     project_id: str = typer.Argument(..., help="Name of the project"),
     top_k: int = typer.Option(5, help="Top-k results to retrieve"),
     prefix: str = typer.Option(
         "This is a photo of a", help="Prefix to attach to all natural language queries"
+    ),
+    using: FEATURES = typer.Option(
+        FEATURES.IMAGE,
+        help="Select whether image or metadata features must be used for search",
     ),
     batch_size: int = typer.Option(1, help="Batch size to extract features"),
     queries: List[str] = typer.Argument(
@@ -695,11 +717,19 @@ def search(
     model_name = get_model_name(vds_path)
     counts = get_counts(vds_path)
 
-    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
-    num_files = counts[H5Datasets.FEATURES]
+    assert (
+        counts[H5Datasets.IMAGE_FEATURES]
+        == counts[H5Datasets.METADATA_FEATURES]
+        == counts[H5Datasets.IDS]
+    )
+    num_files = counts[H5Datasets.IMAGE_FEATURES]
 
     reader = get_h5iterator(vds_path)
-    all_features = lambda: reader(H5Datasets.FEATURES)
+    all_features = lambda: reader(
+        H5Datasets.IMAGE_FEATURES
+        if using == FEATURES.IMAGE
+        else H5Datasets.METADATA_FEATURES
+    )
 
     _, extract_image_features, extract_text_features = setup_clip(model_name)
     top_k = min(top_k, num_files)
@@ -736,8 +766,9 @@ def search(
 
         dist, ids = brute_force_search(all_features(), query_features, top_k)
 
+    # Classification query
     else:
-        # Classification query
+
         def process(query_images_folder: Path):
             for batch in batched(
                 get_valid_images_from_folder(query_images_folder, lambda _: None),
@@ -776,13 +807,10 @@ def search(
                     # Sqlite row id when not set explicitly starts at 1
                     print(f"Dist: {d:.5f}", MetadataRepo.get(conn, int(k)))
 
-class IndexType(str, Enum):
-    IndexFlatIP = "IndexFlatIP"
-    IndexIVFFlat = "IndexIVFFlat"
 
 @app.command()
 def serve(
-    project_id: Optional[str] = typer.Argument(None, help="Name of the project"),
+    project_id: str = typer.Argument(None, help="Name of the project"),
     theme_asset_dir: Path = typer.Option(
         ...,
         exists=True,
@@ -790,81 +818,92 @@ def serve(
         file_okay=False,
         help="static HTML assets related to the user interface are served from this folder",
     ),
-    index_type: IndexType = typer.Option(IndexType.IndexFlatIP, help="the faiss index to use for serving")
+    index_type: Optional[IndexType] = typer.Option(
+        None, help="the faiss index to use for serving"
+    ),
 ):
     from api import serve
 
-    index_fn = get_wise_project_index_folder(project_id) / str(index_type + '.faiss')
-    if not index_fn.exists():
-        raise typer.BadParameter(f"Index not found at {index_fn}. Use the 'index' command to create an index.")
+    if index_type:
+        index_filename = (
+            get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
+        )
+        if not index_filename.exists():
+            raise typer.BadParameter(
+                f"Index not found at {index_filename}. Use the 'index' command to create an index."
+            )
+    # If index_type is None, it will be read from the config
 
-    serve(project_id, theme_asset_dir, index_type.value)
+    serve(project_id, theme_asset_dir, index_type.value if index_type else None)
+
 
 @app.command()
 def index(
     project_id: str = typer.Argument(..., help="Name of the project"),
-    index_type: IndexType = typer.Option(IndexType.IndexFlatIP, help="the faiss index name")
+    index_type: IndexType = typer.Option(
+        IndexType.IndexFlatIP, help="the faiss index name"
+    ),
+    using: FEATURES = typer.Option(
+        FEATURES.IMAGE, help="Specify the feature set to build the index with"
+    ),
 ):
+    """
+    Creates / Updates the current search index for the project
+    """
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, project_id)
     if project is None:
         raise typer.BadParameter(f"Project {project_id} not found!")
 
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
-    model_name = get_model_name(vds_path)
-    n_dim, _, _ = setup_clip(model_name)  # TODO: is there a simpler way to obtain feature dimension?
+    n_dim = get_shapes(vds_path)[H5Datasets.IMAGE_FEATURES][1]
 
     counts = get_counts(vds_path)
-    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
-    num_files = counts[H5Datasets.FEATURES]
+    assert (
+        counts[H5Datasets.IMAGE_FEATURES]
+        == counts[H5Datasets.METADATA_FEATURES]
+        == counts[H5Datasets.IDS]
+    )
+    num_files = counts[H5Datasets.IMAGE_FEATURES]
+    read_batch_size = 1024
+    reader = get_h5iterator(vds_path, batch_size=read_batch_size)
+    features_set = (
+        H5Datasets.IMAGE_FEATURES
+        if using == FEATURES.IMAGE
+        else H5Datasets.METADATA_FEATURES
+    )
+    all_features = lambda: reader(features_set)
+    cell_count = 10 * round(math.sqrt(num_files))
+    faiss_index = get_index(index_type, n_dim, cell_count)
 
-    faiss_index = None
-    if(index_type == IndexType.IndexFlatIP):
-        faiss_index = faiss.IndexFlatIP(n_dim)
-        reader = get_h5iterator(vds_path)
-        offset = 0
-        for batch in reader(H5Datasets.FEATURES):
-            nbatch = batch.shape[0]
-            faiss_index.add(batch)
-            print('Adding batch %d' % (offset))
-            offset = offset + 1
-        index_fn = get_wise_project_index_folder(project_id) / str('%s.faiss' % (index_type.value))
-    if(index_type == IndexType.IndexIVFFlat):
-        voronoi_cell_count = 100
-        train_batch_count = 1000
-        quantizer = faiss.IndexFlatIP(n_dim)
-        faiss_index = faiss.IndexIVFFlat(quantizer, n_dim, voronoi_cell_count)
-        reader = get_h5iterator(vds_path)
-        train_features = None
-        batch_size = 0
-
-        print('Collecting features for training ...')
-        offset = 0
-        for batch in reader(H5Datasets.FEATURES):
-            print('%d, ' % (offset), end='')
-            if train_features is None:
-                batch_size = batch.shape[0]
-                train_features = np.ndarray((batch_size*train_batch_count, batch.shape[1]), dtype=np.float32)
-            train_features[offset*batch_size : (offset+1)*batch_size, ] = batch
-            offset = offset + 1
-            if offset >= train_batch_count:
-                break
-        print('done')
+    if index_type == IndexType.IndexIVFFlat:
+        # Train stage
+        train_count = min(num_files, 100 * cell_count)
+        num_batches = math.ceil(train_count / read_batch_size)
+        train_features = functools.reduce(
+            lambda a, x: np.concatenate((a, x)),
+            itertools.islice(all_features(), num_batches),
+        )
         assert not faiss_index.is_trained
+        logger.info("Finding clusters from samples...")
         faiss_index.train(train_features)
         assert faiss_index.is_trained
+        logger.info("Done")
+
         del train_features
 
-        print('Indexing features ...')
-        offset = 0
-        for batch in reader(H5Datasets.FEATURES):
-            print('%d, ' % (offset), end='')
+    with tqdm(total=num_files) as pbar:
+        for batch in all_features():
             faiss_index.add(batch)
-            offset = offset + 1
-        print('done')
-        index_fn = get_wise_project_index_folder(project_id) / str('%s.faiss' % (index_type.value))
-    print('Saving faiss index to %s' % (index_fn))
-    faiss.write_index(faiss_index, str(index_fn))
+            pbar.update(batch.shape[0])
+
+    index_filename = (
+        get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
+    )
+    logger.info(f"Saving faiss index to {index_filename}...")
+    write_index(faiss_index, index_filename)
+    logger.info("Done!")
+
 
 if __name__ == "__main__":
     app()

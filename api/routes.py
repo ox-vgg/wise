@@ -1,5 +1,4 @@
 from contextlib import ExitStack
-import itertools
 from typing import Dict, List
 import io
 import logging
@@ -29,7 +28,6 @@ from src.repository import WiseProjectsRepo, MetadataRepo, DatasetRepo
 from src.data_models import ImageInfo, ImageMetadata, DatasetType, Dataset
 from src.ioutils import (
     H5Datasets,
-    get_h5iterator,
     get_h5reader,
     get_model_name,
     get_counts,
@@ -37,10 +35,9 @@ from src.ioutils import (
     get_file_from_tar,
 )
 from src.inference import setup_clip
-#from src.search import search_index
-from src.utils import convert_uint8array_to_base64
 
-import faiss
+from src.search import IndexType, read_index
+from src.utils import convert_uint8array_to_base64
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +46,7 @@ def raise_(ex):
     raise ex
 
 
-def get_project_router(config: APIConfig, index_type: str):
+def get_project_router(config: APIConfig):
     if config.project_id is None:
         raise typer.BadParameter("project id is missing!")
 
@@ -62,7 +59,7 @@ def get_project_router(config: APIConfig, index_type: str):
     project_id = project.id
     router = APIRouter(prefix=f"/{project_id}", tags=[f"{project_id}"])
     router.include_router(_get_project_data_router(config))
-    router.include_router(_get_search_router(config, index_type))
+    router.include_router(_get_search_router(config))
 
     return router
 
@@ -184,15 +181,16 @@ def _get_project_data_router(config: APIConfig):
         return {
             "id": project_id,
             "model": model_name,
-            "num_images": counts[H5Datasets.FEATURES],
+            "num_images": counts[H5Datasets.IMAGE_FEATURES],
         }
 
     return router
 
 
-def _get_search_router(config: APIConfig, index_type: str):
+def _get_search_router(config: APIConfig):
 
     project_id = config.project_id
+    index_type = IndexType[config.index_type]
 
     class SearchResponse(BaseModel):
         link: str
@@ -240,19 +238,18 @@ def _get_search_router(config: APIConfig, index_type: str):
     model_name = get_model_name(vds_path)
 
     # load the feature search index
-    index_fn = get_wise_project_index_folder(project_id) / str(index_type + '.faiss')
-    print('Loading faiss index from %s' % (index_fn))
-    index = faiss.read_index(str(index_fn))
-    if hasattr(index, 'nprobe'):
-        index.nprobe = 3
+    index_filename = (
+        get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
+    )
+    logger.info(f"Loading faiss index from {index_filename}")
+    index = read_index(index_filename)
+    if hasattr(index, "nprobe"):
+        index.nprobe = 5
 
     # Get counts
     counts = get_counts(vds_path)
-    assert counts[H5Datasets.FEATURES] == counts[H5Datasets.IDS]
-    num_files = counts[H5Datasets.FEATURES]
-
-    reader = get_h5iterator(vds_path)
-    all_features = lambda: reader(H5Datasets.FEATURES)
+    assert counts[H5Datasets.IMAGE_FEATURES] == counts[H5Datasets.IDS]
+    num_files = counts[H5Datasets.IMAGE_FEATURES]
 
     _, extract_image_features, extract_text_features = setup_clip(model_name)
 
@@ -274,9 +271,7 @@ def _get_search_router(config: APIConfig, index_type: str):
         end: int = Query(20, gt=0, le=1000),
     ):
         if len(q) == 0:
-            raise HTTPException(
-                400, {"message": "missing search query"}
-            )
+            raise HTTPException(400, {"message": "missing search query"})
 
         end = min(end, num_files)
         if start > end:
@@ -290,7 +285,7 @@ def _get_search_router(config: APIConfig, index_type: str):
         prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
         text_features = extract_text_features(prefixed_queries)
 
-        dist, ids = index.search(text_features, end + 1)
+        dist, ids = index.search(text_features, end)
         with project_engine.connect() as conn:
 
             def get_metadata(_id):
@@ -299,7 +294,13 @@ def _get_search_router(config: APIConfig, index_type: str):
                     raise RuntimeError()
                 return m
 
-            response = make_response(q, dist[[0], start:end], ids[[0], start:end], get_metadata, thumbs_reader)
+            response = make_response(
+                q,
+                dist[[0], start:end],
+                ids[[0], start:end],
+                get_metadata,
+                thumbs_reader,
+            )
 
         return response
 
@@ -311,7 +312,7 @@ def _get_search_router(config: APIConfig, index_type: str):
         top_k = min(top_k, num_files)
         with Image.open(io.BytesIO(q)) as im:
             query_features = extract_image_features([im])
-            dist, ids = index.search(all_features(), query_features, top_k=top_k)
+            dist, ids = index.search(query_features, top_k=top_k)
 
         with project_engine.connect() as conn:
 

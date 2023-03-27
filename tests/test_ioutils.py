@@ -145,15 +145,16 @@ class TestH5Dataset:
 
         with ioutils.get_h5writer(
             h5_dataset,
-            names=[
-                ioutils.H5Datasets.FEATURES,
-                ioutils.H5Datasets.THUMBNAILS,
-                ioutils.H5Datasets.IDS,
-            ],
+            names=list(ioutils.H5Datasets),
             n_dim=10,
             model_name="test",
         ) as write_fn:
-            write_fn(dummy_arr, [b"abc"] * 0, ["1"] * 1)
+            write_fn(
+                dummy_arr,
+                dummy_arr,
+                ["1"] * 1,
+                [b"abc"] * 0,
+            )
 
         # assert file with all datasets exits
         assert ioutils.does_wise_hdf5_exists(h5_dataset)
@@ -164,17 +165,28 @@ class TestH5Dataset:
 
         # Test counts and attribute
         assert counts_after_write == {
-            ioutils.H5Datasets.FEATURES: 10,
+            ioutils.H5Datasets.IMAGE_FEATURES: 10,
+            ioutils.H5Datasets.METADATA_FEATURES: 10,
             ioutils.H5Datasets.IDS: 1,
             ioutils.H5Datasets.THUMBNAILS: 0,
         }
         assert model_name == "test"
 
         # Test iterator
-        read_arr = np.concatenate(list(reader(ioutils.H5Datasets.FEATURES)), axis=0)
+        read_arr = np.concatenate(
+            list(reader(ioutils.H5Datasets.IMAGE_FEATURES)), axis=0
+        )
+        assert np.array_equal(read_arr, dummy_arr)
+
+        read_arr = np.concatenate(
+            list(reader(ioutils.H5Datasets.METADATA_FEATURES)), axis=0
+        )
         assert np.array_equal(read_arr, dummy_arr)
 
         # Test indexed read
         indexed_reader = ioutils.get_h5reader(h5_dataset)
-        with indexed_reader(ioutils.H5Datasets.FEATURES) as _reader:
+        with indexed_reader(ioutils.H5Datasets.IMAGE_FEATURES) as _reader:
+            assert np.array_equal(dummy_arr, np.array(_reader(list(range(10)))))
+
+        with indexed_reader(ioutils.H5Datasets.METADATA_FEATURES) as _reader:
             assert np.array_equal(dummy_arr, np.array(_reader(list(range(10)))))
