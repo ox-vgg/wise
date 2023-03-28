@@ -175,7 +175,7 @@ def parse_and_validate_input_datasets(input_dataset: List[str]):
             processed.append(p)
 
             # Extend with all valid webdataset tar files found inside folder
-            processed.extend(get_valid_webdataset_tar_from_folder(p))
+            processed.extend(sorted(get_valid_webdataset_tar_from_folder(p)))
         else:
             # We don't know what it is, we will try reading it with webdataset
             processed.extend(parse_webdataset_url(dataset))
