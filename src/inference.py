@@ -72,7 +72,7 @@ def setup_clip(model_name: str = "ViT-B/32"):
 
         with torch.no_grad():
 
-            text_tokens = clip.tokenize(queries, truncate=False)
+            text_tokens = clip.tokenize(queries, truncate=True)
             if IS_CUDA:
                 text_tokens = text_tokens.cuda()
 
