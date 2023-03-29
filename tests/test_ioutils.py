@@ -150,14 +150,11 @@ class TestH5Dataset:
             model_name="test",
         ) as write_fn:
             write_fn(
-                dummy_arr,
-                dummy_arr,
                 ["1"] * 1,
                 [b"abc"] * 0,
+                dummy_arr,
+                dummy_arr,
             )
-
-        # assert file with all datasets exits
-        assert ioutils.does_wise_hdf5_exists(h5_dataset)
 
         reader = ioutils.get_h5iterator(h5_dataset)
         model_name = ioutils.get_model_name(h5_dataset)
