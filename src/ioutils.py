@@ -11,9 +11,6 @@ from typing import (
     Literal,
     Optional,
     Union,
-    Generator,
-    overload,
-    Tuple,
     Callable,
     Dict,
     Any,
@@ -37,11 +34,26 @@ class EmptyDatasetException(Exception):
     pass
 
 
-class H5Datasets(str, enum.Enum):
-    IMAGE_FEATURES = "features/image"
-    METADATA_FEATURES = "features/metadata"
+class ContainsEnumMeta(enum.EnumMeta):
+    def __contains__(cls, item):
+        if type(item) == cls:
+            return enum.EnumMeta.__contains__(cls, item)
+        try:
+            cls(item)
+        except ValueError:
+            return False
+        return True
+
+
+class BaseStrEnum(str, enum.Enum, metaclass=ContainsEnumMeta):
+    pass
+
+
+class H5Datasets(BaseStrEnum):
     IDS = "ids"
     THUMBNAILS = "thumbnails"
+    IMAGE_FEATURES = "features/image"
+    METADATA_FEATURES = "features/metadata"
 
 
 def is_valid_uri(uri: str):
@@ -175,16 +187,7 @@ def get_valid_images_from_webdataset(url: str, error_handler):
             error_handler(sample)
 
 
-def does_wise_hdf5_exists(path: Path, **kwargs) -> bool:
-    try:
-        with _get_dataset(path, name=list(H5Datasets), mode="r", **kwargs) as _:
-            return True
-    except FileNotFoundError as e:
-        logger.warning(f"FileNotFound {path} - {e}")
-        return False
-
-
-class H5_ENCODING(str, enum.Enum):
+class H5_ENCODING(BaseStrEnum):
     ARRAY = "array"
     BYTES = "ascii"
     STRING = "utf-8"
@@ -210,14 +213,6 @@ DECODING_FNS: Dict[
     H5_ENCODING.STRING: lambda arr: [x.decode("utf-8") for x in arr],
     H5_ENCODING.BYTES: lambda arr: arr.tolist(),
 }
-
-
-def _get_h5_dataset(f: h5py.File, key: H5Datasets, **kwargs):
-    if not f.mode == "r":
-        # Write mode
-        if key not in f:
-            f.create_dataset(key.value, **kwargs)
-    return typing.cast(h5py.Dataset, f[key])
 
 
 def _get_initial_shape_and_dtype_for_dataset(
@@ -250,56 +245,33 @@ def _is_features_dataset(name: H5Datasets):
     return name in [H5Datasets.IMAGE_FEATURES, H5Datasets.METADATA_FEATURES]
 
 
-@overload
-def _get_dataset(
-    path: Path,
-    name: H5Datasets,
-    *,
-    mode: Literal["r", "w", "a"] = "r",
-    n_dim: Optional[int] = None,
-    **kwargs,
-) -> Generator[h5py.Dataset, None, None]:
-    ...
-
-
-@overload
+@contextmanager
 def _get_dataset(
     path: Path,
     name: List[H5Datasets],
     *,
-    mode: Literal["r", "w", "a"] = "r",
     n_dim: Optional[int] = None,
-    **kwargs,
-) -> Generator[Tuple[h5py.Dataset], None, None]:
-    ...
-
-
-@contextmanager
-def _get_dataset(
-    path: Path,
-    name: Union[H5Datasets, List[H5Datasets]],
-    *,
-    mode: Literal["r", "w", "a"] = "r",
-    n_dim: Optional[int] = None,
+    mode: Literal["w", "a"] = "w",
     **kwargs,
 ):
     """
     Duplicate name keys will be ignored
     """
-    if isinstance(name, list):
-        if len(name) == 0:
-            raise ValueError("Name of at least one dataset required")
 
-        _names = list(dict.fromkeys(name))
-    else:
-        _names = [name]
+    _names = list(dict.fromkeys(name))
+    if not set(H5Datasets).issuperset(_names):
+        raise ValueError(f"Only {[x.name for x in H5Datasets]} are allowed")
 
-    if mode != "r":
-        # Write enabled
-        if any(_is_features_dataset(x) for x in _names) and n_dim is None:
-            raise ValueError(
-                "n_dim cannot be None for image / metadata features in write mode"
-            )
+    # Write enabled
+    if any(_is_features_dataset(x) for x in _names) and n_dim is None:
+        raise ValueError(
+            "n_dim cannot be None for image / metadata features in write mode"
+        )
+
+    def _get_h5_dataset(f: h5py.File, key: H5Datasets, **kwargs):
+        if key not in f:
+            f.create_dataset(key.value, **kwargs)
+        return typing.cast(h5py.Dataset, f[key])
 
     with h5py.File(path, mode=mode, **kwargs) as f:
         if isinstance(name, list):
@@ -363,6 +335,37 @@ def _dataset_iterator(ds: h5py.Dataset, batch_size: int = 1024):
         s_idx = e_idx
 
 
+def _get_shapes(f: h5py.File):
+    """
+    Recursively descend into the hierarchy of the files and find the datasets
+    and get their shape if the dataset belongs to H5Datasets enum
+    """
+    shape = {}
+
+    def fn(name, ds):
+        if isinstance(ds, h5py.Dataset) and name in H5Datasets:
+            shape[H5Datasets(name)] = ds.shape
+
+    f.visititems(fn)
+    return shape
+
+
+def _get_counts(f: h5py.File):
+    """
+    Recursively descend into the hierarchy of the files and find the datasets
+    and get the number of items if the dataset belongs to H5Datasets enum
+    """
+
+    counts = {}
+
+    def fn(name, ds):
+        if isinstance(ds, h5py.Dataset) and name in H5Datasets:
+            counts[H5Datasets(name)] = ds.len()
+
+    f.visititems(fn)
+    return counts
+
+
 # Public functions
 
 
@@ -372,38 +375,36 @@ def generate_thumbnail(im: Image.Image):
     Modifies Image in-place, make sure to pass copy if needed
     """
     with io.BytesIO() as buf:
-        im.thumbnail((192, 192), resample=Image.BILINEAR)
+        im.thumbnail((224, 224), resample=Image.BILINEAR)
         im.save(buf, format="JPEG", quality=90)
         return buf.getvalue()
 
 
-def get_shapes(dataset: Path, **kwargs):
-    _names = list(H5Datasets)
-    with _get_dataset(dataset, _names, mode="r", **kwargs) as ds_arr:
-        return {x: y.shape for x, y in zip(_names, ds_arr)}
+def get_shapes(path: Path, **kwargs):
+    with h5py.File(path, mode="r", **kwargs) as f:
+        return _get_shapes(f)
 
 
-def get_counts(dataset: Path, **kwargs):
+def get_counts(path: Path, **kwargs):
     """
     Returns the counts of all datasets as
     dictionary
 
     TODO: Raises error if the dataset is scalar
     """
-    _names = list(H5Datasets)
-    with _get_dataset(dataset, _names, mode="r", **kwargs) as ds_arr:
-        return {x: y.len() for x, y in zip(_names, ds_arr)}
+    with h5py.File(path, mode="r", **kwargs) as f:
+        return _get_counts(f)
 
 
-def get_model_name(dataset: Path, **kwargs):
+def get_model_name(path: Path, **kwargs):
     """
     Returns the model name stored on the FEATURES datasets
     """
-    with _get_dataset(dataset, H5Datasets.IMAGE_FEATURES, mode="r", **kwargs) as ds:
-        return ds.attrs.get("model", None)
+    with h5py.File(path, mode="r", **kwargs) as f:
+        return f[H5Datasets.IMAGE_FEATURES].attrs.get("model", None)
 
 
-def get_h5iterator(dataset: Path, *, batch_size: int = 1024, **kwargs):
+def get_h5iterator(path: Path, *, batch_size: int = 1024, **kwargs):
     """
     Returns a function that yields values from the chosen dataset
     based on the batch size.
@@ -413,13 +414,14 @@ def get_h5iterator(dataset: Path, *, batch_size: int = 1024, **kwargs):
         if name not in H5Datasets:
             raise ValueError(f"Only {[x.name for x in H5Datasets]} are allowed")
 
-        with _get_dataset(dataset, name, mode="r", **kwargs) as ds:
+        with h5py.File(path, mode="r", **kwargs) as f:
+            ds = f[name]
             yield from _dataset_iterator(ds, batch_size=batch_size)
 
     return _reader
 
 
-def get_h5reader(dataset: Path, **kwargs):
+def get_h5reader(path: Path, **kwargs):
     """
     Returns a contextmanager that allows you to open a
     dataset and random access rows based on leading index
@@ -445,7 +447,8 @@ def get_h5reader(dataset: Path, **kwargs):
         if name not in H5Datasets:
             raise ValueError(f"Only {[x.name for x in H5Datasets]} are allowed")
 
-        with _get_dataset(dataset, name, mode="r", **kwargs) as ds:
+        with h5py.File(path, mode="r", **kwargs) as f:
+            ds = f[name]
             decoding_fn = DECODING_FNS[_get_dataset_type(ds)]
             yield partial(indexed_reader, ds, decoding_fn)
 
@@ -478,9 +481,6 @@ def get_h5writer(
         _names = list(dict.fromkeys(names))
     else:
         _names = [names]
-
-    if not set(H5Datasets).issuperset(set(_names)):
-        raise ValueError(f"Only {[x.name for x in H5Datasets]} are allowed")
 
     is_features_dataset_requested = any(_is_features_dataset(x) for x in _names)
     if is_features_dataset_requested:
@@ -529,7 +529,7 @@ def get_h5writer(
         yield writer
 
 
-def concat_h5datasets(sources, output: Path, **kwargs):
+def concat_h5datasets(sources: List[Path], output: Path, **kwargs):
     # Find number of rows across datasets
     total = {}
     model_name = None
@@ -554,26 +554,25 @@ def concat_h5datasets(sources, output: Path, **kwargs):
             raise ValueError("All feature arrays in source to have same shape!")
 
         counts = get_counts(s, **kwargs)
-        for k, v in counts.items():
-            if k not in H5Datasets:
-                continue
 
+        for k, v in counts.items():
             if k not in total:
                 total[k] = 0
             total[k] += v
 
-    datasets = list(H5Datasets)
-    layouts = {}
+    datasets = list(total.keys())
+    layouts: Dict[H5Datasets, h5py.VirtualLayout] = {}
     for d in datasets:
         params = _get_initial_shape_and_dtype_for_dataset(d, n_dim=features_dim)
         layouts[d] = h5py.VirtualLayout(
             shape=(total[d],) + params["shape"][1:], dtype=params.get("dtype")
         )
-    SIDX = 0
-    for s in sources:
-        with _get_dataset(s, datasets) as ds_arr:
-            EIDX = SIDX + ds_arr[0].len()
-            for d, ds in zip(datasets, ds_arr):
+
+        SIDX = 0
+        for s in sources:
+            with h5py.File(s, mode="r", **kwargs) as f:
+                ds = typing.cast(h5py.Dataset, f[d])
+                EIDX = SIDX + ds.len()
                 vsource = h5py.VirtualSource(
                     os.path.relpath(s, output.parent),
                     ds.name,
@@ -581,14 +580,13 @@ def concat_h5datasets(sources, output: Path, **kwargs):
                     ds.dtype,
                     ds.maxshape,
                 )
-
                 layouts[d][SIDX:EIDX, ...] = vsource
-            SIDX = EIDX
+                SIDX = EIDX
 
     with h5py.File(output, "w", libver="latest") as f:
         for _k, _layout in layouts.items():
             vds = f.create_virtual_dataset(_k, _layout)
-            if _k == H5Datasets.IMAGE_FEATURES:
+            if _is_features_dataset(_k):
                 vds.attrs["model"] = model_name
 
 
