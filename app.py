@@ -266,17 +266,21 @@ def _create_virtual_dataset(project: Project, sources: List[Path]):
 # Function to transform images and metadata into required formats
 def _process(
     extract_image_features,
-    extract_text_features,
+    extract_text_features: Optional[Callable[[List[str]], np.ndarray]],
     batch: List[Tuple[Image.Image, ImageMetadata]],
 ):
     images, metadata = zip(*batch)
+    thumbs = [generate_thumbnail(x) for x in images]
     image_features = extract_image_features(images)
+    if extract_text_features is None:
+        return metadata, thumbs, image_features
+
+    # A callable is pass
     metadata_features = extract_text_features(
         [x.metadata.get("description", "") for x in metadata]
     )
-    thumbs = [generate_thumbnail(x) for x in images]
 
-    return metadata, image_features, metadata_features, thumbs
+    return metadata, thumbs, image_features, metadata_features
 
 
 # Function to convert input source to DatasetModel
@@ -313,7 +317,7 @@ def add_dataset(
     count_ = 0
     with tqdm() as pbar, db_engine.connect() as conn:
         for batch in batched(dataset_iterator, batch_size):
-            metadata, image_features, metadata_features, thumbs = process_fn(batch)
+            metadata, *rest = process_fn(batch)
 
             row_count = len(batch)
             h5_row_ids = [count_ + i for i in range(row_count)]
@@ -333,7 +337,7 @@ def add_dataset(
                 ]
 
                 metadata_row_ids = [str(offset + x) for x in h5_row_ids]
-                writer_fn(image_features, metadata_features, metadata_row_ids, thumbs)
+                writer_fn(metadata_row_ids, *rest)
             count_ += row_count
 
             # Udpate progress bar
@@ -352,6 +356,7 @@ def _update(
     batch_size: int = 1,
     handle_failed_sample=lambda sample: None,
     continue_on_error: bool = False,
+    include_metadata_features: bool = False,
 ):
     """
     Appends new data sources to project
@@ -362,9 +367,17 @@ def _update(
     project_id = project.id
 
     n_dim, extract_image_features, extract_text_features = setup_clip(model_name)
+
     process_fn = functools.partial(
-        _process, extract_image_features, extract_text_features
+        _process,
+        extract_image_features,
+        extract_text_features if include_metadata_features else None,
     )
+
+    excluded_datasets = (
+        [] if include_metadata_features else [H5Datasets.METADATA_FEATURES]
+    )
+    h5datasets = [x for x in H5Datasets if x not in excluded_datasets]
 
     count_: int = 0
     if mode == "update":
@@ -394,7 +407,7 @@ def _update(
             # Get writer fn
             with get_h5writer(
                 features_path,
-                list(H5Datasets),
+                h5datasets,
                 model_name=model_name.value,
                 n_dim=n_dim,
                 mode="w",
@@ -456,6 +469,9 @@ def init(
     continue_on_error: bool = typer.Option(
         False, help="Continue processing when encountered with errors if possible"
     ),
+    include_metadata_features: bool = typer.Option(
+        False, help="Extract features from metadata in addition to the image"
+    ),
     project_id: str = typer.Argument(..., help="Name of the project"),
 ):
     """
@@ -509,6 +525,7 @@ def init(
                 batch_size=batch_size,
                 handle_failed_sample=handle_failed_sample,
                 continue_on_error=continue_on_error,
+                include_metadata_features=include_metadata_features,
             )
 
             if len(added) > 0:
@@ -607,6 +624,10 @@ def update(
 
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = CLIPModel[get_model_name(vds_path)]
+    counts = get_counts(vds_path)
+
+    # Check if include_metadata_eatures was enabled in init command
+    include_metadata_features = H5Datasets.METADATA_FEATURES in counts
 
     failures_path = f"wise_update_failedsamples_{project_id}.tar"
     added = []
@@ -627,6 +648,7 @@ def update(
                 batch_size=batch_size,
                 handle_failed_sample=handle_failed_sample,
                 continue_on_error=continue_on_error,
+                include_metadata_features=include_metadata_features,
             )
             if failed_datasources:
                 logger.error(
@@ -712,14 +734,16 @@ def search(
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
     model_name = CLIPModel[get_model_name(vds_path)]
     counts = get_counts(vds_path)
+    assert counts[H5Datasets.IMAGE_FEATURES] == counts[H5Datasets.IDS]
 
-    assert (
-        counts[H5Datasets.IMAGE_FEATURES]
-        == counts[H5Datasets.METADATA_FEATURES]
-        == counts[H5Datasets.IDS]
-    )
+    if using == FEATURES.METADATA:
+        if H5Datasets.METADATA_FEATURES not in counts:
+            raise typer.BadParameter(
+                "Project does not have metadata features to use. Re-initialise the project with --include-metadata-features flag"
+            )
+        assert counts[H5Datasets.IDS] == counts[H5Datasets.METADATA_FEATURES]
+
     num_files = counts[H5Datasets.IMAGE_FEATURES]
-
     reader = get_h5iterator(vds_path)
     all_features = lambda: reader(
         H5Datasets.IMAGE_FEATURES
@@ -855,11 +879,14 @@ def index(
     n_dim = get_shapes(vds_path)[H5Datasets.IMAGE_FEATURES][1]
 
     counts = get_counts(vds_path)
-    assert (
-        counts[H5Datasets.IMAGE_FEATURES]
-        == counts[H5Datasets.METADATA_FEATURES]
-        == counts[H5Datasets.IDS]
-    )
+    assert counts[H5Datasets.IMAGE_FEATURES] == counts[H5Datasets.IDS]
+    if using == FEATURES.METADATA:
+        if H5Datasets.METADATA_FEATURES not in counts:
+            raise typer.BadParameter(
+                "Project does not have metadata features to use. Re-initialise the project with --include-metadata-features flag"
+            )
+        assert counts[H5Datasets.IDS] == counts[H5Datasets.METADATA_FEATURES]
+
     num_files = counts[H5Datasets.IMAGE_FEATURES]
     read_batch_size = 1024
     reader = get_h5iterator(vds_path, batch_size=read_batch_size)
