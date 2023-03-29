@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import enum
 from functools import partial
 import io
+import os
 import json
 import logging
 import typing
@@ -573,7 +574,14 @@ def concat_h5datasets(sources, output: Path, **kwargs):
         with _get_dataset(s, datasets) as ds_arr:
             EIDX = SIDX + ds_arr[0].len()
             for d, ds in zip(datasets, ds_arr):
-                vsource = h5py.VirtualSource(ds)
+                vsource = h5py.VirtualSource(
+                    os.path.relpath(s, output.parent),
+                    ds.name,
+                    ds.shape,
+                    ds.dtype,
+                    ds.maxshape,
+                )
+
                 layouts[d][SIDX:EIDX, ...] = vsource
             SIDX = EIDX
 
