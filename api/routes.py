@@ -34,7 +34,7 @@ from src.ioutils import (
     is_valid_uri,
     get_file_from_tar,
 )
-from src.inference import setup_clip
+from src.inference import setup_clip, CLIPModel
 
 from src.search import IndexType, read_index
 from src.utils import convert_uint8array_to_base64
@@ -235,7 +235,7 @@ def _get_search_router(config: APIConfig):
 
     # Get model name
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
-    model_name = get_model_name(vds_path)
+    model_name = CLIPModel[get_model_name(vds_path)]
 
     # load the feature search index
     index_filename = (

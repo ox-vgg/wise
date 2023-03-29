@@ -12,7 +12,6 @@ import logging
 
 import typer
 
-from src.inference import setup_clip, AVAILABLE_MODELS
 from torch.hub import download_url_to_file
 
 from src.ioutils import (
@@ -45,7 +44,7 @@ from src.data_models import (
     DatasetCreate,
     ImageMetadata,
 )
-from src.inference import setup_clip, AVAILABLE_MODELS
+from src.inference import setup_clip, CLIPModel
 from src.utils import batched
 from src.search import (
     IndexType,
@@ -87,13 +86,6 @@ def base(verbose: bool = False):
     global logger, engine
     logger = logging.getLogger()
     engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
-
-
-class _CLIPModel(str, enum.Enum):
-    pass
-
-
-CLIPModel = _CLIPModel("CLIPModel", {x: x for x in AVAILABLE_MODELS})
 
 
 def parse_webdataset_url(wds_url: str):
@@ -353,7 +345,7 @@ def add_dataset(
 def _update(
     project: Project,
     input_datasets: List[Union[str, Path]],
-    model_name: str,
+    model_name: CLIPModel,
     *,
     db_engine,
     mode: Literal["init", "update"] = "init",
@@ -403,7 +395,7 @@ def _update(
             with get_h5writer(
                 features_path,
                 list(H5Datasets),
-                model_name=model_name,
+                model_name=model_name.value,
                 n_dim=n_dim,
                 mode="w",
             ) as writer_fn:
@@ -449,7 +441,7 @@ def init(
         1,
         help="Batch size that would fit your RAM/GPURAM",
     ),
-    model: CLIPModel = typer.Option("ViT-B/32", help="CLIP Model to use"),  # type: ignore
+    model: CLIPModel = typer.Option("ViT-B-32:openai", help="CLIP Model to use"),  # type: ignore
     sources: List[str] = typer.Option(
         ..., "--source", help="List[DirPath | WebDataset compatible URL]"
     ),
@@ -491,7 +483,6 @@ def init(
     with engine.begin() as conn:
         project = WiseProjectsRepo.create(conn, data=Project(id=project_id))
 
-    model_name = model.value
     failures_path = f"wise_init_failedsamples_{project_id}.tar"
     failed_datasources = []
     dataset_engine = None
@@ -512,7 +503,7 @@ def init(
             added, failed_datasources = _update(
                 project,
                 input_datasets,
-                model_name,
+                model,
                 db_engine=dataset_engine,
                 mode="init",
                 batch_size=batch_size,
@@ -615,7 +606,7 @@ def update(
     )
 
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
-    model_name = get_model_name(vds_path)
+    model_name = CLIPModel[get_model_name(vds_path)]
 
     failures_path = f"wise_update_failedsamples_{project_id}.tar"
     added = []
@@ -719,7 +710,7 @@ def search(
             raise typer.BadParameter(f"Project {project_id} not found!")
 
     vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
-    model_name = get_model_name(vds_path)
+    model_name = CLIPModel[get_model_name(vds_path)]
     counts = get_counts(vds_path)
 
     assert (
