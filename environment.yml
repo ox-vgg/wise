@@ -29,7 +29,7 @@ dependencies:
   - sqlalchemy=2.0.3
   - alembic=1.9.3
   - pip:
-      - git+https://github.com/openai/CLIP.git
+      - open_clip_torch
       - pydantic
       - python-multipart==0.0.5
       - httpx[http2]
