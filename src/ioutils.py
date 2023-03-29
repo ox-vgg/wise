@@ -110,7 +110,13 @@ def get_valid_images_from_folder(
                     width=w,
                     height=h,
                     source_uri=None,
-                    metadata={"description": relative_path.stem},
+                    metadata={
+                        "title": relative_path.stem,
+                        "description": relative_path.stem,
+                        "author": "",
+                        "datetime": "",
+                        "license": "",
+                    },
                 )
                 yield im, metadata
         except Exception as e:
@@ -155,7 +161,13 @@ def get_valid_images_from_webdataset(url: str, error_handler):
                     width=w,
                     height=h,
                     source_uri=metadata.get("url", None),
-                    metadata={"description": metadata.get("description", "")},
+                    metadata={
+                        "title": metadata.get("title", ""),
+                        "description": metadata.get("description", ""),
+                        "author": metadata.get("author", ""),
+                        "datetime": metadata.get("datetime", ""),
+                        "license": metadata.get("license", ""),
+                    },
                 )
         except Exception as e:
             logging.error(f"Error {url}#{k}.{im_key} - ({e.__class__.__name__}){e}")
