@@ -30,6 +30,7 @@ dependencies:
   - alembic=1.9.3
   - pip:
       - open_clip_torch
+      - transformers
       - pydantic
       - python-multipart==0.0.5
       - httpx[http2]
