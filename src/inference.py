@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 import enum
 import logging
 from typing import List, Tuple, cast, Union
@@ -40,7 +41,30 @@ def _load_clip(clip_model: CLIPModel):
 def setup_clip(model_name: CLIPModel = "ViT-B-32:openai"):
 
     model, preprocess, tokenizer = _load_clip(model_name)
-    output_dim = model.visual.output_dim
+    input_image_size = model.visual.image_size
+
+    if isinstance(input_image_size, Iterable):
+        if isinstance(input_image_size, str):
+            input_image_size = int(input_image_size)
+            input_image_size = (input_image_size, input_image_size)
+        else:
+            input_image_size = tuple(input_image_size)[:2]
+    elif isinstance(input_image_size, int):
+        input_image_size = (input_image_size, input_image_size)
+    else:
+        raise NotImplementedError
+
+    def get_output_dim():
+        """
+        Warmup the GPU with these models
+        and find the output_dim reliably
+        There seems to be no other API in open_clip repo to
+        get the output_dim, than running the model
+        """
+        im_features = extract_image_features([Image.new("RGB", input_image_size)])
+        text_features = extract_text_features(["dummy"])
+        assert im_features.shape[1] == text_features.shape[1]
+        return im_features.shape[1]
 
     def extract_image_features(images: Union[torch.Tensor, List[Image.Image]]) -> np.ndarray:
         if isinstance(images, torch.Tensor):
@@ -67,6 +91,7 @@ def setup_clip(model_name: CLIPModel = "ViT-B-32:openai"):
 
             return output.cpu().numpy()
 
+    output_dim = get_output_dim()
     return output_dim, preprocess, extract_image_features, extract_text_features
 
 
