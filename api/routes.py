@@ -251,7 +251,7 @@ def _get_search_router(config: APIConfig):
     assert counts[H5Datasets.IMAGE_FEATURES] == counts[H5Datasets.IDS]
     num_files = counts[H5Datasets.IMAGE_FEATURES]
 
-    _, extract_image_features, extract_text_features = setup_clip(model_name)
+    _, _, extract_image_features, extract_text_features = setup_clip(model_name)
 
     router_cm = ExitStack()
     thumbs_reader = router_cm.enter_context(

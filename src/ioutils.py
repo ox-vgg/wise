@@ -3,9 +3,9 @@ import enum
 from functools import partial
 import io
 import os
+from multiprocessing import cpu_count
 import json
 import logging
-import typing
 from typing import (
     List,
     Literal,
@@ -14,7 +14,10 @@ from typing import (
     Callable,
     Dict,
     Any,
+    cast
 )
+from torch.utils.data import Dataset as PyTorchDataset, DataLoader, default_collate
+from torch import Tensor
 
 from pathlib import Path
 import tarfile
@@ -25,7 +28,7 @@ import webdataset as wds
 import httpx
 
 from .utils import argsort
-from .data_models import ImageInfo, ImageMetadata
+from .data_models import ImageInfo, ImageMetadata, Dataset, DatasetType
 
 logger = logging.getLogger(__name__)
 
@@ -86,36 +89,54 @@ def is_valid_webdataset_source(p: str):
         return False
 
 
-def get_valid_webdataset_tar_from_folder(folder: Path):
-    return (
-        str(x)
-        for x in folder.rglob("*.tar")
-        if x.is_file() and tarfile.is_tarfile(x) and is_valid_webdataset_source(str(x))
-    )
+class CustomPyTorchDataset(PyTorchDataset):
+    def __init__(self, dataset: Dataset, image_transform: Callable[Image, Tensor],
+                generate_thumbnail: Callable[Image.Image, bytes],
+                error_handler: Callable[[Dict[str, Any]], None]):
+        super().__init__()
 
+        def update_id(metadata: ImageMetadata):
+            return metadata.copy(update={"dataset_id": dataset.id})
 
-def get_file_from_tar(location: Path, key: str):
-    with tarfile.open(location, "r") as t:
-        buf = t.extractfile(key)
-        if buf:
-            yield from buf
-    return None
+        def update_path(metadata: ImageMetadata):
+            return metadata.copy(
+                update={"path": metadata.path.replace(dataset.location, "")}
+            )
+        
+        self.folder_path = dataset.location
+        self.dataset_type = dataset.type
+        if dataset.type == DatasetType.WEBDATASET:
+            raise NotImplementedError
+            # TODO add code to handle WebDataset                
+            # self.metadata_transform = lambda metadata: update_path(update_id(metadata))
+        elif dataset.type == DatasetType.IMAGE_DIR:
+            self.filepaths = [x for x in Path(dataset.location).rglob("*") if x.is_file() and is_valid_image(x)]
+            self.metadata_transform = update_id
+        else:
+            raise NotImplementedError
 
+        self.image_transform = image_transform
+        self.generate_thumbnail = generate_thumbnail
+        self.error_handler = error_handler
 
-# Create iterator over images in folder
-def get_valid_images_from_folder(
-    folder: Path, error_handler: Callable[[Dict[str, Any]], None]
-):
-    image_files = (x for x in folder.rglob("*") if x.is_file() and is_valid_image(x))
-    for image in image_files:
+    def __len__(self):
+        return len(self.filepaths)
+
+    def _getitem_webdataset(self, index):
+        pass
+
+    def _getitem_folder(self, index):
+        image = self.filepaths[index]
         try:
             with Image.open(image) as im:
                 w, h = im.size
                 format = im.format or "UNKNOWN"
                 # Load the image into memory to prevent seeking after generator ends
                 im.load()
-                relative_path = image.relative_to(folder)
+                thumb = self.generate_thumbnail(im)
+                im = self.image_transform(im)
 
+                relative_path = image.relative_to(self.folder_path)
                 metadata = ImageMetadata(
                     path=str(relative_path),
                     size_in_bytes=image.stat().st_size,
@@ -131,15 +152,15 @@ def get_valid_images_from_folder(
                         "license": "",
                     },
                 )
-                yield im, metadata
+                return im, metadata, thumb
         except Exception as e:
             logging.error(f"Error {image} - ({type(e)}){e}")
             _, *suffix_key = image.suffix.split(".", 1)
-            image_key = image.relative_to(folder)
+            image_key = image.relative_to(self.folder_path)
             image_key = image_key.parent / image_key.stem
             sample = {
                 "__key__": str(image_key),
-                "__url__": str(folder),
+                "__url__": str(self.folder_path),
                 f'{".".join(suffix_key)}': image.read_bytes(),
                 "json": json.dumps(
                     {
@@ -148,7 +169,61 @@ def get_valid_images_from_folder(
                     }
                 ).encode("utf-8"),
             }
-            error_handler(sample)
+            self.error_handler(sample)
+
+    def __getitem__(self, index):
+        if self.dataset_type == DatasetType.WEBDATASET:
+            return self._getitem_webdataset(index)
+        elif self.dataset_type == DatasetType.IMAGE_DIR:
+            return self._getitem_folder(index)
+
+
+def get_dataloader(
+    dataset: Dataset,
+    image_transform: Callable[Image, Tensor],
+    handle_failed_sample: Callable[[Dict[str, Any]], None],
+    batch_size: int,
+    num_workers: int = None,
+):
+    """
+    Returns a Dataloader over the datasource which yields batches of processed images (as tensors), metadata, and thumbnails
+
+    Failed samples are passed to the handle_failed_sample function
+    """
+
+    if num_workers is None:
+        if cpu_count() == 1:
+            num_workers = 0
+        else:
+            num_workers = min(cpu_count(), 16)
+        logging.info(f'Loading data with {num_workers} workers')
+    
+    def collate_fn(batch):
+        images, metadata, thumb = zip(*batch)
+        images, metadata, thumb = default_collate(images), list(metadata), list(thumb)
+        return images, metadata, thumb
+
+    pytorch_dataset = CustomPyTorchDataset(dataset, image_transform=image_transform,
+                                            generate_thumbnail=generate_thumbnail, error_handler=handle_failed_sample)
+    dataloader = DataLoader(pytorch_dataset, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_fn, shuffle=False)
+    return dataloader
+    # TODO implement failed_sample_writer_lock
+
+
+def get_valid_webdataset_tar_from_folder(folder: Path):
+    return (
+        str(x)
+        for x in folder.rglob("*.tar")
+        if x.is_file() and tarfile.is_tarfile(x) and is_valid_webdataset_source(str(x))
+    )
+
+
+def get_file_from_tar(location: Path, key: str):
+    with tarfile.open(location, "r") as t:
+        buf = t.extractfile(key)
+        if buf:
+            yield from buf
+    return None
 
 
 # Create iterator over images in webdataset
@@ -271,7 +346,7 @@ def _get_dataset(
     def _get_h5_dataset(f: h5py.File, key: H5Datasets, **kwargs):
         if key not in f:
             f.create_dataset(key.value, **kwargs)
-        return typing.cast(h5py.Dataset, f[key])
+        return cast(h5py.Dataset, f[key])
 
     with h5py.File(path, mode=mode, **kwargs) as f:
         if isinstance(name, list):
@@ -571,7 +646,7 @@ def concat_h5datasets(sources: List[Path], output: Path, **kwargs):
         SIDX = 0
         for s in sources:
             with h5py.File(s, mode="r", **kwargs) as f:
-                ds = typing.cast(h5py.Dataset, f[d])
+                ds = cast(h5py.Dataset, f[d])
                 EIDX = SIDX + ds.len()
                 vsource = h5py.VirtualSource(
                     os.path.relpath(s, output.parent),

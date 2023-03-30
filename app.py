@@ -13,6 +13,7 @@ import logging
 import typer
 
 from torch.hub import download_url_to_file
+from torch import Tensor
 
 from src.ioutils import (
     H5Datasets,
@@ -21,11 +22,9 @@ from src.ioutils import (
     get_counts,
     get_h5iterator,
     get_h5writer,
-    generate_thumbnail,
-    get_valid_images_from_folder,
-    get_valid_images_from_webdataset,
     is_valid_webdataset_source,
     get_valid_webdataset_tar_from_folder,
+    get_dataloader,
     concat_h5datasets,
 )
 
@@ -34,6 +33,7 @@ from PIL import Image
 import braceexpand
 from tqdm import tqdm
 import webdataset as wds
+from threading import Lock
 from src import db
 from src.data_models import (
     Dataset,
@@ -45,7 +45,6 @@ from src.data_models import (
     ImageMetadata,
 )
 from src.inference import setup_clip, CLIPModel
-from src.utils import batched
 from src.search import (
     IndexType,
     write_index,
@@ -109,40 +108,6 @@ def parse_webdataset_url(wds_url: str):
     expanded = map(lambda x: braceexpand.braceexpand(x), stripped)
 
     return list(itertools.chain.from_iterable(expanded))
-
-
-def get_dataset_iterator(
-    dataset: Dataset, handle_failed_sample=Callable[[Dict[str, Any]], None]
-):
-    """
-    Returns an iterator over the datasource
-    Each sample is a tuple[Image, ImageMetadata]
-
-    Failed samples are passed to the handle_failed_sample function
-    """
-
-    def update_id(metadata: ImageMetadata):
-        return metadata.copy(update={"dataset_id": dataset.id})
-
-    def update_path(metadata: ImageMetadata):
-        return metadata.copy(
-            update={"path": metadata.path.replace(dataset.location, "")}
-        )
-
-    if dataset.type == DatasetType.WEBDATASET:
-        yield from map(
-            lambda x: (x[0], update_path(update_id(x[1]))),
-            get_valid_images_from_webdataset(dataset.location, handle_failed_sample),
-        )
-
-    elif dataset.type == DatasetType.IMAGE_DIR:
-        yield from map(
-            lambda x: (x[0], update_id(x[1])),
-            get_valid_images_from_folder(Path(dataset.location), handle_failed_sample),
-        )
-
-    else:
-        raise NotImplementedError
 
 
 # Split input arguments into respective category of folders and webdataset urls
@@ -262,26 +227,21 @@ def _create_virtual_dataset(project: Project, sources: List[Path]):
         raise e
     return next_version
 
-
-# Function to transform images and metadata into required formats
-def _process(
+def _extract_image_and_metadata_features(
     extract_image_features,
-    extract_text_features: Optional[Callable[[List[str]], np.ndarray]],
-    batch: List[Tuple[Image.Image, ImageMetadata]],
+    extract_text_features,
+    images: Union[Tensor, List[Image.Image]],
+    metadata: List[ImageMetadata]
 ):
-    images, metadata = zip(*batch)
-    thumbs = [generate_thumbnail(x) for x in images]
     image_features = extract_image_features(images)
     if extract_text_features is None:
-        return metadata, thumbs, image_features
+        return (image_features,)
 
     # A callable is pass
     metadata_features = extract_text_features(
         [x.metadata.get("description", "") for x in metadata]
     )
-
-    return metadata, thumbs, image_features, metadata_features
-
+    return image_features, metadata_features
 
 # Function to convert input source to DatasetModel
 def _convert_input_source_to_dataset(input_source: Union[str, Path]):
@@ -301,25 +261,26 @@ def _convert_input_source_to_dataset(input_source: Union[str, Path]):
 
 def add_dataset(
     dataset: Dataset,
-    process_fn,
+    image_transform,
+    extract_image_and_metadata_features,
     writer_fn,
     *,
     db_engine,
     offset: int = 0,
-    batch_size: int = 1,
     error_handler=lambda sample: None,
+    batch_size: int = 1,
+    num_workers: int = None,
 ):
-
     # Get dataset iterator
-    dataset_iterator = get_dataset_iterator(dataset, error_handler)
+    dataloader = get_dataloader(dataset, image_transform, error_handler, batch_size, num_workers)
 
     # Keep track of records written in this dataset
     count_ = 0
     with tqdm() as pbar, db_engine.connect() as conn:
-        for batch in batched(dataset_iterator, batch_size):
-            metadata, *rest = process_fn(batch)
+        for images, metadata, thumbs in dataloader:
+            extracted_features = extract_image_and_metadata_features(images, metadata)
 
-            row_count = len(batch)
+            row_count = len(images)
             h5_row_ids = [count_ + i for i in range(row_count)]
 
             with conn.begin():
@@ -337,7 +298,7 @@ def add_dataset(
                 ]
 
                 metadata_row_ids = [str(offset + x) for x in h5_row_ids]
-                writer_fn(metadata_row_ids, *rest)
+                writer_fn(metadata_row_ids, thumbs, *extracted_features)
             count_ += row_count
 
             # Udpate progress bar
@@ -353,10 +314,11 @@ def _update(
     *,
     db_engine,
     mode: Literal["init", "update"] = "init",
-    batch_size: int = 1,
     handle_failed_sample=lambda sample: None,
     continue_on_error: bool = False,
     include_metadata_features: bool = False,
+    batch_size: int = 1,
+    num_workers: int = None,
 ):
     """
     Appends new data sources to project
@@ -366,12 +328,11 @@ def _update(
     """
     project_id = project.id
 
-    n_dim, extract_image_features, extract_text_features = setup_clip(model_name)
-
-    process_fn = functools.partial(
-        _process,
+    n_dim, image_transform, extract_image_features, extract_text_features = setup_clip(model_name)
+    extract_image_and_metadata_features = functools.partial(
+        _extract_image_and_metadata_features,
         extract_image_features,
-        extract_text_features if include_metadata_features else None,
+        extract_text_features if include_metadata_features else None
     )
 
     excluded_datasets = (
@@ -415,12 +376,14 @@ def _update(
                 # Process each item in data source and write to table + hdf5
                 count_ = add_dataset(
                     dataset_obj,
-                    process_fn,
+                    image_transform,
+                    extract_image_and_metadata_features,
                     writer_fn,
                     db_engine=db_engine,
                     offset=count_,
-                    batch_size=batch_size,
                     error_handler=handle_failed_sample,
+                    batch_size=batch_size,
+                    num_workers=num_workers,
                 )
             added_datasets.append(features_path)
         except (KeyboardInterrupt, Exception) as e:
@@ -450,14 +413,10 @@ def _update(
 
 @app.command()
 def init(
-    batch_size: int = typer.Option(
-        1,
-        help="Batch size that would fit your RAM/GPURAM",
-    ),
-    model: CLIPModel = typer.Option("ViT-B-32:openai", help="CLIP Model to use"),  # type: ignore
     sources: List[str] = typer.Option(
         ..., "--source", help="List[DirPath | WebDataset compatible URL]"
     ),
+    model: CLIPModel = typer.Option("ViT-B-32:openai", help="CLIP Model to use"),  # type: ignore
     store_in: Optional[Path] = typer.Option(
         None,
         writable=True,
@@ -473,6 +432,11 @@ def init(
         False, help="Extract features from metadata in addition to the image"
     ),
     project_id: str = typer.Argument(..., help="Name of the project"),
+    batch_size: int = typer.Option(
+        1,
+        help="Batch size that would fit your RAM/GPURAM",
+    ),
+    num_workers: int = typer.Option(None, help="Number of subprocesses to use for data loading (for PyTorch Dataloader). If set to 0, the main process is used for data loading. If omitted, num_workers will be automatically determined."),
 ):
     """
     Initialise WISE Project
@@ -512,9 +476,12 @@ def init(
         )
 
         with wds.TarWriter(failures_path, encoder=False) as sink:
+            failed_sample_writer_lock = Lock()
 
             def handle_failed_sample(sample: Dict[str, Any]):
+                failed_sample_writer_lock.acquire()
                 sink.write(sample)
+                failed_sample_writer_lock.release()
 
             added, failed_datasources = _update(
                 project,
@@ -522,10 +489,11 @@ def init(
                 model,
                 db_engine=dataset_engine,
                 mode="init",
-                batch_size=batch_size,
                 handle_failed_sample=handle_failed_sample,
                 continue_on_error=continue_on_error,
                 include_metadata_features=include_metadata_features,
+                batch_size=batch_size,
+                num_workers=num_workers,
             )
 
             if len(added) > 0:
@@ -751,7 +719,7 @@ def search(
         else H5Datasets.METADATA_FEATURES
     )
 
-    _, extract_image_features, extract_text_features = setup_clip(model_name)
+    _, _, extract_image_features, extract_text_features = setup_clip(model_name)
     top_k = min(top_k, num_files)
 
     dist, ids = None, None
@@ -788,23 +756,24 @@ def search(
 
     # Classification query
     else:
+        pass
+        # TODO update to use dataloader later
+        # def process(query_images_folder: Path):
+        #     for batch in batched(
+        #         get_valid_images_from_folder(query_images_folder, lambda _: None),
+        #         batch_size,
+        #     ):
 
-        def process(query_images_folder: Path):
-            for batch in batched(
-                get_valid_images_from_folder(query_images_folder, lambda _: None),
-                batch_size,
-            ):
+        #         images, _ = zip(*batch)
+        #         features = extract_image_features(images)
 
-                images, _ = zip(*batch)
-                features = extract_image_features(images)
+        #         yield features
 
-                yield features
-
-        parsed_queries = typing.cast(Path, parsed_queries)
-        query_image_features = np.concatenate(list(process(parsed_queries)), axis=0)
-        # TODO Classification query loads all arrays into memory. need to refactor
-        features = np.concatenate(list(all_features()), axis=0)
-        dist, ids = classification_based_query(features, query_image_features, top_k)
+        # parsed_queries = typing.cast(Path, parsed_queries)
+        # query_image_features = np.concatenate(list(process(parsed_queries)), axis=0)
+        # # TODO Classification query loads all arrays into memory. need to refactor
+        # features = np.concatenate(list(all_features()), axis=0)
+        # dist, ids = classification_based_query(features, query_image_features, top_k)
 
     if ids is not None:
         project_engine = db.init_project(

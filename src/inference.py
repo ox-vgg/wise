@@ -1,10 +1,11 @@
 import enum
 import logging
-from typing import List, Tuple, cast
+from typing import List, Tuple, cast, Union
 from PIL import Image
 import numpy as np
 import torch
 from torchvision.transforms import Compose
+from torch.utils.data import Dataset
 import open_clip
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ def _load_clip(clip_model: CLIPModel):
             model_name, pretrained=pretrained, device=DEVICE
         ),
     )
+    model.eval()
     tokenizer = open_clip.get_tokenizer(model_name)
     logger.info("Loaded")
 
@@ -40,12 +42,13 @@ def setup_clip(model_name: CLIPModel = "ViT-B-32:openai"):
     model, preprocess, tokenizer = _load_clip(model_name)
     output_dim = model.visual.output_dim
 
-    def extract_image_features(images: List[Image.Image]) -> np.ndarray:
-        with torch.no_grad():
+    def extract_image_features(images: Union[torch.Tensor, List[Image.Image]]) -> np.ndarray:
+        if isinstance(images, torch.Tensor):
+            _input = images.to(device=DEVICE)
+        elif isinstance(images, List[Image.Image]):
+            _input = torch.stack([preprocess(im) for im in _input], dim=0).to(device=DEVICE)
 
-            _input = torch.stack([preprocess(im) for im in images], dim=0).to(
-                device=DEVICE
-            )
+        with torch.no_grad():
             output = model.encode_image(_input).float()
             output /= torch.linalg.norm(output, dim=-1, keepdims=True)
 
@@ -64,7 +67,7 @@ def setup_clip(model_name: CLIPModel = "ViT-B-32:openai"):
 
             return output.cpu().numpy()
 
-    return output_dim, extract_image_features, extract_text_features
+    return output_dim, preprocess, extract_image_features, extract_text_features
 
 
 class LinearBinaryClassifier(torch.nn.Module):
