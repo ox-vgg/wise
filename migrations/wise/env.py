@@ -17,7 +17,7 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from src.db import wise_metadata_obj
-from src.projects import get_wise_db_uri
+from src.projects import WiseTree
 
 target_metadata = wise_metadata_obj
 
@@ -25,7 +25,7 @@ target_metadata = wise_metadata_obj
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-config.set_main_option("sqlalchemy.url", get_wise_db_uri())
+config.set_main_option("sqlalchemy.url", WiseTree.dburi)
 
 
 def run_migrations_offline() -> None:
