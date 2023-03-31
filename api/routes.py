@@ -35,8 +35,8 @@ from src.ioutils import (
     get_file_from_tar,
 )
 from src.inference import setup_clip, CLIPModel
-
-from src.search import IndexType, read_index
+from src.enums import IndexType
+from src.search import read_index
 from src.utils import convert_uint8array_to_base64
 
 logger = logging.getLogger(__name__)

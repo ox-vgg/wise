@@ -8,14 +8,10 @@ from tqdm import tqdm
 import faiss
 from faiss.contrib.exhaustive_search import knn
 
-from src.inference import LinearBinaryClassifier
+from .enums import IndexType
+from .inference import LinearBinaryClassifier
 
 logger = logging.getLogger(__name__)
-
-
-class IndexType(str, enum.Enum):
-    IndexFlatIP = "IndexFlatIP"
-    IndexIVFFlat = "IndexIVFFlat"
 
 
 def write_index(index, path: Path):
