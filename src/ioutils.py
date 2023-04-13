@@ -16,7 +16,7 @@ from typing import (
     Any,
     cast
 )
-from torch.utils.data import Dataset as PyTorchDataset, DataLoader, default_collate
+from torch.utils.data import IterableDataset as PyTorchIterableDataset, DataLoader, default_collate
 from torch import Tensor
 
 from pathlib import Path
@@ -89,7 +89,7 @@ def is_valid_webdataset_source(p: str):
         return False
 
 
-class CustomPyTorchDataset(PyTorchDataset):
+class CustomPyTorchDataset(PyTorchIterableDataset):
     def __init__(self, dataset: Dataset, image_transform: Callable[Image, Tensor],
                 generate_thumbnail: Callable[Image.Image, bytes],
                 error_handler: Callable[[Dict[str, Any]], None]):
@@ -103,14 +103,15 @@ class CustomPyTorchDataset(PyTorchDataset):
                 update={"path": metadata.path.replace(dataset.location, "")}
             )
         
-        self.folder_path = dataset.location
+        self.dataset_location = dataset.location
         self.dataset_type = dataset.type
         if dataset.type == DatasetType.WEBDATASET:
-            raise NotImplementedError
-            # TODO add code to handle WebDataset                
-            # self.metadata_transform = lambda metadata: update_path(update_id(metadata))
+            self.webdataset = wds.WebDataset(dataset.location)
+            self.webdataset = iter(self.webdataset)            
+            self.metadata_transform = lambda metadata: update_path(update_id(metadata))
         elif dataset.type == DatasetType.IMAGE_DIR:
             self.filepaths = [x for x in Path(dataset.location).rglob("*") if x.is_file() and is_valid_image(x)]
+            self.filepaths = iter(self.filepaths)
             self.metadata_transform = update_id
         else:
             raise NotImplementedError
@@ -119,14 +120,43 @@ class CustomPyTorchDataset(PyTorchDataset):
         self.generate_thumbnail = generate_thumbnail
         self.error_handler = error_handler
 
-    def __len__(self):
-        return len(self.filepaths)
+    def _next_webdataset(self):
+        sample = next(self.webdataset)
+        k = sample["__key__"]
+        # TODO Handle other formats as well
+        im_key = next((a for a in ["jpg", "jpeg"] if a in sample), None)
+        if im_key is None:
+            raise NotImplementedError(f'Sample {self.dataset_location}/{k} is an unsupported file type (non-jpg)')
+        try:
+            im_sample = sample[im_key]
+            with Image.open(io.BytesIO(im_sample)) as im:
+                w, h = im.size
+                im.load()
+                thumb = self.generate_thumbnail(im)
+                im = self.image_transform(im)
+                metadata = json.loads(sample.get("json", b"{}"))
+                metadata = ImageMetadata(
+                    path=f"{self.dataset_location}#{k}.{im_key}",
+                    size_in_bytes=len(im_sample),
+                    format="JPEG",
+                    width=w,
+                    height=h,
+                    source_uri=metadata.get("url", None),
+                    metadata={
+                        "title": metadata.get("title", ""),
+                        "description": metadata.get("description", ""),
+                        "author": metadata.get("author", ""),
+                        "datetime": metadata.get("datetime", ""),
+                        "license": metadata.get("license", ""),
+                    },
+                )
+                return im, metadata, thumb
+        except Exception as e:
+            logging.error(f"Error {self.dataset_location}#{k}.{im_key} - ({e.__class__.__name__}){e}")
+            self.error_handler(sample)
 
-    def _getitem_webdataset(self, index):
-        pass
-
-    def _getitem_folder(self, index):
-        image = self.filepaths[index]
+    def _next_folder(self):
+        image = next(self.filepaths)
         try:
             with Image.open(image) as im:
                 w, h = im.size
@@ -136,7 +166,7 @@ class CustomPyTorchDataset(PyTorchDataset):
                 thumb = self.generate_thumbnail(im)
                 im = self.image_transform(im)
 
-                relative_path = image.relative_to(self.folder_path)
+                relative_path = image.relative_to(self.dataset_location)
                 metadata = ImageMetadata(
                     path=str(relative_path),
                     size_in_bytes=image.stat().st_size,
@@ -156,11 +186,11 @@ class CustomPyTorchDataset(PyTorchDataset):
         except Exception as e:
             logging.error(f"Error {image} - ({type(e)}){e}")
             _, *suffix_key = image.suffix.split(".", 1)
-            image_key = image.relative_to(self.folder_path)
+            image_key = image.relative_to(self.dataset_location)
             image_key = image_key.parent / image_key.stem
             sample = {
                 "__key__": str(image_key),
-                "__url__": str(self.folder_path),
+                "__url__": str(self.dataset_location),
                 f'{".".join(suffix_key)}': image.read_bytes(),
                 "json": json.dumps(
                     {
@@ -171,11 +201,14 @@ class CustomPyTorchDataset(PyTorchDataset):
             }
             self.error_handler(sample)
 
-    def __getitem__(self, index):
+    def __iter__(self):
+        return self
+
+    def __next__(self):
         if self.dataset_type == DatasetType.WEBDATASET:
-            return self._getitem_webdataset(index)
+            return self._next_webdataset()
         elif self.dataset_type == DatasetType.IMAGE_DIR:
-            return self._getitem_folder(index)
+            return self._next_folder()
 
 
 def get_dataloader(
@@ -207,7 +240,6 @@ def get_dataloader(
                                             generate_thumbnail=generate_thumbnail, error_handler=handle_failed_sample)
     dataloader = DataLoader(pytorch_dataset, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_fn, shuffle=False)
     return dataloader
-    # TODO implement failed_sample_writer_lock
 
 
 def get_valid_webdataset_tar_from_folder(folder: Path):
@@ -224,42 +256,6 @@ def get_file_from_tar(location: Path, key: str):
         if buf:
             yield from buf
     return None
-
-
-# Create iterator over images in webdataset
-def get_valid_images_from_webdataset(url: str, error_handler):
-    ds = wds.WebDataset(url)
-    for sample in ds:
-        k = sample["__key__"]
-        # TODO Handle other formats as well
-        im_key = next((a for a in ["jpg", "jpeg"] if a in sample), None)
-        if im_key is None:
-            # Unknown sample - Ignore for now, raise exception later
-            continue
-        try:
-            im_sample = sample[im_key]
-            with Image.open(io.BytesIO(im_sample)) as im:
-                w, h = im.size
-                im.load()
-                metadata = json.loads(sample.get("json", b"{}"))
-                yield im, ImageMetadata(
-                    path=f"{url}#{k}.{im_key}",
-                    size_in_bytes=len(im_sample),
-                    format="JPEG",
-                    width=w,
-                    height=h,
-                    source_uri=metadata.get("url", None),
-                    metadata={
-                        "title": metadata.get("title", ""),
-                        "description": metadata.get("description", ""),
-                        "author": metadata.get("author", ""),
-                        "datetime": metadata.get("datetime", ""),
-                        "license": metadata.get("license", ""),
-                    },
-                )
-        except Exception as e:
-            logging.error(f"Error {url}#{k}.{im_key} - ({e.__class__.__name__}){e}")
-            error_handler(sample)
 
 
 class H5_ENCODING(BaseStrEnum):
