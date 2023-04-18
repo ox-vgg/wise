@@ -239,7 +239,7 @@ def _get_search_router(config: APIConfig):
     logger.info(f"Loading faiss index from {index_filename}")
     index = read_index(index_filename)
     if hasattr(index, "nprobe"):
-        index.nprobe = 5
+        index.nprobe = getattr(config, 'nprobe', 32)
 
     # Get counts
     counts = get_counts(vds_path)
