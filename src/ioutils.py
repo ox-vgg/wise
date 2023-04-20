@@ -5,6 +5,7 @@ import io
 import os
 from multiprocessing import cpu_count
 import json
+import math
 import logging
 from typing import (
     List,
@@ -16,7 +17,7 @@ from typing import (
     Any,
     cast
 )
-from torch.utils.data import IterableDataset as PyTorchIterableDataset, DataLoader, default_collate
+from torch.utils.data import IterableDataset as PyTorchIterableDataset, DataLoader, default_collate, get_worker_info
 from torch import Tensor
 
 from pathlib import Path
@@ -105,13 +106,11 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
         
         self.dataset_location = dataset.location
         self.dataset_type = dataset.type
-        if dataset.type == DatasetType.WEBDATASET:
-            self.webdataset = wds.WebDataset(dataset.location)
-            self.webdataset = iter(self.webdataset)            
+        if self.dataset_type == DatasetType.WEBDATASET:
+            self.webdataset = wds.WebDataset(dataset.location) # splitter=wds.split_by_worker
             self.metadata_transform = lambda metadata: update_path(update_id(metadata))
-        elif dataset.type == DatasetType.IMAGE_DIR:
+        elif self.dataset_type == DatasetType.IMAGE_DIR:
             self.filepaths = [x for x in Path(dataset.location).rglob("*") if x.is_file() and is_valid_image(x)]
-            self.filepaths = iter(self.filepaths)
             self.metadata_transform = update_id
         else:
             raise NotImplementedError
@@ -202,6 +201,18 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
             self.error_handler(sample)
 
     def __iter__(self):
+        if self.dataset_type == DatasetType.WEBDATASET:
+            self.webdataset = iter(self.webdataset)    
+        elif self.dataset_type == DatasetType.IMAGE_DIR:
+            # split workload by worker id (adapted from example in https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
+            worker_info = get_worker_info()
+            if worker_info is not None:
+                per_worker = int(math.ceil(len(self.filepaths) / float(worker_info.num_workers)))
+                worker_id = worker_info.id
+                iter_start = worker_id * per_worker
+                iter_end = min(iter_start + per_worker, len(self.filepaths))
+                self.filepaths = self.filepaths[iter_start:iter_end]
+            self.filepaths = iter(self.filepaths)
         return self
 
     def __next__(self):
