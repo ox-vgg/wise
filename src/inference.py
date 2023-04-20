@@ -69,8 +69,8 @@ def setup_clip(model_name: CLIPModel = "ViT-B-32:openai"):
     def extract_image_features(images: Union[torch.Tensor, List[Image.Image]]) -> np.ndarray:
         if isinstance(images, torch.Tensor):
             _input = images.to(device=DEVICE)
-        elif isinstance(images, List[Image.Image]):
-            _input = torch.stack([preprocess(im) for im in _input], dim=0).to(device=DEVICE)
+        elif isinstance(images, list) and all(isinstance(img, Image.Image) for img in images):
+            _input = torch.stack([preprocess(im) for im in images], dim=0).to(device=DEVICE)
 
         with torch.no_grad():
             output = model.encode_image(_input).float()
