@@ -242,6 +242,9 @@ def get_dataloader(
             num_workers = min(cpu_count(), 16)
         logging.info(f'Loading data with {num_workers} workers')
     
+    if dataset.type == DatasetType.WEBDATASET and num_workers > 1:
+        raise NotImplementedError('Please --num-workers 0 or --num-workers 1 for now (not supported for > 1 for webdatasets)')
+
     def collate_fn(batch):
         images, metadata, thumb = zip(*batch)
         images, metadata, thumb = default_collate(images), list(metadata), list(thumb)
