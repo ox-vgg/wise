@@ -302,12 +302,21 @@ def _get_search_router(config: APIConfig):
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
     async def image_search(
         q: bytes = File(),
-        top_k: int = Query(config.top_k, gt=0, le=100),
+        start: int = Query(0, gt=-1, le=980),
+        end: int = Query(20, gt=0, le=1000),
     ):
-        top_k = min(top_k, num_files)
+        end = min(end, num_files)
+        if start > end:
+            raise HTTPException(
+                400, {"message": "'start' cannot be greater than 'end'"}
+            )
+        if (end - start) > 50:
+            raise HTTPException(
+                400, {"message": "cannot return more than 50 results at a time"}
+            )
         with Image.open(io.BytesIO(q)) as im:
             query_features = extract_image_features([im])
-            dist, ids = index.search(query_features, top_k=top_k)
+            dist, ids = index.search(query_features, end)
 
         with project_engine.connect() as conn:
 
@@ -317,7 +326,13 @@ def _get_search_router(config: APIConfig):
                     raise RuntimeError()
                 return m
 
-            response = make_response(["image"], dist, ids, get_metadata, thumbs_reader)
+            response = make_response(
+                ["image"],
+                dist[[0], start:end],
+                ids[[0], start:end],
+                get_metadata,
+                thumbs_reader,
+            )
         return response
 
     return router
