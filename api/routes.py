@@ -18,12 +18,7 @@ import typer
 
 from config import APIConfig
 from src import db
-from src.projects import (
-    get_wise_db_uri,
-    get_wise_project_latest_virtual_h5dataset,
-    get_wise_project_index_folder,
-    get_wise_project_db_uri,
-)
+from src.projects import WiseTree, WiseProjectTree
 from src.repository import WiseProjectsRepo, MetadataRepo, DatasetRepo
 from src.data_models import ImageInfo, ImageMetadata, DatasetType, Dataset
 from src.ioutils import (
@@ -35,8 +30,8 @@ from src.ioutils import (
     get_file_from_tar,
 )
 from src.inference import setup_clip, CLIPModel
-
-from src.search import IndexType, read_index
+from src.enums import IndexType
+from src.search import read_index
 from src.utils import convert_uint8array_to_base64
 
 logger = logging.getLogger(__name__)
@@ -50,7 +45,7 @@ def get_project_router(config: APIConfig):
     if config.project_id is None:
         raise typer.BadParameter("project id is missing!")
 
-    engine = db.init(get_wise_db_uri())
+    engine = db.init(WiseTree.dburi)
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, config.project_id)
         if project is None:
@@ -76,7 +71,8 @@ def _get_project_data_router(config: APIConfig):
     """
 
     project_id = config.project_id
-    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
+    project_tree = WiseProjectTree(project_id)
+    vds_path = project_tree.latest
 
     router_cm = ExitStack()
     router = APIRouter(
@@ -85,7 +81,7 @@ def _get_project_data_router(config: APIConfig):
     thumbs_reader = router_cm.enter_context(
         get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
     )
-    project_engine = db.init_project(get_wise_project_db_uri(project_id))
+    project_engine = db.init_project(project_tree.dburi)
 
     @router.get(
         "/images/{image_id}",
@@ -190,6 +186,7 @@ def _get_project_data_router(config: APIConfig):
 def _get_search_router(config: APIConfig):
 
     project_id = config.project_id
+    project_tree = WiseProjectTree(project_id)
     index_type = IndexType[config.index_type]
 
     class SearchResponse(BaseModel):
@@ -228,19 +225,17 @@ def _get_search_router(config: APIConfig):
         }
 
     _prefix = config.query_prefix.strip()
-    project_engine = db.init_project(get_wise_project_db_uri(project_id))
+    project_engine = db.init_project(project_tree.dburi)
 
     # TODO Big assumption - all datasets were written with same model name
     # Should Read / Write to project db instead
 
     # Get model name
-    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
+    vds_path = project_tree.latest
     model_name = CLIPModel[get_model_name(vds_path)]
 
     # load the feature search index
-    index_filename = (
-        get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
-    )
+    index_filename = project_tree.index(index_type)
     logger.info(f"Loading faiss index from {index_filename}")
     index = read_index(index_filename)
     if hasattr(index, "nprobe"):

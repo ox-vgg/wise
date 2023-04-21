@@ -2,19 +2,27 @@ import enum
 import functools
 import itertools
 import math
+import logging
 from pathlib import Path
 
+from tempfile import NamedTemporaryFile
+from threading import Lock
 import typing
 from typing import List, Union, Tuple, Literal, Optional, Dict, Any, Callable
-from tempfile import NamedTemporaryFile
-
-import logging
 
 import typer
 
 from torch.hub import download_url_to_file
 from torch import Tensor
 
+import numpy as np
+from PIL import Image
+import braceexpand
+from tqdm import tqdm
+import webdataset as wds
+
+from src import db
+from src.enums import IndexType
 from src.ioutils import (
     H5Datasets,
     get_model_name,
@@ -28,13 +36,6 @@ from src.ioutils import (
     concat_h5datasets,
 )
 
-import numpy as np
-from PIL import Image
-import braceexpand
-from tqdm import tqdm
-import webdataset as wds
-from threading import Lock
-from src import db
 from src.data_models import (
     Dataset,
     DatasetType,
@@ -46,25 +47,12 @@ from src.data_models import (
 )
 from src.inference import setup_clip, CLIPModel
 from src.search import (
-    IndexType,
     write_index,
     get_index,
     brute_force_search,
-    classification_based_query,
 )
 from src.repository import WiseProjectsRepo, DatasetRepo, MetadataRepo
-from src.projects import (
-    get_wise_db_uri,
-    get_wise_project_db_uri,
-    get_wise_project_folder,
-    get_wise_project_h5dataset,
-    get_wise_project_index_folder,
-    get_wise_project_latest_virtual_h5dataset,
-    update_wise_project_virtual_h5dataset,
-    delete_wise_project_h5dataset,
-    create_wise_project_tree,
-    delete_wise_project_tree,
-)
+from src.projects import WiseTree, WiseProjectTree
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -84,7 +72,7 @@ def base(verbose: bool = False):
     )
     global logger, engine
     logger = logging.getLogger()
-    engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
+    engine = db.init(WiseTree.dburi, echo=app_state["verbose"])
 
 
 def parse_webdataset_url(wds_url: str):
@@ -208,10 +196,11 @@ def overwrite():
 
 def _create_virtual_dataset(project: Project, sources: List[Path]):
     project_id = project.id
+    project_tree = WiseProjectTree(project_id)
     old_version = project.version or 0
 
     next_version = 1 + old_version
-    output = update_wise_project_virtual_h5dataset(project_id, next_version)
+    output = project_tree.update_version(next_version)
 
     try:
         concat_h5datasets(sources, output)
@@ -223,15 +212,16 @@ def _create_virtual_dataset(project: Project, sources: List[Path]):
         output.unlink(missing_ok=True)
 
         # Update the symlink back to old version
-        update_wise_project_virtual_h5dataset(project_id, old_version)
+        project_tree.update_version(old_version)
         raise e
     return next_version
+
 
 def _extract_image_and_metadata_features(
     extract_image_features,
     extract_text_features,
     images: Union[Tensor, List[Image.Image]],
-    metadata: List[ImageMetadata]
+    metadata: List[ImageMetadata],
 ):
     image_features = extract_image_features(images)
     if extract_text_features is None:
@@ -242,6 +232,7 @@ def _extract_image_and_metadata_features(
         [x.metadata.get("description", "") for x in metadata]
     )
     return image_features, metadata_features
+
 
 # Function to convert input source to DatasetModel
 def _convert_input_source_to_dataset(input_source: Union[str, Path]):
@@ -272,7 +263,9 @@ def add_dataset(
     num_workers: int = None,
 ):
     # Get dataset iterator
-    dataloader = get_dataloader(dataset, image_transform, error_handler, batch_size, num_workers)
+    dataloader = get_dataloader(
+        dataset, image_transform, error_handler, batch_size, num_workers
+    )
 
     # Keep track of records written in this dataset
     count_ = 0
@@ -327,12 +320,15 @@ def _update(
     at the end for unified access
     """
     project_id = project.id
+    project_tree = WiseProjectTree(project_id)
 
-    n_dim, image_transform, extract_image_features, extract_text_features = setup_clip(model_name)
+    n_dim, image_transform, extract_image_features, extract_text_features = setup_clip(
+        model_name
+    )
     extract_image_and_metadata_features = functools.partial(
         _extract_image_and_metadata_features,
         extract_image_features,
-        extract_text_features if include_metadata_features else None
+        extract_text_features if include_metadata_features else None,
     )
 
     excluded_datasets = (
@@ -342,7 +338,7 @@ def _update(
 
     count_: int = 0
     if mode == "update":
-        vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
+        vds_path = project_tree.latest
         count_ = get_counts(vds_path)[H5Datasets.IMAGE_FEATURES]
 
     added_datasets = []
@@ -363,7 +359,7 @@ def _update(
                 )
 
             # Get dataset path
-            features_path = get_wise_project_h5dataset(project_id, str(dataset_obj.id))
+            features_path = project_tree.features(str(dataset_obj.id))
 
             # Get writer fn
             with get_h5writer(
@@ -391,7 +387,7 @@ def _update(
             # Delete the h5 datasets, table entry, and add to failed summary.
             if dataset_obj:
                 # Delete dataset
-                delete_wise_project_h5dataset(project_id, str(dataset_obj.id))
+                project_tree.delete(str(dataset_obj.id))
 
                 # Delete the Dataset -> Which deletes all metadata
                 # Later, we can just continue from where we left off instead of deleting.
@@ -436,7 +432,10 @@ def init(
         1,
         help="Batch size that would fit your RAM/GPURAM",
     ),
-    num_workers: int = typer.Option(None, help="Number of subprocesses to use for data loading (for PyTorch Dataloader). If set to 0, the main process is used for data loading. If omitted, num_workers will be automatically determined."),
+    num_workers: int = typer.Option(
+        None,
+        help="Number of subprocesses to use for data loading (for PyTorch Dataloader). If set to 0, the main process is used for data loading. If omitted, num_workers will be automatically determined.",
+    ),
 ):
     """
     Initialise WISE Project
@@ -469,11 +468,9 @@ def init(
 
     try:
         # Create project tree, get paths to the HDF5 files
-        create_wise_project_tree(project_id, store_in)
+        project_tree = WiseProjectTree.create(project_id, destination=store_in)
 
-        dataset_engine = db.init_project(
-            get_wise_project_db_uri(project_id), echo=app_state["verbose"]
-        )
+        dataset_engine = db.init_project(project_tree.dburi, echo=app_state["verbose"])
 
         with wds.TarWriter(failures_path, encoder=False) as sink:
             failed_sample_writer_lock = Lock()
@@ -519,11 +516,11 @@ def init(
     except (KeyboardInterrupt, Exception):
         logger.exception(f"Initialising project {project_id} failed!")
         delete_project = typer.confirm("Delete associated project files?", default=True)
+        project_tree = WiseProjectTree(project_id)
         if delete_project:
             with engine.begin() as conn:
                 WiseProjectsRepo.delete(conn, project_id)
-
-            delete_wise_project_tree(project_id)
+            project_tree.delete()
 
             raise typer.Exit(1)
 
@@ -531,8 +528,7 @@ def init(
             logger.info("Creating virtual dataset...")
             with dataset_engine.connect() as conn:
                 datasets = [
-                    get_wise_project_h5dataset(project_id, str(x.id))
-                    for x in DatasetRepo.list(conn)
+                    project_tree.features(str(x.id)) for x in DatasetRepo.list(conn)
                 ]
             with engine.begin() as conn:
                 new_version = _create_virtual_dataset(project, datasets)
@@ -540,9 +536,7 @@ def init(
                     conn, project_id, data=project.copy(update={"version": new_version})
                 )
             logger.info("Done")
-        logger.error(
-            f'Files for "{project_id}" left in {get_wise_project_folder(project_id)}'
-        )
+        logger.error(f'Files for "{project_id}" left in {project_tree.location}')
         raise typer.Exit(1)
 
 
@@ -586,11 +580,10 @@ def update(
         if not project:
             raise typer.BadParameter(f"Project {project_id} not found!")
 
-    dataset_engine = db.init_project(
-        get_wise_project_db_uri(project_id), echo=app_state["verbose"]
-    )
+    project_tree = WiseProjectTree(project_id)
+    dataset_engine = db.init_project(project_tree.dburi, echo=app_state["verbose"])
 
-    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
+    vds_path = project_tree.latest
     model_name = CLIPModel[get_model_name(vds_path)]
     counts = get_counts(vds_path)
 
@@ -601,7 +594,6 @@ def update(
     added = []
     failed_datasources = []
     try:
-
         with wds.TarWriter(failures_path, encoder=False) as sink:
 
             def handle_failed_sample(sample: Dict[str, Any]):
@@ -632,8 +624,7 @@ def update(
         logger.info("Creating Virtual Dataset...")
         with dataset_engine.connect() as conn:
             datasets = [
-                get_wise_project_h5dataset(project_id, str(x.id))
-                for x in DatasetRepo.list(conn)
+                project_tree.features(str(x.id)) for x in DatasetRepo.list(conn)
             ]
         with engine.begin() as conn:
             new_version = _create_virtual_dataset(project, datasets)
@@ -665,7 +656,7 @@ def delete(
             logger.error(f"Not deleting {project_id}")
             raise typer.Abort()
 
-        delete_wise_project_tree(project_id)
+        WiseProjectTree(project_id).delete()
         with engine.begin() as conn:
             WiseProjectsRepo.delete(conn, project_id)
 
@@ -693,13 +684,14 @@ def search(
     ),
 ):
     query_type, parsed_queries = parse_query_parameter(queries)
-    engine = db.init(get_wise_db_uri(), echo=app_state["verbose"])
+    engine = db.init(WiseTree.dburi, echo=app_state["verbose"])
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, project_id)
         if project is None:
             raise typer.BadParameter(f"Project {project_id} not found!")
 
-    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
+    project_tree = WiseProjectTree(project_id)
+    vds_path = project_tree.latest
     model_name = CLIPModel[get_model_name(vds_path)]
     counts = get_counts(vds_path)
     assert counts[H5Datasets.IMAGE_FEATURES] == counts[H5Datasets.IDS]
@@ -727,7 +719,6 @@ def search(
         query_type == QueryType.IMAGE_QUERY
         or query_type == QueryType.NATURAL_LANGUAGE_QUERY
     ):
-
         if query_type == QueryType.NATURAL_LANGUAGE_QUERY:
             prefixed_queries = [
                 f"{prefix.strip()} {x.strip()}".strip()
@@ -776,9 +767,7 @@ def search(
         # dist, ids = classification_based_query(features, query_image_features, top_k)
 
     if ids is not None:
-        project_engine = db.init_project(
-            get_wise_project_db_uri(project_id), echo=app_state["verbose"]
-        )
+        project_engine = db.init_project(project_tree.dburi, echo=app_state["verbose"])
         with project_engine.connect() as conn:
             for query, result_dist, result_ids in zip(
                 (
@@ -813,10 +802,9 @@ def serve(
 ):
     from api import serve
 
+    project_tree = WiseProjectTree(project_id)
     if index_type:
-        index_filename = (
-            get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
-        )
+        index_filename = project_tree.index(index_type)
         if not index_filename.exists():
             raise typer.BadParameter(
                 f"Index not found at {index_filename}. Use the 'index' command to create an index."
@@ -844,7 +832,8 @@ def index(
     if project is None:
         raise typer.BadParameter(f"Project {project_id} not found!")
 
-    vds_path = get_wise_project_latest_virtual_h5dataset(project_id)
+    project_tree = WiseProjectTree(project_id)
+    vds_path = project_tree.latest
     n_dim = get_shapes(vds_path)[H5Datasets.IMAGE_FEATURES][1]
 
     counts = get_counts(vds_path)
@@ -889,9 +878,7 @@ def index(
             faiss_index.add(batch)
             pbar.update(batch.shape[0])
 
-    index_filename = (
-        get_wise_project_index_folder(project_id) / f"{index_type.value}.faiss"
-    )
+    index_filename = project_tree.index(index_type)
     logger.info(f"Saving faiss index to {index_filename}...")
     write_index(faiss_index, index_filename)
     logger.info("Done!")

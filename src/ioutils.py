@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-import enum
 from functools import partial
 import io
 import os
@@ -28,6 +27,7 @@ from PIL import Image, IptcImagePlugin
 import webdataset as wds
 import httpx
 
+from .enums import BaseStrEnum
 from .utils import argsort
 from .data_models import ImageInfo, ImageMetadata, Dataset, DatasetType
 
@@ -35,21 +35,6 @@ logger = logging.getLogger(__name__)
 
 
 class EmptyDatasetException(Exception):
-    pass
-
-
-class ContainsEnumMeta(enum.EnumMeta):
-    def __contains__(cls, item):
-        if type(item) == cls:
-            return enum.EnumMeta.__contains__(cls, item)
-        try:
-            cls(item)
-        except ValueError:
-            return False
-        return True
-
-
-class BaseStrEnum(str, enum.Enum, metaclass=ContainsEnumMeta):
     pass
 
 
