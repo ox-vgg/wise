@@ -861,10 +861,12 @@ def index(
         # Train stage
         train_count = min(num_files, 100 * cell_count)
         num_batches = math.ceil(train_count / read_batch_size)
-        train_features = functools.reduce(
-            lambda a, x: np.concatenate((a, x)),
+        _train_features = functools.reduce(
+            lambda a, x: (a.append(x), a)[1],
             itertools.islice(all_features(), num_batches),
+            [],
         )
+        train_features = np.concatenate(_train_features)
         assert not faiss_index.is_trained
         logger.info("Finding clusters from samples...")
         faiss_index.train(train_features)
