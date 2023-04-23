@@ -199,7 +199,31 @@ def _get_search_router(config: APIConfig):
         def round_distance(cls, v):
             return round(v, config.precision)
 
-    def make_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn):
+    def make_basic_response(queries, dist, ids, get_metadata_fn):
+        return {
+            _q: [
+                SearchResponse(
+                    thumbnail='',
+                    link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
+                    distance=_dist,
+                    info=ImageInfo(
+                        filename=_metadata.path,
+                        width=_metadata.width,
+                        height=_metadata.height,
+                    ),
+                )
+                for _dist, _metadata in zip(
+                    top_dist,
+                    map(
+                        lambda _id: get_metadata_fn(_id),
+                        top_ids,
+                    ),
+                )
+            ]
+            for _q, top_dist, top_ids in zip(queries, dist, ids)
+        }
+
+    def make_full_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn):
         return {
             _q: [
                 SearchResponse(
@@ -264,6 +288,7 @@ def _get_search_router(config: APIConfig):
         ),
         start: int = Query(0, gt=-1, le=980),
         end: int = Query(20, gt=0, le=1000),
+        thumbs: int = 1
     ):
         if len(q) == 0:
             raise HTTPException(400, {"message": "missing search query"})
@@ -273,30 +298,34 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        if (end - start) > 50:
+        if (end - start) > 50 and thumbs == 1:
             raise HTTPException(
-                400, {"message": "cannot return more than 50 results at a time"}
+                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
             )
         prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
         text_features = extract_text_features(prefixed_queries)
 
         dist, ids = index.search(text_features, end)
         with project_engine.connect() as conn:
-
             def get_metadata(_id):
                 m = MetadataRepo.get(conn, int(_id))
                 if m is None:
                     raise RuntimeError()
                 return m
 
-            response = make_response(
-                q,
-                dist[[0], start:end],
-                ids[[0], start:end],
-                get_metadata,
-                thumbs_reader,
-            )
-
+            if thumbs == 0:
+                response = make_basic_response(q,
+                                               dist[[0], start:end],
+                                               ids[[0], start:end],
+                                               get_metadata
+                )
+            else:
+                response = make_full_response(q,
+                                              dist[[0], start:end],
+                                              ids[[0], start:end],
+                                              get_metadata,
+                                              thumbs_reader
+                )
         return response
 
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
