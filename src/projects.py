@@ -12,7 +12,6 @@ WARNING_TEXT = "DO NOT STORE ANYTHING IMPORTANT HERE\n\nMANAGED BY WISE CLI.\n\n
 
 class _WiseTree:
     def __init__(self, base: Path = Path.home()):
-
         self.__root = None
         self.__base = base
 
@@ -124,8 +123,9 @@ class WiseProjectTree:
     def thumbs(self, dataset_id: str):
         return self.location / "thumbs" / f"{dataset_id.zfill(5)}.h5"
 
-    def version(self, version: int):
-        return self.location / "versions" / f"v{version}.h5"
+    def version(self, version: int, *, relative: bool = True):
+        v = Path("versions") / f"v{version}.h5"
+        return v if relative else (self.location / v)
 
     @property
     def dburi(self):
@@ -138,14 +138,14 @@ class WiseProjectTree:
         # 'versions' directory
         if latest.is_file() and not latest.is_symlink():
             # Move it as version 0 and link to new version
-            _old_path = self.version(0)
+            _old_path = self.version(0, relative=False)
             _old_path.parent.mkdir(exist_ok=True)
             latest.rename(_old_path)
 
         latest.unlink(missing_ok=True)
         latest.symlink_to(self.version(version))
 
-        return latest.resolve()
+        return latest.readlink()
 
     def _delete(self):
         project_folder = self.location
