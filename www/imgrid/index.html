@@ -21,10 +21,11 @@
       <div class="top">
         <div class="search">
           <input id="search_keyword" type="text" placeholder="enter search keywords (e.g. a red car)">
-          <button onclick="submit_initial_search_query()">Search</button>
-          <button title="Coming soon" disabled>Upload & Search</button>
+          <button onclick="handle_search_submit()">Search</button>
+          <button onclick="handle_upload_button_click()">Upload and Search</button>
+          <input type="file" id="search_file_input" hidden>
         </div>
-        
+
         <div class="top_toolbar">
           <span id="navinfo1"></span>
           <span id="navinfo2"></span>
@@ -44,7 +45,7 @@
       const search_keyword_input = document.getElementById('search_keyword');
       search_keyword_input.addEventListener('keydown', function(e) {
         if(e.key === 'Enter') {
-          submit_initial_search_query();
+          handle_search_submit();
           e.preventDefault();
         }
       });

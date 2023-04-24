@@ -16,6 +16,9 @@ const toolbar = document.getElementById('toolbar');
 const navinfo1 = document.getElementById('navinfo1');
 const navinfo2 = document.getElementById('navinfo2');
 
+// UI elements
+const search_file_input = document.getElementById("search_file_input");
+
 const UI_MODE = {
 	'BROWSE_IMAGES': 'browse_images',
 	'SHOW_RESULTS': 'show_results'
@@ -29,6 +32,10 @@ var wise_result_start_findex = -1;
 var wise_result_end_findex = -1;
 var wise_current_ui_mode = UI_MODE.BROWSE_IMAGES;
 var wise_total_page_count = -1;
+let search_query = {
+	type: undefined,
+	query: undefined,
+};
 
 //
 // Home Page
@@ -101,7 +108,7 @@ function show_next_page() {
 			if (wise_result_end_findex >= MAX_SEARCH_RESULT) {
 				wise_result_end_findex = MAX_SEARCH_RESULT;
 			}
-			subsequent_search_query(wise_result_start_findex, wise_result_end_findex);
+			submit_search_query();
 		} else {
 			toolbar.innerHTML = 'No more search results are available';
 		}
@@ -129,7 +136,7 @@ function show_prev_page() {
 			if (wise_result_start_findex < 0) {
 				wise_result_start_findex = 0;
 			}
-			subsequent_search_query(wise_result_start_findex, wise_result_end_findex);
+			submit_search_query();
 		} else {
 			toolbar.innerHTML = 'Already in the first page of the search results!';
 		}
@@ -157,46 +164,92 @@ function show_images(from_findex, to_findex) {
 //
 function search_for(query) {
 	document.getElementById('search_keyword').value = query;
-	submit_initial_search_query();
+	handle_search_submit();
 }
 
-function submit_initial_search_query() {
-	const search_keyword = document.getElementById('search_keyword').value;
-	wise_result_start_findex = 0;
-	wise_result_end_findex = SEARCH_RESULT_COUNT;
-	const search_endpoint = 'search?q=' + search_keyword + '&start=' + wise_result_start_findex + '&end=' + wise_result_end_findex;
-
-	toolbar.innerHTML = 'Searching for <strong>' + search_keyword + '</strong> in ' + wise_data['info']['num_images'].toLocaleString('en', { useGrouping: true }) + ' Wikimedia images <div class="spinner"></div>';
-
-	const time0 = performance.now();
-	fetch(search_endpoint, {
-		method: 'GET'
-	})
-		.then((response) => response.json())
-		.then((search_result) => {
-			const time1 = performance.now();
-			const search_time = time1 - time0;
-			show_search_result(search_result, search_time);
-		});
+function handle_search_submit() {
+	search_query = {
+		type: 'NATURAL_LANGUAGE',
+		query: document.getElementById('search_keyword').value
+	}
+	submit_search_query({is_initial_query: true});
 }
 
-function subsequent_search_query(start, end) {
-	const search_keyword = document.getElementById('search_keyword').value;
-	const search_endpoint = 'search?q=' + search_keyword + '&start=' + start + '&end=' + end;
+function submit_search_query({is_initial_query = false} = {}) {
+	if (is_initial_query) {
+		wise_result_start_findex = 0;
+		wise_result_end_findex = SEARCH_RESULT_COUNT;
+	}
 
-	toolbar.innerHTML = 'Continuing search for <strong>' + search_keyword + '</strong> in ' + wise_data['info']['num_images'].toLocaleString('en', { useGrouping: true }) + ' Wikimedia images <div class="spinner"></div>';
+	let searchMessage = '';
+	if (is_initial_query) searchMessage += 'Searching ';
+	else searchMessage += 'Continuing search ';
 
+	if (search_query.type === 'NATURAL_LANGUAGE') {
+		searchMessage += 'for <strong>' + search_query.query + '</strong> in ' + wise_data['info']['num_images'].toLocaleString('en', { useGrouping: true }) + ' Wikimedia images <div class="spinner"></div>';
+	} else {
+		searchMessage += 'for visually similar images in ' + wise_data['info']['num_images'].toLocaleString('en', { useGrouping: true }) + ' Wikimedia images <div class="spinner"></div>';
+	}
+	toolbar.innerHTML = searchMessage;
+	
 	const time0 = performance.now();
-	fetch(search_endpoint, {
-		method: 'GET'
-	})
-		.then((response) => response.json())
-		.then((search_result) => {
-			const time1 = performance.now();
-			const search_time = time1 - time0;
-			show_search_result(search_result, search_time);
-		});
+	send_search_request(wise_result_start_findex, wise_result_end_findex).then((search_result) => {
+		const time1 = performance.now();
+		const search_time = time1 - time0;
+		show_search_result(search_result, search_time);
+	}).catch((err) => {
+		if (err instanceof DOMException) {
+		} else {
+			alert('An error has occurred. See the console for more details');
+			console.error(err);
+		}
+	});
+}
 
+async function send_search_request(start, end) {
+	let res;
+	if (search_query.type === 'NATURAL_LANGUAGE') {
+		res = await fetch(`search?q=${search_query.query}&start=${start}&end=${end}`, {
+			method: 'GET'
+		});
+	} else {
+		let formData = new FormData();
+		formData.append('q', search_query.query);
+		res = await fetch(`search?start=${start}&end=${end}`, {
+			method: "POST",
+			body: formData
+		});
+	}
+
+	if (!res.ok) {
+		const content_type = res.headers.get("content-type");
+		let message = `${res.status} (${res.statusText})`;
+		if (content_type && content_type.includes("application/json")) {
+			const { detail } = await res.json();
+			if ("message" in detail) {
+				message = `${message} - ${detail["message"]}`;
+			} else if (Array.isArray(detail)) {
+				let err_message = "";
+				detail.forEach(({ loc, msg }) => {
+					err_message += `${loc.join("->")} - ${msg},`;
+				});
+				message = `${message} - (${err_message})`;
+			}
+		}
+		throw new Error(message);
+	}
+	return res.json();
+}
+
+function handle_upload_button_click() {
+	search_file_input.click();
+}
+search_file_input.onchange = async () => {
+	search_query = {
+		type: 'IMAGE',
+		query: search_file_input.files[0]
+	}
+	submit_search_query({is_initial_query: true});
 }
 
 function show_search_result(response, search_time) {
