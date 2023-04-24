@@ -254,7 +254,8 @@ def add_dataset(
     dataset: Dataset,
     image_transform,
     extract_image_and_metadata_features,
-    writer_fn,
+    features_writer_fn,
+    thumbs_writer_fn,
     *,
     db_engine,
     offset: int = 0,
@@ -291,7 +292,8 @@ def add_dataset(
                 ]
 
                 metadata_row_ids = [str(offset + x) for x in h5_row_ids]
-                writer_fn(metadata_row_ids, thumbs, *extracted_features)
+                features_writer_fn(metadata_row_ids, *extracted_features)
+                thumbs_writer_fn(thumbs)
             count_ += row_count
 
             # Udpate progress bar
@@ -331,10 +333,13 @@ def _update(
         extract_text_features if include_metadata_features else None,
     )
 
-    excluded_datasets = (
-        [] if include_metadata_features else [H5Datasets.METADATA_FEATURES]
-    )
-    h5datasets = [x for x in H5Datasets if x not in excluded_datasets]
+    thumbs_h5dataset = H5Datasets.THUMBNAILS
+    features_h5datasets = [
+        H5Datasets.IDS,
+        H5Datasets.IMAGE_FEATURES,
+    ]
+    if include_metadata_features:
+        features_h5datasets.append(H5Datasets.METADATA_FEATURES)
 
     count_: int = 0
     if mode == "update":
@@ -360,21 +365,25 @@ def _update(
 
             # Get dataset path
             features_path = project_tree.features(str(dataset_obj.id))
+            thumbs_path = project_tree.thumbs(str(dataset_obj.id))
 
             # Get writer fn
             with get_h5writer(
                 features_path,
-                h5datasets,
+                features_h5datasets,
                 model_name=model_name.value,
                 n_dim=n_dim,
                 mode="w",
-            ) as writer_fn:
+            ) as features_writer_fn, get_h5writer(
+                thumbs_path, thumbs_h5dataset, mode="w"
+            ) as thumbs_writer_fn:
                 # Process each item in data source and write to table + hdf5
                 count_ = add_dataset(
                     dataset_obj,
                     image_transform,
                     extract_image_and_metadata_features,
-                    writer_fn,
+                    features_writer_fn,
+                    thumbs_writer_fn,
                     db_engine=db_engine,
                     offset=count_,
                     error_handler=handle_failed_sample,
@@ -382,6 +391,7 @@ def _update(
                     num_workers=num_workers,
                 )
             added_datasets.append(features_path)
+            added_datasets.append(thumbs_path)
         except (KeyboardInterrupt, Exception) as e:
             logger.error(f'Error while processing data source "{dataset}" - {e}')
             # Delete the h5 datasets, table entry, and add to failed summary.
@@ -528,7 +538,12 @@ def init(
             logger.info("Creating virtual dataset...")
             with dataset_engine.connect() as conn:
                 datasets = [
-                    project_tree.features(str(x.id)) for x in DatasetRepo.list(conn)
+                    d
+                    for x in DatasetRepo.list(conn)
+                    for d in (
+                        project_tree.features(str(x.id)),
+                        project_tree.thumbs(str(x.id)),
+                    )
                 ]
             with engine.begin() as conn:
                 new_version = _create_virtual_dataset(project, datasets)
@@ -624,7 +639,12 @@ def update(
         logger.info("Creating Virtual Dataset...")
         with dataset_engine.connect() as conn:
             datasets = [
-                project_tree.features(str(x.id)) for x in DatasetRepo.list(conn)
+                d
+                for x in DatasetRepo.list(conn)
+                for d in (
+                    project_tree.features(str(x.id)),
+                    project_tree.thumbs(str(x.id)),
+                )
             ]
         with engine.begin() as conn:
             new_version = _create_virtual_dataset(project, datasets)
