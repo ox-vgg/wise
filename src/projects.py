@@ -145,7 +145,7 @@ class WiseProjectTree:
         latest.unlink(missing_ok=True)
         latest.symlink_to(self.version(version))
 
-        return latest.readlink()
+        return self.location / latest.readlink()
 
     def _delete(self):
         project_folder = self.location
