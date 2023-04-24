@@ -156,7 +156,7 @@ function show_images(from_findex, to_findex) {
 
 		imgrid_container.appendChild(a);
 	}
-	navinfo2.innerHTML = 'from ' + from_findex + ' to ' + to_findex + ' of ' + wise_data['info']['num_images'].toLocaleString('en', { useGrouping: true }) + ' images.'
+	navinfo2.innerHTML = 'from ' + (from_findex + 1) + ' to ' + to_findex + ' of ' + wise_data['info']['num_images'].toLocaleString('en', { useGrouping: true }) + ' images.'
 }
 
 //
@@ -276,6 +276,6 @@ function show_search_result(response, search_time) {
 
 		imgrid_container.appendChild(a);
 	}
-	navinfo1.innerHTML = 'Showing search results from ' + wise_result_start_findex + ' to ' + wise_result_end_findex + '.';
+	navinfo1.innerHTML = 'Showing search results from ' + (wise_result_start_findex + 1) + ' to ' + wise_result_end_findex + '.';
 	navinfo2.innerHTML = 'Go back to <span onclick="load_featured_image_grid()" class="text_button">Home</span>';
 }
