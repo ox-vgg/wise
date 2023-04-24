@@ -469,9 +469,12 @@ def get_counts(path: Path, **kwargs):
 def get_model_name(path: Path, **kwargs):
     """
     Returns the model name stored on the FEATURES datasets
+    if not found, returns None
     """
     with h5py.File(path, mode="r", **kwargs) as f:
-        return f[H5Datasets.IMAGE_FEATURES].attrs.get("model", None)
+        if H5Datasets.IMAGE_FEATURES in f:
+            return f[H5Datasets.IMAGE_FEATURES].attrs.get("model", None)
+        return None
 
 
 def get_h5iterator(path: Path, *, batch_size: int = 1024, **kwargs):
@@ -608,20 +611,25 @@ def concat_h5datasets(sources: List[Path], output: Path, **kwargs):
     # Make sure we have the same model name across sources
     for s in sources:
         if model_name is None:
+            # Store model_name to compare against other sources
             model_name = get_model_name(s, **kwargs)
-        elif model_name != get_model_name(s, **kwargs):
-            raise ValueError("Expected model_name to be same in all data sources")
+        elif m := get_model_name(s, **kwargs):
+            # If there is a model_name in the source, it must match what we have
+            if model_name != m:
+                raise ValueError("Expected model_name to be same in all data sources")
 
         if features_dim is None:
+            # Store the feature_dim to compare against other sources
             features_dim = get_shapes(s, **kwargs).get(
                 H5Datasets.IMAGE_FEATURES, (None, None)
             )[1]
 
-        elif (
-            features_dim
-            != get_shapes(s, **kwargs).get(H5Datasets.IMAGE_FEATURES, (None, None))[1]
-        ):
-            raise ValueError("All feature arrays in source to have same shape!")
+        elif f_dim := get_shapes(s, **kwargs).get(
+            H5Datasets.IMAGE_FEATURES, (None, None)
+        )[1]:
+            # If not None, the dimension must match what we already have.
+            if features_dim != f_dim:
+                raise ValueError("All feature arrays in source to have same shape!")
 
         counts = get_counts(s, **kwargs)
 
@@ -641,6 +649,8 @@ def concat_h5datasets(sources: List[Path], output: Path, **kwargs):
         SIDX = 0
         for s in sources:
             with h5py.File(s, mode="r", **kwargs) as f:
+                if d not in f:
+                    continue
                 ds = cast(h5py.Dataset, f[d])
                 EIDX = SIDX + ds.len()
                 vsource = h5py.VirtualSource(
