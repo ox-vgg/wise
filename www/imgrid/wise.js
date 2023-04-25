@@ -139,12 +139,24 @@ function show_featured_images(from_findex, to_findex) {
 		const img_link = wise_home_featured_images[i]['original_download_url']
 		const img_link_tok = img_link.split('/');
 		const img_filename = img_link_tok[img_link_tok.length - 2];
-
+		const img_filename_decoded = decodeURIComponent(img_filename); // Decode filename to show special characters / utf-8 characters
+		
+		const width = wise_home_featured_images[i]['orig_width'];
+		const height = wise_home_featured_images[i]['orig_height'];
+		
 		const img = document.createElement('img');
 		img.src = img_link;
+		img.setAttribute('title', 'File: ' + img_filename_decoded);
+
 		const a = document.createElement('a');
 		a.setAttribute('href', 'https://commons.wikimedia.org/wiki/File:' + img_filename);
 		a.setAttribute('target', '_blank');
+		a.style.width = `${width*200/height}px`;
+		a.style.flexGrow = width*200/height;
+		
+		const paddingEl = document.createElement('i');
+		paddingEl.style.paddingBottom = `${height/width*100}%`;
+		a.appendChild(paddingEl);
 		a.appendChild(img);
 
 		imgrid_container.appendChild(a);
@@ -254,19 +266,28 @@ function show_search_result(response, search_time) {
 
 	toolbar.innerHTML = 'Search completed in ' + (search_time / 1000).toFixed(1) + ' sec.'
 	for (var i = 0; i < results.length; ++i) {
-		const img = document.createElement('img');
 		const img_link = results[i]['link'];
 		const img_link_tok = img_link.split('/');
 		const img_filename = img_link_tok[img_link_tok.length - 2];
 		const img_filename_decoded = decodeURIComponent(img_filename); // Decode filename to show special characters / utf-8 characters
-
+		
+		const width = results[i]['info']['width'];
+		const height = results[i]['info']['height'];
+		
+		const img = document.createElement('img');
 		img.src = results[i]['thumbnail'];
 		img.setAttribute('title', 'File: ' + img_filename_decoded + ' | Distance = ' + results[i]['distance'].toFixed(2));
 
 		const a = document.createElement('a');
 		a.setAttribute('href', 'https://commons.wikimedia.org/wiki/File:' + img_filename);
 		a.setAttribute('target', '_blank');
-		a.appendChild(img)
+		a.style.width = `${width*200/height}px`;
+		a.style.flexGrow = width*200/height;
+		
+		const paddingEl = document.createElement('i');
+		paddingEl.style.paddingBottom = `${height/width*100}%`;
+		a.appendChild(paddingEl);
+		a.appendChild(img);
 
 		imgrid_container.appendChild(a);
 	}
