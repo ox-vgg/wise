@@ -44,6 +44,7 @@ def raise_(ex):
     raise ex
 
 
+
 def get_project_router(config: APIConfig):
     if config.project_id is None:
         raise typer.BadParameter("project id is missing!")
@@ -187,7 +188,6 @@ def _get_project_data_router(config: APIConfig):
 
 
 def _get_search_router(config: APIConfig):
-
     project_id = config.project_id
     project_tree = WiseProjectTree(project_id)
     index_type = IndexType[config.index_type]
@@ -266,7 +266,7 @@ def _get_search_router(config: APIConfig):
     logger.info(f"Loading faiss index from {index_filename}")
     index = read_index(index_filename)
     if hasattr(index, "nprobe"):
-        index.nprobe = getattr(config, 'nprobe', 32)
+        index.nprobe = getattr(config, "nprobe", 32)
 
     # Get counts
     counts = get_counts(vds_path)
@@ -291,7 +291,7 @@ def _get_search_router(config: APIConfig):
         ),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: int = 1
+        thumbs: bool = Query(True),
     ):
         if len(q) == 0:
             raise HTTPException(400, {"message": "missing search query"})
@@ -303,7 +303,10 @@ def _get_search_router(config: APIConfig):
             )
         if (end - start) > 50 and thumbs == 1:
             raise HTTPException(
-                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
+                400,
+                {
+                    "message": "cannot return more than 50 results at a time when thumbs=1"
+                },
             )
         
         if len(q) == 1 and q[0].startswith(("http://", "https://")):
@@ -325,7 +328,7 @@ def _get_search_router(config: APIConfig):
         q: bytes = File(),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: int = 1
+        thumbs: bool = Query(True),
     ):
         end = min(end, num_files)
         if start > end:
@@ -343,6 +346,7 @@ def _get_search_router(config: APIConfig):
         return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
 
     def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: int):
+
         dist, ids = index.search(features, end)
         with project_engine.connect() as conn:
             def get_metadata(_id):
@@ -351,18 +355,18 @@ def _get_search_router(config: APIConfig):
                     raise RuntimeError()
                 return m
 
-            if thumbs == 0:
-                response = make_basic_response(q,
-                                               dist[[0], start:end],
-                                               ids[[0], start:end],
-                                               get_metadata
+
+            if not thumbs:
+                response = make_basic_response(
+                    q, dist[[0], start:end], ids[[0], start:end], get_metadata
                 )
             else:
-                response = make_full_response(q,
-                                              dist[[0], start:end],
-                                              ids[[0], start:end],
-                                              get_metadata,
-                                              thumbs_reader
+                response = make_full_response(
+                    q,
+                    dist[[0], start:end],
+                    ids[[0], start:end],
+                    get_metadata,
+                    thumbs_reader,
                 )
         return response
 
