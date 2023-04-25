@@ -265,9 +265,10 @@ function show_search_result(response, search_time) {
 		const img_link = results[i]['link'];
 		const img_link_tok = img_link.split('/');
 		const img_filename = img_link_tok[img_link_tok.length - 2];
+		const img_filename_decoded = decodeURIComponent(img_filename); // Decode filename to show special characters / utf-8 characters
 
 		img.src = results[i]['thumbnail'];
-		img.setAttribute('title', 'File: ' + img_filename + ' | Distance = ' + results[i]['distance'].toFixed(2));
+		img.setAttribute('title', 'File: ' + img_filename_decoded + ' | Distance = ' + results[i]['distance'].toFixed(2));
 
 		const a = document.createElement('a');
 		a.setAttribute('href', 'https://commons.wikimedia.org/wiki/File:' + img_filename);
