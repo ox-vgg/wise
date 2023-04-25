@@ -7,6 +7,7 @@ from src.repository import WiseProjectsRepo, DatasetRepo
 from src import ioutils
 
 import h5py
+from tqdm import tqdm
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -46,12 +47,12 @@ def run(
     # split data into features and thumbnails
     datasets = []
     with dataset_engine.connect() as conn:
-        for x in DatasetRepo.list(conn):
+        for x in tqdm(DatasetRepo.list(conn)):
             d = project_tree.features(str(x.id))
             t = project_tree.thumbs(str(x.id))
 
             # Copy thumbnails over to new file
-            with h5py.File(d, mode="r") as old_f, h5py.File(
+            with h5py.File(d, mode="a") as old_f, h5py.File(
                 t,
                 mode="a",
             ) as new_f:
@@ -64,8 +65,8 @@ def run(
 
     if current_version == 0:
         raise RuntimeError("Unknown state - expected project to have a version")
-
-    for v in range(1, current_version + 1):
+    logger.info(f"Current version: {current_version}")
+    for v in tqdm(range(1, current_version + 1)):
         _version = project_tree.version(v, relative=False)
 
         # Get virtual sources and get dataset id from them
