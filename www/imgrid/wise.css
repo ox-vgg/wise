@@ -19,16 +19,35 @@ header#wise_panel .top .top_toolbar input#current_page_no { width:3em; text-alig
 header#wise_panel .top .top_toolbar button { padding:0.2em 0.4em; margin:0 0.2em; font-size:1.2em;}
 header#wise_panel #toolbar { grid-column-start:1; grid-column-end:3; grid-row-start:2; grid-row-end:3; text-align:center; padding:1em 0; border-bottom:2px solid #cccccc; }
 
-/* Right aligned image grid
-  - https://codepen.io/johandegrieck/pen/xpVdBG 
+/* Justified image grid
+  - http://jsbin.com/tisaluy/8/edit?html,css,output
+  - https://github.com/xieranmaya/blog/issues/6
   - https://medium.com/google-design/google-photos-45b714dfbed1
 */
 section#content { display:block; }
-section#content .imgrid { display:flex; flex-wrap:wrap; justify-content:space-between; grid-column-start:1; grid-column-end:2; grid-row-start:2; grid-row-end:3; margin:0; padding:0; }
-section#content .imgrid::after { content:""; flex:auto; }
-section#content .imgrid a { display:inline-block; flex-grow:0; padding:0; margin:0.2em 0.4em; }
-section#content .imgrid a img { display:inline-block; height:200px; object-fit:fill; max-width:98%; margin:0; padding:0; }
-
+section#content > .imgrid {
+  display: flex;
+  flex-wrap: wrap;
+}
+section#content > .imgrid::after {
+  content: '';
+  flex-grow: 999999999;
+}
+section#content > .imgrid > a {
+  display: block;
+  margin: 2px;
+  background-color: #eee;
+  position: relative;
+}
+section#content > .imgrid > a > i{
+  display: block;
+}
+section#content > .imgrid > a > img {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  vertical-align: bottom;
+}
 
 /* Misc */
 .text_button { border:none; color:blue !important; background-color:inherit; cursor:pointer; display:inline-block; }

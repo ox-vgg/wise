@@ -286,7 +286,7 @@ def _get_search_router(config: APIConfig):
         q: List[str] = Query(
             default=[],
         ),
-        start: int = Query(0, gt=-1, le=980),
+        start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbs: int = 1
     ):
@@ -331,7 +331,7 @@ def _get_search_router(config: APIConfig):
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
     async def image_search(
         q: bytes = File(),
-        start: int = Query(0, gt=-1, le=980),
+        start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
     ):
         end = min(end, num_files)
@@ -343,6 +343,7 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400, {"message": "cannot return more than 50 results at a time"}
             )
+        
         with Image.open(io.BytesIO(q)) as im:
             query_features = extract_image_features([im])
             dist, ids = index.search(query_features, end)
@@ -360,7 +361,7 @@ def _get_search_router(config: APIConfig):
                 dist[[0], start:end],
                 ids[[0], start:end],
                 get_metadata,
-                thumbs_reader,
+                thumbs_reader
             )
         return response
 
