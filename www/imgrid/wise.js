@@ -207,7 +207,7 @@ function submit_search_query({is_initial_query = false} = {}) {
 async function send_search_request(start, end) {
 	let res;
 	if (search_query.type === 'NATURAL_LANGUAGE') {
-		res = await fetch(`search?q=${search_query.query}&start=${start}&end=${end}`, {
+		res = await fetch(`search?q=${encodeURIComponent(search_query.query)}&start=${start}&end=${end}`, {
 			method: 'GET'
 		});
 	} else {
