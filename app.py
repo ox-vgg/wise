@@ -30,6 +30,7 @@ from src.ioutils import (
     get_counts,
     get_h5iterator,
     get_h5writer,
+    get_h5reader,
     is_valid_webdataset_source,
     get_valid_webdataset_tar_from_folder,
     get_dataloader,
@@ -53,6 +54,7 @@ from src.search import (
 )
 from src.repository import WiseProjectsRepo, DatasetRepo, MetadataRepo
 from src.projects import WiseTree, WiseProjectTree
+from src.utils import argsort, batched
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -896,12 +898,28 @@ def index(
         # Train stage
         train_count = min(num_files, 100 * cell_count)
         num_batches = math.ceil(train_count / read_batch_size)
-        _train_features = functools.reduce(
-            lambda a, x: (a.append(x), a)[1],
-            itertools.islice(all_features(), num_batches),
-            [],
-        )
+
+        # get random permutation
+        rng = np.random.default_rng(26042023)
+        permutation = rng.permutation(num_files)[: (num_batches * read_batch_size)]
+
+        # sort the permutation for faster reads
+        sort_indices = argsort(permutation)
+        sorted_permutation = [permutation[i] for i in sort_indices]
+        unsort_indices = argsort(sort_indices)
+
+        # batch the reads
+        batched_indices = batched(sorted_permutation, read_batch_size)
+        with get_h5reader(vds_path)(features_set) as _reader:
+            _train_features = functools.reduce(
+                lambda a, x: (a.append(np.array(_reader(x))), a)[1],
+                tqdm(itertools.islice(batched_indices, num_batches)),
+                [],
+            )
+        # shuffle after concat
         train_features = np.concatenate(_train_features)
+        train_features = train_features[unsort_indices, ...]
+
         assert not faiss_index.is_trained
         logger.info("Finding clusters from samples...")
         faiss_index.train(train_features)
