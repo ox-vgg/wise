@@ -333,15 +333,16 @@ def _get_search_router(config: APIConfig):
         q: bytes = File(),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
+        thumbs: int = 1
     ):
         end = min(end, num_files)
         if start > end:
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        if (end - start) > 50:
+        if (end - start) > 50 and thumbs == 1:
             raise HTTPException(
-                400, {"message": "cannot return more than 50 results at a time"}
+                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
             )
         
         with Image.open(io.BytesIO(q)) as im:
@@ -356,13 +357,19 @@ def _get_search_router(config: APIConfig):
                     raise RuntimeError()
                 return m
 
-            response = make_response(
-                ["image"],
-                dist[[0], start:end],
-                ids[[0], start:end],
-                get_metadata,
-                thumbs_reader
-            )
+            if thumbs == 0:
+                response = make_basic_response(["image"],
+                                               dist[[0], start:end],
+                                               ids[[0], start:end],
+                                               get_metadata
+                )
+            else:
+                response = make_full_response(["image"],
+                                              dist[[0], start:end],
+                                              ids[[0], start:end],
+                                              get_metadata,
+                                              thumbs_reader
+                )
         return response
 
     return router
