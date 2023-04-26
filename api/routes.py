@@ -5,6 +5,9 @@ import logging
 from pathlib import Path
 import tarfile
 from PIL import Image
+from numpy import ndarray
+from tempfile import NamedTemporaryFile
+from torch.hub import download_url_to_file
 from fastapi import APIRouter, HTTPException, Query, File
 from fastapi.responses import (
     Response,
@@ -282,7 +285,7 @@ def _get_search_router(config: APIConfig):
     )
 
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
-    async def natural_language_search(
+    async def handle_get_search(
         q: List[str] = Query(
             default=[],
         ),
@@ -302,34 +305,23 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
             )
-        prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
-        text_features = extract_text_features(prefixed_queries)
+        
+        if len(q) == 1 and q[0].startswith(("http://", "https://")):
+            query = q[0]
+            logger.info("Downloading", query, "to file")
+            with NamedTemporaryFile() as tmpfile:
+                download_url_to_file(query, tmpfile.name)
+                with Image.open(tmpfile.name) as im:
+                    query_features = extract_image_features([im])
 
-        dist, ids = index.search(text_features, end)
-        with project_engine.connect() as conn:
-            def get_metadata(_id):
-                m = MetadataRepo.get(conn, int(_id))
-                if m is None:
-                    raise RuntimeError()
-                return m
-
-            if thumbs == 0:
-                response = make_basic_response(q,
-                                               dist[[0], start:end],
-                                               ids[[0], start:end],
-                                               get_metadata
-                )
-            else:
-                response = make_full_response(q,
-                                              dist[[0], start:end],
-                                              ids[[0], start:end],
-                                              get_metadata,
-                                              thumbs_reader
-                )
-        return response
+            return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
+        else:
+            prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
+            text_features = extract_text_features(prefixed_queries)
+            return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
 
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
-    async def image_search(
+    async def handle_post_search(
         q: bytes = File(),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
@@ -347,10 +339,12 @@ def _get_search_router(config: APIConfig):
         
         with Image.open(io.BytesIO(q)) as im:
             query_features = extract_image_features([im])
-            dist, ids = index.search(query_features, end)
 
+        return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
+
+    def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: int):
+        dist, ids = index.search(features, end)
         with project_engine.connect() as conn:
-
             def get_metadata(_id):
                 m = MetadataRepo.get(conn, int(_id))
                 if m is None:
@@ -358,13 +352,13 @@ def _get_search_router(config: APIConfig):
                 return m
 
             if thumbs == 0:
-                response = make_basic_response(["image"],
+                response = make_basic_response(q,
                                                dist[[0], start:end],
                                                ids[[0], start:end],
                                                get_metadata
                 )
             else:
-                response = make_full_response(["image"],
+                response = make_full_response(q,
                                               dist[[0], start:end],
                                               ids[[0], start:end],
                                               get_metadata,
