@@ -557,10 +557,6 @@ def init(
 
 @app.command()
 def update(
-    batch_size: int = typer.Option(
-        1,
-        help="Batch size that would fit your RAM/GPURAM",
-    ),
     sources: List[str] = typer.Option(
         ..., "--source", help="List[DirPath | WebDataset compatible URL]"
     ),
@@ -568,6 +564,14 @@ def update(
         False, help="Continue processing when encountered with errors if possible"
     ),
     project_id: str = typer.Argument(..., help="Name of the project"),
+    batch_size: int = typer.Option(
+        1,
+        help="Batch size that would fit your RAM/GPURAM",
+    ),
+    num_workers: int = typer.Option(
+        None,
+        help="Number of subprocesses to use for data loading (for PyTorch Dataloader). If set to 0, the main process is used for data loading. If omitted, num_workers will be automatically determined.",
+    ),
 ):
     """
     Update WISE Project
@@ -624,6 +628,7 @@ def update(
                 handle_failed_sample=handle_failed_sample,
                 continue_on_error=continue_on_error,
                 include_metadata_features=include_metadata_features,
+                num_workers=num_workers
             )
             if failed_datasources:
                 logger.error(

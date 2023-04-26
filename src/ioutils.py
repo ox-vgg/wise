@@ -138,6 +138,7 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
         except Exception as e:
             logging.error(f"Error {self.dataset_location}#{k}.{im_key} - ({e.__class__.__name__}){e}")
             self.error_handler(sample)
+            return self._next_webdataset() # (Temporary fix - skip to next sample)
 
     def _next_folder(self):
         image = next(self.filepaths)
@@ -184,6 +185,7 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
                 ).encode("utf-8"),
             }
             self.error_handler(sample)
+            return self._next_folder() # (Temporary fix - skip to next sample)
 
     def __iter__(self):
         if self.dataset_type == DatasetType.WEBDATASET:
@@ -228,7 +230,7 @@ def get_dataloader(
         logging.info(f'Loading data with {num_workers} workers')
     
     if dataset.type == DatasetType.WEBDATASET and num_workers > 1:
-        raise NotImplementedError('Please --num-workers 0 or --num-workers 1 for now (not supported for > 1 for webdatasets)')
+        raise NotImplementedError('Please use --num-workers 0 or --num-workers 1 for now (not supported for > 1 for webdatasets)')
 
     def collate_fn(batch):
         images, metadata, thumb = zip(*batch)
