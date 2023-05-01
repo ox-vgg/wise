@@ -1,14 +1,15 @@
 from contextlib import ExitStack
-from typing import Dict, List
+from typing import Dict, List, Union
 import io
 import logging
 from pathlib import Path
 import tarfile
 from PIL import Image
-from numpy import ndarray
+from numpy import ndarray, array, average, float32
+from numpy.linalg import norm
 from tempfile import NamedTemporaryFile
 from torch.hub import download_url_to_file
-from fastapi import APIRouter, HTTPException, Query, File
+from fastapi import APIRouter, HTTPException, Query, File, Form
 from fastapi.responses import (
     Response,
     FileResponse,
@@ -344,6 +345,59 @@ def _get_search_router(config: APIConfig):
             query_features = extract_image_features([im])
 
         return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
+    
+    @router.post("/multimodal-search", response_model=Dict[str, List[SearchResponse]])
+    async def handle_multimodal_search(
+        file_queries: List[bytes] = File([]),
+        url_queries: List[str] = Form([]),
+        text_queries: List[str] = Form([]),
+        start: int = Query(0, ge=0, le=980),
+        end: int = Query(20, gt=0, le=1000),
+        thumbs: int = Query(True),
+    ):
+        """Perform multimodal queries (e.g. images + text) by computing a weighted sum of the feature vectors of the
+            input images/text, and then using this as the query vector"""
+        
+        q = file_queries + url_queries + text_queries
+        if len(q) == 0:
+            raise HTTPException(400, {"message": "missing search query"})
+        elif len(q) > 5:
+            raise HTTPException(400, {"message": "Too many query items"})
+
+        end = min(end, num_files)
+        if start > end:
+            raise HTTPException(
+                400, {"message": "'start' cannot be greater than 'end'"}
+            )
+        if (end - start) > 50 and thumbs == 1:
+            raise HTTPException(
+                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
+            )
+
+        feature_vectors = []
+        weights = []
+        for query in q:
+            feature_vector = None
+            if isinstance(query, bytes):
+                with Image.open(io.BytesIO(query)) as im:
+                    feature_vector = extract_image_features([im])
+                    weights.append(1)
+            elif query.startswith(("http://", "https://")):
+                logger.info("Downloading", query, "to file")
+                with NamedTemporaryFile() as tmpfile:
+                    download_url_to_file(query, tmpfile.name)
+                    with Image.open(tmpfile.name) as im:
+                        feature_vector = extract_image_features([im])
+                        weights.append(1)
+            else:
+                prefixed_queries = f"{_prefix} {query.strip()}".strip()
+                feature_vector = extract_text_features(prefixed_queries)
+                weights.append(2) # assign higher weight to natural language queries
+            feature_vectors.append(feature_vector)
+        weights = array(weights, dtype=float32)
+        average_features = average(feature_vectors, axis=0, weights=weights)
+        average_features /= norm(average_features, axis=-1, keepdims=True)
+        return similarity_search(q=["multimodal"], features=average_features, start=start, end=end, thumbs=thumbs)
 
     def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: int):
 
