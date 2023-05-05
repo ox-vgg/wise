@@ -34,10 +34,18 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
     return app
 
 
-def serve(project_id: str, theme_asset_dir: Path, index_type: Optional[str] = None):
+def serve(project_id: str, theme_asset_dir: Path, index_type: Optional[str] = None, query_blocklist_file: Path = None):
     options = {"project_id": project_id} if project_id else {}
     if index_type:
         options.update({"index_type": index_type})
+    if query_blocklist_file:
+        query_blocklist = []
+        with open(query_blocklist_file, 'r') as f:
+            for line in f:
+                term = line.strip()
+                if term:
+                    query_blocklist.append(term)
+        options.update({"query_blocklist": query_blocklist})
 
     config = APIConfig.parse_obj(options)  # type: ignore
 

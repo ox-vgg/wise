@@ -320,6 +320,12 @@ def _get_search_router(config: APIConfig):
 
             return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
         else:
+            for query in q:
+                if query in config.query_blocklist:
+                    message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
+                    raise HTTPException(
+                        403, {"message": message}
+                    )
             prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
             text_features = extract_text_features(prefixed_queries)
             return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
@@ -390,6 +396,11 @@ def _get_search_router(config: APIConfig):
                         feature_vector = extract_image_features([im])
                         weights.append(1)
             else:
+                if query in config.query_blocklist:
+                    message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
+                    raise HTTPException(
+                        403, {"message": message}
+                    )
                 prefixed_queries = f"{_prefix} {query.strip()}".strip()
                 feature_vector = extract_text_features(prefixed_queries)
                 weights.append(2) # assign higher weight to natural language queries

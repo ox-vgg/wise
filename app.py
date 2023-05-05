@@ -824,6 +824,16 @@ def serve(
     index_type: Optional[IndexType] = typer.Option(
         None, help="The faiss index to use for serving"
     ),
+    query_blocklist: Path = typer.Option(
+        None,
+        '--query-blocklist',
+        '--query-blacklist',
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        readable=True,
+        help="A text file containing a list of words/phrases (each separated by a line break) that users should be blocked from searching. When the user enters a query that matches one of the terms in the blocklist, an error message will be returned",
+    )
 ):
     from api import serve
 
@@ -836,7 +846,7 @@ def serve(
             )
     # If index_type is None, it will be read from the config
 
-    serve(project_id, theme_asset_dir, index_type.value if index_type else None)
+    serve(project_id, theme_asset_dir, index_type.value if index_type else None, query_blocklist)
 
 
 @app.command()
