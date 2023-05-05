@@ -295,7 +295,7 @@ def _get_search_router(config: APIConfig):
         thumbs: bool = Query(True),
     ):
         if len(q) == 0:
-            raise HTTPException(400, {"message": "missing search query"})
+            raise HTTPException(400, {"message": "Missing search query"})
 
         end = min(end, num_files)
         if start > end:
@@ -306,7 +306,7 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400,
                 {
-                    "message": "cannot return more than 50 results at a time when thumbs=1"
+                    "message": "Cannot return more than 50 results at a time when thumbs=1"
                 },
             )
         
@@ -338,7 +338,7 @@ def _get_search_router(config: APIConfig):
             )
         if (end - start) > 50 and thumbs == 1:
             raise HTTPException(
-                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
+                400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
             )
         
         with Image.open(io.BytesIO(q)) as im:
@@ -360,7 +360,7 @@ def _get_search_router(config: APIConfig):
         
         q = file_queries + url_queries + text_queries
         if len(q) == 0:
-            raise HTTPException(400, {"message": "missing search query"})
+            raise HTTPException(400, {"message": "Missing search query"})
         elif len(q) > 5:
             raise HTTPException(400, {"message": "Too many query items"})
 
@@ -371,7 +371,7 @@ def _get_search_router(config: APIConfig):
             )
         if (end - start) > 50 and thumbs == 1:
             raise HTTPException(
-                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
+                400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
             )
 
         feature_vectors = []

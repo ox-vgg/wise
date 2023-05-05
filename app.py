@@ -819,10 +819,10 @@ def serve(
         exists=True,
         dir_okay=True,
         file_okay=False,
-        help="static HTML assets related to the user interface are served from this folder",
+        help="Static HTML assets related to the user interface are served from this folder",
     ),
     index_type: Optional[IndexType] = typer.Option(
-        None, help="the faiss index to use for serving"
+        None, help="The faiss index to use for serving"
     ),
 ):
     from api import serve
@@ -843,7 +843,7 @@ def serve(
 def index(
     project_id: str = typer.Argument(..., help="Name of the project"),
     index_type: IndexType = typer.Option(
-        IndexType.IndexFlatIP, help="the faiss index name"
+        IndexType.IndexFlatIP, help="The faiss index name"
     ),
     using: FEATURES = typer.Option(
         FEATURES.IMAGE, help="Specify the feature set to build the index with"
