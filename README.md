@@ -34,7 +34,8 @@ python3 app.py index wikimedia --index-type IndexIVFFlat
 ## serve the visual search engine over web
 python3 app.py serve wikimedia \
   --index-type IndexIVFFlat \
-  --theme-asset-dir ./www/imgrid/
+  --theme-asset-dir ./www/dynamic/
+# you can optionally provide a query blocklist (i.e. a list of queries that users should be blocked from searching) using `--query-blocklist /path/to/blocklist.txt`
 ```
 
 ## Test
