@@ -59,6 +59,7 @@ def get_project_router(config: APIConfig):
     project_id = project.id
     router = APIRouter(prefix=f"/{project_id}", tags=[f"{project_id}"])
     router.include_router(_get_project_data_router(config))
+    router.include_router(_get_report_image_router(config))
     router.include_router(_get_search_router(config))
 
     return router
@@ -185,6 +186,22 @@ def _get_project_data_router(config: APIConfig):
             "num_images": counts[H5Datasets.IMAGE_FEATURES],
         }
 
+    return router
+
+
+def _get_report_image_router(config: APIConfig):
+    router_cm = ExitStack()
+    router = APIRouter(
+        on_shutdown=[lambda: print("shutting down") and router_cm.close()],
+    )
+
+    @router.post("/report")
+    def report_image():
+        # TODO implement code to store data in database
+        return PlainTextResponse(
+            status_code=200, content="Image has been reported"
+        )
+    
     return router
 
 
