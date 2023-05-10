@@ -13,26 +13,26 @@ git clone git@gitlab.com:vgg/wise/wise.git
 cd $HOME/wise
 conda env create -f environment.yml
 conda activate wise
-python3 app.py --help
+python3 wise.py --help
 
 ## initialise a project with a batch of nearly 80 million images from 
 ## the Wikimedia Commons stored in the WebDataset format
-python3 app.py init wikimedia \
+python3 wise.py init wikimedia \
   --batch-size 128 --model "ViT-L-14:laion2b_s32b_b82k" \
   --store-in "/data/hdd/wikimedia/wise-store" \
   --source "/data/hdd1/wikimedia/data/batch{001..999}/{00000..00007}.tar"
   
 ## add some new images stored in a folder to the project 
-python3 app.py update wikimedia \
+python3 wise.py update wikimedia \
   --batch-size 128 \
   --source "/data/hdd1/wikimedia/data/new-images-uploaded-in-2023/"
 
 ## create a search index which based on approximate nearest neighbour search
 ## (for exhaustive search, use --index-type IndexFlatIP)
-python3 app.py index wikimedia --index-type IndexIVFFlat
+python3 wise.py index wikimedia --index-type IndexIVFFlat
 
 ## serve the visual search engine over web
-python3 app.py serve wikimedia \
+python3 wise.py serve wikimedia \
   --index-type IndexIVFFlat \
   --theme-asset-dir ./www/dynamic/
 # you can optionally provide a query blocklist (i.e. a list of queries that users should be blocked from searching) using `--query-blocklist /path/to/blocklist.txt`
