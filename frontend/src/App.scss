@@ -36,6 +36,10 @@
 
     &.wise-example-queries {
       line-height: 2;
+
+      > button {
+        margin: 0 2px;
+      }
     }
   }
 }
