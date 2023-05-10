@@ -122,16 +122,17 @@ export const App: React.FunctionComponent = () => {
       </div>
     ),
     'About WISE': <>
-      <p>TODO add explanation</p>
-      <p>WISE uses vision language models etc.</p>
-      <p>WISE is developed at the Visual Geometry Group, University of Oxford and the code will be open sourced soon.</p>
+      <p>WISE Image Search Engine (WISE) is an open-source image search engine which leverages recent advances in machine learning and vision-language models that enable search based on image content using natural language. The expressive power of natural language allows the user to flexibly describe what they are looking for.</p>
+      {/* TODO add more explanations */}
+      <p>WISE is developed at the Visual Geometry Group, University of Oxford.</p>
+      <p><a href="https://gitlab.com/vgg/wise/wise" target='_blank'>Code repository</a></p>
+      <p><a href="https://www.robots.ox.ac.uk/~vgg/software/wise/" target='_blank'>Project webpage</a></p>
     </>,
     'How to use WISE': <p>TODO</p>,
     'Disclaimer': (
       <>
-        <p>TODO</p>
         <ul>
-          <li>Images belong to their authors</li>
+          <li>The images shown below are hosted on Wikimedia Commons and this website only provides search. The images belong to their respective authors and they are not the property of the University of Oxford.</li>
           <li>We currently do not use cookies on this website</li>
         </ul>
       </>

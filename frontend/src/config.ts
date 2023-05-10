@@ -4,7 +4,7 @@ let config = {
   API_BASE_URL: "./", // "./" is relative to the <base href> defined in index.html
   MAX_SEARCH_RESULTS: 1000, // Maximum number of search rsults
   PAGE_SIZE: 50, // Number of images in each page when displaying search results
-  NUM_PAGES_PER_REQUEST: 4, // Number of pages (each with having size PAGE_SIZE) to fetch in each API call
+  NUM_PAGES_PER_REQUEST: 2, // Number of pages (each with having size PAGE_SIZE) to fetch in each API call
   FETCH_THUMBS: 0,
   FETCH_TIMEOUT: 60000, // Number of milliseconds to wait when fetching search results / featured images
   REPO_URL: "https://gitlab.com/vgg/wise/wise",
