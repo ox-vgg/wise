@@ -1,0 +1,115 @@
+.wise-large-loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 30vh;
+
+  > .anticon {
+    font-size: 64px;
+  }
+}
+
+.wise-loading-message {
+  width: 100%;
+  text-align: center;
+  margin: 8px 0 0 0;
+
+  > .anticon {
+    margin-left: 5px;
+    font-size: 18px;
+  }
+}
+
+section#search-results {
+  display: block;
+
+  .ant-pagination {
+    margin: 10px 0;
+
+    &:first-of-type {
+      float: right;
+    }
+    &:last-of-type {
+      display: flex;
+      justify-content: center;
+    }
+  }
+
+  /*
+    Compact/justified image grid based on:
+    - http://jsbin.com/tisaluy/8/edit?html,css,output
+    - https://github.com/xieranmaya/blog/issues/6
+  */
+  > .wise-image-grid {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+
+    &::after {
+      content: '';
+      flex-grow: 999999999;
+    }
+
+    > a {
+      display: block;
+      margin: 2px;
+      background-color: #eee;
+      position: relative;
+      color: unset;
+
+      > .wise-image-more-button {
+        display: none;
+        position: absolute;
+        top: 3px;
+        right: 2px;
+        z-index: 1;
+        padding: 2px;
+        // background-color: rgba(255,255,255,0.3);
+        width: 31px;
+      }
+      &:hover > .wise-image-more-button, &.wise-image-dropdown-open > .wise-image-more-button {
+        display: block;
+      }
+
+      > i {
+        display: block;
+      }
+
+      > img.wise-image {
+        position: absolute;
+        top: 0;
+        width: 100%;
+        vertical-align: bottom;
+      }
+
+      // Additional rules to deal with very wide / panorama images causing issues
+      max-width: 50vw;
+      > img.wise-image {
+        height: 100%;
+        object-fit: contain;
+      }
+
+      > .wise-image-hover-display {
+        visibility: hidden;
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        padding: 8px;
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 12px;
+      }
+      
+      &:hover > .wise-image-hover-display, &.wise-image-dropdown-open > .wise-image-hover-display {
+        display: block;
+        visibility: visible;
+        background-color: rgba(0,0,0,0.35);
+        color: white;
+      }
+    }
+  }
+}
