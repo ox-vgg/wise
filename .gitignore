@@ -8,6 +8,7 @@ public/thumbs
 *.npy
 *.tar
 *.db
+data/
 
 # generated output
 output/
@@ -24,3 +25,6 @@ __pycache__/
 # Vim
 *.swo
 *.swp
+
+# System files
+.DS_Store
