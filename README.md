@@ -1,7 +1,7 @@
 <h1 align="center">WISE Image Search Engine (WISE)</h1>
 
 <p align="center">
-  <img src="docs/images/wise_logo.svg" alt="wise-logo" width="160px" height="70px"/>
+  <img src="docs/assets/wise_logo.svg" alt="wise-logo" width="160px" height="70px"/>
   <br>
   WISE is an AI-based image search engine for efficiently searching through large collections of images.
 </p>
@@ -14,17 +14,17 @@
 
 * **Natural language search** - use natural language to describe what you want to search for
 
-  <img src="docs/images/natural_language_search.png" width="600px">
+  <img src="docs/assets/natural_language_search.png" width="600px">
 
   WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image (i.e. it searches by image content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions.
 
 * **Visual similarity search** - upload an image or paste an image link to find similar images
 
-  <img src="docs/images/visual_similarity_search.png" width="600px">
+  <img src="docs/assets/visual_similarity_search.png" width="600px">
 
 * **Multi-modal search** - combine images and text in your query. For example, if you upload a picture of a golden retriever and enter the text "in snow", WISE will find images of golden retrievers in snow.
 
-  <img src="docs/images/multimodal_search.png" width="600px">
+  <img src="docs/assets/multimodal_search.png" width="600px">
 
 * Searches can be performed via:
   * CLI
@@ -44,7 +44,7 @@ WISE uses vision-language models such as OpenAI [CLIP](https://openai.com/resear
 
 Vision-language models are able to map both images and text onto the same feature space. Images and/or text that have similar semantics (meanings) are placed closer together in this feature space. This means users can search a collection of images, using natural language or using another image.
 
-<img src="docs/images/clip_diagram.png" width="600px">
+<img src="docs/assets/clip_diagram.png" width="600px">
 
 The [Faiss](https://github.com/facebookresearch/faiss) library is used to perform approximate nearest neighbour search.
 
