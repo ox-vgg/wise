@@ -84,7 +84,7 @@ def main():
                         type=str,
                         help="save results as a JSON file")
     parser.add_argument("--results-to-return",
-                        required=True,
+                        required=False,
                         type=int,
                         default=100,
                         help="the number of search results to be retain")

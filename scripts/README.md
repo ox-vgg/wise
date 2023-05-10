@@ -36,8 +36,8 @@ can achieved by an approximate nearest neighbour method.
 ```
 $ cd wise/script
 $ python3 export-exhaustive-search-results.py \
-  --wise-server-url http://jupiter.robots.ox.ac.uk:9670/wikimedia5/ \
-  --out-fn /ssd/adutta/code/wise/data/index/wikimedia5-55M-exhaustive-search-results.json
+  --wise-server-url http://localhost:9670/wikimedia5/ \
+  --out-fn ../data/index/wikimedia5-55M-exhaustive-search-results.json
 
 toy aeroplane [completed in 29.627 sec.]
 pencil drawing of lion [completed in 75.313 sec.]
@@ -54,6 +54,6 @@ car with a bicycle on top [completed in 47.316 sec.]
 
 ## TODO
 $ python3 eval-ann-search-perf.py \
-  --wise-server-url http://jupiter.robots.ox.ac.uk:9671/wikimedia/ \
-  --exhaustive-search-results=/ssd/adutta/code/wise/data/index/wikimedia5-55M-exhaustive-search-results.json
+  --wise-server-url http://localhost:9671/wikimedia/ \
+  --exhaustive-search-results=../data/index/wikimedia5-55M-exhaustive-search-results.json
 ```
