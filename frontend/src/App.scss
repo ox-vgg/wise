@@ -1,0 +1,45 @@
+.wise-content, .wise-header {
+  padding: 0 6vw;
+}
+.wise-content {
+  padding-bottom: 50px;
+}
+
+#wise-overview-card {
+  & > .ant-card-head {
+    padding: 0 18px;
+  
+    .ant-tabs-tab {
+      padding: 10px 0;
+      font-size: 14px;
+    }
+  }
+  & > .ant-card-body {
+    padding: 16px;
+
+    .wise-overview {
+      margin-bottom: 0;
+  
+      > p:first-of-type {
+        margin-top: 0;
+      }
+    }
+  }
+}
+
+.wise-overview {
+  margin-bottom: 30px;
+
+  & > p {
+    line-height: 1.5;
+    font-size: 14px;
+
+    &.wise-example-queries {
+      line-height: 2;
+
+      > button {
+        margin: 0 2px;
+      }
+    }
+  }
+}

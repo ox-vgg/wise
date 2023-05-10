@@ -1,0 +1,23 @@
+.wise-report-image-modal {
+  .ant-modal-title {
+    display: flex;
+  
+    > .anticon{
+      color: #faad14;
+      font-size: 22px;
+      margin-inline-end: 12px;
+    }
+  }
+  .ant-modal-body {
+    margin-inline-start: 34px;
+
+    .ant-checkbox-group {
+      flex-direction: column;
+      flex-wrap: wrap;
+  
+      > label {
+        margin-inline-start: 0;
+      }
+    }
+  }
+}

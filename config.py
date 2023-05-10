@@ -1,4 +1,5 @@
 from pydantic import BaseSettings
+from typing import List
 
 
 class APIConfig(BaseSettings):
@@ -9,4 +10,5 @@ class APIConfig(BaseSettings):
     query_prefix: str = "This is a photo of a"
     index_type: str = "IndexFlatIP"
     nprobe: int = 1024
+    query_blocklist: List[str] = []
     project_id: str

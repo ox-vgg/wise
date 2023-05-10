@@ -1,14 +1,15 @@
 from contextlib import ExitStack
-from typing import Dict, List
+from typing import Dict, List, Union
 import io
 import logging
 from pathlib import Path
 import tarfile
 from PIL import Image
-from numpy import ndarray
+from numpy import ndarray, array, average, float32
+from numpy.linalg import norm
 from tempfile import NamedTemporaryFile
 from torch.hub import download_url_to_file
-from fastapi import APIRouter, HTTPException, Query, File
+from fastapi import APIRouter, HTTPException, Query, File, Form
 from fastapi.responses import (
     Response,
     FileResponse,
@@ -44,6 +45,7 @@ def raise_(ex):
     raise ex
 
 
+
 def get_project_router(config: APIConfig):
     if config.project_id is None:
         raise typer.BadParameter("project id is missing!")
@@ -57,6 +59,7 @@ def get_project_router(config: APIConfig):
     project_id = project.id
     router = APIRouter(prefix=f"/{project_id}", tags=[f"{project_id}"])
     router.include_router(_get_project_data_router(config))
+    router.include_router(_get_report_image_router(config))
     router.include_router(_get_search_router(config))
 
     return router
@@ -186,8 +189,23 @@ def _get_project_data_router(config: APIConfig):
     return router
 
 
-def _get_search_router(config: APIConfig):
+def _get_report_image_router(config: APIConfig):
+    router_cm = ExitStack()
+    router = APIRouter(
+        on_shutdown=[lambda: print("shutting down") and router_cm.close()],
+    )
 
+    @router.post("/report")
+    def report_image():
+        # TODO implement code to store data in database
+        return PlainTextResponse(
+            status_code=200, content="Image has been reported"
+        )
+    
+    return router
+
+
+def _get_search_router(config: APIConfig):
     project_id = config.project_id
     project_tree = WiseProjectTree(project_id)
     index_type = IndexType[config.index_type]
@@ -266,7 +284,7 @@ def _get_search_router(config: APIConfig):
     logger.info(f"Loading faiss index from {index_filename}")
     index = read_index(index_filename)
     if hasattr(index, "nprobe"):
-        index.nprobe = getattr(config, 'nprobe', 32)
+        index.nprobe = getattr(config, "nprobe", 32)
 
     # Get counts
     counts = get_counts(vds_path)
@@ -291,10 +309,10 @@ def _get_search_router(config: APIConfig):
         ),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: int = 1
+        thumbs: bool = Query(True),
     ):
         if len(q) == 0:
-            raise HTTPException(400, {"message": "missing search query"})
+            raise HTTPException(400, {"message": "Missing search query"})
 
         end = min(end, num_files)
         if start > end:
@@ -303,7 +321,10 @@ def _get_search_router(config: APIConfig):
             )
         if (end - start) > 50 and thumbs == 1:
             raise HTTPException(
-                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
+                400,
+                {
+                    "message": "Cannot return more than 50 results at a time when thumbs=1"
+                },
             )
         
         if len(q) == 1 and q[0].startswith(("http://", "https://")):
@@ -316,6 +337,12 @@ def _get_search_router(config: APIConfig):
 
             return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
         else:
+            for query in q:
+                if query in config.query_blocklist:
+                    message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
+                    raise HTTPException(
+                        403, {"message": message}
+                    )
             prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
             text_features = extract_text_features(prefixed_queries)
             return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
@@ -325,7 +352,7 @@ def _get_search_router(config: APIConfig):
         q: bytes = File(),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: int = 1
+        thumbs: bool = Query(True),
     ):
         end = min(end, num_files)
         if start > end:
@@ -334,15 +361,74 @@ def _get_search_router(config: APIConfig):
             )
         if (end - start) > 50 and thumbs == 1:
             raise HTTPException(
-                400, {"message": "cannot return more than 50 results at a time when thumbs=1"}
+                400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
             )
         
         with Image.open(io.BytesIO(q)) as im:
             query_features = extract_image_features([im])
 
         return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
+    
+    @router.post("/multimodal-search", response_model=Dict[str, List[SearchResponse]])
+    async def handle_multimodal_search(
+        file_queries: List[bytes] = File([]),
+        url_queries: List[str] = Form([]),
+        text_queries: List[str] = Form([]),
+        start: int = Query(0, ge=0, le=980),
+        end: int = Query(20, gt=0, le=1000),
+        thumbs: int = Query(True),
+    ):
+        """Perform multimodal queries (e.g. images + text) by computing a weighted sum of the feature vectors of the
+            input images/text, and then using this as the query vector"""
+        
+        q = file_queries + url_queries + text_queries
+        if len(q) == 0:
+            raise HTTPException(400, {"message": "Missing search query"})
+        elif len(q) > 5:
+            raise HTTPException(400, {"message": "Too many query items"})
+
+        end = min(end, num_files)
+        if start > end:
+            raise HTTPException(
+                400, {"message": "'start' cannot be greater than 'end'"}
+            )
+        if (end - start) > 50 and thumbs == 1:
+            raise HTTPException(
+                400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
+            )
+
+        feature_vectors = []
+        weights = []
+        for query in q:
+            feature_vector = None
+            if isinstance(query, bytes):
+                with Image.open(io.BytesIO(query)) as im:
+                    feature_vector = extract_image_features([im])
+                    weights.append(1)
+            elif query.startswith(("http://", "https://")):
+                logger.info("Downloading", query, "to file")
+                with NamedTemporaryFile() as tmpfile:
+                    download_url_to_file(query, tmpfile.name)
+                    with Image.open(tmpfile.name) as im:
+                        feature_vector = extract_image_features([im])
+                        weights.append(1)
+            else:
+                if query in config.query_blocklist:
+                    message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
+                    raise HTTPException(
+                        403, {"message": message}
+                    )
+                prefixed_queries = f"{_prefix} {query.strip()}".strip()
+                feature_vector = extract_text_features(prefixed_queries)
+                weights.append(2) # assign higher weight to natural language queries
+            feature_vectors.append(feature_vector)
+        weights = array(weights, dtype=float32)
+        average_features = average(feature_vectors, axis=0, weights=weights)
+        average_features /= norm(average_features, axis=-1, keepdims=True)
+        return similarity_search(q=["multimodal"], features=average_features, start=start, end=end, thumbs=thumbs)
 
     def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: int):
+
         dist, ids = index.search(features, end)
         with project_engine.connect() as conn:
             def get_metadata(_id):
@@ -351,18 +437,18 @@ def _get_search_router(config: APIConfig):
                     raise RuntimeError()
                 return m
 
-            if thumbs == 0:
-                response = make_basic_response(q,
-                                               dist[[0], start:end],
-                                               ids[[0], start:end],
-                                               get_metadata
+
+            if not thumbs:
+                response = make_basic_response(
+                    q, dist[[0], start:end], ids[[0], start:end], get_metadata
                 )
             else:
-                response = make_full_response(q,
-                                              dist[[0], start:end],
-                                              ids[[0], start:end],
-                                              get_metadata,
-                                              thumbs_reader
+                response = make_full_response(
+                    q,
+                    dist[[0], start:end],
+                    ids[[0], start:end],
+                    get_metadata,
+                    thumbs_reader,
                 )
         return response
 
