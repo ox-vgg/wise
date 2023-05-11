@@ -44,11 +44,17 @@
 ## How it works
 WISE uses vision-language models such as OpenAI [CLIP](https://openai.com/research/clip) (specifically [OpenCLIP](https://github.com/mlfoundations/open_clip), which is an open-source implementation of CLIP trained on the [LAION](https://laion.ai/blog/laion-5b/) dataset).
 
-Vision-language models are able to map both images and text onto the same feature space. Images and/or text that have similar semantics (meanings) are placed closer together in this feature space. This means users can search a collection of images, using natural language or using another image.
+A vision-language model consists of a text encoder and image encoder that have been trained together, resulting in a model that is able to map both images and text onto the same feature space. Images and/or text that have similar semantics (meanings) are placed closer together in this feature space, while unrelated images/text are placed further apart.
 
 <img src="docs/assets/clip_diagram.png" width="600px">
 
+When you enter a text query, WISE uses the text encoder to transform the input text into a feature vector. This feature vector is compared against the feature vectors of the images in the search collection, to find the nearest neighbours (using a distance metric such as cosine distance). The vectors that are closest to the feature vector of the text query, represent the images that are most relevant to the search query.
+
+A similar approach is used when an image is used as the query, except that the image encoder is used to encode the query, rather than the text encoder.
+
 The [Faiss](https://github.com/facebookresearch/faiss) library is used to perform approximate nearest neighbour search.
+
+For multi-modal queries (images + text), the feature vectors of the individual images/text that make up the query are added together, with higher weight assigned to the text query/queries. The weighted sum is then normalised and used as the query vector for the nearest neighbour search.
 
 ## Installation
 
