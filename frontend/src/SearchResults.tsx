@@ -46,7 +46,10 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
           }}
             onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.id) }}
             placement="bottomRight" trigger={['click']} arrow>
-            <img src="more_icon.png" className="wise-image-more-button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}} />
+            <img src="more_icon.png"
+                  className="wise-image-more-button"
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
+                  />
           </Dropdown>
           <i style={{paddingBottom: `${height/width*100}%`}}></i>
           <img src={searchResult.thumbnail}
