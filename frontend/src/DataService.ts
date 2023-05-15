@@ -37,7 +37,7 @@ const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
 
-  const endpoint = config.API_BASE_URL + `multimodal-search?start=${start}&end=${end}&thumbs=${config.FETCH_THUMBS}`;
+  const endpoint = config.API_BASE_URL + `search?start=${start}&end=${end}&thumbs=${config.FETCH_THUMBS}`;
   const formData = convertQueriesToFormData(queries);
   
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {

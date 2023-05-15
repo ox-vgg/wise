@@ -348,7 +348,7 @@ def _get_search_router(config: APIConfig):
             return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
     
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
-    async def handle_multimodal_search(
+    async def handle_post_search_multimodal(
         file_queries: List[bytes] = File([]),
         url_queries: List[str] = Form([]),
         text_queries: List[str] = Form([]),
@@ -356,8 +356,11 @@ def _get_search_router(config: APIConfig):
         end: int = Query(20, gt=0, le=1000),
         thumbs: int = Query(True),
     ):
-        """Perform multimodal queries (e.g. images + text) by computing a weighted sum of the feature vectors of the
-            input images/text, and then using this as the query vector"""
+        """
+        Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+        Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+        input images/text, and then using this as the query vector.
+        """
         
         q = file_queries + url_queries + text_queries
         if len(q) == 0:
