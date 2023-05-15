@@ -346,30 +346,8 @@ def _get_search_router(config: APIConfig):
             prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
             text_features = extract_text_features(prefixed_queries)
             return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
-
-    @router.post("/search", response_model=Dict[str, List[SearchResponse]])
-    async def handle_post_search(
-        q: bytes = File(),
-        start: int = Query(0, ge=0, le=980),
-        end: int = Query(20, gt=0, le=1000),
-        thumbs: bool = Query(True),
-    ):
-        end = min(end, num_files)
-        if start > end:
-            raise HTTPException(
-                400, {"message": "'start' cannot be greater than 'end'"}
-            )
-        if (end - start) > 50 and thumbs == 1:
-            raise HTTPException(
-                400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
-            )
-        
-        with Image.open(io.BytesIO(q)) as im:
-            query_features = extract_image_features([im])
-
-        return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
     
-    @router.post("/multimodal-search", response_model=Dict[str, List[SearchResponse]])
+    @router.post("/search", response_model=Dict[str, List[SearchResponse]])
     async def handle_multimodal_search(
         file_queries: List[bytes] = File([]),
         url_queries: List[str] = Form([]),
