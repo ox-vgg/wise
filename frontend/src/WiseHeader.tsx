@@ -129,23 +129,17 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
     examplesJSX = examples.map(example => 
       <img src={example.url} key={example.url}
           onClick={() => addImageURLQuery(example.url)}
-          style={{cursor: 'pointer', borderRadius: '8px', width: '80px', height: '80px', objectFit: 'cover', marginRight: '10px'}} />
+          className="wise-example-image-query" />
     )
   } else {
     examplesJSX = examples.slice(0,2).map(example => 
-      <div style={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'center', padding: '10px',
-                    marginRight: '20px', backgroundColor: '#eee', borderRadius: '8px', cursor: 'pointer'}}
+      <div className="wise-multimodal-example-query"
           onClick={() => handleExampleMultimodalQueryClick(example)}
+          key={example.url}
       >
-        <img src={example.url} key={example.url}
-            style={{borderRadius: '8px', width: '80px', height: '80px', objectFit: 'cover'}} />
-        <span style={{fontSize: '36px', margin: '0 5px'}}>+</span>
-        <Tag key={example.url}
-              style={{width: 'fit-content'}}
-              color='blue'
-            >
-          {example.text}
-        </Tag>
+        <img src={example.url} />
+        <span className="wise-multimodal-example-query-plus-sign">+</span>
+        <Tag color='blue'>{example.text}</Tag>
       </div>
     )
   }
@@ -162,7 +156,7 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
       >
       <div style={divStyle}>
         {
-          onlyVisualSearch ? <></> : <h3 style={{marginTop: '10px'}}>Image</h3>
+          onlyVisualSearch ? <></> : <h3>Image</h3>
         }
         <Form.Item name="dragger" noStyle>
           <Upload.Dragger name="files" accept="image/*" beforeUpload={beforeUpload}
@@ -176,11 +170,11 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
         </Form.Item>
         <div className="wise-visual-search-separator">
           <div></div>
-          <span style={{margin: '0 10px'}}>OR</span>
+          <span>OR</span>
           <div></div>
         </div>
-        <Space.Compact style={{width: '100%'}}>
-          <Form.Item name="image-url" style={{flex: 1}}>
+        <Space.Compact>
+          <Form.Item name="image-url">
             <Input onChange={(e) => {setUrlText(e.target.value)}} onKeyDown={handleImageUrlInputKeydown} placeholder="Paste image link" />
           </Form.Item>
           {
@@ -199,13 +193,13 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
           <>
             <div className="wise-visual-search-separator">
               <div></div>
-              <span style={{margin: '0 10px'}}>AND</span>
+              <span>AND</span>
               <div></div>
             </div>
             <div style={{...divStyle, marginBottom: '15px'}}>
-              <h3 style={{marginTop: '10px'}}>Text</h3>
-              <Space.Compact style={{width: '100%'}}>
-                <Form.Item name="text-query" style={{flex: 1}}>
+              <h3>Text</h3>
+              <Space.Compact>
+                <Form.Item name="text-query">
                   <Input placeholder="Text query" onChange={handleTextInputChange} onKeyDown={handleTextInputKeydown} />
                 </Form.Item>
                 <Form.Item>

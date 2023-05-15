@@ -5,7 +5,7 @@ export const fetchWithTimeout = (url: string, ms: number, { signal, ...options }
   if (signal) signal.addEventListener("abort", () => controller.abort());
   const timeout = setTimeout(() => controller.abort("Request timed out"), ms);
   return promise.catch((err) => {
-    console.log('CAGHT', controller.signal)
+    console.log('CAUGHT', controller.signal)
     if (controller.signal.aborted) {
       throw new Error('Request timed out', { cause: err });
       // TODO use controller.signal.reason (issue: the reason parameter is not supported by some browsers)

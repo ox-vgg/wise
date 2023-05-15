@@ -93,7 +93,6 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
   return (
     <Card
       id="wise-overview-card"
-      style={{ width: '100%' }}
       size='small'
       tabList={aboutWiseTabList}
       activeTabKey={aboutWiseActiveTabKey}
