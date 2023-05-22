@@ -134,6 +134,7 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
                         "license": metadata.get("license", ""),
                     },
                 )
+                metadata = self.metadata_transform(metadata)
                 return im, metadata, thumb
         except Exception as e:
             logging.error(f"Error {self.dataset_location}#{k}.{im_key} - ({e.__class__.__name__}){e}")
@@ -167,6 +168,7 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
                         "license": "",
                     },
                 )
+                metadata = self.metadata_transform(metadata)
                 return im, metadata, thumb
         except Exception as e:
             logging.error(f"Error {image} - ({type(e)}){e}")
