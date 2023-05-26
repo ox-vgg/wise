@@ -338,7 +338,7 @@ def _get_search_router(config: APIConfig):
             return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
         else:
             for query in q:
-                if query in config.query_blocklist:
+                if query.strip() in config.query_blocklist:
                     message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
                     raise HTTPException(
                         403, {"message": message}
@@ -346,31 +346,9 @@ def _get_search_router(config: APIConfig):
             prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
             text_features = extract_text_features(prefixed_queries)
             return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
-
-    @router.post("/search", response_model=Dict[str, List[SearchResponse]])
-    async def handle_post_search(
-        q: bytes = File(),
-        start: int = Query(0, ge=0, le=980),
-        end: int = Query(20, gt=0, le=1000),
-        thumbs: bool = Query(True),
-    ):
-        end = min(end, num_files)
-        if start > end:
-            raise HTTPException(
-                400, {"message": "'start' cannot be greater than 'end'"}
-            )
-        if (end - start) > 50 and thumbs == 1:
-            raise HTTPException(
-                400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
-            )
-        
-        with Image.open(io.BytesIO(q)) as im:
-            query_features = extract_image_features([im])
-
-        return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
     
-    @router.post("/multimodal-search", response_model=Dict[str, List[SearchResponse]])
-    async def handle_multimodal_search(
+    @router.post("/search", response_model=Dict[str, List[SearchResponse]])
+    async def handle_post_search_multimodal(
         file_queries: List[bytes] = File([]),
         url_queries: List[str] = Form([]),
         text_queries: List[str] = Form([]),
@@ -378,8 +356,11 @@ def _get_search_router(config: APIConfig):
         end: int = Query(20, gt=0, le=1000),
         thumbs: int = Query(True),
     ):
-        """Perform multimodal queries (e.g. images + text) by computing a weighted sum of the feature vectors of the
-            input images/text, and then using this as the query vector"""
+        """
+        Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+        Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+        input images/text, and then using this as the query vector.
+        """
         
         q = file_queries + url_queries + text_queries
         if len(q) == 0:
@@ -413,7 +394,7 @@ def _get_search_router(config: APIConfig):
                         feature_vector = extract_image_features([im])
                         weights.append(1)
             else:
-                if query in config.query_blocklist:
+                if query.strip() in config.query_blocklist:
                     message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
                     raise HTTPException(
                         403, {"message": message}

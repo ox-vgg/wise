@@ -51,12 +51,34 @@ section#search-results {
       flex-grow: 999999999;
     }
 
-    > a {
-      display: block;
+    > .wise-image-wrapper {
+      // display: block;
       margin: 2px;
       background-color: #eee;
       position: relative;
-      color: unset;
+      cursor: pointer;
+      
+      > i {
+        display: block;
+      }
+
+      > a {
+        color: unset;
+
+        > img.wise-image {
+          position: absolute;
+          top: 0;
+          width: 100%;
+          vertical-align: bottom;
+        }
+      }
+
+      // Additional rules to deal with very wide / panorama images causing issues
+      max-width: 50vw;
+      > a > img.wise-image {
+        height: 100%;
+        object-fit: contain;
+      }
 
       > .wise-image-more-button {
         display: none;
@@ -72,27 +94,10 @@ section#search-results {
         display: block;
       }
 
-      > i {
-        display: block;
-      }
-
-      > img.wise-image {
-        position: absolute;
-        top: 0;
-        width: 100%;
-        vertical-align: bottom;
-      }
-
-      // Additional rules to deal with very wide / panorama images causing issues
-      max-width: 50vw;
-      > img.wise-image {
-        height: 100%;
-        object-fit: contain;
-      }
-
       > .wise-image-hover-display {
         visibility: hidden;
         position: absolute;
+        pointer-events: none;
         bottom: 0;
         width: 100%;
         padding: 8px;

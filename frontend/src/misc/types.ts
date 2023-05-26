@@ -1,3 +1,4 @@
+import { MutableRefObject } from "react";
 import { UploadFile } from "antd";
 
 export type Query = {
@@ -57,9 +58,17 @@ export interface DataServiceOutput {
   totalResults: number;
   pageNum: number;
   changePageNum: (x: number) => void;
-  performNewSearch: any;
-  fetchAndTransformFeaturedImages: any;
+  performNewSearch: (queries: Query[]) => Promise<void>;
+  fetchAndTransformFeaturedImages: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
+}
+
+interface RefsForTour {
+  searchBar: MutableRefObject<any>;
+  visualSearchButton: MutableRefObject<any>;
+  multimodalSearchButton: MutableRefObject<any>;
+  paginationControls: MutableRefObject<any>;
+  reportImageButton: MutableRefObject<any>;
 }
 
 
@@ -79,8 +88,14 @@ export interface WiseHeaderProps {
   searchText: string;
   setSearchText: (x: string) => void;
   submitSearch: () => void;
+  refsForTour: RefsForTour;
   isHomePage?: boolean;
   isSearching?: boolean;
+};
+export interface WiseOverviewCardProps {
+  handleExampleQueryClick: (exampleQuery: string) => void;
+  projectInfo: any;
+  refsForTour: RefsForTour;
 };
 export interface SearchResultsProps {
   dataService: DataServiceOutput;

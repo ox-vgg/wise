@@ -8,6 +8,19 @@ import './WiseHeader.scss';
 import { WiseLogo } from './misc/logo.tsx';
 import { CompoundSearchPopoverProps, WiseHeaderProps, Query } from './misc/types.ts';
 
+const examples = [
+  {
+    url: 'https://unsplash.com/photos/_tMDkTl7zs8/download?ixid=M3wxMjA3fDB8MXxhbGx8fHx8fHx8fHwxNjgzODA0ODk0fA&force=true&w=640',
+    text: 'in snow'
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=987&q=80',
+    text: 'at night'
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1642653856727-957f76dd014e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=987&q=80'
+  }
+];
 
 const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps> = ({
   multimodalQueries, setMultimodalQueries,
@@ -28,7 +41,12 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
       setVisualSearchErrorMessage('Error: you can only upload a maximum of 5 images');
       throw new Error('Too many files selected');
     }
-    setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'FILE', displayText: file.name, value: file }]);
+    if (onlyVisualSearch) {
+      setSearchText('');
+      setMultimodalQueries([{ id: nanoid(), type: 'FILE', displayText: file.name, value: file }]);
+    } else {
+      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'FILE', displayText: file.name, value: file }]);
+    }
     setVisualSearchErrorMessage('');
     if (onlyVisualSearch) return true;
     else return false;
@@ -56,8 +74,8 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
       addTextQuery();
     }
   }
-  const addImageURLQuery = () => {
-    let urlTextTrimmed = urlText.trim();
+  const addImageURLQuery = (_urlText?: string) => {
+    let urlTextTrimmed = (_urlText || urlText).trim();
     if (!urlTextTrimmed) return;
     try {
       urlTextTrimmed = new URL(urlTextTrimmed).href;
@@ -67,7 +85,12 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
       return;
     }
 
-    setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'URL', displayText: urlTextTrimmed, value: urlTextTrimmed }]);
+    if (onlyVisualSearch) {
+      setSearchText('');
+      setMultimodalQueries([{ id: nanoid(), type: 'URL', displayText: urlTextTrimmed, value: urlTextTrimmed }]);
+    } else {
+      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'URL', displayText: urlTextTrimmed, value: urlTextTrimmed }]);
+    }
     setUrlText('');
     setVisualSearchErrorMessage('');
     formRef.current?.setFieldsValue({'image-url': ''});
@@ -84,9 +107,42 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
     formRef.current?.setFieldsValue({'text-query': ''});
   }
 
+  const handleExampleMultimodalQueryClick = (example: any) => {
+    // Copied/modified from addImageURLQuery() and addTextQuery()
+
+    let urlTextTrimmed = example.url.trim();
+    let searchTextTrimmed = example.text.trim();
+    setMultimodalQueries([
+      { id: nanoid(), type: 'URL', displayText: urlTextTrimmed, value: urlTextTrimmed },
+      { id: nanoid(), type: 'TEXT', displayText: searchTextTrimmed, value: searchTextTrimmed }
+    ]);
+
+    formRef.current?.submit();
+  }
+
   let divStyle = {};
   if (onlyVisualSearch) divStyle = {padding: '1px 1px'};
   else divStyle = {padding: '1px 15px', backgroundColor: '#f2f2f2', borderRadius: '10px'};
+
+  let examplesJSX;
+  if (onlyVisualSearch) {
+    examplesJSX = examples.map(example => 
+      <img src={example.url} key={example.url}
+          onClick={() => addImageURLQuery(example.url)}
+          className="wise-example-image-query" />
+    )
+  } else {
+    examplesJSX = examples.slice(0,2).map(example => 
+      <div className="wise-multimodal-example-query"
+          onClick={() => handleExampleMultimodalQueryClick(example)}
+          key={example.url}
+      >
+        <img src={example.url} />
+        <span className="wise-multimodal-example-query-plus-sign">+</span>
+        <Tag color='blue'>{example.text}</Tag>
+      </div>
+    )
+  }
 
   return <div style={{width: '450px'}}>
     {
@@ -114,17 +170,17 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
         </Form.Item>
         <div className="wise-visual-search-separator">
           <div></div>
-          <span style={{margin: '0 10px'}}>OR</span>
+          <span>OR</span>
           <div></div>
         </div>
-        <Space.Compact style={{width: '100%'}}>
-          <Form.Item name="image-url" style={{flex: 1}}>
+        <Space.Compact>
+          <Form.Item name="image-url">
             <Input onChange={(e) => {setUrlText(e.target.value)}} onKeyDown={handleImageUrlInputKeydown} placeholder="Paste image link" />
           </Form.Item>
           {
             onlyVisualSearch ? <></> : 
               <Form.Item>
-                <Button type="primary" onClick={addImageURLQuery}>Add image</Button>
+                <Button type="primary" onClick={() => addImageURLQuery()}>Add image</Button>
               </Form.Item>
           }
         </Space.Compact>
@@ -137,13 +193,13 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
           <>
             <div className="wise-visual-search-separator">
               <div></div>
-              <span style={{margin: '0 10px'}}>AND</span>
+              <span>AND</span>
               <div></div>
             </div>
             <div style={{...divStyle, marginBottom: '15px'}}>
               <h3>Text</h3>
-              <Space.Compact style={{width: '100%'}}>
-                <Form.Item name="text-query" style={{flex: 1}}>
+              <Space.Compact>
+                <Form.Item name="text-query">
                   <Input placeholder="Text query" onChange={handleTextInputChange} onKeyDown={handleTextInputKeydown} />
                 </Form.Item>
                 <Form.Item>
@@ -151,16 +207,19 @@ const CompoundSearchPopover: React.FunctionComponent<CompoundSearchPopoverProps>
                 </Form.Item>
               </Space.Compact>
             </div>
-            <Button type="primary" htmlType="submit">Search</Button>
+            <Button type="primary" htmlType="submit" style={{marginBottom: '15px'}}>Search</Button>
           </>
       }
+      <div style={{borderTop: '1px solid #e3e3e3'}} />
+      <p>Try one of the examples below:</p>
+      {examplesJSX}
     </Form>
   </div>
 };
 
 
 const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
-  multimodalQueries, setMultimodalQueries, searchText, setSearchText, submitSearch, isHomePage = false, isSearching = false}: WiseHeaderProps) => {
+  multimodalQueries, setMultimodalQueries, searchText, setSearchText, submitSearch, refsForTour, isHomePage = false, isSearching = false}: WiseHeaderProps) => {
   const handleTextInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
   }
@@ -226,7 +285,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                                         submitSearch={_submitSearch} onlyVisualSearch={true} />
                 } title="Visual search" open={isPopover1Open} onOpenChange={setIsPopover1Open} trigger="click">
                 <Tooltip title="Search with an image">
-                  <Button type="text" shape="circle" size="large" icon={<PictureOutlined />} />
+                  <Button type="text" shape="circle" size="large" icon={<PictureOutlined />} ref={refsForTour.visualSearchButton} />
                 </Tooltip>
               </Popover>
               <Popover content={
@@ -235,12 +294,16 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                                         submitSearch={_submitSearch} handleTextInputChange={handleTextInputChange} />
                 } title="Compound multi-modal search" open={isPopover2Open} onOpenChange={setIsPopover2Open} trigger="click">
                 <Tooltip title="Compound multi-modal search">
-                  <Button type="text" shape="circle" size="large" icon={<span className="anticon wise-multimodal-search-icon"><img src="compound_icon.svg" /></span>} />
+                  <Button type="text" shape="circle" size="large"
+                          icon={<span className="anticon wise-multimodal-search-icon"><img src="compound_icon.svg" /></span>}
+                          ref={refsForTour.multimodalSearchButton}
+                  />
                 </Tooltip>
               </Popover>
               <Button type="text" shape="circle" size="large" loading={isSearching} htmlType="submit" icon={<SearchOutlined />} />
             </>
           }
+          ref={refsForTour.searchBar}
         />
       </Form>
       <span className="wise-spacer"></span>

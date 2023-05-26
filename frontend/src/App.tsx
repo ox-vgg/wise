@@ -1,21 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Card, Layout, Modal, Tooltip } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Layout, Modal } from 'antd';
 const { Content } = Layout;
-import { CloseCircleFilled, InfoCircleOutlined, StopTwoTone } from '@ant-design/icons';
+import { CloseCircleFilled, StopTwoTone } from '@ant-design/icons';
 
 import './App.scss';
 import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
+import WiseOverviewCard from './WiseOverviewCard.tsx';
 import { Query } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataSerivce } from './DataService.ts';
-
-let exampleQueries = config.EXAMPLE_QUERIES;
-exampleQueries = exampleQueries.map(value => ({ value, sort: Math.random() }))
-                              .sort((a, b) => a.sort - b.sort)
-                              .map(({ value }) => value); // Shuffle array
-exampleQueries = exampleQueries.slice(0,5);
 
 export const App: React.FunctionComponent = () => {
   // const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
@@ -28,6 +23,14 @@ export const App: React.FunctionComponent = () => {
   const dataService = useDataSerivce();
   const [isHomePage, setIsHomePage] = useState(true);
   const [projectInfo, setProjectInfo] = useState<any>({});
+
+  const refsForTour = {
+    searchBar: useRef(null),
+    visualSearchButton: useRef(null),
+    multimodalSearchButton: useRef(null),
+    paginationControls: useRef(null),
+    reportImageButton: useRef(null)
+  }
 
   useEffect(() => {
     // Initialise home page with featured images
@@ -100,66 +103,17 @@ export const App: React.FunctionComponent = () => {
       type: "TEXT",
       value: exampleQuery
     }]);
-  }
-
-  const aboutWiseTabContent: Record<string, React.ReactNode> = {
-    'Overview': (
-      <div className="wise-overview">
-        <p>WISE is a smart search engine for images, using AI to understand the meaning behind your search query, to find the most relevant images that match what you're looking for.
-          {/* <br />
-          <a role="button" onClick={showAboutModal}>Learn more about WISE and how to use WISE</a> */}
-        </p>
-        <p>Here, you can search a subset of {Math.floor(projectInfo.num_images / 1000000)} million images
-        <Tooltip title="This subset only includes JPEG and PNG images uploaded on/before 1 Jan 2023 with a minimum height and width of 224px. We plan on adding more images to this set over time.">
-          <InfoCircleOutlined style={{marginLeft: '3px', marginRight: '5px'}} />
-        </Tooltip>
-        from Wikimedia Commons.</p>
-        <p className="wise-example-queries">
-          Example queries: {exampleQueries.map((x, i) => 
-            <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick(x)} key={i}>{x}</Button>
-          )}
-        </p>
-      </div>
-    ),
-    'About WISE': <>
-      <p>WISE Image Search Engine (WISE) is an open-source image search engine which leverages recent advances in machine learning and vision-language models that enable search based on image content using natural language. The expressive power of natural language allows the user to flexibly describe what they are looking for.</p>
-      {/* TODO add more explanations */}
-      <p>WISE is developed at the Visual Geometry Group, University of Oxford.</p>
-      <p><a href="https://gitlab.com/vgg/wise/wise" target='_blank'>Code repository</a></p>
-      <p><a href="https://www.robots.ox.ac.uk/~vgg/software/wise/" target='_blank'>Project webpage</a></p>
-    </>,
-    'How to use WISE': <p>TODO</p>,
-    'Disclaimer': (
-      <>
-        <ul>
-          <li>The images shown below are hosted on Wikimedia Commons and this website only provides search. The images belong to their respective authors and they are not the property of the University of Oxford.</li>
-          <li>We currently do not use cookies on this website</li>
-        </ul>
-      </>
-    )
-  };
-  const aboutWiseTabList = Object.keys(aboutWiseTabContent).map(x => ({key: x, tab: x}));
-  const [aboutWiseActiveTabKey, setAboutWiseActiveTabKey] = useState('Overview');
-  
+  }  
 
   return <Layout style={(dataService.searchResults.length === 0) ? {background: 'transparent'} : {}}>
     <WiseHeader multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                 searchText={searchText} setSearchText={setSearchText}
-                isHomePage={isHomePage} isSearching={dataService.isSearching}
-                submitSearch={submitSearch}></WiseHeader>
+                submitSearch={submitSearch}
+                refsForTour={refsForTour}
+                isHomePage={isHomePage} isSearching={dataService.isSearching}></WiseHeader>
     <Content className="wise-content">
       {isHomePage && // Only show if isHomePage is true
-        <Card
-          id="wise-overview-card"
-          style={{ width: '100%' }}
-          size='small'
-          tabList={aboutWiseTabList}
-          activeTabKey={aboutWiseActiveTabKey}
-          tabBarExtraContent={<></>} // <a href="#">Close</a>
-          onTabChange={setAboutWiseActiveTabKey}
-        >
-          {aboutWiseTabContent[aboutWiseActiveTabKey]}
-        </Card>
+        <WiseOverviewCard handleExampleQueryClick={handleExampleQueryClick} projectInfo={projectInfo} refsForTour={refsForTour} />
       }
       {/* <Modal title="About WISE"
               open={isAboutModalOpen}

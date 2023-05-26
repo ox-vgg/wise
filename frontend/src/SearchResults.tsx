@@ -5,6 +5,7 @@ import { LoadingOutlined } from '@ant-design/icons';
 import './SearchResults.scss'
 import { SearchResultsProps } from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
+import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import config from './config.ts';
 
 const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService, isHomePage, projectInfo}: SearchResultsProps) => {
@@ -19,7 +20,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
   }
       
   let searchResultsHTML = searchResults
-    .map(searchResult => {
+    .map((searchResult) => {
       const img_link = searchResult.link;
       const img_link_tok = img_link.split('/');
       const img_filename = img_link_tok[img_link_tok.length - 2];
@@ -31,11 +32,9 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
       let title = img_filename_decoded.replaceAll('_', ' '); // Temporary hack for now. TODO display actual title from metadata
 
       return (
-        <a href={'https://commons.wikimedia.org/wiki/File:' + img_filename}
-          target='_blank'
-          style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
-          className={(dropdownImageId === searchResult.id) ? 'wise-image-dropdown-open' : ''}
-          key={searchResult.id}
+        <div key={searchResult.id}
+            style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
+            className={'wise-image-wrapper ' + ((dropdownImageId === searchResult.id) ? 'wise-image-dropdown-open' : '')}
         >
           <Dropdown menu={{
             items: [{
@@ -46,15 +45,21 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
           }}
             onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.id) }}
             placement="bottomRight" trigger={['click']} arrow>
-            <img src="more_icon.png" className="wise-image-more-button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}} />
+            <img src="more_icon.png"
+                  className="wise-image-more-button"
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
+                  />
           </Dropdown>
           <i style={{paddingBottom: `${height/width*100}%`}}></i>
-          <img src={searchResult.thumbnail}
-              title={title + (searchResult.distance ? ` | Distance = ${searchResult.distance.toFixed(2)}` : '')}
-              className="wise-image"
-          ></img>
+          <a href={'https://commons.wikimedia.org/wiki/File:' + img_filename} target='_blank'>
+            <img src={searchResult.thumbnail}
+                title={title + (searchResult.distance ? ` | Distance = ${searchResult.distance.toFixed(2)}` : '')}
+                className="wise-image"
+            ></img>
+          </a>
           <div className="wise-image-hover-display">{title}</div>
-        </a>
+          <SensitiveImageWarning isSensitive={false} />
+        </div>
       )
     });
 

@@ -212,7 +212,7 @@ async function send_search_request(start, end) {
 		});
 	} else {
 		let formData = new FormData();
-		formData.append('q', search_query.query);
+		formData.append('file_queries', search_query.query);
 		res = await fetch(`search?start=${start}&end=${end}`, {
 			method: "POST",
 			body: formData

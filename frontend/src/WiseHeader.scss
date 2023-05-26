@@ -1,3 +1,32 @@
+.ant-tag {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-right: 8px;
+  padding-left: 10px;
+  height: 37px;
+  border-radius: 8px;
+
+  &.wise-search-tag-image {
+    padding-left: 0;
+  }
+  
+  > img {
+    width: 35px;
+    height: 35px;
+    margin-right: 10px;
+    object-fit: cover;
+  }
+
+  > span:first-of-type {
+    overflow: hidden;
+    max-width: 150px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+  }
+}
+
 .wise-spacer {
   flex: 1 1 auto;
   min-width: 20px;
@@ -65,33 +94,8 @@
         // width: 700px;
       }
 
-      .ant-tag {
-        display: flex;
-        align-items: center;
-        overflow: hidden;
-        padding-right: 8px;
-        padding-left: 10px;
-        height: 37px;
-        border-radius: 8px;
-
-        &.wise-search-tag-image {
-          padding-left: 0;
-        }
-        
-        > img {
-          width: 35px;
-          height: 35px;
-          margin-right: 10px;
-          object-fit: cover;
-        }
-
-        > span:first-of-type {
-          overflow: hidden;
-          max-width: 150px;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          display: inline-block;
-        }
+      #search-input {
+        font-size: 17px;
       }
 
       .ant-input-suffix >*:not(:last-child) {
@@ -130,15 +134,33 @@
 }
 
 #wise-visual-search-form {
+  > div {
+    > h3 {
+      margin-top: 10px;
+    }
+
+    > .ant-space-compact {
+      width: 100%;
+
+      > .ant-form-item:first-of-type {
+        flex: 1;
+      }
+    }
+  }
+
   .wise-visual-search-separator {
     display: flex;
     flex-direction: row;
     align-items: center;
     height: 40px;
   
-    & > div {
+    > div {
       flex: 1;
       border-top: 1px solid #e3e3e3;
+    }
+
+    > span {
+      margin: 0 10px;
     }
   }
 
@@ -149,5 +171,50 @@
 
   > div.ant-form-item:last-of-type {
     margin-bottom: 10px;
+  }
+
+  .wise-example-image-query {
+    cursor: pointer;
+    border-radius: 8px;
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    margin-right: 15px;
+
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+
+  .wise-multimodal-example-query {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 8px;
+    margin-right: 15px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+
+    &:hover {
+      opacity: 0.8;
+    }
+
+    > img {
+      border-radius: 8px;
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+    }
+
+    > .ant-tag {
+      margin-inline-end: 0;
+    }
+
+    > .wise-multimodal-example-query-plus-sign {
+      font-size: 36px;
+      margin: 0 5px;
+    }
   }
 }
