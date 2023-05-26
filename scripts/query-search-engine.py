@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 import argparse
 import os
+import csv
 
 import hashlib
 from urllib.parse import urlencode, quote_plus, quote
@@ -19,40 +20,6 @@ import http.client
 
 from json import encoder
 encoder.FLOAT_REPR = lambda o: format(o, '.3f') # save float with only 3 decimal places
-
-search_query_list = [
-    'toy aeroplane',
-    'pencil drawing of lion',
-    'a train in mountains near waterfall',
-    'cheetah running',
-    'hot air balloon above a mountain',
-    'dolphin playing with ball',
-    'penguin with wings raised',
-    'running on a hill',
-    'people on a roller coaster',
-    'car with a bicycle on top',
-    'paintings created by van gogh',
-    'red blue car on empty street',
-    'a roaring tiger in mountain',
-    'people looking at animal',
-    'Cute puppy', 
-    'Bees feeding on flower', 
-    'People taking pictures of mona lisa',
-    'Painting of a naval battle', 
-    'Panda chewing on bamboo', 
-    'Plane refuelling another plane',
-    'Mount Fuji during sunset',
-    'Squirrel eating a nut',
-    'A peculiar airplane',
-    'Busy street in Paris',
-    'Singer next to a piano',
-    'Black and white photo of a steam train', 
-    'First lady and her husband',
-    'Cubist painting of a violin',
-    'black dog',
-    'pink car',
-    'roaring dragon cartoon'
-]
 
 def search_wise(base_url, query, result_count=50):
     query = {
@@ -75,11 +42,24 @@ def fetch_wise_info(base_url):
 
 def main():
     parser = argparse.ArgumentParser(description="Create manual annotation dataset to benchmark image retrieval performance")
+    parser.add_argument("--search-queries-fn",
+                        required=True,
+                        type=str,
+                        help="a text file containing all the search queries (one per line)")
+    parser.add_argument("--search-queries-count",
+                        required=False,
+                        type=int,
+                        default=None,
+                        help="only use the first N search queries in the --search-queries-fn file; use all if missing")
     parser.add_argument("--wise-server-url",
                         required=True,
                         type=str,
                         help="URL of WISE Image Search Engine (WISE) server (e.g. https://meru.robots.ox.ac.uk/wikimedia/)")
-    parser.add_argument("--out-fn",
+    parser.add_argument("--wise-server-description",
+                        required=True,
+                        type=str,
+                        help="description text that will be added to saved results (for future reference)")
+    parser.add_argument("--save-results-to",
                         required=True,
                         type=str,
                         help="save results as a JSON file")
@@ -93,30 +73,43 @@ def main():
     
     wise_server_info = fetch_wise_info(args.wise_server_url)
     now_timestamp = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z'))
-    topline = {
+    perf_result = {
         'wise_server': {
             'url': args.wise_server_url,
             'info': wise_server_info,
+            'description': args.wise_server_description,
             'date': now_timestamp,
             'last_updated': now_timestamp
         },
         'search_queries': {},
         'response_time_in_seconds':{}
     }
-    if os.path.exists(args.out_fn):
-        with open(args.out_fn, 'r') as f:
-            topline = json.load(f)
+    if os.path.exists(args.save_results_to):
+        with open(args.save_results_to, 'r') as f:
+            perf_result = json.load(f)
+
+    if 'description' not in perf_result['wise_server']:
+        perf_result['wise_server']['description'] = args.wise_server_description
+
+    search_query_list = []
+    search_query_count = 0
+    with open(args.search_queries_fn, 'r') as f:
+        for search_query in f.readlines():
+            search_query_list.append(search_query.rstrip())
+            search_query_count += 1
+            if args.search_queries_count is not None and search_query_count == args.search_queries_count:
+                break
 
     for qi in range(0, len(search_query_list)):
         search_query = search_query_list[qi]
         search_query_santized = search_query.replace(' ', '-')
         print('%s' % (search_query), end='')
 
-        if search_query in topline['search_queries']:
+        if search_query in perf_result['search_queries']:
             print(' [SKIPPED]')
             continue
         else:
-            topline['search_queries'][search_query] = []
+            perf_result['search_queries'][search_query] = []
 
         ## WISE
         wise_server_response = search_wise(args.wise_server_url, search_query, args.results_to_return)
@@ -126,15 +119,15 @@ def main():
             img_link_tok = img_link.split('/');
             img_filename = img_link_tok[ len(img_link_tok) - 2 ];
             wikimedia_file_page = 'https://commons.wikimedia.org/wiki/File:' + img_filename
-            topline['search_queries'][search_query].append( {
+            perf_result['search_queries'][search_query].append( {
                 'filename':img_filename,
                 'distance':wise_result[ri]['distance'],
             })
 
-        topline['response_time_in_seconds'][search_query] = wise_server_response['elapsed_seconds']
-        topline['wise_server']['last_updated'] = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z'))
-        with open(args.out_fn, 'w') as f:
-            json.dump(topline, f)
+        perf_result['response_time_in_seconds'][search_query] = wise_server_response['elapsed_seconds']
+        perf_result['wise_server']['last_updated'] = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z'))
+        with open(args.save_results_to, 'w') as f:
+            json.dump(perf_result, f)
         print(' [completed in %.3f sec.]' % (wise_server_response['elapsed_seconds']))
 if __name__ == '__main__':
     main()
