@@ -6,6 +6,7 @@ import './SearchResults.scss'
 import { SearchResultsProps } from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
 import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
+import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
 import config from './config.ts';
 
 const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService, isHomePage, projectInfo}: SearchResultsProps) => {
@@ -14,9 +15,15 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
 
   const [dropdownImageId, setDropdownImageId] = useState<string>();
   const handleOpenDropdownChange = (open: boolean, imageId: string) => {
-    console.log(open)
     if (open) setDropdownImageId(imageId);
     else setDropdownImageId(undefined);
+  }
+
+  const [imageDetails, setImageDetails] = useState<any>({});
+  const openImageDetails = (imageId: string) => {
+    console.log(imageId)
+    const openedImage = searchResults.find(x => x.id === imageId);
+    setImageDetails(openedImage);
   }
       
   let searchResultsHTML = searchResults
@@ -51,7 +58,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
                   />
           </Dropdown>
           <i style={{paddingBottom: `${height/width*100}%`}}></i>
-          <a href={'https://commons.wikimedia.org/wiki/File:' + img_filename} target='_blank'>
+          <a onClick={() => openImageDetails(searchResult.id)}>
             <img src={searchResult.thumbnail}
                 title={title + (searchResult.distance ? ` | Distance = ${searchResult.distance.toFixed(2)}` : '')}
                 className="wise-image"
@@ -107,6 +114,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
     <ReportImageModal dataService={dataService} isHomePage={isHomePage}
                       selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId}
                       setDropdownImageId={setDropdownImageId}/>
+    <ImageDetailsModal imageDetails={imageDetails} setImageDetails={setImageDetails} />
   </>
 };
 
