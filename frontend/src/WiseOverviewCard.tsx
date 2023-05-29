@@ -44,10 +44,26 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
     },
     {
       title: 'Report image',
-      description: 'If you want to report an image that is inappropriate, offensive, irrelevant to the search query, etc, you can hover over the image and click on the button on the top right corner.',
-      target: () => document.querySelector("#wise-image-grid > a:nth-of-type(2)"),
+      description: <>
+        If you want to report an image that is inappropriate, offensive, irrelevant to the search query, etc, you can hover over the image and click on the <img src="more_icon.png" height="14px" /> button on the top right corner.
+      </>,
+      target: () => document.querySelector("#wise-image-grid > .wise-image-wrapper:nth-of-type(2)"),
     },
   ];
+
+  const handleTourChange = (current?: number) => {
+    // Make the 'three dots' icon (for reporting images) visible
+    if (current === 4) {
+      document.querySelector("#wise-image-grid > .wise-image-wrapper:nth-of-type(2)")?.classList.add('wise-image-dropdown-open');
+    } else {
+      document.querySelector("#wise-image-grid > .wise-image-wrapper:nth-of-type(2)")?.classList.remove('wise-image-dropdown-open');
+    }
+  }
+
+  const handleTourClose = () => {
+    setIsTourOpen(false);
+    handleTourChange();
+  }
 
   const aboutWiseTabContent: Record<string, React.ReactNode> = {
     'Overview': (
@@ -100,7 +116,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
       onTabChange={setAboutWiseActiveTabKey}
     >
       {aboutWiseTabContent[aboutWiseActiveTabKey]}
-      <Tour open={isTourOpen} onClose={() => setIsTourOpen(false)} steps={tourSteps} />
+      <Tour open={isTourOpen} onClose={handleTourClose} steps={tourSteps} onChange={handleTourChange} />
     </Card>
   );
 }
