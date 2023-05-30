@@ -127,7 +127,7 @@ const ImageDetailsModal = ({imageDetails, setImageDetails}: any) => {
       open={isImageDetails} closable={true} maskClosable={true}
       footer={<Button type="primary" onClick={() => setImageDetails({})}>Close</Button>}
       onCancel={() => setImageDetails({})}
-      width='80vw'
+      width='90vw'
       className="wise-image-details-model"
     >
       <a href={'https://commons.wikimedia.org/wiki/File:' + img_filename} target='_blank'>

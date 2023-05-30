@@ -1,6 +1,8 @@
 .wise-image-details-model {
+  top: 5vh;
+
   > .ant-modal-content {
-    height: 80vh;
+    height: 90vh;
     display: flex;
     flex-direction: column;
 
@@ -19,6 +21,7 @@
       > a {
         width: calc(100% - 300px);
         height: 100%;
+        height: fit-content;
         display: inline-flex;
         position: absolute;
         left: 0;
@@ -26,7 +29,6 @@
         flex-grow: 1;
 
         > img {
-          position: absolute;
           width: 100%;
           height: 100%;
           object-fit: contain;
@@ -44,6 +46,36 @@
         position: absolute;
         right: 0;
         top: 0;
+      }
+
+    }
+  }
+  
+  // Styles for smaller screens / mobile devices
+  @media (max-width: 800px) {
+    top: 2vh;
+
+    > .ant-modal-content > .ant-modal-body {
+      overflow: scroll;
+
+      > a {
+        width: 100%;
+        height: fit-content;
+        max-height: 80%;
+        position: unset;
+  
+        > img {
+          height: unset;
+        }
+      }
+  
+      > .wise-image-details-metadata {
+        width: 100%;
+        height: unset;
+        position: unset;
+        display: block;
+        right: unset;
+        top: unset;
       }
     }
   }

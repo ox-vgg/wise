@@ -52,11 +52,11 @@ section#search-results {
     }
 
     > .wise-image-wrapper {
-      // display: block;
       margin: 2px;
       background-color: #eee;
       position: relative;
       cursor: pointer;
+      box-sizing: border-box;
       
       > i {
         display: block;
@@ -74,7 +74,8 @@ section#search-results {
       }
 
       // Additional rules to deal with very wide / panorama images causing issues
-      max-width: 50vw;
+      max-width: calc(50% - 4px);
+      max-height: 230px;
       > a > img.wise-image {
         height: 100%;
         object-fit: contain;
