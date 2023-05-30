@@ -19,6 +19,12 @@ export type FeaturedImagesJSONObject = {
   orig_width: number;
   orig_height: number;
   original_download_url: string;
+  ImageDescription: string;
+  DateTimeOriginal: string;
+  Artist: string;
+  LicenseShortName: string;
+  Credit: string;
+  UsageTerms: string;
 };
 
 export type SearchResponseJSONObject = {
@@ -30,8 +36,10 @@ export type SearchResponseJSONObject = {
     width: number;
     height: number;
     title: string;
+    author?: string;
     caption: string;
     copyright: string;
+    is_nsfw?: boolean;
   }
 };
 export type SearchResponse = Record<string, SearchResponseJSONObject[]>;
@@ -46,8 +54,10 @@ export interface ProcessedSearchResult {
     width: number;
     height: number;
     title: string;
+    author?: string;
     caption?: string;
     copyright?: string;
+    is_nsfw?: boolean;
   }
 };
 
