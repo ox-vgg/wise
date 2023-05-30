@@ -13,6 +13,20 @@
     //   white-space: nowrap;
     //   width: 100%;
     // }
+    > .ant-modal-header > .ant-modal-title > a {
+      white-space: normal;
+      height: unset;
+      text-align: left;
+      margin-left: -10px;
+      margin-top: -5px;
+
+      > svg {
+        height: 22px;
+        width: 22px;
+        vertical-align: -5px;
+        margin-left: 5px;
+      }
+    }
     
     > .ant-modal-body {
       flex-grow: 1;

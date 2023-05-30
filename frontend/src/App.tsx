@@ -10,7 +10,7 @@ import WiseOverviewCard from './WiseOverviewCard.tsx';
 import { Query } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
-import { useDataSerivce } from './DataService.ts';
+import { useDataService } from './DataService.ts';
 
 export const App: React.FunctionComponent = () => {
   // const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
@@ -20,7 +20,7 @@ export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
 
-  const dataService = useDataSerivce();
+  const dataService = useDataService();
   const [isHomePage, setIsHomePage] = useState(true);
   const [projectInfo, setProjectInfo] = useState<any>({});
 

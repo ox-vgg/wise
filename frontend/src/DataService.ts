@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FeaturedImagesJSONObject, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
+import { DataServiceOutput, FeaturedImagesJSONObject, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout, chunk, getArrayOfEmptyArrays } from './misc/utils.ts';
 
@@ -64,11 +64,21 @@ const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number
       }
     }
     return response.json() as Promise<SearchResponse>;
-  }).then((response: SearchResponse) => Object.values(response)[0]); // Get value corresponding to first key
+  }).then(
+    (response: SearchResponse) => Object.values(response)[0] // Get value corresponding to first key
+  ).then((results: SearchResponseJSONObject[]) => {
+    // Populate title field with filename if it doesn't exist
+    results.forEach(result => {
+      if (!result.info.title) {
+        result.info.title = result.info.filename;
+      }
+    });
+    return results;
+  });
 }
 
 
-export const useDataSerivce = () => {
+export const useDataService = (): DataServiceOutput => {
   const [ searchingState, setSearchingState ] = useState({
     queries: [] as Query[],
     isFeaturedImages: false,
@@ -100,6 +110,9 @@ export const useDataSerivce = () => {
           width: featuredImagesJSONObject.orig_width,
           height: featuredImagesJSONObject.orig_height,
           title: featuredImagesJSONObject.img_title,
+          author: featuredImagesJSONObject.Artist,
+          caption: featuredImagesJSONObject.ImageDescription,
+          copyright: featuredImagesJSONObject.LicenseShortName
         }
       }));
 

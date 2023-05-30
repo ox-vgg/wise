@@ -28,15 +28,9 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
       
   let searchResultsHTML = searchResults
     .map((searchResult) => {
-      const img_link = searchResult.link;
-      const img_link_tok = img_link.split('/');
-      const img_filename = img_link_tok[img_link_tok.length - 2];
-      const img_filename_decoded = decodeURIComponent(img_filename); // Decode filename to show special characters / utf-8 characters
-      
+      const title = searchResult.info.title;
       const width = searchResult.info.width;
       const height = searchResult.info.height;
-
-      let title = img_filename_decoded.replaceAll('_', ' '); // Temporary hack for now. TODO display actual title from metadata
 
       return (
         <div key={searchResult.id}
@@ -65,7 +59,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
             ></img>
           </a>
           <div className="wise-image-hover-display">{title}</div>
-          <SensitiveImageWarning isSensitive={false} />
+          <SensitiveImageWarning isSensitive={searchResult.info.is_nsfw || false} />
         </div>
       )
     });
