@@ -217,7 +217,10 @@ def _get_report_image_router(config: APIConfig):
             writer.writerow({
                 'text_queries': json.dumps(text_queries),
                 'url_queries': json.dumps(url_queries),
-                'file_queries': json.dumps(file_queries),
+                'file_queries': json.dumps(
+                    # to prevent the CSV file from getting too large, we store a placeholder text ('uploaded image')
+                    # instead of storing the image file
+                    ['uploaded image' for _ in file_queries]),
                 'sourceURI': sourceURI,
                 'reasons': json.dumps(reasons)
             })
