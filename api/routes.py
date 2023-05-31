@@ -19,6 +19,9 @@ from fastapi.responses import (
 )
 from pydantic import BaseModel, validator
 import typer
+import csv
+import json
+import os
 
 from config import APIConfig
 from src import db
@@ -196,8 +199,29 @@ def _get_report_image_router(config: APIConfig):
     )
 
     @router.post("/report")
-    def report_image():
+    def report_image(file_queries: List[bytes] = File([]), url_queries: List[str] = Form([]), text_queries: List[str] = Form([]),
+                     sourceURI: str = Form(), reasons: List[str] = Form([])):
         # TODO implement code to store data in database
+        # For now, we are saving the reports in a CSV file
+        report_filename = 'data/reported_images.csv'
+        fieldnames = ['text_queries', 'url_queries', 'file_queries', 'sourceURI', 'reasons']
+
+        # Write header row if the file doesn't exist
+        if not os.path.exists(report_filename):
+            with open(report_filename, 'a', newline='') as report_file:
+                csv.writer(report_file).writerow(fieldnames)
+
+        # Write data row
+        with open(report_filename, 'a', newline='') as report_file:
+            writer = csv.DictWriter(report_file, fieldnames=fieldnames)
+            writer.writerow({
+                'text_queries': json.dumps(text_queries),
+                'url_queries': json.dumps(url_queries),
+                'file_queries': json.dumps(file_queries),
+                'sourceURI': sourceURI,
+                'reasons': json.dumps(reasons)
+            })
+
         return PlainTextResponse(
             status_code=200, content="Image has been reported"
         )

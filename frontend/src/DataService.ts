@@ -201,7 +201,9 @@ export const useDataService = (): DataServiceOutput => {
   const reportImage = async (imageId: string, reasons: string[]) => {
     const formData = convertQueriesToFormData(searchingState.queries);
     formData.append('sourceURI', imageId);
-    formData.append('reasons', JSON.stringify(reasons));
+    for (let reason of reasons) {
+      formData.append('reasons', reason);
+    }
     return fetchWithTimeout(config.API_BASE_URL+'report', 40000, {
       method: 'POST',
       body: formData
