@@ -48,7 +48,7 @@ const ImageDetailsModal = ({imageDetails, setImageDetails}: any) => {
     >
       <a href={external_link} target='_blank'>
         <img src={imageDetails.link || undefined}
-          title={title + (imageDetails.distance ? ` | Distance = ${imageDetails.distance.toFixed(2)}` : '')}
+          title={imageDetails.info?.title + (imageDetails.distance ? ` | Distance = ${imageDetails.distance.toFixed(2)}` : '')}
         />
       </a>
       <div className="wise-image-details-metadata">
