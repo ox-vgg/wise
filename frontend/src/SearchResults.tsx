@@ -108,7 +108,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
     <ReportImageModal dataService={dataService} isHomePage={isHomePage}
                       selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId}
                       setDropdownImageId={setDropdownImageId}/>
-    <ImageDetailsModal imageDetails={imageDetails} setImageDetails={setImageDetails} />
+    <ImageDetailsModal imageDetails={imageDetails} setImageDetails={setImageDetails} setSelectedImageId={setSelectedImageId} />
   </>
 };
 

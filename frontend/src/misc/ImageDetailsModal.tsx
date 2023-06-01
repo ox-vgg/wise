@@ -1,4 +1,5 @@
-import { Button, Modal } from "antd";
+import { Button, Dropdown, Modal } from "antd";
+import { MoreOutlined } from "@ant-design/icons";
 import './ImageDetailsModal.scss';
 
 /*
@@ -10,10 +11,9 @@ TODO
 
 - sanitize HTML before dangerously setting?
 - add disclaimer
-- include report image button
 */
 
-const ImageDetailsModal = ({imageDetails, setImageDetails}: any) => {
+const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: any) => {
   let img_link, img_link_tok, img_filename, /*img_filename_decoded,*/ title;
   let external_link;
   let caption, author, copyright;
@@ -41,7 +41,21 @@ const ImageDetailsModal = ({imageDetails, setImageDetails}: any) => {
   return (
     <Modal title={title}
       open={isImageDetails} closable={true} maskClosable={true}
-      footer={<Button type="primary" onClick={() => setImageDetails({})}>Close</Button>}
+      footer={
+        <>
+          <Dropdown menu={{
+            items: [{
+              label: 'Report image',
+              key: imageDetails.id
+            }],
+            onClick: ({key}) => { setSelectedImageId(key) }
+          }}
+            placement="topLeft" trigger={['click']} arrow>
+            <Button shape="circle" icon={<MoreOutlined />} style={{float: 'left'}} />
+          </Dropdown>
+          <Button type="primary" onClick={() => setImageDetails({})}>Close</Button>
+        </>
+      }
       onCancel={() => setImageDetails({})}
       width='90vw'
       className="wise-image-details-model"
