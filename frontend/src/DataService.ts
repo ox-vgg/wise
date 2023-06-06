@@ -37,8 +37,21 @@ const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
 
-  const endpoint = config.API_BASE_URL + `search?start=${start}&end=${end}&thumbs=${config.FETCH_THUMBS}`;
-  const formData = convertQueriesToFormData(queries);
+  const textQueries = queries.filter(q => q.type === "TEXT");
+  const nonTextQueries = queries.filter(q => q.type !== 'TEXT');
+  let formData = undefined;
+  if (nonTextQueries.length > 0) {
+    formData = convertQueriesToFormData(nonTextQueries);
+  }
+
+  const urlParams = new URLSearchParams([
+    ['start', start.toString()],
+    ['end', end.toString()],
+    ['thumbs', config.FETCH_THUMBS.toString()],
+    ...textQueries.map(q => ['text_queries', q.value as string])
+  ]);
+  
+  const endpoint = config.API_BASE_URL + `search?${urlParams.toString()}`;
   
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {
     method: 'POST',

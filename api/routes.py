@@ -376,9 +376,11 @@ def _get_search_router(config: APIConfig):
     
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
     async def handle_post_search_multimodal(
+        text_queries: List[str] = Query(
+            default=[],
+        ),
         file_queries: List[bytes] = File([]),
         url_queries: List[str] = Form([]),
-        text_queries: List[str] = Form([]),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbs: int = Query(True),
