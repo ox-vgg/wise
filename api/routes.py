@@ -255,6 +255,7 @@ def _get_search_router(config: APIConfig):
                     link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
                     distance=_dist,
                     info=ImageInfo(
+                        id=_metadata.id,
                         filename=_metadata.path,
                         width=_metadata.width,
                         height=_metadata.height,
@@ -279,6 +280,7 @@ def _get_search_router(config: APIConfig):
                     link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
                     distance=_dist,
                     info=ImageInfo(
+                        id=_metadata.id,
                         filename=_metadata.path,
                         width=_metadata.width,
                         height=_metadata.height,
@@ -329,11 +331,49 @@ def _get_search_router(config: APIConfig):
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
 
+    def load_internal_images(image_ids: List[int]) -> List[bytes]:
+        if len(image_ids) == 0:
+            return []
+        internal_images_bytes = []
+        with project_engine.connect() as conn:
+            for image_id in image_ids:
+                metadata = MetadataRepo.get(conn, image_id)
+                if metadata is None:
+                    raise FileNotFoundError(f"Image {image_id} not found in metadata database")
+
+                # Look up the dataset table and find the location and type
+                dataset = DatasetRepo.get(conn, metadata.dataset_id)
+                if dataset is None:
+                    raise LookupError(f"Dataset not found for image {image_id}")
+
+                location = Path(dataset.location)
+
+                if dataset.type == DatasetType.IMAGE_DIR:
+                    # Try to read image from disk if present
+                    # metadata.source_uri will be None, so we have to search for it on disk
+                    file_path = location / metadata.path
+                    if file_path.is_file():
+                        with open(file_path, 'rb') as f:
+                            internal_images_bytes.append(f.read())
+                    else:
+                        raise FileNotFoundError(f"Image file for image {image_id} does not exist or is not a regular file")
+                else:
+                    # Try to extract from local file if present
+                    if not location.is_file() or not tarfile.is_tarfile(location):
+                        raise FileNotFoundError(f"WebDataset tar file (for image {image_id}) does not exist or is not a tar file")
+                    try:
+                        with tarfile.open(location, "r") as t:
+                            buf = t.extractfile(metadata.path.lstrip("#"))
+                            internal_images_bytes.append(buf.read())
+                    except Exception as e:
+                        logger.exception(f"Exception when reading image {image_id}")
+                        raise FileNotFoundError(f"Error extracting image {image_id} from WebDataset tar file")
+        return internal_images_bytes
+
+
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
     async def handle_get_search(
-        q: List[str] = Query(
-            default=[],
-        ),
+        q: List[str] = Query(default=[]),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbs: bool = Query(True),
@@ -373,14 +413,13 @@ def _get_search_router(config: APIConfig):
             prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
             text_features = extract_text_features(prefixed_queries)
             return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
-    
+
     @router.post("/search", response_model=Dict[str, List[SearchResponse]])
     async def handle_post_search_multimodal(
-        text_queries: List[str] = Query(
-            default=[],
-        ),
-        file_queries: List[bytes] = File([]),
-        url_queries: List[str] = Form([]),
+        text_queries: List[str] = Query(default=[]),
+        file_queries: List[bytes] = File([]), # user-uploaded images
+        url_queries: List[str] = Form([]), # URLs to online images
+        internal_image_queries: List[int] = Query(default=[]), # ids to internal images
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbs: int = Query(True),
@@ -390,8 +429,15 @@ def _get_search_router(config: APIConfig):
         Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
         input images/text, and then using this as the query vector.
         """
+        try:
+            internal_image_queries = load_internal_images(internal_image_queries)
+        except Exception as e:
+            logger.exception(e)
+            return PlainTextResponse(
+                status_code=500, content=f"Error processing internal image queries"
+            )
         
-        q = file_queries + url_queries + text_queries
+        q = file_queries + url_queries + text_queries + internal_image_queries
         if len(q) == 0:
             raise HTTPException(400, {"message": "Missing search query"})
         elif len(q) > 5:

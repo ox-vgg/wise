@@ -15,6 +15,7 @@ class QueryType(str, enum.Enum):
 
 
 class ImageInfo(BaseModel):
+    id: str
     filename: str
     width: int
     height: int
