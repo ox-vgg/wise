@@ -23,6 +23,8 @@ const convertQueriesToFormData = (queries: Query[]) => {
       formData.append('file_queries', (q.value as unknown) as File);
     } else if (q.type === 'URL') {
       formData.append('url_queries', q.value);
+    } else if (q.type === 'INTERNAL_IMAGE') {
+      formData.append('internal_image_queries', q.value);
     } else if (q.type === 'TEXT') {
       formData.append('text_queries', q.value);
     } else {
@@ -38,17 +40,19 @@ const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
 
   const textQueries = queries.filter(q => q.type === "TEXT");
-  const nonTextQueries = queries.filter(q => q.type !== 'TEXT');
+  const internalImageQueries = queries.filter(q => q.type === "INTERNAL_IMAGE");
+  const otherQueries = queries.filter(q => q.type !== 'TEXT' && q.type !== 'INTERNAL_IMAGE');
   let formData = undefined;
-  if (nonTextQueries.length > 0) {
-    formData = convertQueriesToFormData(nonTextQueries);
+  if (otherQueries.length > 0) {
+    formData = convertQueriesToFormData(otherQueries);
   }
 
   const urlParams = new URLSearchParams([
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
-    ...textQueries.map(q => ['text_queries', q.value as string])
+    ...textQueries.map(q => ['text_queries', q.value as string]),
+    ...internalImageQueries.map(q => ['internal_image_queries', q.value as string])
   ]);
   
   const endpoint = config.API_BASE_URL + `search?${urlParams.toString()}`;
@@ -116,10 +120,10 @@ export const useDataService = (): DataServiceOutput => {
   
       // Data transformation
       const images = featuredImagesJSONShuffled.map((featuredImagesJSONObject) => ({
-        id: featuredImagesJSONObject.original_download_url,
         link: featuredImagesJSONObject.original_download_url,
         thumbnail: featuredImagesJSONObject.original_download_url,
         info: {
+          id: featuredImagesJSONObject.original_download_url, // TODO use actual id instead of this
           width: featuredImagesJSONObject.orig_width,
           height: featuredImagesJSONObject.orig_height,
           title: featuredImagesJSONObject.img_title,
@@ -154,15 +158,10 @@ export const useDataService = (): DataServiceOutput => {
 
       const searchResponseJSON = await fetchSearchResults(searchingState.queries, fetchStartPageNum, fetchEndPageNum);
   
-      // Data transformation
-      const images = searchResponseJSON.map((searchResponseJSONObject) => ({
-        ...searchResponseJSONObject,
-        id: searchResponseJSONObject.link,
-      }));
-  
+      // Page slicing
       setPagedResults(_pagedResults => {
         _pagedResults = [..._pagedResults];
-        const resultPages = chunk(images, config.PAGE_SIZE);
+        const resultPages = chunk(searchResponseJSON, config.PAGE_SIZE);
         _pagedResults.splice(fetchStartPageNum, config.NUM_PAGES_PER_REQUEST, ...resultPages);
         return _pagedResults;
       });
@@ -196,14 +195,9 @@ export const useDataService = (): DataServiceOutput => {
     });
     setPageNum(0);
 
-    // Data transformation
-    const images = searchResponseJSON.map((searchResponseJSONObject) => ({
-      ...searchResponseJSONObject,
-      id: searchResponseJSONObject.link,
-    }));
-
+    // Page slicing
     const _pagedResults = getArrayOfEmptyArrays(NUM_PAGES);
-    const resultPages = chunk(images, config.PAGE_SIZE);
+    const resultPages = chunk(searchResponseJSON, config.PAGE_SIZE);
     _pagedResults.splice(0, resultPages.length, ...resultPages);
 
     setPagedResults(_pagedResults);

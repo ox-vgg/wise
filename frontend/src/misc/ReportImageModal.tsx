@@ -15,7 +15,7 @@ const reasons = [
 
 const reasonsHomePageVersion = reasons.filter((_, i) => i !== 3); // Don't show the fourth element on the home page
 
-const ReportImageModal: React.FunctionComponent<ReportImageModalProps> = ({dataService, isHomePage, selectedImageId, setSelectedImageId, setDropdownImageId}) => {
+const ReportImageModal: React.FunctionComponent<ReportImageModalProps> = ({dataService, isHomePage, selectedImageId, setSelectedImageId}) => {
   // Note: for the Wikimedia project, the image id is the source URI where the Wikimedia image was downloaded from.
   // Note: the modal is open when selectedImageId has a value (i.e. is not undefined). Calling setSelectedImageId() sets selectedImageId to undefined which closes the modal.
 
@@ -45,7 +45,6 @@ const ReportImageModal: React.FunctionComponent<ReportImageModalProps> = ({dataS
     setConfirmLoading(false);
     setErrorMessage('');
     setSelectedImageId(); // This closes the modal
-    setDropdownImageId();
     messageApi.open({
       type: 'success',
       content: responseText
@@ -57,7 +56,6 @@ const ReportImageModal: React.FunctionComponent<ReportImageModalProps> = ({dataS
     setConfirmLoading(false); // TODO abort the fetch request in dataService.reportImage?
     setErrorMessage('');
     setSelectedImageId(); // This closes the modal
-    setDropdownImageId();
   }
   
   return <>

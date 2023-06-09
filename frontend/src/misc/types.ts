@@ -11,6 +11,11 @@ export type Query = {
   type: 'FILE';
   displayText: string;
   value: UploadFile;
+} | {
+  id: string;
+  type: 'INTERNAL_IMAGE';
+  displayText: string;
+  value: string; // this value represents the internal image id
 }
 
 export type FeaturedImagesJSONObject = {
@@ -32,6 +37,7 @@ export type SearchResponseJSONObject = {
   thumbnail: string;
   distance: number;
   info: {
+    id: string;
     filename: string;
     width: number;
     height: number;
@@ -45,11 +51,11 @@ export type SearchResponseJSONObject = {
 export type SearchResponse = Record<string, SearchResponseJSONObject[]>;
 
 export interface ProcessedSearchResult {
-  id: string;
   link: string;
   thumbnail: string;
   distance?: number;
   info: {
+    id: string;
     // filename: string;
     width: number;
     height: number;
@@ -111,11 +117,13 @@ export interface SearchResultsProps {
   dataService: DataServiceOutput;
   isHomePage: boolean;
   projectInfo: any;
+  setSearchText: (x: string) => void;
+  setMultimodalQueries: (x: Query[]) => void;
+  submitSearch: () => void;
 };
 export interface ReportImageModalProps {
   dataService: DataServiceOutput;
   isHomePage: boolean;
   selectedImageId?: string;
   setSelectedImageId: (imageId?: string) => void;
-  setDropdownImageId: (imageId?: string) => void;
 }

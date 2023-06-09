@@ -7,6 +7,7 @@ import { nanoid } from 'nanoid'
 import './WiseHeader.scss';
 import { WiseLogo } from './misc/logo.tsx';
 import { CompoundSearchPopoverProps, WiseHeaderProps, Query } from './misc/types.ts';
+import config from './config.ts';
 
 const examples = [
   {
@@ -244,11 +245,12 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     let icon = <></>;
     if (query.type === 'FILE') icon = <img src={URL.createObjectURL((query.value as unknown) as File)} />;
     else if (query.type === 'URL') icon = <img src={query.value} />;
+    else if (query.type === 'INTERNAL_IMAGE') icon = <img src={config.API_BASE_URL + 'thumbs/' + query.value} />;
 
     const tag = <Tag closable
                   key={query.id}
-                  className={(query.type === 'FILE' || query.type === 'URL') ? 'wise-search-tag-image' : undefined}
-                  color={(query.type === 'FILE' || query.type === 'URL') ? 'blue' : 'geekblue'}
+                  className={(query.type === 'FILE' || query.type === 'URL' || query.type === 'INTERNAL_IMAGE') ? 'wise-search-tag-image' : undefined}
+                  color={(query.type === 'FILE' || query.type === 'URL' || query.type === 'INTERNAL_IMAGE') ? 'blue' : 'geekblue'}
                   icon={icon}
                   onClose={(e) => handleTagClose(e, index)}
                 >
@@ -259,6 +261,8 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
       return <Popover content={icon} key={query.id} title="Uploaded image" overlayClassName="wise-search-image-preview">{tag}</Popover>
     } else if (query.type === 'URL') {
       return <Popover content={icon} key={query.id} title="Online image" overlayClassName="wise-search-image-preview">{tag}</Popover>
+    } else if (query.type === 'INTERNAL_IMAGE') {
+      return <Popover content={icon} key={query.id} title="Internal image" overlayClassName="wise-search-image-preview">{tag}</Popover>
     } else {
       return tag;
     }

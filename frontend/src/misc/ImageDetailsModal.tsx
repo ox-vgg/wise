@@ -46,7 +46,7 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
           <Dropdown menu={{
             items: [{
               label: 'Report image',
-              key: imageDetails.id
+              key: imageDetails.info?.id
             }],
             onClick: ({key}) => { setSelectedImageId(key) }
           }}

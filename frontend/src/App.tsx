@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Layout, Modal } from 'antd';
 const { Content } = Layout;
 import { CloseCircleFilled, StopTwoTone } from '@ant-design/icons';
+import { nanoid } from 'nanoid';
 
 import './App.scss';
 import SearchResults from './SearchResults.tsx';
@@ -79,7 +80,7 @@ export const App: React.FunctionComponent = () => {
     let queries: Query[] = [...multimodalQueries];
     let searchTextTrimmed = searchText.trim();
     if (searchTextTrimmed) queries.push({
-      id: '',
+      id: nanoid(),
       type: "TEXT",
       value: searchTextTrimmed
     });
@@ -99,7 +100,7 @@ export const App: React.FunctionComponent = () => {
     setMultimodalQueries([]);
     setSearchText(exampleQuery);
     _submitSearch([{
-      id: '',
+      id: nanoid(),
       type: "TEXT",
       value: exampleQuery
     }]);
@@ -124,7 +125,8 @@ export const App: React.FunctionComponent = () => {
         <p>TODO add explanation...</p>
         <p>WISE is developed at Oxford VGG and the code is available open-source.</p>
       </Modal> */}
-      <SearchResults dataService={dataService} isHomePage={isHomePage} projectInfo={projectInfo} />
+      <SearchResults dataService={dataService} isHomePage={isHomePage} projectInfo={projectInfo}
+                      setSearchText={setSearchText} setMultimodalQueries={setMultimodalQueries} submitSearch={submitSearch} />
     </Content>
   </Layout>
 };

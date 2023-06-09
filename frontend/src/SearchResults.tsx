@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dropdown, Pagination } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
+import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
 import { SearchResultsProps } from './misc/types.ts';
@@ -9,7 +10,9 @@ import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
 import config from './config.ts';
 
-const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService, isHomePage, projectInfo}: SearchResultsProps) => {
+const SearchResults: React.FunctionComponent<SearchResultsProps> = (
+  {dataService, isHomePage, projectInfo, setSearchText, setMultimodalQueries, submitSearch}: SearchResultsProps
+) => {
   const { searchResults, isSearching, searchLatency, totalResults, pageNum, changePageNum } = dataService;
   const [selectedImageId, setSelectedImageId] = useState<string>();
 
@@ -19,10 +22,31 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
     else setDropdownImageId(undefined);
   }
 
+  const [isSubmitSearch, setIsSubmitSearch] = useState(false);
+  useEffect(() => {
+    if (isSubmitSearch === true) {
+      submitSearch();
+      setIsSubmitSearch(false);
+    }
+  }, [isSubmitSearch]);
+  const handleDropdownItemClick = ({key}: {key: string}) => {
+    if (key.startsWith('report_')) {
+      key = key.replace(/^report_/, '');
+      setDropdownImageId(undefined);
+      setSelectedImageId(key);
+    } else if (key.startsWith('visual_search_')) {
+      key = key.replace(/^visual_search_/, '');
+      setDropdownImageId(undefined);
+      setSearchText('');
+      setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: key }]);
+      setIsSubmitSearch(true);
+    }
+  }
+
   const [imageDetails, setImageDetails] = useState<any>({});
   const openImageDetails = (imageId: string) => {
     console.log(imageId)
-    const openedImage = searchResults.find(x => x.id === imageId);
+    const openedImage = searchResults.find(x => x.info.id === imageId);
     setImageDetails(openedImage);
   }
       
@@ -32,19 +56,36 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
       const width = searchResult.info.width;
       const height = searchResult.info.height;
 
+      const dropdownItems = [
+        {
+          label: 'Report image',
+          // TODO change this to link instead of id (also change it in ImageDetailsModal.tsx)
+          key: 'report_' + searchResult.info.id
+        }
+      ];
+      if (!isHomePage) {
+        dropdownItems.push(...[
+          {
+            label: 'Find visually similar images',
+            key: 'visual_search_' + searchResult.info.id
+          },
+          // {
+          //   label: 'Use this image as an additional query',
+          //   key: 'add_image_' + searchResult.info.id
+          // }
+        ]);
+      }
+
       return (
-        <div key={searchResult.id}
+        <div key={searchResult.info.id}
             style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
-            className={'wise-image-wrapper ' + ((dropdownImageId === searchResult.id) ? 'wise-image-dropdown-open' : '')}
+            className={'wise-image-wrapper ' + ((dropdownImageId === searchResult.info.id) ? 'wise-image-dropdown-open' : '')}
         >
           <Dropdown menu={{
-            items: [{
-              label: 'Report image',
-              key: searchResult.id
-            }],
-            onClick: ({key}) => { setSelectedImageId(key) }
+            items: dropdownItems,
+            onClick: handleDropdownItemClick
           }}
-            onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.id) }}
+            onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.info.id) }}
             placement="bottomRight" trigger={['click']} arrow>
             <img src="more_icon.png"
                   className="wise-image-more-button"
@@ -52,7 +93,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
                   />
           </Dropdown>
           <i style={{paddingBottom: `${height/width*100}%`}}></i>
-          <a onClick={() => openImageDetails(searchResult.id)}>
+          <a onClick={() => openImageDetails(searchResult.info.id)}>
             <img src={searchResult.thumbnail}
                 title={title + (searchResult.distance ? ` | Distance = ${searchResult.distance.toFixed(2)}` : '')}
                 className="wise-image"
@@ -106,8 +147,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({dataService
       {(searchResults.length === 0) ? <></> : pagination}
     </section>
     <ReportImageModal dataService={dataService} isHomePage={isHomePage}
-                      selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId}
-                      setDropdownImageId={setDropdownImageId}/>
+                      selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId} />
     <ImageDetailsModal imageDetails={imageDetails} setImageDetails={setImageDetails} setSelectedImageId={setSelectedImageId} />
   </>
 };
