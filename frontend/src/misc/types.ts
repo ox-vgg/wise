@@ -118,6 +118,7 @@ export interface SearchResultsProps {
   isHomePage: boolean;
   projectInfo: any;
   setSearchText: (x: string) => void;
+  multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
   submitSearch: () => void;
 };

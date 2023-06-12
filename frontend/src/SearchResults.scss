@@ -81,11 +81,25 @@ section#search-results {
         object-fit: contain;
       }
 
+      > .wise-internal-image-search-button {
+        display: none;
+        position: absolute;
+        top: 4px;
+        right: 40px;
+        z-index: 1;
+        color: white;
+        width: 23px;
+        margin-right: -4px;
+      }
+      &:hover > .wise-internal-image-search-button, &.wise-image-dropdown-open > .wise-internal-image-search-button {
+        display: block;
+      }
+
       > .wise-image-more-button {
         display: none;
         position: absolute;
-        top: 3px;
-        right: 2px;
+        top: 5px;
+        right: 3px;
         z-index: 1;
         padding: 2px;
         // background-color: rgba(255,255,255,0.3);

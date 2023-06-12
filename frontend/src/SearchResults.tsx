@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Dropdown, Pagination } from 'antd';
+import { Dropdown, Pagination, Tooltip } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { nanoid } from 'nanoid';
 
@@ -11,7 +11,7 @@ import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
 import config from './config.ts';
 
 const SearchResults: React.FunctionComponent<SearchResultsProps> = (
-  {dataService, isHomePage, projectInfo, setSearchText, setMultimodalQueries, submitSearch}: SearchResultsProps
+  {dataService, isHomePage, projectInfo, setSearchText, multimodalQueries, setMultimodalQueries, submitSearch}: SearchResultsProps
 ) => {
   const { searchResults, isSearching, searchLatency, totalResults, pageNum, changePageNum } = dataService;
   const [selectedImageId, setSelectedImageId] = useState<string>();
@@ -34,13 +34,31 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
       key = key.replace(/^report_/, '');
       setDropdownImageId(undefined);
       setSelectedImageId(key);
-    } else if (key.startsWith('visual_search_')) {
-      key = key.replace(/^visual_search_/, '');
+    } else if (key.startsWith('add_image_query_')) {
+      key = key.replace(/^add_image_query_/, '');
       setDropdownImageId(undefined);
-      setSearchText('');
-      setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: key }]);
+      if (isHomePage) {
+        // Temporary hack; TODO implement a better solution later
+        setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'URL', displayText: 'Internal image', value: key }]);
+        setIsSubmitSearch(true);
+        return;
+      }
+      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: key }]);
       setIsSubmitSearch(true);
     }
+  }
+
+  const handleInternalSearchButtonClick = (imageId: string) => {
+    if (isHomePage) {
+      // Temporary hack; TODO implement a better solution later
+      setSearchText('');
+      setMultimodalQueries([{ id: nanoid(), type: 'URL', displayText: 'Internal image', value: imageId }]);
+      setIsSubmitSearch(true);
+      return;
+    }
+    setSearchText('');
+    setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: imageId }]);
+    setIsSubmitSearch(true);
   }
 
   const [imageDetails, setImageDetails] = useState<any>({});
@@ -61,37 +79,40 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
           label: 'Report image',
           // TODO change this to link instead of id (also change it in ImageDetailsModal.tsx)
           key: 'report_' + searchResult.info.id
-        }
+        },
+        {
+          label: 'Add this image as an additional query',
+          key: 'add_image_query_' + searchResult.info.id
+        },
+        // TODO implement
+        // {
+        //   label: 'Add this image as a negative query',
+        //   key: 'add_negative_image_query_' + searchResult.info.id
+        // }
       ];
-      if (!isHomePage) {
-        dropdownItems.push(...[
-          {
-            label: 'Find visually similar images',
-            key: 'visual_search_' + searchResult.info.id
-          },
-          // {
-          //   label: 'Use this image as an additional query',
-          //   key: 'add_image_' + searchResult.info.id
-          // }
-        ]);
-      }
 
       return (
         <div key={searchResult.info.id}
             style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
             className={'wise-image-wrapper ' + ((dropdownImageId === searchResult.info.id) ? 'wise-image-dropdown-open' : '')}
         >
-          <Dropdown menu={{
-            items: dropdownItems,
-            onClick: handleDropdownItemClick
-          }}
-            onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.info.id) }}
-            placement="bottomRight" trigger={['click']} arrow>
-            <img src="more_icon.png"
-                  className="wise-image-more-button"
-                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
-                  />
-          </Dropdown>
+          <Tooltip title="Find visually similar images">
+            <img src="internal_search_icon.png" className="wise-internal-image-search-button"
+                  onClick={() => handleInternalSearchButtonClick(searchResult.info.id)} />
+          </Tooltip>
+          <Tooltip title="More options">
+            <Dropdown menu={{
+              items: dropdownItems,
+              onClick: handleDropdownItemClick
+            }}
+              onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.info.id) }}
+              placement="bottomRight" trigger={['click']} arrow>
+              <img src="more_icon.png"
+                    className="wise-image-more-button"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
+                    />
+            </Dropdown>
+          </Tooltip>
           <i style={{paddingBottom: `${height/width*100}%`}}></i>
           <a onClick={() => openImageDetails(searchResult.info.id)}>
             <img src={searchResult.thumbnail}

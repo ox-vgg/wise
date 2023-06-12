@@ -126,7 +126,8 @@ export const App: React.FunctionComponent = () => {
         <p>WISE is developed at Oxford VGG and the code is available open-source.</p>
       </Modal> */}
       <SearchResults dataService={dataService} isHomePage={isHomePage} projectInfo={projectInfo}
-                      setSearchText={setSearchText} setMultimodalQueries={setMultimodalQueries} submitSearch={submitSearch} />
+                      setSearchText={setSearchText} multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
+                      submitSearch={submitSearch} />
     </Content>
   </Layout>
 };

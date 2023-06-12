@@ -262,7 +262,8 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     } else if (query.type === 'URL') {
       return <Popover content={icon} key={query.id} title="Online image" overlayClassName="wise-search-image-preview">{tag}</Popover>
     } else if (query.type === 'INTERNAL_IMAGE') {
-      return <Popover content={icon} key={query.id} title="Internal image" overlayClassName="wise-search-image-preview">{tag}</Popover>
+      const full_image = <img src={config.API_BASE_URL + 'images/' + query.value} />;
+      return <Popover content={full_image} key={query.id} title="Internal image" overlayClassName="wise-search-image-preview">{tag}</Popover>
     } else {
       return tag;
     }
