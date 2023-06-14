@@ -66,6 +66,7 @@ cd wise
 conda env create -f environment.yml
 conda activate wise
 ```
+We recommend you to use Python 3.9 or greater, and conda 22 or greater. The software might not work on lower versions.
 
 ## Usage
 For more details on the commands available, run
