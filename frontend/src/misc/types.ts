@@ -6,16 +6,19 @@ export type Query = {
   type: 'TEXT' | 'URL';
   displayText?: string;
   value: string;
+  isNegative?: boolean;
 } | {
   id: string;
   type: 'FILE';
   displayText: string;
   value: UploadFile;
+  isNegative?: boolean;
 } | {
   id: string;
   type: 'INTERNAL_IMAGE';
   displayText: string;
   value: string; // this value represents the internal image id
+  isNegative?: boolean;
 }
 
 export type FeaturedImagesJSONObject = {

@@ -254,7 +254,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                   icon={icon}
                   onClose={(e) => handleTagClose(e, index)}
                 >
-                  {query.displayText}
+                  {(query.isNegative ? '(Negative) ' : '') + query.displayText}
                 </Tag>
     
     if (query.type === 'FILE') {

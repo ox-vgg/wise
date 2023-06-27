@@ -20,13 +20,21 @@ const convertQueriesToFormData = (queries: Query[]) => {
   let formData = new FormData();
   for (const q of queries) {
     if (q.type === 'FILE') {
-      formData.append('file_queries', (q.value as unknown) as File);
+      let query_type = 'file_queries';
+      if (q.isNegative) query_type = 'negative_' + query_type
+      formData.append(query_type, (q.value as unknown) as File);
     } else if (q.type === 'URL') {
-      formData.append('url_queries', q.value);
+      let query_type = 'url_queries';
+      if (q.isNegative) query_type = 'negative_' + query_type
+      formData.append(query_type, q.value);
     } else if (q.type === 'INTERNAL_IMAGE') {
-      formData.append('internal_image_queries', q.value);
+      let query_type = 'internal_image_queries';
+      if (q.isNegative) query_type = 'negative_' + query_type
+      formData.append(query_type, q.value);
     } else if (q.type === 'TEXT') {
-      formData.append('text_queries', q.value);
+      let query_type = 'text_queries';
+      if (q.isNegative) query_type = 'negative_' + query_type
+      formData.append(query_type, q.value);
     } else {
       throw new Error('Invalid query type');
     }
@@ -51,8 +59,8 @@ const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
-    ...textQueries.map(q => ['text_queries', q.value as string]),
-    ...internalImageQueries.map(q => ['internal_image_queries', q.value as string])
+    ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
+    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value as string])
   ]);
   
   const endpoint = config.API_BASE_URL + `search?${urlParams.toString()}`;
