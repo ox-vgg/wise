@@ -20,8 +20,8 @@ const productionConfig = {
     `,
     DISCLAIMER: `
       <ul>
-        <li>The images shown below are hosted on Wikimedia Commons and this website only provides search. The images belong to their respective authors and they are not the property of the University of Oxford.</li>
-        <li>We currently do not use cookies on this website</li>
+        <li>Feel free to write a custom disclaimer here</li>
+        <li>Lorem ipsum</li>
       </ul>
     `
   },
