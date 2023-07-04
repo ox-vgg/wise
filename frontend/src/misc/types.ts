@@ -21,20 +21,6 @@ export type Query = {
   isNegative?: boolean;
 }
 
-export type FeaturedImagesJSONObject = {
-  row_num: number;
-  img_title: string;
-  orig_width: number;
-  orig_height: number;
-  original_download_url: string;
-  ImageDescription: string;
-  DateTimeOriginal: string;
-  Artist: string;
-  LicenseShortName: string;
-  Credit: string;
-  UsageTerms: string;
-};
-
 export type SearchResponseJSONObject = {
   link: string;
   thumbnail: string;

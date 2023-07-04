@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { DataServiceOutput, FeaturedImagesJSONObject, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
+import { DataServiceOutput, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout, chunk, getArrayOfEmptyArrays } from './misc/utils.ts';
 
 const NUM_PAGES = Math.ceil(config.MAX_SEARCH_RESULTS / config.PAGE_SIZE);
 
-const fetchFeaturedImages = (): Promise<FeaturedImagesJSONObject[]> => {
-  return fetchWithTimeout("./featured_images.json", config.FETCH_TIMEOUT, {
+const fetchFeaturedImages = (): Promise<SearchResponse> => {
+  return fetchWithTimeout("./featured", config.FETCH_TIMEOUT, {
     method: 'GET'
   }).then(async (response) => {
     if (!response.ok) {
       throw new Error(`Failed to fetch featured images. ${response.status} - ${response.statusText}`);
     }
-    return response.json() as Promise<FeaturedImagesJSONObject[]>;
+    return response.json() as Promise<SearchResponse>;
   });
 }
 
@@ -117,29 +117,21 @@ export const useDataService = (): DataServiceOutput => {
 
   // Get featured images to display on home page
   const fetchAndTransformFeaturedImages = () => {
-    return fetchFeaturedImages().then((featuredImagesJSON: FeaturedImagesJSONObject[]) => {
-      // console.log(featuredImagesJSON);
+    return fetchFeaturedImages().then((featuredImagesJSON: SearchResponse) => {
+      let images = Object.values(featuredImagesJSON)[0]; // Get value corresponding to first key
   
       // Shuffle images
-      const featuredImagesJSONShuffled = featuredImagesJSON
+      images = images
         .map((value) => ({ value, sort: Math.random() }))
         .sort((a, b) => a.sort - b.sort)
         .map(({ value }) => value);
-  
-      // Data transformation
-      const images = featuredImagesJSONShuffled.map((featuredImagesJSONObject) => ({
-        link: featuredImagesJSONObject.original_download_url,
-        thumbnail: featuredImagesJSONObject.original_download_url,
-        info: {
-          id: featuredImagesJSONObject.original_download_url, // TODO use actual id instead of this
-          width: featuredImagesJSONObject.orig_width,
-          height: featuredImagesJSONObject.orig_height,
-          title: featuredImagesJSONObject.img_title,
-          author: featuredImagesJSONObject.Artist,
-          caption: featuredImagesJSONObject.ImageDescription,
-          copyright: featuredImagesJSONObject.LicenseShortName
+      
+      // Populate title field with filename if it doesn't exist
+      images.forEach(result => {
+        if (!result.info.title) {
+          result.info.title = result.info.filename;
         }
-      }));
+      });
 
       setPagedResults(chunk(images, config.PAGE_SIZE));
       setSearchingState({
