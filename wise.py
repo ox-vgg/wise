@@ -822,11 +822,11 @@ def search(
 def serve(
     project_id: str = typer.Argument(None, help="Name of the project"),
     theme_asset_dir: Path = typer.Option(
-        ...,
+        'www/dynamic',
         exists=True,
         dir_okay=True,
         file_okay=False,
-        help="Static HTML assets related to the user interface are served from this folder",
+        help="Static HTML assets related to the user interface are served from this folder. There are two UIs included in WISE: 'www/dynamic' and 'www/imgrid'",
     ),
     index_type: Optional[IndexType] = typer.Option(
         None, help="The faiss index to use for serving"
