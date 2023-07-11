@@ -277,7 +277,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
       <Form onFinish={submitSearch}>
         <Input
           id="search-input"
-          autocomplete="off"
+          autoComplete="off"
           size={isHomePage ? 'large' : 'middle'}
           placeholder={multimodalQueries.length === 0 ? 'Search' : ''}
           value={searchText}
