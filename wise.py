@@ -4,6 +4,7 @@ import itertools
 import math
 import logging
 from pathlib import Path
+from sqlalchemy.exc import IntegrityError
 
 from tempfile import NamedTemporaryFile
 from threading import Lock
@@ -470,9 +471,13 @@ def init(
     logger.info(f"Processsing data sources - {_sources}")
 
     # Try creating project id, it will fail if not unique.
-    # TODO Translate the exception
     with engine.begin() as conn:
-        project = WiseProjectsRepo.create(conn, data=Project(id=project_id))
+        try:
+            project = WiseProjectsRepo.create(conn, data=Project(id=project_id))
+        except IntegrityError as err:
+            if err.args[0] == '(sqlite3.IntegrityError) UNIQUE constraint failed: projects.id':
+                logger.error(f"Init failed: project \'{project_id}\' already exists")
+                return
 
     failures_path = f"wise_init_failedsamples_{project_id}.tar"
     failed_datasources = []
