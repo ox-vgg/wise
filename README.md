@@ -59,16 +59,31 @@ For multi-modal queries (images + text), the feature vectors of the individual i
 ## Installation
 
 ### Setup virtual environment and install dependencies
-(You will need to have Python 3 and conda installed beforehand)
+
+You can either use `pip` or `conda` to set up WISE.
+
+#### Option 1: Installation using pip
+(You will need to have Python 3 and pip installed beforehand. Click [here](https://www.python.org/downloads/) to install both. We recommend using Python 3.9 or greater, and pip 22 or greater. WISE might not work on lower versions.)
 ```bash
-git clone git@gitlab.com:vgg/wise/wise.git
+git clone https://gitlab.com/vgg/wise/wise.git
+cd wise
+python3 -m venv env
+source env/bin/activate
+pip install -r requirements.txt
+```
+
+#### Option 2: Installation using conda
+(You will need to have Python 3 and conda installed beforehand. Click [here](https://docs.conda.io/en/latest/miniconda.html) to install both Python and conda. We recommend you to use Python 3.9 or greater, and conda 22 or greater. WISE might not work on lower versions.)
+```bash
+git clone https://gitlab.com/vgg/wise/wise.git
 cd wise
 conda env create -f environment.yml
 conda activate wise
 ```
-We recommend you to use Python 3.9 or greater, and conda 22 or greater. The software might not work on lower versions.
 
 ## Usage
+Before running the commands below, make sure you have `cd`'ed into the `wise` folder (if you haven't done so already), and activate the virtual environment by running `source env/bin/activate` (if you are using pip) or `conda activate wise` (if you are using conda).
+
 For more details on the commands available, run
 ```bash
 python3 wise.py --help
@@ -91,7 +106,7 @@ Parameters:
 * `--store-in`: folder where you would like the extracted features, indices, thumbnails, and metadata to be stored. (Make sure this is on a disk with sufficient space.) If unspecified, these files will be stored within the `~/.wise/projects/project-name` folder (in your home directory)
 * `--batch-size`: number of images in each batch to pass to the model. Default value: 1
 * `--model`: specify an OpenCLIP model to use for extracting features (for a full list of models available, run `python3 wise.py init --help`). Default value: `ViT-B-32:openai`.
-* For more details, run `python3 wise.py init --help`
+* For more details on the options available, run `python3 wise.py init --help`
 
 ### Add more images to an existing project
 ```bash
@@ -99,14 +114,14 @@ python3 wise.py update your-project-name \
   --batch-size 128 \
   --source "/path/to/folder/or/webdataset"
 ```
-* For more details, run `python3 wise.py init --help`
+* For more details on the options available, run `python3 wise.py init --help`
 
 ### Create a search index based on approximate nearest neighbour search
 ```bash
 python3 wise.py index your-project-name --index-type IndexIVFFlat
 # (for exhaustive search, use --index-type IndexFlatIP)
 ```
-* For more details, run `python3 wise.py index --help`
+* For more details on the options available, run `python3 wise.py index --help`
 
 ### Serve the web interface for the search engine
 ```bash
@@ -117,7 +132,7 @@ python3 wise.py serve your-project-name \
 * For now you will need to replace the `<base href="/wikimedia/">` in `frontend/dist/index.html` with your project name, e.g. `<base href="/your-project-name-here/">`. This will be done automatically later on.
 * Once the server has been started, go to http://localhost:9670/your-project-name in your browser
 * You can optionally provide a query blocklist (i.e. a list of queries that users should be blocked from searching) using `--query-blocklist /path/to/blocklist.txt`
-* For more details, run `python3 wise.py serve --help`
+* For more details on the options available, run `python3 wise.py serve --help`
 
 ## Frontend
 
@@ -133,7 +148,6 @@ WISE contains some automated tests to verify the software's
 functionality.
 
 ```
-conda activate wise
 python -m pytest -s tests
 ```
 
