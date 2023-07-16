@@ -45,7 +45,7 @@ def serve(project_id: str, theme_asset_dir: Path, index_type: Optional[str] = No
                 term = line.strip()
                 if term:
                     query_blocklist.append(term)
-        options.update({"query_blocklist": query_blocklist})
+        options.update({"query_blocklist": set(query_blocklist)})
 
     config = APIConfig.model_validate(options)  # type: ignore
 
