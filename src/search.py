@@ -18,8 +18,12 @@ def write_index(index, path: Path):
     faiss.write_index(index, str(path))
 
 
-def read_index(path: Path):
-    return faiss.read_index(str(path))
+def read_index(path: Path, readonly: bool = False, memory_mapped: bool = False):
+    flags = 0
+    flags = (flags | faiss.IO_FLAG_READ_ONLY) if readonly else flags
+    flags = (flags | faiss.IO_FLAG_MMAP) if memory_mapped else flags
+
+    return faiss.read_index(str(path), flags)
 
 
 def get_index(type: IndexType, n_dim: int, *args):
