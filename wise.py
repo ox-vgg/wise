@@ -49,6 +49,7 @@ from src.data_models import (
 )
 from src.inference import setup_clip, CLIPModel
 from src.search import (
+    read_index,
     write_index,
     get_index,
     brute_force_search,
@@ -865,10 +866,17 @@ def index(
     using: FEATURES = typer.Option(
         FEATURES.IMAGE, help="Specify the feature set to build the index with"
     ),
+    pretrained_index: Optional[Path] = typer.Option(
+        None, file_okay=True, help="pretrained faiss index to use for adding ids"
+    ),
 ):
     """
     Creates / Updates the current search index for the project
     """
+
+    if pretrained_index and index_type == IndexType.IndexFlatIP:
+        raise typer.BadParameter("Pretrained index can only be used with IndexFlatIVF")
+
     with engine.connect() as conn:
         project = WiseProjectsRepo.get(conn, project_id)
     if project is None:
@@ -896,42 +904,48 @@ def index(
         else H5Datasets.METADATA_FEATURES
     )
     all_features = lambda: reader(features_set)
-    cell_count = 10 * round(math.sqrt(num_files))
-    faiss_index = get_index(index_type, n_dim, cell_count)
 
-    if index_type == IndexType.IndexIVFFlat:
+    if index_type == IndexType.IndexFlatIP:
+        faiss_index = get_index(index_type, n_dim)
+
+    elif index_type == IndexType.IndexIVFFlat:
         # Train stage
-        train_count = min(num_files, 100 * cell_count)
-        num_batches = math.ceil(train_count / read_batch_size)
+        if pretrained_index:
+            faiss_index = read_index(pretrained_index)
+        else:
+            cell_count = 10 * round(math.sqrt(num_files))
+            faiss_index = get_index(index_type, n_dim, cell_count)
+            train_count = min(num_files, 100 * cell_count)
+            num_batches = math.ceil(train_count / read_batch_size)
 
-        # get random permutation
-        rng = np.random.default_rng(26042023)
-        permutation = rng.permutation(num_files)[: (num_batches * read_batch_size)]
+            # get random permutation
+            rng = np.random.default_rng(26042023)
+            permutation = rng.permutation(num_files)[: (num_batches * read_batch_size)]
 
-        # sort the permutation for faster reads
-        sort_indices = argsort(permutation)
-        sorted_permutation = [permutation[i] for i in sort_indices]
-        unsort_indices = argsort(sort_indices)
+            # sort the permutation for faster reads
+            sort_indices = argsort(permutation)
+            sorted_permutation = [permutation[i] for i in sort_indices]
+            unsort_indices = argsort(sort_indices)
 
-        # batch the reads
-        batched_indices = batched(sorted_permutation, read_batch_size)
-        with get_h5reader(vds_path)(features_set) as _reader:
-            _train_features = functools.reduce(
-                lambda a, x: (a.append(np.array(_reader(x))), a)[1],
-                tqdm(itertools.islice(batched_indices, num_batches)),
-                [],
-            )
-        # shuffle after concat
-        train_features = np.concatenate(_train_features)
-        train_features = train_features[unsort_indices, ...]
+            # batch the reads
+            batched_indices = batched(sorted_permutation, read_batch_size)
+            with get_h5reader(vds_path)(features_set) as _reader:
+                _train_features = functools.reduce(
+                    lambda a, x: (a.append(np.array(_reader(x))), a)[1],
+                    tqdm(itertools.islice(batched_indices, num_batches)),
+                    [],
+                )
+            # shuffle after concat
+            train_features = np.concatenate(_train_features)
+            train_features = train_features[unsort_indices, ...]
 
-        assert not faiss_index.is_trained
-        logger.info("Finding clusters from samples...")
-        faiss_index.train(train_features)
-        assert faiss_index.is_trained
-        logger.info("Done")
+            assert not faiss_index.is_trained
+            logger.info("Finding clusters from samples...")
+            faiss_index.train(train_features)
+            assert faiss_index.is_trained
+            logger.info("Done")
 
-        del train_features
+            del train_features
 
     with tqdm(total=num_files) as pbar:
         for batch in all_features():
