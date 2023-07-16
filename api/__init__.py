@@ -47,7 +47,7 @@ def serve(project_id: str, theme_asset_dir: Path, index_type: Optional[str] = No
                     query_blocklist.append(term)
         options.update({"query_blocklist": query_blocklist})
 
-    config = APIConfig.parse_obj(options)  # type: ignore
+    config = APIConfig.model_validate(options)  # type: ignore
 
     app = create_app(config, theme_asset_dir)
     uvicorn.run(app, host=config.hostname, port=config.port, log_level="info")

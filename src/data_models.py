@@ -1,5 +1,5 @@
 import enum
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from typing import Optional, Dict, Any
 
 
@@ -36,10 +36,7 @@ class DatasetCreate(BaseDataset):
 
 class Dataset(BaseDataset):
     id: int
-
-    class Config:
-        orm_mode = True
-        use_enum_values = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class ImageMetadata(BaseModel):
@@ -53,17 +50,13 @@ class ImageMetadata(BaseModel):
     height: int = -1
     source_uri: Optional[str] = None
     metadata: Dict[str, Any]  # TODO: tighter type
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Project(BaseModel):
     id: str
     version: Optional[int] = None
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class URL(str):

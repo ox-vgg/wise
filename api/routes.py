@@ -17,7 +17,7 @@ from fastapi.responses import (
     RedirectResponse,
     StreamingResponse,
 )
-from pydantic import BaseModel, validator
+from pydantic import field_validator, BaseModel
 import typer
 import csv
 import json
@@ -228,7 +228,7 @@ def _get_report_image_router(config: APIConfig):
         return PlainTextResponse(
             status_code=200, content="Image has been reported"
         )
-    
+
     return router
 
 
@@ -243,7 +243,8 @@ def _get_search_router(config: APIConfig):
         distance: float
         info: ImageInfo
 
-        @validator("distance")
+        @field_validator("distance")
+        @classmethod
         def round_distance(cls, v):
             return round(v, config.precision)
 
@@ -255,7 +256,7 @@ def _get_search_router(config: APIConfig):
                     link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
                     distance=_dist,
                     info=ImageInfo(
-                        id=_metadata.id,
+                        id=str(_metadata.id),
                         filename=_metadata.path,
                         width=_metadata.width,
                         height=_metadata.height,
@@ -280,7 +281,7 @@ def _get_search_router(config: APIConfig):
                     link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
                     distance=_dist,
                     info=ImageInfo(
-                        id=_metadata.id,
+                        id=str(_metadata.id),
                         filename=_metadata.path,
                         width=_metadata.width,
                         height=_metadata.height,
@@ -393,7 +394,7 @@ def _get_search_router(config: APIConfig):
                     "message": "Cannot return more than 50 results at a time when thumbs=1"
                 },
             )
-        
+
         if len(q) == 1 and q[0].startswith(("http://", "https://")):
             query = q[0]
             logger.info("Downloading", query, "to file")
@@ -446,7 +447,7 @@ def _get_search_router(config: APIConfig):
             return PlainTextResponse(
                 status_code=500, content=f"Error processing internal image queries"
             )
-        
+
         q = file_queries + url_queries + text_queries + internal_image_queries
         q = [dict(type='positive', val=query) for query in q]
 

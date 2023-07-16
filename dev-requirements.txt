@@ -1,0 +1,5 @@
+httpx[cli]
+pytest
+jupyter-console
+matplotlib
+bump-pydantic

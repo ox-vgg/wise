@@ -1,42 +1,23 @@
 name: wise
 
 channels:
-  - nvidia/label/cuda-11.6.0
   - pytorch
+  - nvidia
   - conda-forge
   - defaults
 
 dependencies:
-  - braceexpand=0.1.5
-  - cuda-toolkit=11.6.0
-  - python=3.10.6
-  - pip=22.3.0
-  - scikit-image=0.19.3
-  - matplotlib=3.6.0
-  - imageio=2.22.0
-  - typer=0.6.1
-  - pytorch=1.12.1
-  - torchvision=0.13.0
-  - torchaudio=0.12.1
-  - ftfy=6.1.1
-  - regex=2022.9.13
-  - tqdm=4.38.0
-  - faiss-gpu=1.7.2
-  - h5py=3.7.0
-  - fastapi=0.85.1
-  - uvicorn-standard=0.19.0
-  - webdataset=0.2.26
-  - sqlalchemy=2.0.3
-  - alembic=1.9.3
+  - python=3.10
+  - pip=23
+  - pytorch=1.13.1
+  - pytorch-cuda=11.6
+  - torchvision=0.14.1
+  - torchaudio=0.13.1
+  - faiss-gpu=1.7.4
+  - mkl=2021
+  - blas=1.0=mkl
   - pip:
-      - open_clip_torch
-      - transformers
-      - pydantic
-      - python-multipart==0.0.5
-      - httpx[http2]
-      - httpx[cli]
-      - beautifulsoup4
-      - pytest
+      - -r requirements.txt
 
 variables:
   PYTHONNOUSERSITE: 1
