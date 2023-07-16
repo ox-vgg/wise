@@ -249,6 +249,10 @@ def _get_search_router(config: APIConfig):
             return round(v, config.precision)
 
     def make_basic_response(queries, dist, ids, get_metadata_fn):
+        valid_indices = [[i for i, x in enumerate(top_ids) if x != -1] for top_ids in ids]
+        valid_ids = [[top_ids[x] for x in indices] for indices, top_ids in zip(valid_indices, ids)]
+        valid_dist = [[top_dist[x] for x in indices] for indices, top_dist in zip(valid_indices, dist)]
+
         return {
             _q: [
                 SearchResponse(
@@ -270,10 +274,14 @@ def _get_search_router(config: APIConfig):
                     ),
                 )
             ]
-            for _q, top_dist, top_ids in zip(queries, dist, ids)
+            for _q, top_dist, top_ids in zip(queries, valid_dist, valid_ids)
         }
 
     def make_full_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn):
+        valid_indices = [[i for i, x in enumerate(top_ids) if x != -1] for top_ids in ids]
+        valid_ids = [[top_ids[x] for x in indices] for indices, top_ids in zip(valid_indices, ids)]
+        valid_dist = [[top_dist[x] for x in indices] for indices, top_dist in zip(valid_indices, dist)]
+
         return {
             _q: [
                 SearchResponse(
@@ -296,7 +304,7 @@ def _get_search_router(config: APIConfig):
                     get_thumbs_fn(top_ids),
                 )
             ]
-            for _q, top_dist, top_ids in zip(queries, dist, ids)
+            for _q, top_dist, top_ids in zip(queries, valid_dist, valid_ids)
         }
 
     _prefix = config.query_prefix.strip()
@@ -312,8 +320,10 @@ def _get_search_router(config: APIConfig):
     # load the feature search index
     index_filename = project_tree.index(index_type)
     logger.info(f"Loading faiss index from {index_filename}")
-    index = read_index(index_filename)
+    index = read_index(index_filename, readonly=True)
     if hasattr(index, "nprobe"):
+        # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
+        index.parallel_mode = 1
         index.nprobe = getattr(config, "nprobe", 32)
 
     # Get counts
@@ -387,7 +397,7 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        if (end - start) > 50 and thumbs == 1:
+        if (end - start) > 50 and thumbs == True:
             raise HTTPException(
                 400,
                 {
@@ -432,7 +442,7 @@ def _get_search_router(config: APIConfig):
         # Other parameters
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: int = Query(True),
+        thumbs: bool = Query(True),
     ):
         """
         Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
@@ -464,7 +474,7 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        if (end - start) > 50 and thumbs == 1:
+        if (end - start) > 50 and thumbs == True:
             raise HTTPException(
                 400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
             )
@@ -511,7 +521,7 @@ def _get_search_router(config: APIConfig):
         average_features /= norm(average_features, axis=-1, keepdims=True)
         return similarity_search(q=["multimodal"], features=average_features, start=start, end=end, thumbs=thumbs)
 
-    def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: int):
+    def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: bool):
 
         dist, ids = index.search(features, end)
         with project_engine.connect() as conn:
