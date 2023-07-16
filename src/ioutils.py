@@ -82,13 +82,13 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
         super().__init__()
 
         def update_id(metadata: ImageMetadata):
-            return metadata.copy(update={"dataset_id": dataset.id})
+            return metadata.model_copy(update={"dataset_id": dataset.id})
 
         def update_path(metadata: ImageMetadata):
-            return metadata.copy(
+            return metadata.model_copy(
                 update={"path": metadata.path.replace(dataset.location, "")}
             )
-        
+
         self.dataset_location = dataset.location
         self.dataset_type = dataset.type
         if self.dataset_type == DatasetType.WEBDATASET:
@@ -191,7 +191,7 @@ class CustomPyTorchDataset(PyTorchIterableDataset):
 
     def __iter__(self):
         if self.dataset_type == DatasetType.WEBDATASET:
-            self.webdataset = iter(self.webdataset)    
+            self.webdataset = iter(self.webdataset)
         elif self.dataset_type == DatasetType.IMAGE_DIR:
             # split workload by worker id (adapted from example in https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset)
             worker_info = get_worker_info()
@@ -230,7 +230,7 @@ def get_dataloader(
         else:
             num_workers = min(cpu_count(), 16)
         logging.info(f'Loading data with {num_workers} workers')
-    
+
     if dataset.type == DatasetType.WEBDATASET and num_workers > 1:
         raise NotImplementedError('Please use --num-workers 0 or --num-workers 1 for now (not supported for > 1 for webdatasets)')
 
@@ -691,6 +691,7 @@ def get_image_info(p: Path, basedir: Optional[Path] = None):
     with Image.open(p) as im:
         w, h = im.size
         iminfo = ImageInfo(
+            id="",
             filename=str(p.relative_to(basedir) if basedir else p),
             width=w,
             height=h,

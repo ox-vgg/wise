@@ -284,7 +284,7 @@ def add_dataset(
                 metadata = [
                     MetadataRepo.create(
                         conn,
-                        data=x.copy(
+                        data=x.model_copy(
                             update={
                                 "dataset_row": row_id,
                                 "id": offset + row_id,
@@ -517,7 +517,7 @@ def init(
                     WiseProjectsRepo.update(
                         conn,
                         project_id,
-                        data=project.copy(update={"version": new_version}),
+                        data=project.model_copy(update={"version": new_version}),
                     )
                 logger.info("Done")
 
@@ -555,7 +555,7 @@ def init(
             with engine.begin() as conn:
                 new_version = _create_virtual_dataset(project, datasets)
                 WiseProjectsRepo.update(
-                    conn, project_id, data=project.copy(update={"version": new_version})
+                    conn, project_id, data=project.model_copy(update={"version": new_version})
                 )
             logger.info("Done")
         logger.error(f'Files for "{project_id}" left in {project_tree.location}')
@@ -661,7 +661,7 @@ def update(
         with engine.begin() as conn:
             new_version = _create_virtual_dataset(project, datasets)
             WiseProjectsRepo.update(
-                conn, project_id, data=project.copy(update={"version": new_version})
+                conn, project_id, data=project.model_copy(update={"version": new_version})
             )
         logger.info("Done")
 

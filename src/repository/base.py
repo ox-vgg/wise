@@ -48,17 +48,17 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
     def get(self, conn: sa.Connection, id: Any) -> Optional[Entity]:
         result = conn.execute(sa.select(self._table).where(self._table.c.id == id))
         for row in result.mappings():
-            return self.model.from_orm(row)
+            return self.model.model_validate(row)
         return None
 
     def list(self, conn: sa.Connection):
         result = conn.execute(sa.select(self._table))
         for row in result.mappings():
-            yield self.model.from_orm(row)
+            yield self.model.model_validate(row)
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
         result = conn.execute(
-            sa.insert(self._table).returning(self._table.c.id), [data.dict()]
+            sa.insert(self._table).returning(self._table.c.id), [data.model_dump()]
         )
         obj = self.get(conn, next(result)[0])
         if not obj:
@@ -70,12 +70,12 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         if current_data is None:
             raise EntityNotFoundException()
 
-        updated_data = current_data.copy(update=data.dict(exclude_unset=True))
+        updated_data = current_data.model_copy(update=data.model_dump(exclude_unset=True))
 
         conn.execute(
             sa.update(self._table)
             .where(self._table.c.id == id)
-            .values(**updated_data.dict())
+            .values(**updated_data.model_dump())
         )
 
     def delete(self, conn: sa.Connection, id: Any):
