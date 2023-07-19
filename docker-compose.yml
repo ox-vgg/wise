@@ -1,0 +1,20 @@
+version: '3.1'
+
+services:
+  wise:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wise
+    restart: always
+    ports:
+      - 9670:9670
+    volumes:
+      - ./:/wise
+      - $HOME/.wise/wise.db:/root/.wise/wise.db
+      - $HOME/.wise/projects/wikimedia:/wise-store/wikimedia
+    command: bash -c "
+        mkdir /root/.wise/projects
+        && ln -s /wise-store/wikimedia ~/.wise/projects/wikimedia
+        && HOSTNAME=0.0.0.0 python wise.py serve wikimedia --query-blocklist word-list-0.txt
+      "
