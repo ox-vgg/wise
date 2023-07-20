@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional
+from typing import Optional, Callable
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -12,8 +12,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+def log_custom_format(message: str):
+    """Log a message with a custom format (green text, bold)"""
+    RESET_SEQ = "\033[0m"
+    COLOR_SEQ = "\033[92m" # green color
+    BOLD_SEQ = "\033[1m"
+    logger.info(
+        f'{COLOR_SEQ}{BOLD_SEQ}{message}{RESET_SEQ}',
+    )
 
-def create_app(config: APIConfig, theme_asset_dir: Path):
+def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = None):
     app = FastAPI()
     app.state.config = config
 
@@ -26,6 +34,9 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
             StaticFiles(directory=theme_asset_dir, html=True),
             name="assets",
         )
+        log_custom_format(f'Open http://0.0.0.0:{config.port}/{config.project_id}/ in your browser')
+        if callback:
+            callback()
 
     @app.on_event("shutdown")
     async def shutdown():
@@ -34,7 +45,13 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
     return app
 
 
-def serve(project_id: str, theme_asset_dir: Path, index_type: Optional[str] = None, query_blocklist_file: Path = None):
+def serve(
+    project_id: str,
+    theme_asset_dir: Path,
+    index_type: Optional[str] = None,
+    query_blocklist_file: Path = None,
+    callback: Callable = None # You can pass in a callback function to be called when the server has started
+):
     options = {"project_id": project_id} if project_id else {}
     if index_type:
         options.update({"index_type": index_type})
@@ -49,5 +66,5 @@ def serve(project_id: str, theme_asset_dir: Path, index_type: Optional[str] = No
 
     config = APIConfig.model_validate(options)  # type: ignore
 
-    app = create_app(config, theme_asset_dir)
+    app = create_app(config, theme_asset_dir, callback)
     uvicorn.run(app, host=config.hostname, port=config.port, log_level="info")
