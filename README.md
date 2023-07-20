@@ -151,9 +151,7 @@ python3 wise.py index your-project-name --index-type IndexIVFFlat
 ### Serve the web interface for the search engine
 
 ```bash
-python3 wise.py serve your-project-name \
-  --index-type IndexIVFFlat \
-  --theme-asset-dir www/dynamic/
+python3 wise.py serve your-project-name --index-type IndexIVFFlat
 ```
 
 - For now you will need to replace the `<base href="/wikimedia/">` in `frontend/dist/index.html` with your project name, e.g. `<base href="/your-project-name-here/">`. This will be done automatically later on.
@@ -163,7 +161,7 @@ python3 wise.py serve your-project-name \
 
 ## Frontend
 
-WISE currently has two frontends, `imgrid` and `dynamic`. When running `python3 wise.py serve`, you can either pass in `--theme-asset-dir www/imgrid` or `--theme-asset-dir www/dynamic`.
+WISE currently has two frontends, `imgrid` and `dynamic`. When running `python3 wise.py serve`, you can either pass in `--theme-asset-dir www/imgrid` or `--theme-asset-dir www/dynamic`. If left unspecified, the `dynamic` frontend is used by default.
 
 - `imgrid` is a simple frontend written in vanilla JavaScript and its source code is located in `www/imgrid`
 - `dynamic` is built using React and TypeScript and contains additional features. The source code for this frontend is located in the `frontend` folder. The production build is located in the `frontend/dist` folder and is also symlinked in `www/dynamic`.
