@@ -8,6 +8,10 @@ type ConfigType = {
   FETCH_THUMBS: number;
   FETCH_TIMEOUT: number;
   REPO_URL: string;
+  WISE_OVERVIEW_CARD: {
+    ABOUT: string,
+    DISCLAIMER: string
+  };
   EXAMPLE_QUERIES: string[];
 }
 

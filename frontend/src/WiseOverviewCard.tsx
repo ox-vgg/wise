@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { Button, Card, Tooltip, Tour, TourProps } from 'antd';
+import sanitizeHtml from 'sanitize-html';
 
 import './WiseOverviewCard.scss';
 import config from './config';
@@ -85,23 +86,8 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
         <Button type="primary" onClick={() => { setIsTourOpen(true) }}>Show me how to use WISE</Button>
       </div>
     ),
-    'About WISE': <>
-      <p>WISE Image Search Engine (WISE) is an open-source image search engine which leverages recent advances in machine learning and vision-language models that enable search based on image content using natural language. The expressive power of natural language allows the user to flexibly describe what they are looking for.</p>
-      {/* TODO include something like: WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image (i.e. it searches by image content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions. */}
-
-      <p><a href="https://gitlab.com/vgg/wise/wise#how-it-works" target='_blank'>How WISE works</a></p>
-      <p><a href="https://gitlab.com/vgg/wise/wise" target='_blank'>Code repository</a></p>
-      <p><a href="https://www.robots.ox.ac.uk/~vgg/software/wise/" target='_blank'>Project webpage</a></p>
-      <p>WISE is developed at the Visual Geometry Group, University of Oxford.</p>
-    </>,
-    'Disclaimer': (
-      <>
-        <ul>
-          <li>The images shown below are hosted on Wikimedia Commons and this website only provides search. The images belong to their respective authors and they are not the property of the University of Oxford.</li>
-          <li>We currently do not use cookies on this website</li>
-        </ul>
-      </>
-    )
+    'About WISE': <div dangerouslySetInnerHTML={{__html: sanitizeHtml(config.WISE_OVERVIEW_CARD.ABOUT)}}></div>,
+    'Disclaimer': <div dangerouslySetInnerHTML={{__html: sanitizeHtml(config.WISE_OVERVIEW_CARD.DISCLAIMER)}}></div>
   };
   const aboutWiseTabList = Object.keys(aboutWiseTabContent).map(x => ({key: x, tab: x}));
   const [aboutWiseActiveTabKey, setAboutWiseActiveTabKey] = useState('Overview');
