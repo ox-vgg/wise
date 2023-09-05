@@ -1,5 +1,6 @@
 import { Button, Dropdown, Modal } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
+import sanitizeHtml from 'sanitize-html';
 import './ImageDetailsModal.scss';
 
 /*
@@ -9,7 +10,6 @@ TODO
   - LicenseShortName, License, UsageTerms, LicenseUrl
   - find out what is Restrictions field
 
-- sanitize HTML before dangerously setting?
 - add disclaimer
 */
 
@@ -68,11 +68,11 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
       <div className="wise-image-details-metadata">
         <p>
           <b>Description</b><br />
-          <span dangerouslySetInnerHTML={{__html: caption}} />
+          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(caption)}} />
         </p>
         <p>
           <b>Author</b><br />
-          <span dangerouslySetInnerHTML={{__html: author}} />
+          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(author)}} />
         </p>
         {/* <p>
           <b>Source</b><br />
@@ -80,7 +80,7 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
         </p> */}
         <p>
           <b>License</b><br />
-          <span dangerouslySetInnerHTML={{__html: copyright}} />
+          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(copyright)}} />
         </p>
       </div>
     </Modal>
