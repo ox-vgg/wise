@@ -26,13 +26,13 @@ const productionConfig = {
     `
   },
   EXAMPLE_QUERIES: [
-    'Cute puppy', 'Bees feeding on flower', 'Hot air balloon above a mountain',
-    'Penguin with wings raised', 'Dolphin playing with ball', 'People taking pictures of mona lisa',
-    'Painting of a naval battle', 'Panda chewing on bamboo', 'Plane refuelling another plane',
-    'Mount Fuji during sunset',  'Car with a bicycle on top', 'Squirrel eating a nut',
-    'People on a roller coaster', 'Running on a hill', 'A peculiar airplane', 'Busy street in Paris',
-    'Singer next to a piano', 'Black and white photo of a steam train', 'First lady and her husband',
-    'Cubist painting of a violin'
+    // 'Cute puppy', 'Bees feeding on flower', 'Hot air balloon above a mountain',
+    // 'Penguin with wings raised', 'Dolphin playing with ball', 'People taking pictures of mona lisa',
+    // 'Painting of a naval battle', 'Panda chewing on bamboo', 'Plane refuelling another plane',
+    // 'Mount Fuji during sunset',  'Car with a bicycle on top', 'Squirrel eating a nut',
+    // 'People on a roller coaster', 'Running on a hill', 'A peculiar airplane', 'Busy street in Paris',
+    // 'Singer next to a piano', 'Black and white photo of a steam train', 'First lady and her husband',
+    // 'Cubist painting of a violin'
   ]
 };
 

@@ -66,6 +66,17 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
     handleTourChange();
   }
 
+  let exampleQueriesHTML = <></>;
+  if (exampleQueries.length > 0) {
+    exampleQueriesHTML = (
+      <p className="wise-example-queries">
+        Example queries: {exampleQueries.map((x, i) => 
+          <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick(x)} key={i}>{x}</Button>
+        )}
+      </p>
+    );
+  }
+
   const aboutWiseTabContent: Record<string, React.ReactNode> = {
     'Overview': (
       <div className="wise-overview">
@@ -78,11 +89,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
           <InfoCircleOutlined style={{marginLeft: '3px', marginRight: '5px'}} />
         </Tooltip>
         from Wikimedia Commons.</p>
-        <p className="wise-example-queries">
-          Example queries: {exampleQueries.map((x, i) => 
-            <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick(x)} key={i}>{x}</Button>
-          )}
-        </p>
+        {exampleQueriesHTML}
         <Button type="primary" onClick={() => { setIsTourOpen(true) }}>Show me how to use WISE</Button>
       </div>
     ),
