@@ -166,6 +166,8 @@ WISE currently has two frontends, `imgrid` and `dynamic`. When running `python3 
 - `imgrid` is a simple frontend written in vanilla JavaScript and its source code is located in `www/imgrid`
 - `dynamic` is built using React and TypeScript and contains additional features. The source code for this frontend is located in the `frontend` folder. The production build is located in the `frontend/dist` folder and is also symlinked in `www/dynamic`.
 
+For more details on the `dynamic` frontend (e.g. if you want to make custom modifications to it), please see [`frontend/README.md`](frontend/README.md)
+
 You can also develop your own frontend that interacts with the WISE backend. The backend API endpoints are defined in `api/routes.py`.
 
 ## Test
