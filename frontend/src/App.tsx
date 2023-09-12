@@ -14,10 +14,6 @@ import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
 
 export const App: React.FunctionComponent = () => {
-  // const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
-  // const showAboutModal = () => { setIsAboutModalOpen(true) };
-  // const closeAboutModal = () => { setIsAboutModalOpen(false) };
-
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
 
@@ -116,15 +112,6 @@ export const App: React.FunctionComponent = () => {
       {isHomePage && // Only show if isHomePage is true
         <WiseOverviewCard handleExampleQueryClick={handleExampleQueryClick} projectInfo={projectInfo} refsForTour={refsForTour} />
       }
-      {/* <Modal title="About WISE"
-              open={isAboutModalOpen}
-              onCancel={closeAboutModal}
-              footer={<Button type="primary" onClick={closeAboutModal}>Close</Button>}
-      >
-        <p>Explanation of what WISE does, and how to use WISE</p>
-        <p>TODO add explanation...</p>
-        <p>WISE is developed at Oxford VGG and the code is available open-source.</p>
-      </Modal> */}
       <SearchResults dataService={dataService} isHomePage={isHomePage} projectInfo={projectInfo}
                       setSearchText={setSearchText} multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                       submitSearch={submitSearch} />
