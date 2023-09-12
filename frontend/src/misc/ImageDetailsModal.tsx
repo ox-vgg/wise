@@ -14,21 +14,13 @@ TODO
 */
 
 const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: any) => {
-  let img_link, img_link_tok, img_filename, /*img_filename_decoded,*/ title;
-  let external_link;
+  let title;
   let caption, author, copyright;
 
   const isImageDetails = imageDetails && Object.keys(imageDetails).length > 0;
 
   if (isImageDetails) {
-    console.log('ASDF', imageDetails)
-    img_link = imageDetails.link;
-    img_link_tok = img_link.split('/');
-    img_filename = img_link_tok[img_link_tok.length - 2];
-    // img_filename_decoded = decodeURIComponent(img_filename); // Decode filename to show special characters / utf-8 characters
-
-    external_link = 'https://commons.wikimedia.org/wiki/File:' + img_filename;
-    title = <Button type="text" href={external_link} target='_blank' size="large">
+    title = <Button type="text" href="" onClick={(e) => {e.preventDefault()}} size="large">
       <b>{imageDetails.info.title}</b>
       <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
     </Button>;
@@ -60,7 +52,7 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
       width='90vw'
       className="wise-image-details-model"
     >
-      <a href={external_link} target='_blank'>
+      <a>
         <img src={imageDetails.link || undefined}
           title={imageDetails.info?.title + (imageDetails.distance ? ` | Distance = ${imageDetails.distance.toFixed(2)}` : '')}
         />

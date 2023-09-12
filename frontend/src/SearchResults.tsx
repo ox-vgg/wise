@@ -148,9 +148,9 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
   const numImagesString: string = projectInfo.num_images?.toLocaleString('en', { useGrouping: true }) || '?';
   let loadingMessage = <></>;
   if (isSearching) {
-    loadingMessage = <p className="wise-loading-message">Searching in {numImagesString} Wikimedia images <LoadingOutlined /></p>;
+    loadingMessage = <p className="wise-loading-message">Searching in {numImagesString} images <LoadingOutlined /></p>;
   } else if (!isHomePage && !isSearching) {
-    loadingMessage = <p className="wise-loading-message">Search completed in {(searchLatency / 1000).toFixed(1)} seconds of {numImagesString} Wikimedia images</p>;
+    loadingMessage = <p className="wise-loading-message">Search completed in {(searchLatency / 1000).toFixed(1)} seconds of {numImagesString} images</p>;
   }
 
   const isLoadingFeaturedImages = (isHomePage && searchResults.length === 0);

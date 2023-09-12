@@ -382,6 +382,18 @@ def _get_search_router(config: APIConfig):
         return internal_images_bytes
 
 
+    @router.get('/featured', response_model=Dict[str, List[SearchResponse]])
+    async def handle_get_featured(
+        thumbs: bool = Query(True),
+    ):
+        q = ['']
+        start = 0
+        end = 200
+        prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
+        text_features = extract_text_features(prefixed_queries)
+        return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
+
+
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
     async def handle_get_search(
         q: List[str] = Query(default=[]),

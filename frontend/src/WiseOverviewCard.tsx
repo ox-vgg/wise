@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { InfoCircleOutlined } from '@ant-design/icons';
-import { Button, Card, Tooltip, Tour, TourProps } from 'antd';
+import { Button, Card, Tour, TourProps } from 'antd';
 import sanitizeHtml from 'sanitize-html';
 
 import './WiseOverviewCard.scss';
@@ -81,11 +80,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
     'Overview': (
       <div className="wise-overview">
         <p>WISE is a smart search engine for images, using AI to understand the meaning behind your search query, to find the most relevant images that match what you're looking for.</p>
-        <p>Here, you can search a subset of {Math.floor(projectInfo.num_images / 1000000)} million images
-        <Tooltip title="This subset only includes JPEG and PNG images uploaded on/before 1 Jan 2023 with a minimum height and width of 224px. We plan on adding more images to this set over time.">
-          <InfoCircleOutlined style={{marginLeft: '3px', marginRight: '5px'}} />
-        </Tooltip>
-        from Wikimedia Commons.</p>
+        <p>Here, you can search within a set of {projectInfo.num_images?.toLocaleString('en-us')} images.</p>
         {exampleQueriesHTML}
         <Button type="primary" onClick={() => { setIsTourOpen(true) }}>Show me how to use WISE</Button>
       </div>
