@@ -5,15 +5,38 @@ import { fetchWithTimeout, chunk, getArrayOfEmptyArrays } from './misc/utils.ts'
 
 const NUM_PAGES = Math.ceil(config.MAX_SEARCH_RESULTS / config.PAGE_SIZE);
 
-const fetchFeaturedImages = (): Promise<SearchResponse> => {
-  return fetchWithTimeout("./featured", config.FETCH_TIMEOUT, {
+const MAX_FEATURED_IMAGES = 1000; // TODO set this based on actual number of featured images
+const FEATURED_IMAGES_RANDOM_SEED = Math.floor(Math.random()*100); // Generate a random number between 0-100 to be used as the random seed when fetching the featured images
+
+const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<SearchResponseJSONObject[]> => {
+  const start = pageStart*config.PAGE_SIZE;
+  const end = Math.min(MAX_FEATURED_IMAGES, pageEnd*config.PAGE_SIZE);
+
+  const urlParams = new URLSearchParams([
+    ['start', start.toString()],
+    ['end', end.toString()],
+    ['thumbs', config.FETCH_THUMBS.toString()],
+    ['random_seed', FEATURED_IMAGES_RANDOM_SEED.toString()]
+  ]);
+
+  return fetchWithTimeout(config.API_BASE_URL + `featured?${urlParams.toString()}`, config.FETCH_TIMEOUT, {
     method: 'GET'
   }).then(async (response) => {
     if (!response.ok) {
       throw new Error(`Failed to fetch featured images. ${response.status} - ${response.statusText}`);
     }
     return response.json() as Promise<SearchResponse>;
-  });
+  }).then(
+    (response: SearchResponse) => Object.values(response)[0] // Get value corresponding to first key
+  ).then((results: SearchResponseJSONObject[]) => {
+    // Populate title field with filename if it doesn't exist
+    results.forEach(result => {
+      if (!result.info.title) {
+        result.info.title = result.info.filename;
+      }
+    });
+    return results;
+  });;
 }
 
 const convertQueriesToFormData = (queries: Query[]) => {
@@ -116,32 +139,23 @@ export const useDataService = (): DataServiceOutput => {
   const [ pageNum, setPageNum ] = useState(0);
 
   // Get featured images to display on home page
-  const fetchAndTransformFeaturedImages = () => {
-    return fetchFeaturedImages().then((featuredImagesJSON: SearchResponse) => {
-      let images = Object.values(featuredImagesJSON)[0]; // Get value corresponding to first key
-  
-      // Shuffle images
-      images = images
-        .map((value) => ({ value, sort: Math.random() }))
-        .sort((a, b) => a.sort - b.sort)
-        .map(({ value }) => value);
-      
-      // Populate title field with filename if it doesn't exist
-      images.forEach(result => {
-        if (!result.info.title) {
-          result.info.title = result.info.filename;
-        }
-      });
-
-      setPagedResults(chunk(images, config.PAGE_SIZE));
+  const fetchFeaturedImagesAndSetState = () => {
+    return fetchFeaturedImages(0, config.NUM_PAGES_PER_REQUEST).then((images: SearchResponseJSONObject[]) => {
       setSearchingState({
         queries: [],
         isFeaturedImages: true,
         isSearching: false,
         searchLatency: NaN,
-        totalResults: images.length
+        totalResults: MAX_FEATURED_IMAGES
       });
       setPageNum(0);
+
+      // Page slicing
+      const _pagedResults = getArrayOfEmptyArrays(NUM_PAGES);
+      const resultPages = chunk(images, config.PAGE_SIZE);
+      _pagedResults.splice(0, resultPages.length, ...resultPages);
+
+      setPagedResults(_pagedResults);
       return;
     });
   };
@@ -156,7 +170,12 @@ export const useDataService = (): DataServiceOutput => {
         Math.floor(page / config.NUM_PAGES_PER_REQUEST) * config.NUM_PAGES_PER_REQUEST;
       const fetchEndPageNum = fetchStartPageNum + config.NUM_PAGES_PER_REQUEST;
 
-      const searchResponseJSON = await fetchSearchResults(searchingState.queries, fetchStartPageNum, fetchEndPageNum);
+      let searchResponseJSON: SearchResponseJSONObject[];
+      if (searchingState.isFeaturedImages) {
+        searchResponseJSON = await fetchFeaturedImages(fetchStartPageNum, fetchEndPageNum);
+      } else {
+        searchResponseJSON = await fetchSearchResults(searchingState.queries, fetchStartPageNum, fetchEndPageNum);
+      }
   
       // Page slicing
       setPagedResults(_pagedResults => {
@@ -231,7 +250,7 @@ export const useDataService = (): DataServiceOutput => {
     pageNum,
     changePageNum,
     performNewSearch,
-    fetchAndTransformFeaturedImages,
+    fetchFeaturedImagesAndSetState,
     reportImage
   }
 }
