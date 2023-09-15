@@ -31,7 +31,7 @@ export const App: React.FunctionComponent = () => {
 
   useEffect(() => {
     // Initialise home page with featured images
-    dataService.fetchAndTransformFeaturedImages().then(_ => {
+    dataService.fetchFeaturedImagesAndSetState().then(_ => {
       setIsHomePage(true); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
     }).catch((err) => {
       Modal.error({

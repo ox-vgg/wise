@@ -5,7 +5,8 @@ import logging
 from pathlib import Path
 import tarfile
 from PIL import Image
-from numpy import ndarray, array, average, float32
+from numpy import ndarray, array, zeros, average, expand_dims, float32
+from numpy.random import default_rng
 from numpy.linalg import norm
 from tempfile import NamedTemporaryFile
 from torch.hub import download_url_to_file
@@ -381,17 +382,50 @@ def _get_search_router(config: APIConfig):
                         raise FileNotFoundError(f"Error extracting image {image_id} from WebDataset tar file")
         return internal_images_bytes
 
+    # Create a random array of featured images
+    with project_engine.connect() as conn:
+        # Get all image ids from the metadata table
+        ids = array([row['id'] for row in MetadataRepo.get_columns(conn, ('id',))])
+
+        # Select a random subset of up to 10000 image ids (for performance reasons)
+        default_rng(seed=42).shuffle(ids)
+        ids = ids[:10000]
 
     @router.get('/featured', response_model=Dict[str, List[SearchResponse]])
     async def handle_get_featured(
+        start: int = Query(0, ge=0, le=980),
+        end: int = Query(20, gt=0, le=1000),
         thumbs: bool = Query(True),
+        random_seed: int = Query(123) # This seed is used to randomly select the set of images used for the featured images
     ):
-        q = ['']
-        start = 0
-        end = 200
-        prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
-        text_features = extract_text_features(prefixed_queries)
-        return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
+        with project_engine.connect() as conn:
+            # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
+            selected_ids = ids.copy()
+            default_rng(seed=random_seed).shuffle(selected_ids)
+            selected_ids = selected_ids[:1000]
+            selected_ids = expand_dims(selected_ids, axis=0)
+
+            dist = zeros(selected_ids.shape) # Use 0 as a filler value for the distance array since this is not relevant for the featured images
+
+            def get_metadata(_id):
+                m = MetadataRepo.get(conn, int(_id))
+                if m is None:
+                    raise RuntimeError()
+                return m
+
+            if not thumbs:
+                response = make_basic_response(
+                    'featured', dist[[0], start:end], selected_ids[[0], start:end], get_metadata
+                )
+            else:
+                response = make_full_response(
+                    'featured',
+                    dist[[0], start:end],
+                    selected_ids[[0], start:end],
+                    get_metadata,
+                    thumbs_reader,
+                )
+        return response
 
 
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])

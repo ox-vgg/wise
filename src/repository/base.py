@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Iterable, Any, Type, Optional
+from typing import Tuple, TypeVar, Generic, Iterable, Any, Type, Optional
 
 from pydantic import BaseModel
 import sqlalchemy as sa
@@ -55,6 +55,10 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         result = conn.execute(sa.select(self._table))
         for row in result.mappings():
             yield self.model.model_validate(row)
+
+    def get_columns(self, conn: sa.Connection, column_names: Tuple[str]):
+        result = conn.execute(sa.select(self._table.c[column_names]))
+        yield from result.mappings()
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
         result = conn.execute(

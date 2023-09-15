@@ -64,7 +64,7 @@ export interface DataServiceOutput {
   pageNum: number;
   changePageNum: (x: number) => void;
   performNewSearch: (queries: Query[]) => Promise<void>;
-  fetchAndTransformFeaturedImages: () => Promise<void>;
+  fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
 }
 
