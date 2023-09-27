@@ -9,6 +9,7 @@ const wise_data = {};
 const PAGE_IMG_COUNT = 30;
 const SEARCH_RESULT_COUNT = 20;
 const MAX_SEARCH_RESULT = 1000;
+const FEATURED_IMAGES_RANDOM_SEED = Math.floor(Math.random()*100); // Generate a random number between 0-100 to be used as the random seed when fetching the featured images
 
 // html containers
 const imgrid_container = document.getElementById('imgrid');
@@ -64,15 +65,12 @@ function load_project_info() {
 function load_featured_images() {
 	wise_current_ui_mode = UI_MODE.BROWSE_IMAGES;
 
-	fetch("featured_images.json", {
+	fetch("featured?end=500&random_seed="+FEATURED_IMAGES_RANDOM_SEED, {
 		method: 'GET'
 	})
 		.then((response) => response.json())
 		.then((featured_images_json) => {
-			wise_home_featured_images = featured_images_json
-				.map(value => ({ value, sort: Math.random() }))
-				.sort((a, b) => a.sort - b.sort)
-				.map(({ value }) => value); // Shuffle images
+			wise_home_featured_images = Object.values(featured_images_json)[0];
 		
 			wise_data['num_featured_images'] = wise_home_featured_images.length;
 			show_featured_images(wise_home_from_findex, wise_home_to_findex);
@@ -129,16 +127,16 @@ function show_featured_images(from_findex, to_findex) {
 	navinfo1.innerHTML = 'Showing featured images';
 	imgrid_container.innerHTML = '';
 	for (var i = from_findex; i < to_findex; ++i) {
-		const img_link = wise_home_featured_images[i]['original_download_url']
+		const img_link = wise_home_featured_images[i]['link']
 		const img_link_tok = img_link.split('/');
 		const img_filename = img_link_tok[img_link_tok.length - 2];
 		const img_filename_decoded = decodeURIComponent(img_filename); // Decode filename to show special characters / utf-8 characters
 		
-		const width = wise_home_featured_images[i]['orig_width'];
-		const height = wise_home_featured_images[i]['orig_height'];
+		const width = wise_home_featured_images[i]['info']['width'];
+		const height = wise_home_featured_images[i]['info']['height'];
 		
 		const img = document.createElement('img');
-		img.src = img_link;
+		img.src = wise_home_featured_images[i]['thumbnail'];
 		img.setAttribute('title', 'File: ' + img_filename_decoded);
 
 		const a = document.createElement('a');
@@ -285,5 +283,5 @@ function show_search_result(response, search_time) {
 		imgrid_container.appendChild(a);
 	}
 	navinfo1.innerHTML = 'Showing search results from ' + (wise_result_start_findex + 1) + ' to ' + wise_result_end_findex + '.';
-	navinfo2.innerHTML = 'Go back to <span onclick="load_featured_image_grid()" class="text_button">Home</span>';
+	navinfo2.innerHTML = 'Go back to <span onclick="load_featured_images()" class="text_button">Home</span>';
 }
