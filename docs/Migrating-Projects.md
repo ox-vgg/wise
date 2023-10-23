@@ -6,11 +6,11 @@ A WISE project stores absolute path of many assets (e.g. image location) in a SQ
 Here is an example.
 
 ```
-sqlite3 wise-store/oumnh/
+sqlite3 wise-store/project-name-here/
 sqlite> select * from datasets;
-1|/data/disk1/oumnh/data|IMAGE_DIR
+1|/data/disk1/project-name-here/data|IMAGE_DIR
 sqlite> UPDATE datasets \
-  SET location="/data/new-disk/oumnh/data" \
+  SET location="/data/new-disk/project-name-here/data" \
   WHERE id=1;
 sqlite> (Note: press Ctrl +D to exit)
 ```

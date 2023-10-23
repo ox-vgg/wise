@@ -582,7 +582,7 @@ def update(
     ),
 ):
     """
-    Update WISE Project
+    Update WISE Project (add more images to an existing project)
 
     - For each data source, extract the features, thumbnails and metadata
       of images and append it to the project dataset

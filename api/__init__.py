@@ -34,7 +34,7 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
             StaticFiles(directory=theme_asset_dir, html=True),
             name="assets",
         )
-        log_custom_format(f'Open http://0.0.0.0:{config.port}/{config.project_id}/ in your browser')
+        log_custom_format(f'Open http://{config.hostname}:{config.port}/{config.project_id}/ in your browser')
         if callback:
             callback()
 
