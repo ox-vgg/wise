@@ -1,3 +1,5 @@
+
+
 <div align="center">
   <h1>WISE Image Search Engine (WISE)</h1>
 
@@ -8,9 +10,13 @@
   </p>
 </div>
 
+
+[[_TOC_]]
+
 > The code and documentation contained in this repository is not stable yet for production usage. We are working on making it production ready.
 
 <hr>
+
 
 ## Features
 
