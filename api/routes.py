@@ -534,7 +534,7 @@ def _get_search_router(config: APIConfig):
                 with Image.open(io.BytesIO(query)) as im:
                     feature_vector = extract_image_features([im])
                     if query_dict['type'] == 'negative':
-                        weights.append(0.2)
+                        weights.append(config.negative_queries_weight)
                     else:
                         weights.append(1)
             elif query.startswith(("http://", "https://")):
@@ -544,7 +544,7 @@ def _get_search_router(config: APIConfig):
                     with Image.open(tmpfile.name) as im:
                         feature_vector = extract_image_features([im])
                         if query_dict['type'] == 'negative':
-                            weights.append(0.2)
+                            weights.append(config.negative_queries_weight)
                         else:
                             weights.append(1)
             else:
@@ -556,9 +556,9 @@ def _get_search_router(config: APIConfig):
                 prefixed_queries = f"{_prefix} {query.strip()}".strip()
                 feature_vector = extract_text_features(prefixed_queries)
                 if query_dict['type'] == 'negative':
-                    weights.append(0.4)
+                    weights.append(config.text_queries_weight * config.negative_queries_weight)
                 else:
-                    weights.append(2) # assign higher weight to natural language queries
+                    weights.append(config.text_queries_weight) # assign higher weight to natural language queries
             if query_dict['type'] == 'negative':
                 feature_vector = -feature_vector
             feature_vectors.append(feature_vector)
