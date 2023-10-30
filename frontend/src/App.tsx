@@ -42,7 +42,7 @@ export const App: React.FunctionComponent = () => {
     });
 
     // Fetch project info
-    fetchWithTimeout(config.API_BASE_URL+"info", 7000, { method: 'GET' })
+    fetchWithTimeout(config.API_BASE_URL+"info", 30000, { method: 'GET' })
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Failed to fetch project info. ${response.status} - ${response.statusText}`);
