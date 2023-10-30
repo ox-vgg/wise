@@ -3,16 +3,6 @@ import { MoreOutlined } from "@ant-design/icons";
 import sanitizeHtml from 'sanitize-html';
 import './ImageDetailsModal.scss';
 
-/*
-TODO
-- figure out:
-  - difference between DateTime vs DateTimeOriginal
-  - LicenseShortName, License, UsageTerms, LicenseUrl
-  - find out what is Restrictions field
-
-- add disclaimer
-*/
-
 const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: any) => {
   let title;
   let caption, author, copyright;

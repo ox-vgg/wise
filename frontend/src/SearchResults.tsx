@@ -37,36 +37,17 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
     } else if (key.startsWith('add_image_query_')) {
       key = key.replace(/^add_image_query_/, '');
       setDropdownImageId(undefined);
-      if (isHomePage) {
-        // Temporary hack; TODO implement a better solution later
-        setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'URL', displayText: 'Internal image', value: key }]);
-        setIsSubmitSearch(true);
-        return;
-      }
       setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: key }]);
       setIsSubmitSearch(true);
     } else if (key.startsWith('add_negative_image_query_')) {
       key = key.replace(/^add_negative_image_query_/, '');
       setDropdownImageId(undefined);
-      if (isHomePage) {
-        // Temporary hack; TODO implement a better solution later
-        setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'URL', displayText: 'Internal image', value: key, isNegative: true }]);
-        setIsSubmitSearch(true);
-        return;
-      }
       setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: key, isNegative: true }]);
       setIsSubmitSearch(true);
     }
   }
 
   const handleInternalSearchButtonClick = (imageId: string) => {
-    if (isHomePage) {
-      // Temporary hack; TODO implement a better solution later
-      setSearchText('');
-      setMultimodalQueries([{ id: nanoid(), type: 'URL', displayText: 'Internal image', value: imageId }]);
-      setIsSubmitSearch(true);
-      return;
-    }
     setSearchText('');
     setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: imageId }]);
     setIsSubmitSearch(true);
