@@ -92,12 +92,28 @@ reference for evaluating the performance of approximate nearest
 neighbour search methods as shown in the table below.
 
 ```
-|------------+--------------------+-------+-------+-------|
-| Index-Type | Index-Parameters   | Size  |   MAP | Time  |
-|------------+--------------------+-------+-------+-------|
-| Naive      | IndexFlatIP        | 158GB |   1.0 | 52.8s |
-| IVF        | nprobe=1024        | 159GB | 0.495 | 1.0s  |
-|            | nprobe=512         |       | 0.386 | 0.2s  |
-|            | nprobe=256         |       | 0.324 | 0.8s  |
-|------------+--------------------+-------+-------+-------|
+|--------+------------------+--------+------------+------------|
+| Index  | Index-Parameters | Size   | Recall@100 | Time (sec) |
+|--------+------------------+--------+------------+------------|
+| Naive  | IndexFlatIP      | 158 GB |        1.0 |       52.8 |
+| IVF    | nprobe=1024      | 159 GB |        1.0 |       1.0s |
+|        | nprobe=512       |        |        1.0 |       0.2s |
+|        | nprobe=256       |        |        1.0 |       0.8s |
+|        |                  |        |            |            |
+| IVF+PQ | m     = 8        | 938 MB |      0.617 |      0.001 |
+|        | nbits = 8        |        |            |            |
+|        | nlist = 32768    |        |            |            |
+|        |                  |        |            |            |
+| IVF+PQ | m     = 16       | 1.4 GB |      0.700 |      0.001 |
+|        | nbits = 8        |        |            |            |
+|        | nlist = 32768    |        |            |            |
+|        |                  |        |            |            |
+| IVF+PQ | m     = 24       | 1.8 GB |      0.783 |      0.001 |
+|        | nbits = 8        |        |            |            |
+|        | nlist = 32768    |        |            |            |
+|--------+------------------+--------+------------+------------|
 ```
+
+The performance metric **Recall@100** measures the proportion of query
+vectors for which the nearest neighbor is ranked in the first 100
+positions as defined in [this paper](https://ieeexplore.ieee.org/abstract/document/5432202).
