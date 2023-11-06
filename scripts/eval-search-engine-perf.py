@@ -1,14 +1,10 @@
-# Evaluate the performance of a search engine
-#
-# Author: Abhishek Dutta <adutta@robots.ox.ac.uk>
-# Date  : 2023-05-24
-## Compute image retrieval performance metrics (e.g. Precision@K) based on 
+## Compute image retrieval performance metrics (e.g. Recall@K) based on 
 ## search results obtained from a reference search engine (e.g. based on naive 
 ## or exhaustive search) and similar search results obtained from another
 ## search engine which uses search index based on approximate nearest neighbour search.
 ##
 ## Author: Abhishek Dutta <adutta@robots.ox.ac.uk>
-## Date  : 2023-05-26
+## Date  : 2023-11-03
 
 import json
 import argparse
@@ -50,38 +46,48 @@ def main():
             if search_query not in eval_perf['search_queries']:
                 print('Warning: the eval and perf files mis-match in their search queries')
 
-        # see https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)
+        # see Jegou H, Douze M, Schmid C. Product quantization for nearest neighbor search. (2010)
+        # for the definition of retrieval performance metric Recall@K
         MAX_K = 100
-        mean_average_precision = 0.0
-        average_search_time = 0.0
-        for search_query in ref_perf['search_queries']:
-            average_precision = 0
-            for k in range(1, MAX_K+1):
-                eval_filename_list = set()
+        k_list = []
+        recall_at_k_list = []
+        for k in range(1, MAX_K+1):
+            queries_in_which_nn_in_first_k = 0
+            average_search_time = 0
+            for search_query in ref_perf['search_queries']:
                 ref_filename_list = set()
+                for i in range(0, MAX_K):
+                    ref_filename_list.add(ref_perf['search_queries'][search_query][i]['filename'])
+
+                eval_filename_list = set()
                 for i in range(0, k):
                     eval_filename_list.add(eval_perf['search_queries'][search_query][i]['filename'])
-                    ref_filename_list.add(ref_perf['search_queries'][search_query][i]['filename'])
                 tp = len( set.intersection(eval_filename_list, ref_filename_list) )
-                Pk = tp / k
-                eval_filename_k = eval_perf['search_queries'][search_query][k-1]['filename']
-                ref_filename_k = ref_perf['search_queries'][search_query][k-1]['filename']
-
-                if eval_filename_k == ref_filename_k:
-                    average_precision += (tp / k)
-            average_precision = average_precision / MAX_K
-            mean_average_precision += average_precision
-            average_search_time += eval_perf['response_time_in_seconds'][search_query]
-        mean_average_precision = mean_average_precision / len(ref_perf['search_queries'])
+                if tp:
+                    queries_in_which_nn_in_first_k += 1
+                average_search_time += eval_perf['response_time_in_seconds'][search_query]
+            recall_at_k_list.append( queries_in_which_nn_in_first_k / len(ref_perf['search_queries']) )
+            k_list.append(k)
         average_search_time = average_search_time / len(ref_perf['search_queries'])
-        print('%s : MAP=%.3f, average search time=%.3f sec' % (eval_perf['wise_server']['description'], mean_average_precision, average_search_time))
+        index_desc = eval_perf['wise_server']['description']
+        first_dash_index = index_desc.find('-', 0)
+        index_name = index_desc[0:first_dash_index]
+        index_param = index_desc[first_dash_index+1:]
+        index_param_tok = index_param.split('-')
+        if len(index_param_tok) == 3:
+            m = index_param_tok[0].split('m')[1]
+            nbits = index_param_tok[1].split('nbits')[1]
+            nlist = index_param_tok[2].split('nlist')[1]
+            print('| %s | {%s, %s, %s} | ? | %.3f | %.3f | %.3f |' % (index_name, m, nbits, nlist, recall_at_k_list[99], recall_at_k_list[19], average_search_time))
+        else:
+            print('| %s | %s | ? | %.3f | %.3f | %.3f sec |' % (index_name, index_param, recall_at_k_list[99], recall_at_k_list[19], average_search_time))
 
     ## Compute the average search time of reference search index
-    average_search_time = 0.0
+    ref_average_search_time = 0.0
     for search_query in ref_perf['search_queries']:
-        average_search_time += ref_perf['response_time_in_seconds'][search_query]
-    average_search_time = average_search_time / len(ref_perf['search_queries'])
-    print('%s : MAP=1.0, average search time=%.3f sec' % (ref_perf['wise_server']['description'], average_search_time))
+        ref_average_search_time += ref_perf['response_time_in_seconds'][search_query]
+    ref_average_search_time = ref_average_search_time / len(ref_perf['search_queries'])
+    print('| Naive | IndexFlatIP | 158 GB | 1.0 | 1.0 | %.1f |' % (ref_average_search_time))
 
 if __name__ == '__main__':
     main()

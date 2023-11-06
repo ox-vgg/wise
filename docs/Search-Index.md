@@ -92,28 +92,38 @@ reference for evaluating the performance of approximate nearest
 neighbour search methods as shown in the table below.
 
 ```
-|--------+------------------+--------+------------+------------|
-| Index  | Index-Parameters | Size   | Recall@100 | Time (sec) |
-|--------+------------------+--------+------------+------------|
-| Naive  | IndexFlatIP      | 158 GB |        1.0 |       52.8 |
-| IVF    | nprobe=1024      | 159 GB |        1.0 |       1.0s |
-|        | nprobe=512       |        |        1.0 |       0.2s |
-|        | nprobe=256       |        |        1.0 |       0.8s |
-|        |                  |        |            |            |
-| IVF+PQ | m     = 8        | 938 MB |      0.617 |      0.001 |
-|        | nbits = 8        |        |            |            |
-|        | nlist = 32768    |        |            |            |
-|        |                  |        |            |            |
-| IVF+PQ | m     = 16       | 1.4 GB |      0.700 |      0.001 |
-|        | nbits = 8        |        |            |            |
-|        | nlist = 32768    |        |            |            |
-|        |                  |        |            |            |
-| IVF+PQ | m     = 24       | 1.8 GB |      0.783 |      0.001 |
-|        | nbits = 8        |        |            |            |
-|        | nlist = 32768    |        |            |            |
-|--------+------------------+--------+------------+------------|
+|--------+------------------+------+-------+-------+-------|
+| Index  | Index-Parameters | Size |  R@20 | R@100 |  Time |
+|--------+------------------+------+-------+-------+-------|
+| Naive  | IndexFlatIP      | 158G |   1.0 |   1.0 |  52.8 |
+| IVF    | nprobe=1024      | 159G | 1.000 | 1.000 | 1.018 |
+| IVF+PQ | {  8, 8, 32768}  | 938M | 0.617 | 0.217 | 0.058 |
+| IVF+PQ | { 16, 8, 32768}  | 1.4G | 0.700 | 0.267 | 0.056 |
+| IVF+PQ | { 24, 8, 32768}  | 1.8G | 0.783 | 0.367 | 0.062 |
+| IVF+PQ | { 48, 8, 32768}  | 3.0G | 0.850 | 0.567 | 0.057 |
+| IVF+PQ | { 64, 8, 65536}  | 3.9G | 0.967 | 0.733 | 0.073 |
+| IVF+PQ | {128, 8, 65536}  | 7.2G | 1.000 | 0.983 | 0.074 |
+| IVF+PQ | {192, 8, 65536}  | 11G  | 1.000 | 1.000 | 0.078 |
+|--------+------------------+------+-------+-------+-------|
 ```
 
-The performance metric **Recall@100** measures the proportion of query
-vectors for which the nearest neighbor is ranked in the first 100
-positions as defined in [this paper](https://ieeexplore.ieee.org/abstract/document/5432202).
+Notes:
+
+* The performance metric R@20 or R@100 (i.e. Recall@20 or Recall@100)
+measures the proportion of query vectors for which the nearest
+neighbor is ranked in the first 20 or 100 positions as defined in
+[this paper](https://ieeexplore.ieee.org/abstract/document/5432202).
+
+* For index IVF+PQ, the Index Parameters are given as a tuple `{m,
+nbits, nlist}` which indicates that each feature vector gets split
+into `m` sub-vectors which is quantized using `2^nbits` centroids. The
+search space is divided into `nlist` Voronoi cells. The IVF search
+indices visit `1024` nearby Voronoi cells (i.e. `nprobe=1024`) for
+each search operation.
+
+* The dataset contains 55070776 images from Wikimedia Commons image
+repository. Each image is represented by a `768` dimensional feature
+vector extracted by the `ViT-L-14:laion2b_s32b_b82k`
+[OpenClip](https://github.com/mlfoundations/open_clip) model. The
+"Time" column measures the average search query response time in
+seconds.
