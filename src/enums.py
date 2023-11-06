@@ -17,3 +17,4 @@ class BaseStrEnum(str, enum.Enum, metaclass=ContainsEnumMeta):
 class IndexType(BaseStrEnum):
     IndexFlatIP = "IndexFlatIP"
     IndexIVFFlat = "IndexIVFFlat"
+    IndexIVFPQ = "IndexIVFPQ"

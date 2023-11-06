@@ -31,7 +31,9 @@ def get_index(type: IndexType, n_dim: int, *args):
     if type == IndexType.IndexIVFFlat:
         quantizer = index
         index = faiss.IndexIVFFlat(quantizer, n_dim, *args)
-
+    if type == IndexType.IndexIVFPQ:
+        quantizer = index
+        index = faiss.IndexIVFPQ(quantizer, n_dim, *args)
     return index
 
 
