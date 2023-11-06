@@ -48,27 +48,31 @@ def main():
 
         # see Jegou H, Douze M, Schmid C. Product quantization for nearest neighbor search. (2010)
         # for the definition of retrieval performance metric Recall@K
-        MAX_K = 100
-        k_list = []
-        recall_at_k_list = []
-        for k in range(1, MAX_K+1):
-            queries_in_which_nn_in_first_k = 0
-            average_search_time = 0
+        k_value_list = [20, 100]
+        recall_at_k_list = {}
+
+        search_query_count = len(ref_perf['search_queries'])
+        for k_value_index in range(0, len(k_value_list)):
+            k = k_value_list[k_value_index]
+            average_recall_at_k = 0
             for search_query in ref_perf['search_queries']:
                 ref_filename_list = set()
-                for i in range(0, MAX_K):
+                for i in range(0, k):
                     ref_filename_list.add(ref_perf['search_queries'][search_query][i]['filename'])
 
                 eval_filename_list = set()
                 for i in range(0, k):
                     eval_filename_list.add(eval_perf['search_queries'][search_query][i]['filename'])
                 tp = len( set.intersection(eval_filename_list, ref_filename_list) )
-                if tp:
-                    queries_in_which_nn_in_first_k += 1
-                average_search_time += eval_perf['response_time_in_seconds'][search_query]
-            recall_at_k_list.append( queries_in_which_nn_in_first_k / len(ref_perf['search_queries']) )
-            k_list.append(k)
-        average_search_time = average_search_time / len(ref_perf['search_queries'])
+                recall_at_k = tp / k
+                average_recall_at_k += recall_at_k
+            recall_at_k_list[k] = average_recall_at_k / search_query_count
+
+        average_search_time = 0.0
+        for search_query in ref_perf['search_queries']:
+            average_search_time += eval_perf['response_time_in_seconds'][search_query]
+        average_search_time = average_search_time / search_query_count
+
         index_desc = eval_perf['wise_server']['description']
         first_dash_index = index_desc.find('-', 0)
         index_name = index_desc[0:first_dash_index]
@@ -78,9 +82,9 @@ def main():
             m = index_param_tok[0].split('m')[1]
             nbits = index_param_tok[1].split('nbits')[1]
             nlist = index_param_tok[2].split('nlist')[1]
-            print('| %s | {%s, %s, %s} | ? | %.3f | %.3f | %.3f |' % (index_name, m, nbits, nlist, recall_at_k_list[99], recall_at_k_list[19], average_search_time))
+            print('| %s | {%s, %s, %s} | ? | %.3f | %.3f | %.3f |' % (index_name, m, nbits, nlist, recall_at_k_list[20], recall_at_k_list[100], average_search_time))
         else:
-            print('| %s | %s | ? | %.3f | %.3f | %.3f sec |' % (index_name, index_param, recall_at_k_list[99], recall_at_k_list[19], average_search_time))
+            print('| %s | %s | ? | %.3f | %.3f | %.3f sec |' % (index_name, index_param, recall_at_k_list[20], recall_at_k_list[100], average_search_time))
 
     ## Compute the average search time of reference search index
     ref_average_search_time = 0.0
