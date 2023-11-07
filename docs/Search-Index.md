@@ -96,7 +96,7 @@ neighbour search methods as shown in the table below.
 | Index  | Index-Parameters | Size |  R@20 | R@100 |  Time |
 |--------+------------------+------+-------+-------+-------|
 | Naive  | IndexFlatIP      | 158G |   1.0 |   1.0 |  52.8 |
-| IVF    | nprobe=1024      | 159G | 1.000 | 1.000 | 1.018 |
+| IVF    | nlist=74160      | 159G | 1.000 | 1.000 | 1.018 |
 | IVF+PQ | {  8, 8, 32768}  | 938M | 0.006 | 0.019 | 0.058 |
 | IVF+PQ | { 16, 8, 32768}  | 1.4G | 0.008 | 0.025 | 0.056 |
 | IVF+PQ | { 24, 8, 32768}  | 1.8G | 0.011 | 0.032 | 0.062 |
