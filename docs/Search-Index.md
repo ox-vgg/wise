@@ -91,44 +91,69 @@ The naive approach to nearest neighbour search is taken as the
 reference for evaluating the performance of approximate nearest
 neighbour search methods as shown in the table below.
 
+
 ```
-|--------+------------------+------+-------+-------+-------|
-| Index  | Index-Parameters | Size |  R@20 | R@100 |  Time |
-|--------+------------------+------+-------+-------+-------|
-| Naive  | IndexFlatIP      | 158G |   1.0 |   1.0 |  52.8 |
-| IVF    | nprobe=1024      | 159G | 1.000 | 1.000 | 1.018 |
-| IVF+PQ | {  8, 8, 32768}  | 938M | 0.006 | 0.019 | 0.058 |
-| IVF+PQ | { 16, 8, 32768}  | 1.4G | 0.008 | 0.025 | 0.056 |
-| IVF+PQ | { 24, 8, 32768}  | 1.8G | 0.011 | 0.032 | 0.062 |
-| IVF+PQ | { 48, 8, 32768}  | 3.0G | 0.023 | 0.051 | 0.057 |
-| IVF+PQ | { 64, 8, 65536}  | 3.9G | 0.057 | 0.097 | 0.073 |
-| IVF+PQ | {128, 8, 65536}  | 7.2G | 0.235 | 0.294 | 0.074 |
-| IVF+PQ | {192, 8, 65536}  | 11G  | 0.459 | 0.545 | 0.078 |
-| IVF+PQ | {256, 8, 65536}  | 14G  | 0.617 | 0.687 | 0.087 |
-| IVF+PQ | {384, 8, 65536}  | 21G  | 0.775 | 0.831 | 0.084 |
-| IVF+PQ | {768, 8, 65536}  | 40G  | 0.907 | 0.919 | 0.098 |
-|--------+------------------+------+-------+-------+-------|
+Recall0@K   ( R0@K   ) = ( ref[0:K-1] INTERSECT ann[0:K-1] ) / K
+
+Recall1@N,K ( R1@N,K ) = ( ref[0:N-1] INTERSECT ann[0:K-1] ) / N
+
+where,
+  ref[0:N-1] : denote the top-N results from exhaustive search (i.e. compare against all)
+  ann[0:K-1] : denote the top-K results from approximate nearest neighbour (ANN) search
+  N          : size of result set obtained from exhaustive search
+  K          : size of result set obtained from ANN search
+
+|--------+------------------+-------+-------+--------+----------+-----------+-------|
+| Index  | Index-Parameters | Size  | R0@20 | R0@100 | R1@20,30 | R1@20,100 |  Time |
+|--------+------------------+-------+-------+--------+----------+-----------+-------|
+| Naive  | IndexFlatIP      | 158G  |   1.0 |    1.0 |      1.0 |       1.0 |  52.8 |
+| IVF    | nlist=74160      | 159G  | 0.954 |  0.951 |    0.961 |     0.961 | 1.018 |
+| IVF+PQ | {  8, 8, 32768}  | 937M  | 0.007 |  0.019 |    0.008 |     0.025 | 0.058 |
+| IVF+PQ | { 16, 8, 32768}  | 1.3G  | 0.011 |  0.025 |    0.012 |     0.042 | 0.056 |
+| IVF+PQ | { 24, 8, 32768}  | 1.7G  | 0.014 |  0.032 |    0.017 |     0.060 | 0.062 |
+| IVF+PQ | { 48, 8, 32768}  | 3.0G  | 0.028 |  0.051 |    0.036 |     0.101 | 0.057 |
+| IVF+PQ | { 64, 8, 65536}  | 3.9G  | 0.069 |  0.097 |    0.078 |     0.188 | 0.073 |
+| IVF+PQ | {128, 8, 65536}  | 7.2G  | 0.259 |  0.294 |    0.313 |     0.576 | 0.074 |
+| IVF+PQ | {192, 8, 65536}  | 10.4G | 0.486 |  0.545 |    0.578 |     0.865 | 0.078 |
+| IVF+PQ | {256, 8, 65536}  | 13.7G | 0.642 |  0.687 |    0.766 |     0.950 | 0.087 |
+| IVF+PQ | {384, 8, 65536}  | 20.3G | 0.799 |  0.831 |    0.923 |     0.968 | 0.084 |
+| IVF+PQ | {768, 8, 65536}  | 40.0G | 0.904 |  0.919 |    0.963 |     0.968 | 0.098 |
+|--------+------------------+-------+-------+--------+----------+-----------+-------|
 ```
 
 Notes:
 
-* The performance metric R@20 or R@100 (i.e. Recall@20 or Recall@100)
-measures the proportion of query vectors for which the nearest
-neighbor is ranked in the first 20 or 100 positions as defined in
-[this paper](https://ieeexplore.ieee.org/abstract/document/5432202). The
-reported recall values were obtained by averaging the recall values
-for the [following manually selected 60 search queries](data/index/search-queries.txt).
+* Recall0@N (or R0@N) is a more stricter measure of recall which
+measures the proportion of search results that are common in top N
+results from the reference index (i.e. exhaustive search) and the
+Approximate nearest neighbour (ANN) search index. For example,
+`R0@20=0.904` indicates that `90.4%` percent of images retrieved by
+ANN search index matches the images retrieved by the exhaustive search
+method.
 
-* For index IVF+PQ, the Index Parameters are given as a tuple `{m,
-nbits, nlist}` which indicates that each feature vector gets split
+* Recall1@N,K (or R1@N,K) is a more lenient measure of recall which
+measures the proportion of top N results from the reference index
+(i.e. exhaustive search) contained in the top K results from the ANN
+search index. For example, `R1@20,30=0.963` indicates that `96.3%` of
+the top 30 images retrived by the ANN search index matches the top 20
+images retrieved by the exhaustive search method. The [product
+quantization paper (2010)](https://ieeexplore.ieee.org/abstract/document/5432202) uses
+Recall1@N=1,K metric for reporting performance of PQ based ANN
+methods.
+
+* The reported recall values were obtained by averaging the recall
+values for the [following manually selected 60 search queries](data/index/search-queries.txt).
+
+* For index IVF+PQ, the Index Parameters are given as a tuple
+`{m, nbits, nlist}` which indicates that each feature vector gets split
 into `m` sub-vectors which is quantized using `2^nbits` centroids. The
-search space is divided into `nlist` Voronoi cells. The IVF search
-indices visit `1024` nearby Voronoi cells (i.e. `nprobe=1024`) for
-each search operation.
+search space is divided into `nlist` Voronoi cells. All the IVF based
+search indices visit `1024` nearby Voronoi cells (i.e. `nprobe=1024`)
+for each search operation.
 
-* The dataset contains 55070776 images from Wikimedia Commons image
-repository. Each image is represented by a `768` dimensional feature
-vector extracted by the `ViT-L-14:laion2b_s32b_b82k`
+* The search index contains 55070776 images from Wikimedia Commons
+image repository. Each image is represented by a `768` dimensional
+feature vector extracted by the `ViT-L-14:laion2b_s32b_b82k`
 [OpenClip](https://github.com/mlfoundations/open_clip) model. The
 "Time" column measures the average search query response time in
 seconds.
