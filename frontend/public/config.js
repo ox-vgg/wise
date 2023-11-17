@@ -10,9 +10,12 @@ const productionConfig = {
   REPO_URL: "https://gitlab.com/vgg/wise/wise",
   WISE_OVERVIEW_CARD: {
     ABOUT: `
-      <p>WISE Image Search Engine (WISE) is an open-source image search engine which leverages recent advances in machine learning and vision-language models that enable search based on image content using natural language. The expressive power of natural language allows the user to flexibly describe what they are looking for.</p>
-      <!-- TODO include something like: WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image (i.e. it searches by image content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions. -->
-
+      <p>
+        WISE Image Search Engine (WISE) is an open-source multi-modal AI-powered image search engine.
+        Recent advances in machine learning and vision-language models have enabled search based on image content using natural language.
+        With the expressive power of natural language, users can flexibly describe what they are looking for.
+        Furthermore, WISE uses a vision model to understand what's being depicted in an image – search results are retrieved based on image content rather than metadata such as keywords, tags, or descriptions, so the images do not need to be manually tagged or labelled with text captions.
+      </p>
       <p><a href="https://gitlab.com/vgg/wise/wise#how-it-works" target='_blank'>How WISE works</a></p>
       <p><a href="https://gitlab.com/vgg/wise/wise" target='_blank'>Code repository</a></p>
       <p><a href="https://www.robots.ox.ac.uk/~vgg/software/wise/" target='_blank'>Project webpage</a></p>

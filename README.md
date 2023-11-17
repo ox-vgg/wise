@@ -6,7 +6,7 @@
   <p>
     <img src="docs/assets/wise_logo.svg" alt="wise-logo" width="160px" height="70px"/>
     <br>
-    WISE is an AI-based image search engine for efficiently searching through large collections of images.
+    WISE is an AI-powered search engine for images, allowing you to quickly and easily search through large collections of images.
   </p>
 </div>
 
