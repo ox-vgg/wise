@@ -343,12 +343,23 @@ def _get_search_router(config: APIConfig):
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
 
-    def load_internal_images(image_ids: List[int]) -> List[bytes]:
+    def load_internal_images(image_ids: List[int]) -> List[Union[ndarray, bytes]]:
         if len(image_ids) == 0:
             return []
-        internal_images_bytes = []
+        internal_images_loaded = [] # a list of ndarrays (feature vectors) or bytes (from image file)
         with project_engine.connect() as conn:
             for image_id in image_ids:
+                # Try to read feature vector from h5 dataset
+                try:
+                    with get_h5reader(vds_path)(H5Datasets.IMAGE_FEATURES) as image_features_reader:
+                        image_features = image_features_reader([image_id])[0] # This is an np.ndarray of shape: (output_dim,) e.g. (768,)
+                        image_features = expand_dims(image_features, axis=0) # Add batch dimension so the shape becomes (1, output_dim) e.g. (1, 768)
+                        internal_images_loaded.append(image_features)
+                        continue
+                except Exception:
+                    logger.info(f"Could not retrieve feature vector for image {image_id} from h5 dataset. Attempting to re-compute features from original image")
+                    pass
+                
                 metadata = MetadataRepo.get(conn, image_id)
                 if metadata is None:
                     raise FileNotFoundError(f"Image {image_id} not found in metadata database")
@@ -366,7 +377,7 @@ def _get_search_router(config: APIConfig):
                     file_path = location / metadata.path
                     if file_path.is_file():
                         with open(file_path, 'rb') as f:
-                            internal_images_bytes.append(f.read())
+                            internal_images_loaded.append(f.read())
                     else:
                         raise FileNotFoundError(f"Image file for image {image_id} does not exist or is not a regular file")
                 else:
@@ -376,11 +387,11 @@ def _get_search_router(config: APIConfig):
                     try:
                         with tarfile.open(location, "r") as t:
                             buf = t.extractfile(metadata.path.lstrip("#"))
-                            internal_images_bytes.append(buf.read())
+                            internal_images_loaded.append(buf.read())
                     except Exception as e:
                         logger.exception(f"Exception when reading image {image_id}")
                         raise FileNotFoundError(f"Error extracting image {image_id} from WebDataset tar file")
-        return internal_images_bytes
+        return internal_images_loaded
 
     # Create a random array of featured images
     with project_engine.connect() as conn:
@@ -533,20 +544,17 @@ def _get_search_router(config: APIConfig):
             if isinstance(query, bytes):
                 with Image.open(io.BytesIO(query)) as im:
                     feature_vector = extract_image_features([im])
-                    if query_dict['type'] == 'negative':
-                        weights.append(config.negative_queries_weight)
-                    else:
-                        weights.append(1)
+                    weights.append(config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
+            elif isinstance(query, ndarray):
+                feature_vector = query
+                weights.append(config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
             elif query.startswith(("http://", "https://")):
                 logger.info("Downloading", query, "to file")
                 with NamedTemporaryFile() as tmpfile:
                     download_url_to_file(query, tmpfile.name)
                     with Image.open(tmpfile.name) as im:
                         feature_vector = extract_image_features([im])
-                        if query_dict['type'] == 'negative':
-                            weights.append(config.negative_queries_weight)
-                        else:
-                            weights.append(1)
+                        weights.append(config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
             else:
                 if query.strip() in config.query_blocklist:
                     message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
@@ -555,10 +563,10 @@ def _get_search_router(config: APIConfig):
                     )
                 prefixed_queries = f"{_prefix} {query.strip()}".strip()
                 feature_vector = extract_text_features(prefixed_queries)
-                if query_dict['type'] == 'negative':
-                    weights.append(config.text_queries_weight * config.negative_queries_weight)
-                else:
-                    weights.append(config.text_queries_weight) # assign higher weight to natural language queries
+                weights.append(
+                    config.text_queries_weight * # assign higher weight to natural language queries
+                    (config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
+                )
             if query_dict['type'] == 'negative':
                 feature_vector = -feature_vector
             feature_vectors.append(feature_vector)
@@ -568,7 +576,6 @@ def _get_search_router(config: APIConfig):
         return similarity_search(q=["multimodal"], features=average_features, start=start, end=end, thumbs=thumbs)
 
     def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: bool):
-
         dist, ids = index.search(features, end)
         with project_engine.connect() as conn:
             def get_metadata(_id):
