@@ -44,6 +44,7 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
     >
       <a>
         <img src={imageDetails.link || undefined}
+          key={imageDetails.link || undefined}
           title={imageDetails.info?.title + (imageDetails.distance ? ` | Distance = ${imageDetails.distance.toFixed(2)}` : '')}
         />
       </a>
