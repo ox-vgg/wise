@@ -69,7 +69,6 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
       const dropdownItems = [
         {
           label: 'Report image',
-          // TODO change this to link instead of id (also change it in ImageDetailsModal.tsx)
           key: 'report_' + searchResult.info.id
         },
         {

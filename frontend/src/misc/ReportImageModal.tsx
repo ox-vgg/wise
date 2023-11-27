@@ -16,7 +16,6 @@ const reasons = [
 const reasonsHomePageVersion = reasons.filter((_, i) => i !== 3); // Don't show the fourth element on the home page
 
 const ReportImageModal: React.FunctionComponent<ReportImageModalProps> = ({dataService, isHomePage, selectedImageId, setSelectedImageId}) => {
-  // Note: for the Wikimedia project, the image id is the source URI where the Wikimedia image was downloaded from.
   // Note: the modal is open when selectedImageId has a value (i.e. is not undefined). Calling setSelectedImageId() sets selectedImageId to undefined which closes the modal.
 
   const [form] = Form.useForm();
