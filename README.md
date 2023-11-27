@@ -124,7 +124,7 @@ python3 wise.py init your-project-name \
   --store-in /path/to/some/folder \
   --source /path/to/a/folder/of/images \
   --source /you/can/specify/multiple/sources \
-  --source /path/to/a/webdataset{000..999}.tar
+  --source "/path/to/a/webdataset{000..999}.tar"
 ```
 
 Parameters:
