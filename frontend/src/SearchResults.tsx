@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Dropdown, Pagination, Tooltip } from 'antd';
-import { LoadingOutlined } from '@ant-design/icons';
+import { FlagFilled, LoadingOutlined, MinusCircleFilled, PlusCircleFilled } from '@ant-design/icons';
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
@@ -69,15 +69,18 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
       const dropdownItems = [
         {
           label: 'Report image',
-          key: 'report_' + searchResult.info.id
+          key: 'report_' + searchResult.info.id,
+          icon: <FlagFilled style={{color: '#d48806'}} />
         },
         {
           label: 'Add this image as an additional query',
-          key: 'add_image_query_' + searchResult.info.id
+          key: 'add_image_query_' + searchResult.info.id,
+          icon: <PlusCircleFilled style={{color: '#389e0d'}} />
         },
         {
           label: 'Add this image as a negative query',
-          key: 'add_negative_image_query_' + searchResult.info.id
+          key: 'add_negative_image_query_' + searchResult.info.id,
+          icon: <MinusCircleFilled style={{color: '#cf1322'}} />
         }
       ];
 
