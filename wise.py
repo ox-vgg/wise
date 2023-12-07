@@ -867,11 +867,27 @@ def index(
         FEATURES.IMAGE, help="Specify the feature set to build the index with"
     ),
     pretrained_index: Optional[Path] = typer.Option(
-        None, file_okay=True, help="pretrained faiss index to use for adding ids"
+        None,
+        file_okay=True,
+        exists=True,
+        readable=True,
+        help="pretrained faiss index to use for adding ids",
     ),
-    m: Optional[int] = typer.Option(4, help="split feature in this number of sub-vectors"),
-    nbits: Optional[int] = typer.Option(8, help="number of bits per sub-quantizer; results in 2^nbits centroid for each sub-vector space"),
-    nlist: Optional[int] = typer.Option(2048, help="number of Voronoi cells (>=k which is 2^nbits)")
+    save_trained_index_to: Optional[Path] = typer.Option(
+        None,
+        dir_okay=True,
+        file_okay=False,
+        writable=True,
+        exists=True,
+        help="Whether to save the index after training when using IVF* type, useful when re-training for same dataset (no effect when used with --pretrained-index option)",
+    ),
+    m: Optional[int] = typer.Option(
+        4, help="split feature in this number of sub-vectors"
+    ),
+    nbits: Optional[int] = typer.Option(
+        8,
+        help="number of bits per sub-quantizer; results in 2^nbits centroid for each sub-vector space",
+    ),
 ):
     """
     Creates / Updates the current search index for the project
@@ -916,8 +932,8 @@ def index(
         if pretrained_index:
             faiss_index = read_index(pretrained_index)
         else:
+            cell_count = 10 * round(math.sqrt(num_files))
             if index_type == IndexType.IndexIVFFlat:
-                cell_count = 10 * round(math.sqrt(num_files))
                 faiss_index = get_index(index_type, n_dim, cell_count)
             else:
                 # n_dim : feature dimension (e.g. 768)
@@ -925,43 +941,59 @@ def index(
                 # nbits : number of bits that each sub-quantizer can use
                 # k     : number of centroid per sub-vector space (k = 2^nbits)
                 k = pow(2, nbits)
-                assert n_dim % m == 0
-                assert nlist >= k
-                cell_count = nlist
-                faiss_index = get_index(index_type, n_dim, nlist, m, nbits)
+                assert (
+                    n_dim % m == 0
+                ), f"Feature dimension n_dim(={n_dim}) must be divisible by m(={m})"
+                assert cell_count >= k  # TODO Is this needed?
 
-    if index_type == IndexType.IndexIVFFlat or index_type == IndexType.IndexIVFPQ:
-        train_count = min(num_files, 100 * cell_count)
-        num_batches = math.ceil(train_count / read_batch_size)
+                faiss_index = get_index(index_type, n_dim, cell_count, m, nbits)
 
-        # get random permutation
-        rng = np.random.default_rng(26042023)
-        permutation = rng.permutation(num_files)[: (num_batches * read_batch_size)]
+            if (
+                index_type == IndexType.IndexIVFFlat
+                or index_type == IndexType.IndexIVFPQ
+            ):
+                train_count = min(num_files, 100 * cell_count)
+                num_batches = math.ceil(train_count / read_batch_size)
 
-        # sort the permutation for faster reads
-        sort_indices = argsort(permutation)
-        sorted_permutation = [permutation[i] for i in sort_indices]
-        unsort_indices = argsort(sort_indices)
+                # get random permutation
+                rng = np.random.default_rng(26042023)
+                permutation = rng.permutation(num_files)[
+                    : (num_batches * read_batch_size)
+                ]
 
-        # batch the reads
-        batched_indices = batched(sorted_permutation, read_batch_size)
-        with get_h5reader(vds_path)(features_set) as _reader:
-            _train_features = functools.reduce(
-                lambda a, x: (a.append(np.array(_reader(x))), a)[1],
-                tqdm(itertools.islice(batched_indices, num_batches)),
-                [],
-            )
-        # shuffle after concat
-        train_features = np.concatenate(_train_features)
-        train_features = train_features[unsort_indices, ...]
+                # sort the permutation for faster reads
+                sort_indices = argsort(permutation)
+                sorted_permutation = [permutation[i] for i in sort_indices]
+                unsort_indices = argsort(sort_indices)
 
-        assert not faiss_index.is_trained
-        logger.info("Finding clusters from samples...")
-        faiss_index.train(train_features)
-        assert faiss_index.is_trained
-        logger.info("Done")
+                # batch the reads
+                batched_indices = batched(sorted_permutation, read_batch_size)
+                with get_h5reader(vds_path)(features_set) as _reader:
+                    _train_features = functools.reduce(
+                        lambda a, x: (a.append(np.array(_reader(x))), a)[1],
+                        tqdm(itertools.islice(batched_indices, num_batches)),
+                        [],
+                    )
+                # shuffle after concat
+                train_features = np.concatenate(_train_features)
+                train_features = train_features[unsort_indices, ...]
 
-        del train_features
+                assert not faiss_index.is_trained
+                logger.info("Finding clusters from samples...")
+                faiss_index.train(train_features)
+                assert faiss_index.is_trained
+
+                if save_trained_index_to:
+                    output_file = (
+                        save_trained_index_to
+                        / f"{project_id}_{index_type}_trained.faiss"
+                    )
+                    logger.info(f"Saving trained index to - {output_file}")
+                    write_index(faiss_index, output_file)
+
+                logger.info("Done")
+
+                del train_features
 
     with tqdm(total=num_files) as pbar:
         for batch in all_features():
@@ -970,6 +1002,7 @@ def index(
 
     index_filename = project_tree.index(index_type)
     logger.info(f"Saving faiss index to {index_filename}...")
+
     write_index(faiss_index, index_filename)
     logger.info("Done!")
 
