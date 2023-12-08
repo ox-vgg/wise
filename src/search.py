@@ -33,7 +33,13 @@ def get_index(type: IndexType, n_dim: int, *args):
         index = faiss.IndexIVFFlat(quantizer, n_dim, *args)
     if type == IndexType.IndexIVFPQ:
         quantizer = index
-        index = faiss.IndexIVFPQ(quantizer, n_dim, *args)
+        if len(args) < 3:
+            raise ValueError("Insufficient args passed to create a IVFPQ index")
+        nlist, m, nbits = args[:3]
+        index_ivfpq = faiss.IndexIVFPQ(quantizer, n_dim, nlist, m, nbits)
+        opq_matrix = faiss.OPQMatrix(n_dim, m)
+
+        index = faiss.IndexPreTransform(opq_matrix, index_ivfpq)
     return index
 
 
@@ -93,7 +99,8 @@ def classification_based_query(
     features: np.ndarray, query_features, top_k: int, num_training_iterations: int = 20
 ) -> tuple[np.ndarray, np.ndarray]:
     """Process a classification-based query, where a binary classifier is trained on a set of query images,
-    and is used to determine which images in the dataset belong to the same category as the query images"""
+    and is used to determine which images in the dataset belong to the same category as the query images
+    """
 
     # Define classifier
     linear_classifier = LinearBinaryClassifier(embedding_dim=features.shape[1])
