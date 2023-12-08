@@ -250,43 +250,20 @@ def _get_search_router(config: APIConfig):
             return round(v, config.precision)
 
     def make_basic_response(queries, dist, ids, get_metadata_fn):
+        return make_full_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn=None)
+
+    def make_full_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn=None):
         valid_indices = [[i for i, x in enumerate(top_ids) if x != -1] for top_ids in ids]
         valid_ids = [[top_ids[x] for x in indices] for indices, top_ids in zip(valid_indices, ids)]
         valid_dist = [[top_dist[x] for x in indices] for indices, top_dist in zip(valid_indices, dist)]
 
-        return {
-            _q: [
-                SearchResponse(
-                    thumbnail='',
-                    link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
-                    distance=_dist,
-                    info=ImageInfo(
-                        id=str(_metadata.id),
-                        filename=_metadata.path,
-                        width=_metadata.width,
-                        height=_metadata.height,
-                    ),
-                )
-                for _dist, _metadata in zip(
-                    top_dist,
-                    map(
-                        lambda _id: get_metadata_fn(_id),
-                        top_ids,
-                    ),
-                )
-            ]
-            for _q, top_dist, top_ids in zip(queries, valid_dist, valid_ids)
-        }
-
-    def make_full_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn):
-        valid_indices = [[i for i, x in enumerate(top_ids) if x != -1] for top_ids in ids]
-        valid_ids = [[top_ids[x] for x in indices] for indices, top_ids in zip(valid_indices, ids)]
-        valid_dist = [[top_dist[x] for x in indices] for indices, top_dist in zip(valid_indices, dist)]
+        if get_thumbs_fn is None:
+            get_thumbs_fn = lambda x: [None for _ in range(len(x))]
 
         return {
             _q: [
                 SearchResponse(
-                    thumbnail=convert_uint8array_to_base64(_thumb),
+                    thumbnail=convert_uint8array_to_base64(_thumb) if _thumb is not None else "",
                     link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
                     distance=_dist,
                     info=ImageInfo(
@@ -426,11 +403,11 @@ def _get_search_router(config: APIConfig):
 
             if not thumbs:
                 response = make_basic_response(
-                    'featured', dist[[0], start:end], selected_ids[[0], start:end], get_metadata
+                    ['featured'], dist[[0], start:end], selected_ids[[0], start:end], get_metadata
                 )
             else:
                 response = make_full_response(
-                    'featured',
+                    ['featured'],
                     dist[[0], start:end],
                     selected_ids[[0], start:end],
                     get_metadata,
