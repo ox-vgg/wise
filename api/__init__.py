@@ -25,6 +25,19 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
     app = FastAPI()
     app.state.config = config
 
+    # Enable CORS for development mode
+    # If you are running a dev server for the frontend React app,
+    # this allows the frontend dev server on a different port to access the backend
+    if config.mode == 'development':
+        from fastapi.middleware.cors import CORSMiddleware
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     @app.on_event("startup")
     async def startup():
         app.include_router(get_project_router(config))

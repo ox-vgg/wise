@@ -1,8 +1,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Set
+from typing import Literal, Set
 
 
 class APIConfig(BaseSettings):
+    mode: Literal['production', 'development'] = 'production'
     hostname: str = "0.0.0.0"
     port: int = 9670
     top_k: int = 10

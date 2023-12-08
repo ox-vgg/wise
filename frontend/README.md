@@ -22,7 +22,7 @@ Also, for now you will need to replace the `<base href="/wikimedia/">` in `dist/
 2. `cd` into this directory and then run `npm install` to install the project dependencies
 3. Start the development server using `npm run dev`
 
-Note: You will need to separately run the API server using `python3 wise.py serve` from the root directory of this repository. You might also need to modify some of the configurations in `src/config.ts` such as `API_BASE_URL` depending on the URL of the the API server.
+Note: You will need to separately run the API server using `MODE="development" python3 wise.py serve` from the root directory of this repository (or run `python3 wise.py serve` with `mode` set to `"development"` in `config.py`). You might also need to modify some of the configurations in `src/config.ts` such as `API_BASE_URL` depending on the URL of the the API server. The `<base href>` in `index.html` in this directory (not `dist/index.html`) needs to be set to `<base href="/">` in order for the development server to work.
 
 ### Production build
 To build the project, simply run `npm run build`.
