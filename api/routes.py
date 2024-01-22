@@ -304,6 +304,15 @@ def _get_search_router(config: APIConfig):
         index.parallel_mode = 1
         index.nprobe = getattr(config, "nprobe", 32)
 
+    if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
+        try:
+            logger.info(f"Enabling direct map on search index for faster internal search.")
+            index.make_direct_map(True)
+        except Exception as e:
+            logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
+    else:
+        logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
+
     # Get counts
     counts = get_counts(vds_path)
     assert counts[H5Datasets.IMAGE_FEATURES] == counts[H5Datasets.IDS]
@@ -484,8 +493,16 @@ def _get_search_router(config: APIConfig):
         input images/text, and then using this as the query vector.
         """
         try:
-            internal_image_queries = load_internal_images(internal_image_queries)
-            negative_internal_image_queries = load_internal_images(negative_internal_image_queries)
+            if index.direct_map.type == index.direct_map.NoMap:
+                # load saved features from HDF file (slower)
+                internal_image_queries = load_internal_images(internal_image_queries)
+                negative_internal_image_queries = load_internal_images(negative_internal_image_queries)
+            else:
+                # reconstruct features from faiss index (faster)
+                internal_image_features = index.reconstruct_batch(internal_image_queries)
+                internal_image_queries = []
+                for i in range(0, internal_image_features.shape[0]):
+                    internal_image_queries.append( expand_dims(internal_image_features[i,], axis=0) )
         except Exception as e:
             logger.exception(e)
             return PlainTextResponse(

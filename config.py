@@ -12,6 +12,7 @@ class APIConfig(BaseSettings):
     text_queries_weight: float = 2.0
     negative_queries_weight: float = 0.2
     index_type: str = "IndexFlatIP"
+    index_use_direct_map: int = 0
     nprobe: int = 1024
     query_blocklist: Set[str] = set()
     project_id: str
