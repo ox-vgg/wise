@@ -329,6 +329,13 @@ def _get_search_router(config: APIConfig):
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
 
+    def reconstruct_internal_img_feature(image_ids: List[int]) -> List[Union[ndarray, bytes]]:
+        reconstructed_features = index.reconstruct_batch(image_ids)
+        features_list = []
+        for i in range(0, reconstructed_features.shape[0]):
+            features_list.append( expand_dims(reconstructed_features[i,], axis=0) )
+        return features_list
+
     def load_internal_images(image_ids: List[int]) -> List[Union[ndarray, bytes]]:
         if len(image_ids) == 0:
             return []
@@ -499,10 +506,8 @@ def _get_search_router(config: APIConfig):
                 negative_internal_image_queries = load_internal_images(negative_internal_image_queries)
             else:
                 # reconstruct features from faiss index (faster)
-                internal_image_features = index.reconstruct_batch(internal_image_queries)
-                internal_image_queries = []
-                for i in range(0, internal_image_features.shape[0]):
-                    internal_image_queries.append( expand_dims(internal_image_features[i,], axis=0) )
+                internal_image_queries = reconstruct_internal_img_feature(internal_image_queries)
+                negative_internal_image_queries = reconstruct_internal_img_feature(negative_internal_image_queries)
         except Exception as e:
             logger.exception(e)
             return PlainTextResponse(
