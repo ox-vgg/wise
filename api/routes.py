@@ -297,6 +297,9 @@ def _get_search_router(config: APIConfig):
 
     # load the feature search index
     index_filename = project_tree.index(index_type)
+    if not index_filename.is_file():
+        raise FileNotFoundError(f"faiss index file {index_filename} was not found. "
+            "If you have not created a search index yet, you can create one using the `python3 wise.py index` command")
     logger.info(f"Loading faiss index from {index_filename}")
     index = read_index(index_filename, readonly=True)
     if hasattr(index, "nprobe"):
