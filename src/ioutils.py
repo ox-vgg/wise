@@ -450,6 +450,7 @@ def generate_thumbnail(im: Image.Image):
     """
     with io.BytesIO() as buf:
         im.thumbnail((224, 224), resample=Image.BILINEAR)
+        im = im.convert('RGB')
         im.save(buf, format="JPEG", quality=90)
         return buf.getvalue()
 
