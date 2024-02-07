@@ -503,7 +503,7 @@ def _get_search_router(config: APIConfig):
         input images/text, and then using this as the query vector.
         """
         try:
-            if hasattr(index, 'direct_map') and index.direct_map.type == index.direct_map.NoMap:
+            if not hasattr(index, 'direct_map') or index.direct_map.type == index.direct_map.NoMap:
                 # load saved features from HDF file (slower)
                 internal_image_queries = load_internal_images(internal_image_queries)
                 negative_internal_image_queries = load_internal_images(negative_internal_image_queries)
