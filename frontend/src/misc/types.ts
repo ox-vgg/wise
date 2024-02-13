@@ -80,14 +80,34 @@ export type EmptyObject = Record<string, never>;
 
 
 /* ------ Component props ------ */
-export interface CompoundSearchPopoverProps {
+export interface TextSearchFormProps {
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
   searchText: string;
   setSearchText: (x: string) => void;
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
   submitSearch: () => void;
-  onlyVisualSearch?: boolean;
+}
+export interface MediaSearchFormProps {
+  multimodalQueries: Query[];
+  setMultimodalQueries: (x: Query[]) => void;
+  submitSearch: () => void;
+  modality: string;
+}
+export interface SearchExamplesProps {
+  setMultimodalQueries: (x: Query[]) => void;
+  setSearchText: (x: string) => void;
+  submitSearch: () => void;
+}
+export interface SearchDropdownProps {
+  multimodalQueries: Query[];
+  setMultimodalQueries: (x: Query[]) => void;
+  searchText: string;
+  setSearchText: (x: string) => void;
+  handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
+  submitSearch: () => void;
+  clearSearchBar: () => void;
+  isHomePage?: boolean;
 }
 export interface WiseHeaderProps {
   multimodalQueries: Query[];
