@@ -15,6 +15,7 @@ const ImageDetailsModal = ({
   imageDetails,
   setImageDetails,
   setSelectedImageId,
+  isHomePage,
 }: ImageDetailsModalProps) => {
   let title;
   // let caption, author, copyright;
@@ -53,7 +54,7 @@ const ImageDetailsModal = ({
   
   const setStartTimestamp = () => {
     // This is needed because the video player doesn't automatically play the video from the start time in the URL (e.g. #t=16.0)
-    if (imageDetails && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
+    if (imageDetails && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
   }
 
   const handleClickOccurrence = (videoSegment: ProcessedVideoSegment) => {
@@ -120,17 +121,19 @@ const ImageDetailsModal = ({
             TODO - chapter markers by default use thumbnails from storyboard - change this to use thumbnails from search results instead
             */}
             <MediaProvider>
-              <Track content={{
-                // @ts-ignore
-                cues: [...imageDetails.videoInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
-                    startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
-                                                                add 0.1s to the timestamp due to CSS rule
-                                                                requiring the matching chapter elements to be 'even' rather than odd */
-                    endTime: shot.te,
-                    text: 'Match found'
-                  })),
-              }} kind="chapters" lang="en-US" default />;
-
+              {
+                !isHomePage && 
+                <Track content={{
+                  // @ts-ignore
+                  cues: [...imageDetails.videoInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
+                      startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
+                                                                  add 0.1s to the timestamp due to CSS rule
+                                                                  requiring the matching chapter elements to be 'even' rather than odd */
+                      endTime: shot.te,
+                      text: 'Match found'
+                    })),
+                }} kind="chapters" lang="en-US" default />
+              }
             </MediaProvider>
             <DefaultVideoLayout
               thumbnails={imageDetails.videoInfo.timeline_hover_thumbnails}
@@ -149,7 +152,7 @@ const ImageDetailsModal = ({
         )}
       </div>
       {
-        imageDetails ?
+        imageDetails && !isHomePage ?
         <VideoOccurrencesView videoInfo={imageDetails.videoInfo}
           handleClickOccurrence={handleClickOccurrence}
           customHeaderSingular='search match in this video'

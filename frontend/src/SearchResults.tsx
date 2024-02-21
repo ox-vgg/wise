@@ -181,7 +181,10 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
           <div className="wise-video-text-wrapper">
             <h1>{video.title}</h1>
             {/* <p>Some metadata here</p> */}
-            <VideoOccurrencesView videoInfo={video} handleClickOccurrence={setImageDetails} />
+            {
+              !isHomePage &&
+              <VideoOccurrencesView videoInfo={video} handleClickOccurrence={setImageDetails} />
+            }
           </div>
         </div>
       )
@@ -242,7 +245,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     </section>
     <ReportImageModal dataService={dataService} isHomePage={isHomePage}
                       selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId} />
-    <ImageDetailsModal imageDetails={imageDetails} setImageDetails={setImageDetails} setSelectedImageId={setSelectedImageId} />
+    <ImageDetailsModal isHomePage={isHomePage} imageDetails={imageDetails} setImageDetails={setImageDetails} setSelectedImageId={setSelectedImageId} />
   </>
 };
 

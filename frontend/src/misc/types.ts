@@ -212,6 +212,7 @@ export interface SearchResultsProps {
 };
 
 export interface ImageDetailsModalProps {
+  isHomePage: boolean;
   imageDetails?: ProcessedVideoSegment;
   setImageDetails: (x?: ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
