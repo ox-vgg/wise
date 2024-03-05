@@ -4,7 +4,7 @@ import { FlagFilled, LoadingOutlined, MinusCircleFilled, PlusCircleFilled } from
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
-import { SearchResultsProps } from './misc/types.ts';
+import { EmptyObject, ProcessedSearchResult, SearchResultsProps } from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
 import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
@@ -53,11 +53,11 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
     setIsSubmitSearch(true);
   }
 
-  const [imageDetails, setImageDetails] = useState<any>({});
+  const [imageDetails, setImageDetails] = useState<ProcessedSearchResult | EmptyObject>({});
   const openImageDetails = (imageId: string) => {
     console.log(imageId)
     const openedImage = searchResults.find(x => x.info.id === imageId);
-    setImageDetails(openedImage);
+    setImageDetails(openedImage || {});
   }
       
   let searchResultsHTML = searchResults

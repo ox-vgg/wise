@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DataServiceOutput, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
+import { DataServiceOutput, ProcessedSearchResult, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout, chunk, getArrayOfEmptyArrays } from './misc/utils.ts';
 
@@ -135,7 +135,7 @@ export const useDataService = (): DataServiceOutput => {
     totalResults: NaN
   });
   // pagedResults will be an array of arrays (each sub-array represents the results in a given page)
-  const [ pagedResults, setPagedResults ] = useState<any[][]>(getArrayOfEmptyArrays(NUM_PAGES));
+  const [ pagedResults, setPagedResults ] = useState<ProcessedSearchResult[][]>(getArrayOfEmptyArrays(NUM_PAGES));
   const [ pageNum, setPageNum ] = useState(0);
 
   // Get featured images to display on home page
