@@ -1,9 +1,10 @@
 import { Button, Dropdown, Modal } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 import sanitizeHtml from 'sanitize-html';
+import { ImageDetailsModalProps } from "./types";
 import './ImageDetailsModal.scss';
 
-const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: any) => {
+const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: ImageDetailsModalProps) => {
   let title;
   let caption, author, copyright;
 
@@ -52,19 +53,15 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
       <div className="wise-image-details-metadata">
         <p>
           <b>Description</b><br />
-          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(caption)}} />
+          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(caption || '')}} />
         </p>
         <p>
           <b>Author</b><br />
-          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(author)}} />
+          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(author || '')}} />
         </p>
-        {/* <p>
-          <b>Source</b><br />
-          <span dangerouslySetInnerHTML={{__html: json_metadata['Credit']['value']}} />
-        </p> */}
         <p>
           <b>License</b><br />
-          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(copyright)}} />
+          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(copyright || '')}} />
         </p>
       </div>
     </Modal>

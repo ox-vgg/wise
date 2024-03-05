@@ -76,6 +76,8 @@ interface RefsForTour {
   reportImageButton: MutableRefObject<any>;
 }
 
+export type EmptyObject = Record<string, never>;
+
 
 /* ------ Component props ------ */
 export interface CompoundSearchPopoverProps {
@@ -111,6 +113,11 @@ export interface SearchResultsProps {
   setMultimodalQueries: (x: Query[]) => void;
   submitSearch: () => void;
 };
+export interface ImageDetailsModalProps {
+  imageDetails: ProcessedSearchResult | EmptyObject;
+  setImageDetails: (x: ProcessedSearchResult | EmptyObject) => void;
+  setSelectedImageId: (x: string) => void;
+}
 export interface ReportImageModalProps {
   dataService: DataServiceOutput;
   isHomePage: boolean;

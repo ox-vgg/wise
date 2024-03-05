@@ -15,7 +15,7 @@ export const fetchWithTimeout = (url: string, ms: number, { signal, ...options }
   }).finally(() => clearTimeout(timeout));
 };
 
-export const chunk = (arr: any[], chunkSize: number) => {
+export const chunk = <arraytype>(arr: arraytype[], chunkSize: number): arraytype[][] => {
   let R = [];
   for (let i = 0, len = arr.length; i < len; i += chunkSize)
     R.push(arr.slice(i, i + chunkSize));
