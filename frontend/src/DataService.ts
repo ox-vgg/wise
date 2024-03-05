@@ -36,7 +36,7 @@ const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<Search
       }
     });
     return results;
-  });;
+  });
 }
 
 const convertQueriesToFormData = (queries: Query[]) => {

@@ -45,7 +45,7 @@ export interface ProcessedSearchResult {
   distance?: number;
   info: {
     id: string;
-    // filename: string;
+    filename: string;
     width: number;
     height: number;
     title: string;
