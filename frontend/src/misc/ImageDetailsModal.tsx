@@ -42,7 +42,7 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
       onCancel={() => setImageDetails({})}
       width='90vw'
       zIndex={500} // The default zIndex is 1000. Setting this to 500 allows the ReportImageModal to be shown on top / in front of this modal, rather than behind
-      className="wise-image-details-model"
+      className="wise-image-details-modal"
     >
       <a>
         <img src={imageDetails.link || undefined}

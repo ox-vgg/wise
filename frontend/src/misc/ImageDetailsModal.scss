@@ -1,7 +1,7 @@
-.wise-image-details-model {
+.wise-image-details-modal {
   top: 5vh;
 
-  > .ant-modal-content {
+  .ant-modal-content {
     height: 90vh;
     display: flex;
     flex-direction: column;
@@ -71,7 +71,7 @@
   @media (max-width: 800px) {
     top: 2vh;
 
-    > .ant-modal-content > .ant-modal-body {
+    .ant-modal-content > .ant-modal-body {
       overflow: scroll;
 
       > a {
