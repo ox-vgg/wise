@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { DataServiceOutput, ProcessedSearchResult, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
+import { nanoid } from 'nanoid';
+import { DataServiceOutput, InternalSearchDataServiceOutput, ProcessedSearchResult, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout, chunk, getArrayOfEmptyArrays } from './misc/utils.ts';
 
@@ -254,3 +255,48 @@ export const useDataService = (): DataServiceOutput => {
     reportImage
   }
 }
+
+
+
+export const useInternalSearchDataService = (): InternalSearchDataServiceOutput => {
+  const [ searchingState, setSearchingState ] = useState<{
+    internalImageId?: string,
+    isSearching: boolean,
+    searchResults: ProcessedSearchResult[]
+  }>({
+    internalImageId: undefined,
+    isSearching: false,
+    searchResults: []
+  });
+
+  const performInternalSearch = async (internalImageId: string) => {
+    setSearchingState({
+      internalImageId: internalImageId,
+      isSearching: true,
+      searchResults: []
+    });
+    let searchResponseJSON: SearchResponseJSONObject[];
+    try {
+      searchResponseJSON = await fetchSearchResults([{id: nanoid(), type: 'INTERNAL_IMAGE', displayText: '', value: internalImageId}], 0, 1);
+    } catch (e) {
+      setSearchingState({
+        internalImageId: internalImageId,
+        isSearching: false,
+        searchResults: []
+      });
+      throw e;
+    }
+    setSearchingState({
+      internalImageId: internalImageId,
+      isSearching: false,
+      searchResults: searchResponseJSON.filter(x => x.info.id !== internalImageId)
+    });
+    return;
+  };
+
+  return {
+    ...searchingState,
+    performInternalSearch
+  }
+}
+

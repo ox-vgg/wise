@@ -68,6 +68,13 @@ export interface DataServiceOutput {
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
 }
 
+export interface InternalSearchDataServiceOutput {
+  internalImageId?: string;
+  isSearching: boolean;
+  searchResults: ProcessedSearchResult[];
+  performInternalSearch: (internalImageId: string) => void;
+}
+
 interface RefsForTour {
   searchBar: MutableRefObject<any>;
   visualSearchButton: MutableRefObject<any>;

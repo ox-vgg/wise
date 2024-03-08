@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { Button, Dropdown, Modal } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 import sanitizeHtml from 'sanitize-html';
-import { ImageDetailsModalProps } from "./types";
+import { ImageDetailsModalProps, ProcessedSearchResult } from "./types";
+import { useInternalSearchDataService } from "../DataService";
 import './ImageDetailsModal.scss';
 
 const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: ImageDetailsModalProps) => {
@@ -9,6 +11,9 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
   let caption, author, copyright;
 
   const isImageDetails = imageDetails && Object.keys(imageDetails).length > 0;
+
+  const internalSearchDataService = useInternalSearchDataService();
+  let relatedImages: ProcessedSearchResult[] = [];
 
   if (isImageDetails) {
     title = <Button type="text" href="" onClick={(e) => {e.preventDefault()}} size="large">
@@ -19,7 +24,17 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
 
     // const width = imageDetails.info.width;
     // const height = imageDetails.info.height;
+
+    if (internalSearchDataService.internalImageId === imageDetails.info.id) {
+      relatedImages = internalSearchDataService.searchResults;
+    }
   }
+
+  useEffect(() => {
+    if (isImageDetails) {
+      internalSearchDataService.performInternalSearch(imageDetails.info.id);
+    }
+  }, [imageDetails])
 
   return (
     <Modal title={title}
@@ -44,25 +59,33 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
       zIndex={500} // The default zIndex is 1000. Setting this to 500 allows the ReportImageModal to be shown on top / in front of this modal, rather than behind
       className="wise-image-details-modal"
     >
-      <a>
-        <img src={imageDetails.link || undefined}
-          key={imageDetails.link || undefined}
-          title={imageDetails.info?.title + (imageDetails.distance ? ` | Distance = ${imageDetails.distance.toFixed(2)}` : '')}
-        />
-      </a>
-      <div className="wise-image-details-metadata">
-        <p>
-          <b>Description</b><br />
-          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(caption || '')}} />
-        </p>
-        <p>
-          <b>Author</b><br />
-          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(author || '')}} />
-        </p>
-        <p>
-          <b>License</b><br />
-          <span dangerouslySetInnerHTML={{__html: sanitizeHtml(copyright || '')}} />
-        </p>
+      <div className="wise-image-details-modal-main-section">
+        <a>
+          <img src={imageDetails.link || undefined}
+            key={imageDetails.link || undefined}
+            title={imageDetails.info?.title + (imageDetails.distance ? ` | Distance = ${imageDetails.distance.toFixed(2)}` : '')}
+          />
+        </a>
+        <div className="wise-image-details-metadata">
+          <p>
+            <b>Description</b><br />
+            <span dangerouslySetInnerHTML={{__html: sanitizeHtml(caption || '')}} />
+          </p>
+          <p>
+            <b>Author</b><br />
+            <span dangerouslySetInnerHTML={{__html: sanitizeHtml(author || '')}} />
+          </p>
+          <p>
+            <b>License</b><br />
+            <span dangerouslySetInnerHTML={{__html: sanitizeHtml(copyright || '')}} />
+          </p>
+        </div>
+      </div>
+      <div style={{borderTop: '1px solid #e3e3e3', marginTop: 20, marginBottom: 20}} />
+      <div className="wise-image-details-modal-related-images">
+        {
+          relatedImages.map(x => <img src={x.thumbnail} onClick={() => setImageDetails(x)} />)
+        }
       </div>
     </Modal>
   )
