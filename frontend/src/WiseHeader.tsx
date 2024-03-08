@@ -14,15 +14,15 @@ import config from './config.ts';
 
 const examples = [
   {
-    url: 'https://unsplash.com/photos/_tMDkTl7zs8/download?ixid=M3wxMjA3fDB8MXxhbGx8fHx8fHx8fHwxNjgzODA0ODk0fA&force=true&w=640',
+    url: 'https://images.unsplash.com/photo-1559562328-bc48b8b32e2b?fm=jpg&w=640&fit=crop&q=80',
     text: 'in snow'
   },
   {
-    url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=987&q=80',
+    url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?auto=format&fit=crop&w=640&q=80',
     text: 'at night'
   },
   {
-    url: 'https://images.unsplash.com/photo-1642653856727-957f76dd014e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=987&q=80'
+    url: 'https://images.unsplash.com/photo-1642653856727-957f76dd014e?auto=format&fit=crop&w=640&q=80'
   }
 ];
 
