@@ -318,6 +318,7 @@ const SearchDropdown: React.FunctionComponent<SearchDropdownProps> = ({
         {
           modalities.map(modality => (
             <Button type="text" size="large" id={`wise-header-${modality.id}-modality-button`}
+              key={modality.id}
               className={(isModalitySelected && selectedModality === modality.id) ? 'selected' : isModalitySelected ? 'inactive' : undefined}
               onClick={() => selectModality(modality.id)}>
               {modality.icon} {modality.label}
@@ -359,7 +360,13 @@ const QUERY_COLORS = {
 }
 
 const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
-  multimodalQueries, setMultimodalQueries, searchText, setSearchText, submitSearch, refsForTour, isHomePage = false, isSearching = false}: WiseHeaderProps) => {
+  multimodalQueries, setMultimodalQueries, searchText, setSearchText, submitSearch, refsForTour, isHomePage = false, isSearching = false
+}: WiseHeaderProps) => {
+  // This state is set to true when the dropdown is triggered (by hovering over the search bar), and false when the mouse moves outside the search bar
+  const [isSearchDropdownTriggered, setIsSearchDropdownTriggered] = useState(false);
+  // This state is set to true when the search input field is focused, and false when the input is blurred
+  const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
+
   const handleTextInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
   }
@@ -419,8 +426,8 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                             submitSearch={submitSearch} clearSearchBar={clearSearchBar}
                             isHomePage={isHomePage} />
           }
-          // open={true}
-          // TODO keep dropdown open when search input is focused
+          open={isSearchDropdownTriggered || isSearchInputFocused}
+          onOpenChange={(open) => setIsSearchDropdownTriggered(open)}
         >
           <Form onFinish={submitSearch} id="search-input-form">
             <Input
@@ -443,6 +450,8 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                 </>
               }
               ref={refsForTour.searchBar}
+              onFocus={() => setIsSearchInputFocused(true)}
+              onBlur={() => setIsSearchInputFocused(false)}
             />
           </Form>
         </Dropdown>
