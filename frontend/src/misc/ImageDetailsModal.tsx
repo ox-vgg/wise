@@ -82,9 +82,29 @@ const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: 
         </div>
       </div>
       <div style={{borderTop: '1px solid #e3e3e3', marginTop: 20, marginBottom: 20}} />
-      <div className="wise-image-details-modal-related-images">
+      <div className="wise-image-grid">
         {
-          relatedImages.map(x => <img src={x.thumbnail} onClick={() => setImageDetails(x)} />)
+          relatedImages.map(x => {
+            const title = x.info.title;
+            const width = x.info.width;
+            const height = x.info.height;
+            
+            return (
+              <div key={x.info.id}
+                style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
+                className='wise-image-wrapper'
+              >
+                <i style={{paddingBottom: `${height/width*100}%`}}></i>
+                <a onClick={() => setImageDetails(x)}>
+                  <img src={x.thumbnail}
+                      title={x.info.title + (x.distance ? ` | Distance = ${x.distance.toFixed(2)}` : '')}
+                      className="wise-image"
+                  ></img>
+                </a>
+                <div className="wise-image-hover-display">{title}</div>
+              </div>
+            )
+          })
         }
       </div>
     </Modal>

@@ -69,22 +69,6 @@
           top: 0;
         }
       }
-
-      .wise-image-details-modal-related-images {
-        display: flex;
-        flex-wrap: wrap;
-
-        > img {
-          cursor: pointer;
-          margin: 2px;
-          height: 150px;
-          
-          &:hover {
-            box-shadow: 0 2px 5px 2px rgba(0,0,0,0.2);
-          }
-        }
-      }
-
     }
   }
   
@@ -114,6 +98,135 @@
           top: unset;
         }
       }
+    }
+  }
+}
+
+
+
+// TODO remove this later
+// Temporarily copied from SearchResults.scss
+.wise-image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+
+  &::after {
+    content: '';
+    flex-grow: 999999999;
+  }
+
+  > .wise-image-wrapper {
+    margin: 2px;
+    background-color: #eee;
+    position: relative;
+    cursor: pointer;
+    box-sizing: border-box;
+    border: 0px solid #d6e4ff;
+    transition: all 0.1s;
+
+    &.wise-image-selected {
+      border-width: 12px;
+    }
+    
+    > i {
+      display: block;
+    }
+
+    > a {
+      color: unset;
+
+      > img.wise-image {
+        position: absolute;
+        top: 0;
+        width: 100%;
+        vertical-align: bottom;
+      }
+    }
+
+    // Additional rules to deal with very wide / panorama images causing issues
+    max-width: calc(50% - 4px);
+    max-height: 230px;
+    > a > img.wise-image {
+      height: 100%;
+      object-fit: contain;
+    }
+
+    > .wise-internal-image-search-button {
+      display: none;
+      position: absolute;
+      top: 4px;
+      right: 40px;
+      z-index: 1;
+      color: white;
+      width: 23px;
+      margin-right: -4px;
+    }
+    &:hover > .wise-internal-image-search-button, &.wise-image-dropdown-open > .wise-internal-image-search-button {
+      display: block;
+    }
+
+    > .wise-image-more-button {
+      display: none;
+      position: absolute;
+      top: 5px;
+      right: 3px;
+      z-index: 1;
+      padding: 2px;
+      // background-color: rgba(255,255,255,0.3);
+      width: 31px;
+    }
+    &:hover > .wise-image-more-button, &.wise-image-dropdown-open > .wise-image-more-button {
+      display: block;
+    }
+
+    > .wise-image-hover-display {
+      visibility: hidden;
+      position: absolute;
+      pointer-events: none;
+      bottom: 0;
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 12px;
+    }
+    
+    &:hover > .wise-image-hover-display, &.wise-image-dropdown-open > .wise-image-hover-display {
+      display: block;
+      visibility: visible;
+      background-color: rgba(0,0,0,0.35);
+      color: white;
+    }
+
+    > .wise-image-selected-icon-wrapper {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+
+      > .wise-image-selected-icon {
+        color: white;
+        font-size: 36px;
+        -webkit-filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.3));
+        filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.3));
+      }
+    }
+    &.wise-image-selected > .wise-image-selected-icon-wrapper {
+      display: flex;
+      background-color: rgba(0,0,0,0.4);
+    }
+    &:hover > .wise-image-selected-icon-wrapper {
+      display: flex;
     }
   }
 }
