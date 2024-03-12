@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
 import { Alert, Button, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
 import { AudioFilled, /*AudioOutlined,*/ CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, /*PlaySquareOutlined,*/ PlusOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons';
@@ -253,13 +253,16 @@ const modalities = [
 ]
 const { useToken } = theme;
 
-const SearchDropdown: React.FunctionComponent<SearchDropdownProps> = ({
+type SearchDropdownRefAttributes = {
+  selectModality: (modality: string) => void;
+}
+const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownProps>(({
   multimodalQueries, setMultimodalQueries,
   searchText, setSearchText,
   handleTextInputChange,
   submitSearch, clearSearchBar,
   isHomePage
-}) => {
+}, ref) => {
   const { token } = useToken();
   const dropdownStyle: React.CSSProperties = {
     backgroundColor: token.colorBgElevated,
@@ -269,7 +272,7 @@ const SearchDropdown: React.FunctionComponent<SearchDropdownProps> = ({
 
   const [selectedModality, setSelectedModality] = useState<string>('image');
   const [isModalitySelected, setIsModalitySelected] = useState<boolean>(false);
-  const selectModality = (modality: string) => {
+  const toggleModality = (modality: string) => {
     if (isModalitySelected && selectedModality === modality) {
       setIsModalitySelected(false);
     } else {
@@ -277,6 +280,12 @@ const SearchDropdown: React.FunctionComponent<SearchDropdownProps> = ({
       setSelectedModality(modality);
     }
   };
+  const selectModality = (modality: string) => {
+    setIsModalitySelected(true);
+    setSelectedModality(modality);
+  }
+  useImperativeHandle(ref, () => ({ selectModality }));
+
   const _submitSearch = () => {
     setIsModalitySelected(false);
     submitSearch();
@@ -320,7 +329,7 @@ const SearchDropdown: React.FunctionComponent<SearchDropdownProps> = ({
             <Button type="text" size="large" id={`wise-header-${modality.id}-modality-button`}
               key={modality.id}
               className={(isModalitySelected && selectedModality === modality.id) ? 'selected' : isModalitySelected ? 'inactive' : undefined}
-              onClick={() => selectModality(modality.id)}>
+              onClick={() => toggleModality(modality.id)}>
               {modality.icon} {modality.label}
             </Button>
           ))
@@ -350,7 +359,7 @@ const SearchDropdown: React.FunctionComponent<SearchDropdownProps> = ({
       </Flex>
     </div>
   )
-}
+});
 
 const QUERY_COLORS = {
   'TEXT': 'geekblue',
@@ -382,6 +391,28 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     newMultimodalQueries.splice(index, 1);
     setMultimodalQueries(newMultimodalQueries);
   }
+
+  const _submitSearch = () => {
+    // remove focus from search bar input element, to close the search dropdown
+    refsForTour.searchBar.current.blur();
+    submitSearch()
+  }
+
+  // Automatically open the search dropdown when the user is dragging a file into the browser window
+  const searchDropdownRef = useRef<SearchDropdownRefAttributes>(null);
+  const handleDragEnter = (e: DragEvent) => {
+    if (e.dataTransfer?.types.includes('Files')) {
+      refsForTour.searchBar.current.focus();
+      searchDropdownRef.current?.selectModality('image')
+    }
+  }
+  useEffect(() => {
+    document.addEventListener('dragenter', handleDragEnter);
+
+    return () => {
+      document.removeEventListener('dragenter', handleDragEnter);
+    }
+  }, [handleDragEnter]);
 
   const multimodalQueryTags = multimodalQueries.map((query, index) => {
     let icon = <></>;
@@ -423,13 +454,14 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
             <SearchDropdown multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                             searchText={searchText} setSearchText={setSearchText}
                             handleTextInputChange={handleTextInputChange}
-                            submitSearch={submitSearch} clearSearchBar={clearSearchBar}
-                            isHomePage={isHomePage} />
+                            submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
+                            isHomePage={isHomePage}
+                            ref={searchDropdownRef} />
           }
           open={isSearchDropdownTriggered || isSearchInputFocused}
           onOpenChange={(open) => setIsSearchDropdownTriggered(open)}
         >
-          <Form onFinish={submitSearch} id="search-input-form">
+          <Form onFinish={_submitSearch} id="search-input-form">
             <Input
               id="search-input"
               autoComplete="off"
