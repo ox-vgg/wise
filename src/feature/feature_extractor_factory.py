@@ -1,4 +1,4 @@
-from MlFoundationOpenClip import MlFoundationOpenClip
+from mlfoundation_openclip import MlfoundationOpenClip
 
 def FeatureExtractorFactory(id):
     """
@@ -19,7 +19,7 @@ def FeatureExtractorFactory(id):
             model trained on the Web Language Image (WebLI) dataset.
             ''')
     if id.startswith('mlfoundations/open_clip:'):
-        return MlFoundationOpenClip(id)
+        return MlfoundationOpenClip(id)
     else:
         raise ValueError(f'Unknown feature extractor id {id}')
 

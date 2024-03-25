@@ -3,8 +3,7 @@ import torch
 import tempfile
 from PIL import Image
 
-from FeatureExtractorFactory import FeatureExtractorFactory
-from store.NumpySaveStore import NumpySaveStore
+from feature_extractor_factory import FeatureExtractorFactory
 
 class TestFeatureExtractor(unittest.TestCase):
     def setUp(self):

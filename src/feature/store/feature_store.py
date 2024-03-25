@@ -6,10 +6,10 @@ class FeatureStore:
     # or the FeatureStore manages indexing.
     def add(self, features):
         raise NotImplementedError
-    
+
     def add(self, index, features):
         raise NotImplementedError
-    
+
     # TODO: implement IterableDataset
     # def __iter__(self):
     # def __next__(self):

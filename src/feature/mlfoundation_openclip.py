@@ -5,9 +5,9 @@ from typing import List
 from PIL import Image
 from collections.abc import Iterable
 
-from FeatureExtractor import FeatureExtractor
+from feature_extractor import FeatureExtractor
 
-class MlFoundationOpenClip(FeatureExtractor):
+class MlfoundationOpenClip(FeatureExtractor):
     """
     Feature extractors created by ML Foundation's open clip models
     see https://github.com/mlfoundations/open_clip
