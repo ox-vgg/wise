@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from feature_store import FeatureStore
+from store.feature_store import FeatureStore
 
 class NumpySaveStore(FeatureStore):
     def __init__(self, store_name, store_data_dir):

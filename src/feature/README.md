@@ -3,5 +3,6 @@ Contains implementation for feature extractor and feature store.
 
 ## Tests
 ```
-python -m unittest
+cd wise/src/feature/
+python -m unittest discover -s .
 ```
