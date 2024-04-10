@@ -69,3 +69,10 @@ WISE project.
 ```
 python3 wise.py [init|index|search|serve|add|del|] ...
 ```
+
+## Test
+
+```
+cd $HOME/wise
+python -m unittest discover -s src/
+```
