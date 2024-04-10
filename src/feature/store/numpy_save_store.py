@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from store.feature_store import FeatureStore
+from .feature_store import FeatureStore
 
 class NumpySaveStore(FeatureStore):
     def __init__(self, store_name, store_data_dir):
@@ -13,14 +13,14 @@ class NumpySaveStore(FeatureStore):
         self.EXTENSION = 'npy'
         self.store_data_filename = os.path.join(self.store_data_dir,
                                                 self.store_name + '.' + self.EXTENSION)
-    def add(self, new_features):
+    def add(self, index, features):
         if os.path.exists(self.store_data_filename):
             with open(self.store_data_filename, 'rb') as f:
                 old_features = np.load(f)
-                assert(old_features.shape[1] == new_features.shape[1])
-                all_features = np.concatenate((old_features, new_features), axis=0)
+                assert(old_features.shape[1] == features.shape[1])
+                all_features = np.concatenate((old_features, features), axis=0)
         else:
-            all_features = new_features
+            all_features = features
         with open(self.store_data_filename, 'wb') as f:
             np.save(f, all_features)
         return all_features.shape

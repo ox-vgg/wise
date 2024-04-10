@@ -3,14 +3,15 @@ import torch
 import tempfile
 from PIL import Image
 
-from feature_extractor_factory import FeatureExtractorFactory
+from .feature_extractor_factory import FeatureExtractorFactory
 
 class TestFeatureExtractor(unittest.TestCase):
     def setUp(self):
         pass
 
     def test_image_feature(self):
-        featureExtractor = FeatureExtractorFactory('mlfoundations/open_clip:ViT-B-16:dfn2b')
+        pass
+        featureExtractor = FeatureExtractorFactory('mlfoundations/open_clip/ViT-L-14/openai')
         input_image_size = featureExtractor.get_input_image_size()
         self.assertEqual(input_image_size, (224,224))
 
@@ -30,10 +31,10 @@ class TestFeatureExtractor(unittest.TestCase):
         extracted_features = featureExtractor.extract_image_features(preprocessed_data)
 
         self.assertEqual(preprocessed_data.shape[0], extracted_features.shape[0])
-        self.assertEqual(extracted_features.shape[1], 512)
+        self.assertEqual(extracted_features.shape[1], 768)
 
     def tearDown(self):
         pass
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)

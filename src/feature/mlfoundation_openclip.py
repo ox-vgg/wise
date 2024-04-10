@@ -1,11 +1,12 @@
 import open_clip
 import torch
 import numpy as np
-from typing import List
+from typing import List, Union
 from PIL import Image
+import torchvision.transforms.functional as F
 from collections.abc import Iterable
 
-from feature_extractor import FeatureExtractor
+from .feature_extractor import FeatureExtractor
 
 class MlfoundationOpenClip(FeatureExtractor):
     """
@@ -18,19 +19,19 @@ class MlfoundationOpenClip(FeatureExtractor):
     see FeatureExtractor.py for documentation of API
     """
 
-    ID_PREFIX = 'mlfoundations/open_clip:'
+    ID_PREFIX = 'mlfoundations/open_clip/'
     DESCRIPTION = 'See https://github.com/mlfoundations/open_clip'
 
     def __init__(self, id):
         if not id.startswith(self.ID_PREFIX):
-            raise ValueError('feature id cannot start with {id} and must start with {self.id_prefix}')
-        id_tokens = id.split(':')
+            raise ValueError(f'feature id cannot start with {id} and must start with {self.ID_PREFIX}')
+        id_tokens = id.split('/')
 
-        assert len(id_tokens) == 3
-        if (id_tokens[1], id_tokens[2]) not in open_clip.list_pretrained():
-            raise ValueError(f'Model ({id_tokens[1]}, {id_tokens[2]}) not available in {ID_PREFIX}')
-        self.pretrained_model_name = id_tokens[1]
-        self.pretraining_dataset = id_tokens[2]
+        assert len(id_tokens) == 4
+        if (id_tokens[2], id_tokens[3]) not in open_clip.list_pretrained():
+            raise ValueError(f'Model ({id_tokens[2]}, {id_tokens[3]}) not available in {self.ID_PREFIX}')
+        self.pretrained_model_name = id_tokens[2]
+        self.pretraining_dataset = id_tokens[3]
 
         self.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -63,8 +64,8 @@ class MlfoundationOpenClip(FeatureExtractor):
         than running the model
         """
         if not hasattr(self, 'output_dim'):
-            input_image = Image.new("RGB", self.input_image_size)
-            model_image_input = self.preprocess_image([input_image])
+            random_image = torch.rand( (1, 3,) + (self.input_image_size) )
+            model_image_input = self.preprocess_image(random_image)
             model_image_features = self.extract_image_features(model_image_input)
             model_text_input = ['some random text']
             model_text_features  = self.extract_text_features(model_text_input)
@@ -77,12 +78,16 @@ class MlfoundationOpenClip(FeatureExtractor):
     def get_input_image_size(self):
         return self.input_image_size
 
-    def preprocess_image(self, images: List[Image.Image]) -> torch.Tensor:
+    def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
         if isinstance(images, list) and all(isinstance(img, Image.Image) for img in images):
             result = torch.stack([self.preprocess(im) for im in images], dim=0).to(device=self.DEVICE)
             return result
+        elif isinstance(images, torch.Tensor) and len(images.shape) == 4:
+            result = torch.stack([self.preprocess(F.to_pil_image(im)) for im in images], dim=0).to(device=self.DEVICE)
+            return result
+
         else:
-            raise ValueError('all input to preprocess_image() must be an instance of PIL.Image')
+            raise ValueError('all input to preprocess_image() must be an instance of torch.Tensor or PIL.Image')
 
     def extract_image_features(self, images: torch.Tensor) -> np.ndarray:
         if isinstance(images, torch.Tensor):

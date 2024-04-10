@@ -2,7 +2,7 @@ import os
 import numpy as np
 import webdataset as wds
 
-from store.feature_store import FeatureStore
+from .feature_store import FeatureStore
 
 class WebdatasetStore(FeatureStore):
     def __init__(self, store_name, store_data_dir, shard_maxcount, shard_maxsize):
@@ -34,15 +34,13 @@ class WebdatasetStore(FeatureStore):
         self.shardWriter = wds.ShardWriter(pattern=self.store_data_filename,
                                            maxcount=self.shard_maxcount,
                                            maxsize=self.shard_maxsize)
-        self.current_feature_index = 0
+        self.shardWriter.verbose = 0
 
-    def add(self, new_features):
-        feature_index_end = self.current_feature_index + new_features.shape[0]
+    def add(self, id, features):
         self.shardWriter.write({
-            '__key__': ('%06d' % self.current_feature_index), # needs to be a string
-            'features.pyd': new_features
+            '__key__': ('%10d' % id), # needs to be a string
+            'features.pyd': features
         })
-        self.current_feature_index += new_features.shape[0]
 
     def load(self, start_index, count):
         print(f'Loading features from {self.store_data_filename}')

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 from PIL import Image
 import torch
 import numpy as np
@@ -6,8 +6,8 @@ import numpy as np
 class FeatureExtractor:
     def __init__(self):
         raise NotImplementedError
- 
-    def preprocess_image(self, images: List[Image.Image]) -> torch.Tensor:
+
+    def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
         """ Preprocess media to prepare it for feature extraction
 
         Parameters

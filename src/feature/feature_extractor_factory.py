@@ -1,4 +1,4 @@
-from mlfoundation_openclip import MlfoundationOpenClip
+from .mlfoundation_openclip import MlfoundationOpenClip
 
 def FeatureExtractorFactory(id):
     """
@@ -8,17 +8,17 @@ def FeatureExtractorFactory(id):
     ----------
     id : str
          The id string is formatted as MODEL_CREATOR:MODEL_NAME:PRETRAINING_DATASET
-         e.g. "mlfoundations/open_clip:ViT-B-16-SigLIP-256:webli" for extracting features using ViT
+         e.g. "mlfoundations/open_clip/ViT-B-16-SigLIP-256/webli" for extracting features using ViT
          model trained on the Web Language Image (WebLI) dataset.
          Use "__RANDOM_768__" for generating random 768 dimensional features for debugging.
     """
-    if len(id.split(':')) != 3:
+    if len(id.split('/')) != 4:
         raise ValueError(f'''Feature extractor name must be formatted as
-              MODEL_CREATOR : MODEL_NAME : PRETRAINING_DATASET
-            For example, use "mlfoundations/open_clip:ViT-B-16-SigLIP-256:webli" for extracting features using ViT
+              MODEL_CREATOR_NAMESPACE / MODEL_CREATOR / MODEL_NAME / PRETRAINING_DATASET
+            For example, use "mlfoundations/open_clip/ViT-B-16-SigLIP-256/webli" for extracting features using ViT
             model trained on the Web Language Image (WebLI) dataset.
             ''')
-    if id.startswith('mlfoundations/open_clip:'):
+    if id.startswith('mlfoundations/open_clip/'):
         return MlfoundationOpenClip(id)
     else:
         raise ValueError(f'Unknown feature extractor id {id}')

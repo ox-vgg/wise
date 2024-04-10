@@ -3,8 +3,8 @@ import torch
 import tempfile
 import numpy as np
 
-from store.webdataset_store import WebdatasetStore
-from store.numpy_save_store import NumpySaveStore
+from .webdataset_store import WebdatasetStore
+from .numpy_save_store import NumpySaveStore
 
 class TestFeatureExtractorFactory(unittest.TestCase):
     def setUp(self):
@@ -20,7 +20,7 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             feature_count = 2048
             for feature_index in range(0, self.feature_count, shard_maxcount):
                 rand_features = torch.rand((shard_maxcount, self.feature_dim))
-                featureStore1.add(rand_features)
+                featureStore1.add(feature_index, rand_features)
 
             featureStore2 = NumpySaveStore(self.store_name, temp_store_dir)
             features = featureStore2.load(start_index=0, count=-1)
@@ -33,7 +33,7 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             featureStore = WebdatasetStore(self.store_name, temp_store_dir, shard_maxcount, shard_maxsize)
             for feature_index in range(0, self.feature_count, shard_maxcount):
                 rand_features = torch.rand((shard_maxcount, self.feature_dim))
-                featureStore.add(rand_features)
+                featureStore.add(feature_index, rand_features)
             # TODO: test load operation as well
 
     def tearDown(self):
