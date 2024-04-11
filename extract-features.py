@@ -36,9 +36,12 @@ if __name__ == '__main__':
                         help='folder where all project assets are stored')
 
     args = parser.parse_args()
+    store_dir = os.path.join(args.project_dir, 'store')
     if not os.path.exists(args.project_dir):
         os.makedirs(args.project_dir)
-
+    if not os.path.exists(store_dir):
+        os.mkdir(store_dir)
+    
     ## 1. Create a list of input files
     media_filelist = []
     for media_dir in args.media_dir_list:
@@ -56,13 +59,21 @@ if __name__ == '__main__':
     ## 3. Initialise feature store
     shard_maxcount = 1024
     shard_maxsize = 1024*1024 # 1 MB
-    video_store_dir = os.path.join(args.project_dir, 'features')
+    feature_store_dir = store_dir
     for feature_id_tok in video_feature_extractor_id.split('/'):
-        video_store_dir = os.path.join(video_store_dir, feature_id_tok)
-    if not os.path.exists(video_store_dir):
-        os.makedirs(video_store_dir)
+        feature_store_dir = os.path.join(feature_store_dir, feature_id_tok)
+    feature_metadata_dir = os.path.join(feature_store_dir, 'metadata')
+    feature_index_dir = os.path.join(feature_store_dir, 'index')
+    feature_store_dir = os.path.join(feature_store_dir, 'features')
+    if not os.path.exists(feature_store_dir):
+        os.makedirs(feature_store_dir)
+    if not os.path.exists(feature_metadata_dir):
+        os.mkdir(feature_metadata_dir)
+    if not os.path.exists(feature_index_dir):
+        os.mkdir(feature_index_dir)
+
     video_feature_store = WebdatasetStore('video',
-                                          video_store_dir,
+                                          feature_store_dir,
                                           shard_maxcount, shard_maxsize)
 
     ## 4. Initialise data loader
@@ -89,25 +100,23 @@ if __name__ == '__main__':
     feature_id = 0
     for mid, video, audio in tqdm(av_data_loader):
         if video is None or audio is None:
-            # FIXME: temporary fix for malformed tensors at the end of video
             continue
         #print(f"{mid}, {video.tensor.shape}, {video.pts}, {audio.tensor.shape}, {audio.pts}")
         if mid not in internal_metadata:
             internal_metadata[mid] = {
                 'filename': media_filelist[mid],
-                'feature_id_list':[]
+                'video': { 'feature_id_list':[], 'pts':[] },
+                'audio': { 'feature_id_list':[], 'pts':[] },
             }
         video_feature = video_feature_extractor.extract_image_features(video.tensor)
         video_feature_store.add(feature_id, video_feature)
-        internal_metadata[mid]['feature_id_list'].append(feature_id)
+        internal_metadata[mid]['video']['feature_id_list'].append(feature_id)
+        internal_metadata[mid]['video']['pts'].append(video.pts)
         feature_id += 1
-    print(f'Saved {feature_id-1} features to {video_store_dir}')
+    print(f'Saved {feature_id-1} features to {feature_store_dir}')
 
     ## 6. save internal metadata (TODO: replace with DB implementation)
-    metadata_dir = os.path.join(args.project_dir, 'metadata')
-    if not os.path.exists(metadata_dir):
-        os.makedirs(metadata_dir)
-    internal_metadata_fn = os.path.join(metadata_dir, 'internal-metadata.json')
+    internal_metadata_fn = os.path.join(feature_metadata_dir, 'video-internal-metadata.json')
     with open(internal_metadata_fn, 'w') as f:
         json.dump(internal_metadata, f)
         print(f'Saved internal metadata in {internal_metadata_fn}')
