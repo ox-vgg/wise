@@ -16,7 +16,7 @@ if __name__ == '__main__':
                                      description='Initialise a WISE project by extractng features from images, audio and videos.',
                                      epilog='For more details about WISE, visit https://www.robots.ox.ac.uk/~vgg/software/wise/')
     parser.add_argument('--media-dir',
-                        required=False,
+                        required=True,
                         action='append',
                         dest='media_dir_list',
                         type=str,
@@ -29,6 +29,18 @@ if __name__ == '__main__':
                         default=['*.mp4'],
                         type=str,
                         help='regular expression to include certain media files')
+
+    parser.add_argument('--shard_maxcount',
+                        required=False,
+                        type=int,
+                        default=2048,
+                        help='max number of entries in each shard of webdataset tar')
+
+    parser.add_argument('--shard_maxsize',
+                        required=False,
+                        type=int,
+                        default=20*1024*1024, # tar overheads results in 25MB shards
+                        help='max size (in bytes) of each shard of webdataset tar')
 
     parser.add_argument('--project-dir',
                         required=True,
@@ -52,13 +64,11 @@ if __name__ == '__main__':
     print(f'Extracting features from {len(media_filelist)} files')
 
     ## 2. Initialise feature extractor
-    video_feature_extractor_id = 'mlfoundations/open_clip/ViT-L-14/openai'
+    video_feature_extractor_id = 'mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k'
     video_feature_extractor = FeatureExtractorFactory(video_feature_extractor_id)
     print(f'Using {video_feature_extractor_id} for extracting features from video frames')
     
     ## 3. Initialise feature store
-    shard_maxcount = 1024
-    shard_maxsize = 1024*1024 # 1 MB
     feature_store_dir = store_dir
     for feature_id_tok in video_feature_extractor_id.split('/'):
         feature_store_dir = os.path.join(feature_store_dir, feature_id_tok)
@@ -74,7 +84,8 @@ if __name__ == '__main__':
 
     video_feature_store = WebdatasetStore('video',
                                           feature_store_dir,
-                                          shard_maxcount, shard_maxsize)
+                                          args.shard_maxcount,
+                                          args.shard_maxsize)
 
     ## 4. Initialise data loader
     audio_sampling_rate = 48_000  # (48 kHz)
