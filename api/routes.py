@@ -27,8 +27,8 @@ import os
 from config import APIConfig
 from src import db
 from src.projects import WiseTree, WiseProjectTree
-from src.repository import WiseProjectsRepo, MetadataRepo, DatasetRepo
-from src.data_models import ImageInfo, ImageMetadata, DatasetType, Dataset
+from src.repository import WiseProjectsRepo, MediaRepo, SourceCollectionRepo
+from src.data_models import MediaInfo, MediaMetadata, SourceCollectionType
 from src.ioutils import (
     H5Datasets,
     get_h5reader,
@@ -98,9 +98,9 @@ def _get_project_data_router(config: APIConfig):
         response_class=FileResponse,
         responses={404: {"content": "text/plain"}, 302: {}},
     )
-    def get_image(image_id: int):
+    def get_image(image_id: str):
         with project_engine.connect() as conn:
-            metadata = MetadataRepo.get(conn, image_id)
+            metadata = MediaRepo.get(conn, image_id)
             if metadata is None:
                 return PlainTextResponse(
                     status_code=404, content=f"{image_id} not found!"
@@ -109,20 +109,21 @@ def _get_project_data_router(config: APIConfig):
             # we read from
             # Maybe do a HEAD request to check existence before redirect
             # so that we can try to serve the file from disk if present?
+            # TODO (WISE 2) get source URI from imported_metadata table
             if metadata.source_uri and is_valid_uri(metadata.source_uri):
                 return RedirectResponse(metadata.source_uri, status_code=302)
 
-            # Look up the dataset table and find the location and type
-            dataset = DatasetRepo.get(conn, metadata.dataset_id)
-            if dataset is None:
+            # Look up the source_collections table and find the location and type
+            source_collection = SourceCollectionRepo.get(conn, metadata.source_collection_id)
+            if source_collection is None:
                 return PlainTextResponse(
                     status_code=404, content=f"{image_id} not found!"
                 )
 
-            location = Path(dataset.location)
+            location = Path(source_collection.location)
 
             # Handle case where we read the image from disk, but it may not be there
-            if dataset.type == DatasetType.IMAGE_DIR:
+            if source_collection.type == SourceCollectionType.IMAGE_DIR:
                 # metadata.source_uri will be None, so we have to search for it on disk
                 file_path = location / metadata.path
                 if file_path.is_file():
@@ -169,13 +170,13 @@ def _get_project_data_router(config: APIConfig):
 
     @router.get(
         "/metadata/{_id}",
-        response_model=ImageMetadata,
-        response_model_exclude=set(["id", "dataset_id", "dataset_row"]),
+        response_model=MediaMetadata,
+        response_model_exclude=set(["id", "source_collection_id"]),
         responses={200: {"content": "application/json"}},
     )
-    def get_metadata(_id: int):
+    def get_metadata(_id: str):
         with project_engine.connect() as conn:
-            metadata = MetadataRepo.get(conn, _id)
+            metadata = MediaRepo.get(conn, _id)
             if metadata is None:
                 raise HTTPException(status_code=404, detail=f"Metadata not found!")
             return metadata
@@ -242,7 +243,7 @@ def _get_search_router(config: APIConfig):
         link: str
         thumbnail: str
         distance: float
-        info: ImageInfo
+        info: MediaInfo
 
         @field_validator("distance")
         @classmethod
@@ -266,11 +267,14 @@ def _get_search_router(config: APIConfig):
                     thumbnail=convert_uint8array_to_base64(_thumb) if _thumb is not None else "",
                     link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
                     distance=_dist,
-                    info=ImageInfo(
+                    info=MediaInfo(
                         id=str(_metadata.id),
                         filename=_metadata.path,
+                        media_type=str(_metadata.media_type),
                         width=_metadata.width,
                         height=_metadata.height,
+                        format=_metadata.format,
+                        duration=_metadata.duration,
                     ),
                 )
                 for _dist, _metadata, _thumb in zip(
@@ -332,6 +336,7 @@ def _get_search_router(config: APIConfig):
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
 
+    # TODO (WISE 2) update this to use vector ids instead of image ids
     def reconstruct_internal_img_feature(image_ids: List[int]) -> List[Union[ndarray, bytes]]:
         reconstructed_features = index.reconstruct_batch(image_ids)
         features_list = []
@@ -339,7 +344,7 @@ def _get_search_router(config: APIConfig):
             features_list.append( expand_dims(reconstructed_features[i,], axis=0) )
         return features_list
 
-    def load_internal_images(image_ids: List[int]) -> List[Union[ndarray, bytes]]:
+    def load_internal_images(image_ids: List[str]) -> List[Union[ndarray, bytes]]:
         if len(image_ids) == 0:
             return []
         internal_images_loaded = [] # a list of ndarrays (feature vectors) or bytes (from image file)
@@ -356,18 +361,18 @@ def _get_search_router(config: APIConfig):
                     logger.info(f"Could not retrieve feature vector for image {image_id} from h5 dataset. Attempting to re-compute features from original image")
                     pass
                 
-                metadata = MetadataRepo.get(conn, image_id)
+                metadata = MediaRepo.get(conn, image_id)
                 if metadata is None:
                     raise FileNotFoundError(f"Image {image_id} not found in metadata database")
 
-                # Look up the dataset table and find the location and type
-                dataset = DatasetRepo.get(conn, metadata.dataset_id)
-                if dataset is None:
-                    raise LookupError(f"Dataset not found for image {image_id}")
+                # Look up the source_collections table and find the location and type
+                source_collection = SourceCollectionRepo.get(conn, metadata.source_collection_id)
+                if source_collection is None:
+                    raise LookupError(f"Source collection not found for image {image_id}")
 
-                location = Path(dataset.location)
+                location = Path(source_collection.location)
 
-                if dataset.type == DatasetType.IMAGE_DIR:
+                if source_collection.type == SourceCollectionType.IMAGE_DIR:
                     # Try to read image from disk if present
                     # metadata.source_uri will be None, so we have to search for it on disk
                     file_path = location / metadata.path
@@ -392,7 +397,8 @@ def _get_search_router(config: APIConfig):
     # Create a random array of featured images
     with project_engine.connect() as conn:
         # Get all image ids from the metadata table
-        ids = array([row['id'] for row in MetadataRepo.get_columns(conn, ('id',))])
+        # TODO (WISE 2) update this to get vector ids corresponding to the the image ids
+        ids = array([row['id'] for row in MediaRepo.get_columns(conn, ('id',))])
 
         # Select a random subset of up to 10000 image ids (for performance reasons)
         default_rng(seed=42).shuffle(ids)
@@ -415,7 +421,7 @@ def _get_search_router(config: APIConfig):
             dist = zeros(selected_ids.shape) # Use 0 as a filler value for the distance array since this is not relevant for the featured images
 
             def get_metadata(_id):
-                m = MetadataRepo.get(conn, int(_id))
+                m = MediaRepo.get(conn, int(_id))
                 if m is None:
                     raise RuntimeError()
                 return m
@@ -581,7 +587,7 @@ def _get_search_router(config: APIConfig):
         dist, ids = index.search(features, end)
         with project_engine.connect() as conn:
             def get_metadata(_id):
-                m = MetadataRepo.get(conn, int(_id))
+                m = MediaRepo.get(conn, int(_id))
                 if m is None:
                     raise RuntimeError()
                 return m

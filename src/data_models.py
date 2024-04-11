@@ -21,15 +21,18 @@ class QueryType(str, enum.Enum):
     IMAGE_CLASSIFICATION_QUERY = "IMAGE_CLASSIFICATION_QUERY"
 
 
-class ImageInfo(BaseModel):
+# TODO
+class MediaInfo(BaseModel):
     id: str
     filename: str
+    media_type: str
     width: int
     height: int
+    format: str
+    duration: float
     title: str = ""
     caption: str = ""
     copyright: str = ""
-
 
 class BaseSourceCollection(BaseModel):
     id: Optional[str] = None

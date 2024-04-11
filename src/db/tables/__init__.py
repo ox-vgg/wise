@@ -37,8 +37,7 @@ media_table = sa.Table(
     sa.Column("height", sa.Integer, nullable=False),
     sa.Column("num_frames", sa.Integer, nullable=True), # only applies to video files
     sa.Column("duration", sa.Float, nullable=True), # only applies to video files
-
-    # TODO references to these old columns in other files:
+    # TODO (WISE 2) remove references to these old columns in other files:
     # sa.Column("source_uri", sa.Unicode(4096), nullable=True),
     # sa.Column("metadata", sa.JSON, nullable=False, default={}),
 )
@@ -58,7 +57,7 @@ vectors_table = sa.Table(
     sa.Column("end_timestamp", sa.Float(), nullable=True),
 )
 
-imported_metadata = sa.Table(
+imported_metadata_table = sa.Table(
     "imported_metadata",
     project_metadata_obj,
     sa.Column(
@@ -71,7 +70,7 @@ imported_metadata = sa.Table(
     sa.Column("metadata", sa.JSON, nullable=False, default={}),
 )
 
-# TODO remove references to old metadata_table
+# TODO (WISE 2) remove references to old metadata_table
 # metadata_table = sa.Table(
 #     "metadata",
 #     project_metadata_obj,

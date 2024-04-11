@@ -5,8 +5,8 @@ from .. import db
 
 
 WiseProjectsRepo = WiseProjectsSQLAlchemyRepository(db.project_table, Project)
-DatasetRepo = SQLAlchemyRepository[SourceCollection, BaseSourceCollection, SourceCollection](
-    db.dataset_table, SourceCollection
+SourceCollectionRepo = SQLAlchemyRepository[SourceCollection, BaseSourceCollection, SourceCollection](
+    db.source_collections_table, SourceCollection
 )
 MediaRepo = SQLAlchemyRepository[MediaMetadata, MediaMetadata, MediaMetadata](
     db.media_table, MediaMetadata
