@@ -46,4 +46,5 @@ class WebdatasetStore(FeatureStore):
         self.shardWriter.close()
 
     def __del__(self):
-        self.shardWriter.close()
+        if hasattr(self.shardWriter, 'tarstream'):
+            self.shardWriter.close()
