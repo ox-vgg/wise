@@ -58,7 +58,7 @@ vectors_table = sa.Table(
     sa.Column("end_timestamp", sa.Float(), nullable=True),
 )
 
-imported_metadata = sa.Table(
+imported_metadata_table = sa.Table(
     "imported_metadata",
     project_metadata_obj,
     sa.Column(
