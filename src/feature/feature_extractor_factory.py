@@ -1,4 +1,5 @@
 from .mlfoundation_openclip import MlfoundationOpenClip
+from .microsoft_clap import MicrosoftClap
 
 def FeatureExtractorFactory(id):
     """
@@ -20,12 +21,7 @@ def FeatureExtractorFactory(id):
             ''')
     if id.startswith('mlfoundations/open_clip/'):
         return MlfoundationOpenClip(id)
+    elif id.startswith('microsoft/clap/'):
+        return MicrosoftClap(id)
     else:
         raise ValueError(f'Unknown feature extractor id {id}')
-
-        '''
-        elif id.startswith('microsoft/CLAP:'):
-            return MicrosoftClap(id)
-        elif id.startswith('RandomFeatures'):':
-            return RandomFeatures(id)
-        '''

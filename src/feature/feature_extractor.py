@@ -35,6 +35,9 @@ class FeatureExtractor:
         """
         raise NotImplementedError
 
+    def preprocess_text(self, text: str) -> str:
+        raise NotImplementedError
+
     def extract_text_features(self, text_query: List[str]) -> np.ndarray:
         """ Extracts features from text
 
@@ -47,4 +50,10 @@ class FeatureExtractor:
         np.ndarray
             a numpy ndarray containing extracted feature vectors
         """
+        raise NotImplementedError
+
+    def preprocess_audio(self, audio: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError
+
+    def extract_audio_features(self, preprocessed_audio: torch.Tensor) -> np.ndarray:
         raise NotImplementedError

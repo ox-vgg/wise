@@ -72,7 +72,14 @@ python3 wise.py [init|index|search|serve|add|del|] ...
 
 ## Test
 
+All tests can be discovered and run as follows.
 ```
 cd $HOME/wise
 python -m unittest discover -s src/
+```
+
+Individual tests can be executed as follows.
+```
+cd $HOME/wise
+python -m unittest src/feature/test_feature_extractor.py
 ```
