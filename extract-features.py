@@ -124,6 +124,7 @@ if __name__ == '__main__':
         internal_metadata[mid]['video']['feature_id_list'].append(feature_id)
         internal_metadata[mid]['video']['pts'].append(video.pts)
         feature_id += 1
+    video_feature_store.close()
     print(f'Saved {feature_id-1} features to {feature_store_dir}')
 
     ## 6. save internal metadata (TODO: replace with DB implementation)

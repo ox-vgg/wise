@@ -42,9 +42,8 @@ class WebdatasetStore(FeatureStore):
             'features.pyd': features
         })
 
-    def load(self, start_index, count):
-        print(f'Loading features from {self.store_data_filename}')
-        # TODO
+    def close(self):
+        self.shardWriter.close()
 
     def __del__(self):
         self.shardWriter.close()
