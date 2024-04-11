@@ -1,11 +1,18 @@
 import enum
 from pydantic import ConfigDict, BaseModel
 from typing import Optional, Dict, Any
+import datetime
 
 
-class DatasetType(str, enum.Enum):
+class SourceCollectionType(str, enum.Enum):
     IMAGE_DIR = "image_dir"
     WEBDATASET = "webdataset"
+
+
+class MediaType(str, enum.Enum):
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
 
 
 class QueryType(str, enum.Enum):
@@ -24,33 +31,37 @@ class ImageInfo(BaseModel):
     copyright: str = ""
 
 
-class BaseDataset(BaseModel):
-    id: Optional[int] = None
+class BaseSourceCollection(BaseModel):
+    id: Optional[str] = None
     location: str
-    type: DatasetType
+    type: SourceCollectionType
 
-
-class DatasetCreate(BaseDataset):
-    pass
-
-
-class Dataset(BaseDataset):
-    id: int
+class SourceCollection(BaseSourceCollection):
+    id: str
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
-class ImageMetadata(BaseModel):
-    id: Optional[int] = None
-    dataset_id: int = -1
-    dataset_row: Optional[int] = None
+class MediaMetadata(BaseModel):
+    id: Optional[str] = None
+    source_collection_id: str
     path: str
+    md5sum: bytes
     size_in_bytes: int
+    date_modified: datetime.datetime
     format: str
-    width: int = -1
-    height: int = -1
-    source_uri: Optional[str] = None
-    metadata: Dict[str, Any]  # TODO: tighter type
+    width: int
+    height: int
+    num_frames: int
+    duration: float
     model_config = ConfigDict(from_attributes=True)
+
+
+class VectorMetadata(BaseModel):
+    id: int
+    modality: MediaType
+    media_id: str
+    timestamp: Optional[float]
+    end_timestamp: Optional[float]
 
 
 class Project(BaseModel):
