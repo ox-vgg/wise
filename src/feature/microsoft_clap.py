@@ -31,7 +31,13 @@ class MicrosoftClap(FeatureExtractor):
         self.model = CLAP(version=self.version, use_cuda=self.DEVICE)
 
     def preprocess_audio(self, audio: torch.Tensor) -> torch.Tensor:
-        return self.model.default_collate(audio)
+        # CLAP accepts (1xN_samples)
+        if audio.shape[0] > 2:
+            audio = torch.transpose(audio, 0, 1)
+        # the CLAP model only accepts single channel audio
+        if audio.shape[0] != 1:
+            audio = torch.mean(audio, 0, keepdim=True)
+        return self.model.default_collate([audio])
 
     def preprocess_text(self, text: str) -> str:
         return self.model.preprocess_text(text)
