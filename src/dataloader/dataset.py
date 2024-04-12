@@ -246,7 +246,7 @@ class MediaDataset(torch_data.IterableDataset):
         if worker_info is None:
             # Same process
             # Construct iterator with all files
-            return self._get_media_iterator(self._filelist.keys())
+            return self._get_media_iterator(list(self._filelist.keys()))
 
         print(worker_info)
         n_workers = worker_info.num_workers
@@ -256,7 +256,7 @@ class MediaDataset(torch_data.IterableDataset):
         # Each worker will process the video file with index in (w_id, w_id + n, w_id + 2n, ...)
         file_list = itertools.islice(self._filelist.keys(), worker_id, None, n_workers)
 
-        return self._get_media_iterator(file_list)
+        return self._get_media_iterator(list(file_list))
 
 
 class AudioDataset(MediaDataset):
