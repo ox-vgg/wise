@@ -3,6 +3,7 @@ import glob
 import os
 import json
 import configparser
+import time
 
 import torch.utils.data as torch_data
 from tqdm import tqdm
@@ -30,17 +31,23 @@ if __name__ == '__main__':
                         type=str,
                         help='regular expression to include certain media files')
 
-    parser.add_argument('--shard_maxcount',
+    parser.add_argument('--shard-maxcount',
                         required=False,
                         type=int,
                         default=2048,
                         help='max number of entries in each shard of webdataset tar')
 
-    parser.add_argument('--shard_maxsize',
+    parser.add_argument('--shard-maxsize',
                         required=False,
                         type=int,
                         default=20*1024*1024, # tar overheads results in 25MB shards
                         help='max size (in bytes) of each shard of webdataset tar')
+
+    parser.add_argument('--num-workers',
+                        required=False,
+                        type=int,
+                        default=0,
+                        help='number of workers used by data loader')
 
     parser.add_argument('--project-dir',
                         required=True,
@@ -53,7 +60,9 @@ if __name__ == '__main__':
         os.makedirs(args.project_dir)
     if not os.path.exists(store_dir):
         os.mkdir(store_dir)
-    
+
+    start_time = time.time()
+
     ## 1. Create a list of input files
     media_filelist = []
     for media_dir in args.media_dir_list:
@@ -63,72 +72,109 @@ if __name__ == '__main__':
                 media_filelist.append(media_path)
     print(f'Extracting features from {len(media_filelist)} files')
 
-    ## 2. Initialise feature extractor
-    video_feature_extractor_id = 'mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k'
-    video_feature_extractor = FeatureExtractorFactory(video_feature_extractor_id)
-    print(f'Using {video_feature_extractor_id} for extracting features from video frames')
-    
-    ## 3. Initialise feature store
-    feature_store_dir = store_dir
-    for feature_id_tok in video_feature_extractor_id.split('/'):
-        feature_store_dir = os.path.join(feature_store_dir, feature_id_tok)
-    feature_metadata_dir = os.path.join(feature_store_dir, 'metadata')
-    feature_index_dir = os.path.join(feature_store_dir, 'index')
-    feature_store_dir = os.path.join(feature_store_dir, 'features')
-    if not os.path.exists(feature_store_dir):
-        os.makedirs(feature_store_dir)
-    if not os.path.exists(feature_metadata_dir):
-        os.mkdir(feature_metadata_dir)
-    if not os.path.exists(feature_index_dir):
-        os.mkdir(feature_index_dir)
+    ## 2. Prepare for feature extraction and storage
+    feature_extractor_id_list = {
+        'audio': 'microsoft/clap/2023/four-datasets',
+        'video': 'mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k'
+    }
+    feature_extractor_list = {}
+    feature_store_dir_list = {}
+    feature_store_list     = {}
 
-    video_feature_store = WebdatasetStore('video',
-                                          feature_store_dir,
-                                          args.shard_maxcount,
-                                          args.shard_maxsize)
+    for media_type in feature_extractor_id_list:
+        feature_extractor_id = feature_extractor_id_list[media_type]
+
+        ## 2.1 Initialise feature extractor
+        feature_extractor_list[media_type] = FeatureExtractorFactory(feature_extractor_id)
+        print(f'Using {feature_extractor_id} for {media_type}')
+
+        ## 2.2 Create folders to store features, metadata and search index
+        feature_extractor_store_dir = store_dir
+        for feature_extractor_id_tok in feature_extractor_id.split('/'):
+            feature_extractor_store_dir = os.path.join(feature_extractor_store_dir, feature_extractor_id_tok)
+        feature_store_dir_list[media_type] = {
+            'root'             : feature_extractor_store_dir,
+            'index'            : os.path.join(feature_extractor_store_dir, 'index'),
+            'features'         : os.path.join(feature_extractor_store_dir, 'features')
+        }
+        for store_name in feature_store_dir_list[media_type]:
+            feature_extractor_store_dir = feature_store_dir_list[media_type][store_name]
+            if not os.path.exists(feature_extractor_store_dir):
+                os.makedirs(feature_extractor_store_dir)
+
+        ## 2.3 Initialise feature store to store features
+        feature_store_list[media_type] = WebdatasetStore(media_type,
+                                                         feature_store_dir_list[media_type]['features'],
+                                                         args.shard_maxcount,
+                                                         args.shard_maxsize)
 
     ## 4. Initialise data loader
     audio_sampling_rate = 48_000  # (48 kHz)
     video_frame_rate = 2          # fps
     video_frames_per_chunk = 1    # frames
     segment_length = video_frames_per_chunk / video_frame_rate  # frames / fps = seconds
-    audio_frames_per_chunk = int(round(audio_sampling_rate * segment_length))
+    audio_segment_length = 4      # seconds
+    audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
 
     stream = AVDataset(
         media_filelist,
         video_frames_per_chunk=video_frames_per_chunk,
         video_frame_rate=video_frame_rate,
-        video_preprocessing_function=video_feature_extractor.preprocess_image,
+        video_preprocessing_function=feature_extractor_list['video'].preprocess_image,
         audio_samples_per_chunk=audio_frames_per_chunk,
         audio_sample_rate=audio_sampling_rate,
-        audio_preprocessing_function=None,
+        audio_preprocessing_function=feature_extractor_list['audio'].preprocess_audio,
         offset=None,
     )
 
-    ## 5. extract video and audio features
-    av_data_loader = torch_data.DataLoader(stream, batch_size=None, num_workers=0)
+    ## FIXME: temporary code for managing internal metadata
     internal_metadata = {}
-    feature_id = 0
+    feature_id = {}
+    for media_type in feature_extractor_id_list:
+        feature_id[media_type] = 0
+        internal_metadata[media_type] = {}
+
+    ## 5. extract video and audio features
+    print(f'Initializing data loader with {args.num_workers} workers ...')
+    av_data_loader = torch_data.DataLoader(stream, batch_size=None, num_workers=args.num_workers)
     for mid, video, audio in tqdm(av_data_loader):
-        if video is None or audio is None:
-            continue
-        #print(f"{mid}, {video.tensor.shape}, {video.pts}, {audio.tensor.shape}, {audio.pts}")
-        if mid not in internal_metadata:
-            internal_metadata[mid] = {
-                'filename': media_filelist[mid],
-                'video': { 'feature_id_list':[], 'pts':[] },
-                'audio': { 'feature_id_list':[], 'pts':[] },
-            }
-        video_feature = video_feature_extractor.extract_image_features(video.tensor)
-        video_feature_store.add(feature_id, video_feature)
-        internal_metadata[mid]['video']['feature_id_list'].append(feature_id)
-        internal_metadata[mid]['video']['pts'].append(video.pts)
-        feature_id += 1
-    video_feature_store.close()
-    print(f'Saved {feature_id-1} features to {feature_store_dir}')
+        media_segment = { 'video':video, 'audio':audio }
+        
+        for media_type in feature_extractor_id_list:
+            if mid not in internal_metadata[media_type]:
+                internal_metadata[media_type][mid] = {
+                    'filename': media_filelist[mid],
+                    'feature_id_list':[],
+                    'pts':[]
+                }
+            if media_segment[media_type] is None:
+                continue
+            segment_tensor = media_segment[media_type].tensor
+            segment_pts    = media_segment[media_type].pts
+            if segment_tensor is not None:
+                if media_type == 'image' or media_type == 'video':
+                    segment_feature = feature_extractor_list[media_type].extract_image_features(segment_tensor)
+                elif media_type == 'audio':
+                    segment_feature = feature_extractor_list[media_type].extract_audio_features(segment_tensor)
+                else:
+                    raise ValueError('Unknown media_type {media_type}')
+                feature_store_list[media_type].add(feature_id[media_type],
+                                                   segment_feature)
+                internal_metadata[media_type][mid]['feature_id_list'].append( feature_id[media_type] )
+                internal_metadata[media_type][mid]['pts'].append(segment_pts)
+                feature_id[media_type] += 1
 
     ## 6. save internal metadata (TODO: replace with DB implementation)
-    internal_metadata_fn = os.path.join(feature_metadata_dir, 'video-internal-metadata.json')
-    with open(internal_metadata_fn, 'w') as f:
-        json.dump(internal_metadata, f)
-        print(f'Saved internal metadata in {internal_metadata_fn}')
+    for media_type in feature_extractor_id_list:
+        # close all feature store
+        feature_store_list[media_type].close()
+        print(f'Saved {feature_id[media_type]} {media_type} features to {feature_store_dir_list[media_type]["features"]}')
+
+        internal_metadata_fn = os.path.join(feature_store_dir_list[media_type]['root'], 'internal-metadata.json')
+        with open(internal_metadata_fn, 'w') as f:
+            json.dump(internal_metadata, f)
+            print(f'Saved internal metadata for {media_type} in {internal_metadata_fn}')
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f'Feature extraction completed in {int(elapsed_time)} sec. or {int(elapsed_time/60)} min.')
