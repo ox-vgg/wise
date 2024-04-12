@@ -65,7 +65,7 @@ class WebdatasetStore(FeatureStore):
         if not self.shardWriter:
             raise ValueError('enable_write() must be activated before invoking add() method')
         self.shardWriter.write({
-            '__key__': ('%10d' % id), # needs to be a string
+            '__key__': ('%010d' % id), # needs to be a string
             'features.pyd': features
         })
 
