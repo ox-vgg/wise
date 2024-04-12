@@ -104,9 +104,9 @@ if __name__ == '__main__':
 
         ## 2.3 Initialise feature store to store features
         feature_store_list[media_type] = WebdatasetStore(media_type,
-                                                         feature_store_dir_list[media_type]['features'],
-                                                         args.shard_maxcount,
-                                                         args.shard_maxsize)
+                                                         feature_store_dir_list[media_type]['features'])
+        feature_store_list[media_type].enable_write(args.shard_maxcount,
+                                                    args.shard_maxsize)
 
     ## 4. Initialise data loader
     audio_sampling_rate = 48_000  # (48 kHz)
@@ -155,6 +155,9 @@ if __name__ == '__main__':
                 if media_type == 'image' or media_type == 'video':
                     segment_feature = feature_extractor_list[media_type].extract_image_features(segment_tensor)
                 elif media_type == 'audio':
+                    if segment_tensor.shape[2] < audio_frames_per_chunk:
+                        # we discard any malformed audio segments
+                        continue
                     segment_feature = feature_extractor_list[media_type].extract_audio_features(segment_tensor)
                 else:
                     raise ValueError('Unknown media_type {media_type}')

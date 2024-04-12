@@ -1,11 +1,13 @@
 import os
 import numpy as np
 import webdataset as wds
+import glob
+import io
 
 from .feature_store import FeatureStore
 
 class WebdatasetStore(FeatureStore):
-    def __init__(self, store_name, store_data_dir, shard_maxcount, shard_maxsize):
+    def __init__(self, store_name, store_data_dir):
         """
         Store all data in the specified directory as numpy .npy binary file
 
@@ -27,24 +29,58 @@ class WebdatasetStore(FeatureStore):
         self.store_name = store_name
         self.store_data_dir = store_data_dir
         self.EXTENSION = 'tar'
-        self.shard_maxcount = shard_maxcount
-        self.shard_maxsize = shard_maxsize
         self.store_data_filename = os.path.join(self.store_data_dir,
                                                 self.store_name + '-%06d.' + self.EXTENSION)
+        self.feature_count = -1
+        self.feature_dim = -1
+
+    def enable_write(self, shard_maxcount, shard_maxsize, verbose=0):
+        self.shard_maxcount = shard_maxcount
+        self.shard_maxsize = shard_maxsize
         self.shardWriter = wds.ShardWriter(pattern=self.store_data_filename,
                                            maxcount=self.shard_maxcount,
                                            maxsize=self.shard_maxsize)
-        self.shardWriter.verbose = 0
+        self.shardWriter.verbose = verbose
+        
+    def enable_read(self, shard_shuffle=False, shuffle_bufsize=10000):
+        self.shard_shuffle = shard_shuffle
+        self.shuffle_bufsize = shuffle_bufsize
+
+        # load the number of feature count and feature dimension
+        wds_tar_pattern = os.path.join(self.store_data_dir, self.store_name + '-*.tar')
+        self.wds_tar_list = []
+        for tar_file in glob.iglob(pathname=wds_tar_pattern, recursive=False):
+            self.wds_tar_list.append(tar_file)
+        temp_shard_reader = wds.WebDataset(self.wds_tar_list, shardshuffle=False)
+        self.feature_count = 0
+        for _ in temp_shard_reader:
+            self.feature_count += 1
+        feature_dim = -1
+        for payload in temp_shard_reader:
+            feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
+            self.feature_dim = feature_vector.shape[1]
+            break
 
     def add(self, id, features):
+        if not self.shardWriter:
+            raise ValueError('enable_write() must be activated before invoking add() method')
         self.shardWriter.write({
             '__key__': ('%10d' % id), # needs to be a string
             'features.pyd': features
         })
 
+
+    def __iter__(self):
+        shard_reader = wds.WebDataset(self.wds_tar_list,
+                                      shardshuffle=self.shard_shuffle).shuffle(self.shuffle_bufsize)
+        for payload in shard_reader:
+            feature_id = payload['__key__']
+            feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
+            yield feature_id, feature_vector
+
     def close(self):
         self.shardWriter.close()
 
     def __del__(self):
-        if hasattr(self.shardWriter, 'tarstream'):
+        if hasattr(self, 'shardWriter') and hasattr(self.shardWriter, 'tarstream'):
             self.shardWriter.close()
