@@ -7,6 +7,7 @@ import time
 
 import torch.utils.data as torch_data
 from tqdm import tqdm
+import numpy as np
 
 from src.dataloader import AVDataset
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
@@ -137,10 +138,7 @@ if __name__ == '__main__':
     ## 5. extract video and audio features
     print(f'Initializing data loader with {args.num_workers} workers ...')
     av_data_loader = torch_data.DataLoader(stream, batch_size=None, num_workers=args.num_workers)
-    #for mid, video, audio in tqdm(av_data_loader):
-    for mid, video, audio in av_data_loader:
-        #print(f'mid={mid}, filename={media_filelist[mid]}, {video and video.tensor.shape}, {video and video.pts}, {audio and audio.tensor.shape}, {audio and audio.pts}')
-
+    for mid, video, audio in tqdm(av_data_loader):
         media_segment = { 'video':video, 'audio':audio }
         
         for media_type in feature_extractor_id_list:
@@ -155,19 +153,27 @@ if __name__ == '__main__':
             segment_tensor = media_segment[media_type].tensor
             segment_pts    = media_segment[media_type].pts
             
-            if media_type == 'image' or media_type == 'video':
+            if media_type == 'video':
                 segment_feature = feature_extractor_list[media_type].extract_image_features(segment_tensor)
+                # FIXME: temporary hack to sequentially save a batch of 8 frames
+                # find a way to add the full batch at once to webdataset
+                for i in range(0, segment_feature.shape[0]):
+                    feature_i = np.reshape(segment_feature[i], (1, segment_feature.shape[1]))
+                    feature_store_list[media_type].add(feature_id[media_type],
+                                                       feature_i)
+                    internal_metadata[media_type][mid]['feature_id_list'].append( feature_id[media_type] )
+                    internal_metadata[media_type][mid]['pts'].append(segment_pts + i*(1/video_frame_rate))
+                    feature_id[media_type] += 1
             elif media_type == 'audio':
                 if segment_tensor.shape[2] < audio_frames_per_chunk:
                     # we discard any malformed audio segments
                     continue
                 segment_feature = feature_extractor_list[media_type].extract_audio_features(segment_tensor)
-            print(f'[{feature_id[media_type]}] mid={mid}, filename={media_filelist[mid]}, {media_type}, {segment_tensor.shape}, {segment_pts}')
-            feature_store_list[media_type].add(feature_id[media_type],
-                                               segment_feature)
-            internal_metadata[media_type][mid]['feature_id_list'].append( feature_id[media_type] )
-            internal_metadata[media_type][mid]['pts'].append(segment_pts)
-            feature_id[media_type] += 1
+                feature_store_list[media_type].add(feature_id[media_type],
+                                                   segment_feature)
+                internal_metadata[media_type][mid]['feature_id_list'].append( feature_id[media_type] )
+                internal_metadata[media_type][mid]['pts'].append(segment_pts)
+                feature_id[media_type] += 1
 
     ## 6. save internal metadata (TODO: replace with DB implementation)
     for media_type in feature_extractor_id_list:
