@@ -46,7 +46,7 @@ class MicrosoftClap(FeatureExtractor):
         with torch.no_grad():
             preprocessed_audio = preprocessed_audio.reshape(
                 preprocessed_audio.shape[0], preprocessed_audio.shape[2]).to(device=self.DEVICE)
-            return self.model.clap.audio_encoder(preprocessed_audio)[0].cpu()
+            return self.model.clap.audio_encoder(preprocessed_audio)[0].cpu().numpy()
 
     def extract_text_features(self, preprocessed_text: List[str]) -> np.ndarray:
         with torch.no_grad():
