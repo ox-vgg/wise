@@ -111,7 +111,7 @@ if __name__ == '__main__':
     ## 4. Initialise data loader
     audio_sampling_rate = 48_000  # (48 kHz)
     video_frame_rate = 2          # fps
-    video_frames_per_chunk = 1    # frames
+    video_frames_per_chunk = 8    # frames
     segment_length = video_frames_per_chunk / video_frame_rate  # frames / fps = seconds
     audio_segment_length = 4      # seconds
     audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
@@ -137,7 +137,10 @@ if __name__ == '__main__':
     ## 5. extract video and audio features
     print(f'Initializing data loader with {args.num_workers} workers ...')
     av_data_loader = torch_data.DataLoader(stream, batch_size=None, num_workers=args.num_workers)
-    for mid, video, audio in tqdm(av_data_loader):
+    #for mid, video, audio in tqdm(av_data_loader):
+    for mid, video, audio in av_data_loader:
+        #print(f'mid={mid}, filename={media_filelist[mid]}, {video and video.tensor.shape}, {video and video.pts}, {audio and audio.tensor.shape}, {audio and audio.pts}')
+
         media_segment = { 'video':video, 'audio':audio }
         
         for media_type in feature_extractor_id_list:
@@ -151,21 +154,20 @@ if __name__ == '__main__':
                 continue
             segment_tensor = media_segment[media_type].tensor
             segment_pts    = media_segment[media_type].pts
-            if segment_tensor is not None:
-                if media_type == 'image' or media_type == 'video':
-                    segment_feature = feature_extractor_list[media_type].extract_image_features(segment_tensor)
-                elif media_type == 'audio':
-                    if segment_tensor.shape[2] < audio_frames_per_chunk:
-                        # we discard any malformed audio segments
-                        continue
-                    segment_feature = feature_extractor_list[media_type].extract_audio_features(segment_tensor)
-                else:
-                    raise ValueError('Unknown media_type {media_type}')
-                feature_store_list[media_type].add(feature_id[media_type],
-                                                   segment_feature)
-                internal_metadata[media_type][mid]['feature_id_list'].append( feature_id[media_type] )
-                internal_metadata[media_type][mid]['pts'].append(segment_pts)
-                feature_id[media_type] += 1
+            
+            if media_type == 'image' or media_type == 'video':
+                segment_feature = feature_extractor_list[media_type].extract_image_features(segment_tensor)
+            elif media_type == 'audio':
+                if segment_tensor.shape[2] < audio_frames_per_chunk:
+                    # we discard any malformed audio segments
+                    continue
+                segment_feature = feature_extractor_list[media_type].extract_audio_features(segment_tensor)
+            print(f'[{feature_id[media_type]}] mid={mid}, filename={media_filelist[mid]}, {media_type}, {segment_tensor.shape}, {segment_pts}')
+            feature_store_list[media_type].add(feature_id[media_type],
+                                               segment_feature)
+            internal_metadata[media_type][mid]['feature_id_list'].append( feature_id[media_type] )
+            internal_metadata[media_type][mid]['pts'].append(segment_pts)
+            feature_id[media_type] += 1
 
     ## 6. save internal metadata (TODO: replace with DB implementation)
     for media_type in feature_extractor_id_list:
@@ -175,7 +177,7 @@ if __name__ == '__main__':
 
         internal_metadata_fn = os.path.join(feature_store_dir_list[media_type]['root'], 'internal-metadata.json')
         with open(internal_metadata_fn, 'w') as f:
-            json.dump(internal_metadata, f)
+            json.dump(internal_metadata[media_type], f)
             print(f'Saved internal metadata for {media_type} in {internal_metadata_fn}')
 
     end_time = time.time()
