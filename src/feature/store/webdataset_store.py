@@ -42,8 +42,9 @@ class WebdatasetStore(FeatureStore):
                                            maxsize=self.shard_maxsize)
         self.shardWriter.verbose = verbose
         
-    def enable_read(self, shard_shuffle=False, shuffle_bufsize=10000):
+    def enable_read(self, shard_shuffle=False, shuffle_values=False, shuffle_bufsize=10000):
         self.shard_shuffle = shard_shuffle
+        self.shuffle_values = shuffle_values
         self.shuffle_bufsize = shuffle_bufsize
 
         # load the number of feature count and feature dimension
@@ -51,11 +52,11 @@ class WebdatasetStore(FeatureStore):
         self.wds_tar_list = []
         for tar_file in glob.iglob(pathname=wds_tar_pattern, recursive=False):
             self.wds_tar_list.append(tar_file)
+        self.wds_tar_list.sort()
         temp_shard_reader = wds.WebDataset(self.wds_tar_list, shardshuffle=False)
         self.feature_count = 0
         for _ in temp_shard_reader:
             self.feature_count += 1
-        feature_dim = -1
         for payload in temp_shard_reader:
             feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
             self.feature_dim = feature_vector.shape[1]
@@ -71,10 +72,13 @@ class WebdatasetStore(FeatureStore):
 
 
     def __iter__(self):
-        shard_reader = wds.WebDataset(self.wds_tar_list,
+        if self.shuffle_values:
+            shard_reader = wds.WebDataset(self.wds_tar_list,
                                       shardshuffle=self.shard_shuffle).shuffle(self.shuffle_bufsize)
+        else:
+            shard_reader = wds.WebDataset(self.wds_tar_list, shardshuffle=self.shard_shuffle)
         for payload in shard_reader:
-            feature_id = payload['__key__']
+            feature_id = int(payload['__key__'])
             feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
             yield feature_id, feature_vector
 
