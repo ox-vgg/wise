@@ -42,11 +42,8 @@ python3 create-index.py \
 
 ## 6. Search from command line (TODO)
 python3 search.py \
-  --visual-query "..." \
-  --audio-query "..." \
-  --query-by-image "..." \
-  --query-by-video "..." \
-  --query-by-audio "..." \
+  --query-video "..." \
+  --query-audio "..." \
   --project-dir $HOME/wise-projects/CondensedMovies-10/
 
 ## 7. Search using web interface (TODO)

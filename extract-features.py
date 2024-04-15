@@ -10,6 +10,7 @@ from tqdm import tqdm
 import numpy as np
 
 from src.dataloader import AVDataset
+from src.wise_project import WiseProject
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
 from src.feature.store.webdataset_store import WebdatasetStore
 
@@ -56,11 +57,8 @@ if __name__ == '__main__':
                         help='folder where all project assets are stored')
 
     args = parser.parse_args()
-    store_dir = os.path.join(args.project_dir, 'store')
-    if not os.path.exists(args.project_dir):
-        os.makedirs(args.project_dir)
-    if not os.path.exists(store_dir):
-        os.mkdir(store_dir)
+    #TODO: allow adding new files to an existing project
+    project = WiseProject(args.project_dir, create_project=True)
 
     start_time = time.time()
 
@@ -90,22 +88,11 @@ if __name__ == '__main__':
         print(f'Using {feature_extractor_id} for {media_type}')
 
         ## 2.2 Create folders to store features, metadata and search index
-        feature_extractor_store_dir = store_dir
-        for feature_extractor_id_tok in feature_extractor_id.split('/'):
-            feature_extractor_store_dir = os.path.join(feature_extractor_store_dir, feature_extractor_id_tok)
-        feature_store_dir_list[media_type] = {
-            'root'             : feature_extractor_store_dir,
-            'index'            : os.path.join(feature_extractor_store_dir, 'index'),
-            'features'         : os.path.join(feature_extractor_store_dir, 'features')
-        }
-        for store_name in feature_store_dir_list[media_type]:
-            feature_extractor_store_dir = feature_store_dir_list[media_type][store_name]
-            if not os.path.exists(feature_extractor_store_dir):
-                os.makedirs(feature_extractor_store_dir)
+        project.create_features_store(feature_extractor_id)
 
         ## 2.3 Initialise feature store to store features
         feature_store_list[media_type] = WebdatasetStore(media_type,
-                                                         feature_store_dir_list[media_type]['features'])
+                                                         project.features_store(feature_extractor_id))
         feature_store_list[media_type].enable_write(args.shard_maxcount,
                                                     args.shard_maxsize)
 
@@ -174,15 +161,18 @@ if __name__ == '__main__':
                 internal_metadata[media_type][mid]['feature_id_list'].append( feature_id[media_type] )
                 internal_metadata[media_type][mid]['pts'].append(segment_pts)
                 feature_id[media_type] += 1
+            ## TODO: create a copy of media file in project.media_store()
 
     ## 6. save internal metadata (TODO: replace with DB implementation)
     for media_type in feature_extractor_id_list:
+        feature_extractor_id = feature_extractor_id_list[media_type]
+
         # close all feature store
         feature_store_list[media_type].close()
-        print(f'Saved {feature_id[media_type]} {media_type} features to {feature_store_dir_list[media_type]["features"]}')
+        print(f'Saved {media_type} features to {project.features_store(feature_extractor_id)}')
 
-        internal_metadata_fn = os.path.join(feature_store_dir_list[media_type]['root'], 'internal-metadata.json')
-        with open(internal_metadata_fn, 'w') as f:
+        internal_metadata_fn = project.features_root(feature_extractor_id) / 'internal-metadata.json'
+        with open(internal_metadata_fn.as_posix(), 'w') as f:
             json.dump(internal_metadata[media_type], f)
             print(f'Saved internal metadata for {media_type} in {internal_metadata_fn}')
 
