@@ -157,17 +157,13 @@ if __name__ == '__main__':
                 search_result[media_type]['media_fn'].append(filename)
                 search_result[media_type]['media_pts'].append(pts)
                 search_result[media_type]['distance'].append( ('%.4f' % distance) )
-    # FIXME: for debugging
-    print(json.dumps(search_result, indent=2))
-    HTTP_PREFIX = 'https://meru.robots.ox.ac.uk/dset/video/CondensedMovies/'
+
     for media_type in feature_extractor_id_list:
         print(f'\nShowing results for {media_type}')
         for i in range(len(search_result[media_type]['media_fn'])):
-            # FIXME: remove absolute path from replace()
-            fn = search_result[media_type]['media_fn'][i].replace('/data/ssd/wise/data/CondensedMovies-3/', '')
+            fn = search_result[media_type]['media_fn'][i]
             pts = search_result[media_type]['media_pts'][i]
             dist = search_result[media_type]['distance'][i]
-            url = HTTP_PREFIX + urllib.parse.quote(fn) + ('#t=%.2f' % (pts))
-            print('  [%d : %s] %s' % (i, dist, url))
+            print('  [%d] : pts=%s, file=%s' % (i, pts, fn))
 
-    # TODO: combine results from different media_type
+    # TODO: Combine search results for different media types using set operations
