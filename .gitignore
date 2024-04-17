@@ -8,7 +8,7 @@ public/thumbs
 *.npy
 *.tar
 *.db
-data/
+cmd
 
 # generated output
 output/
@@ -28,3 +28,6 @@ __pycache__/
 
 # System files
 .DS_Store
+
+# huggingface
+hub/

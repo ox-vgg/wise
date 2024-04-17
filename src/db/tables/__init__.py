@@ -12,7 +12,7 @@ project_table = sa.Table(
 source_collections_table = sa.Table(
     "source_collections",
     project_metadata_obj,
-    sa.Column("id", sa.String(8), primary_key=True, nullable=False),
+    sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
     sa.Column("location", sa.Unicode(1024), nullable=False),
     sa.Column("type", sa.Enum(SourceCollectionType), nullable=False),
 )
@@ -20,23 +20,23 @@ source_collections_table = sa.Table(
 media_table = sa.Table(
     "media",
     project_metadata_obj,
-    sa.Column("id", sa.String(10), primary_key=True, nullable=False),
+    sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
     sa.Column(
-      "source_collection_id",
-      sa.String(8),
-      sa.ForeignKey("source_collections.id", ondelete="CASCADE"),
-      nullable=False,
+        "source_collection_id",
+        sa.Integer,
+        sa.ForeignKey("source_collections.id", ondelete="CASCADE"),
+        nullable=False,
     ),
     sa.Column("path", sa.Unicode(1024), nullable=False),
-    sa.Column("md5sum", sa.LargeBinary(128), nullable=True),
+    sa.Column("hash", sa.LargeBinary(128), nullable=True),
     sa.Column("size_in_bytes", sa.Integer, nullable=True),
     sa.Column("date_modified", sa.DateTime(True), nullable=True),
     sa.Column("media_type", sa.Enum(MediaType), nullable=False),
     sa.Column("format", sa.String(5), nullable=False),
     sa.Column("width", sa.Integer, nullable=False),
     sa.Column("height", sa.Integer, nullable=False),
-    sa.Column("num_frames", sa.Integer, nullable=True), # only applies to video files
-    sa.Column("duration", sa.Float, nullable=True), # only applies to video files
+    sa.Column("num_frames", sa.Integer, nullable=True),  # only applies to video files
+    sa.Column("duration", sa.Float, nullable=True),  # only applies to video files
     # TODO (WISE 2) remove references to these old columns in other files:
     # sa.Column("source_uri", sa.Unicode(4096), nullable=True),
     # sa.Column("metadata", sa.JSON, nullable=False, default={}),
@@ -49,7 +49,7 @@ vectors_table = sa.Table(
     sa.Column("modality", sa.Enum(MediaType), nullable=False),
     sa.Column(
         "media_id",
-        sa.String(10),
+        sa.Integer,
         sa.ForeignKey("media.id", ondelete="CASCADE"),
         nullable=False,
     ),
@@ -62,7 +62,7 @@ imported_metadata_table = sa.Table(
     project_metadata_obj,
     sa.Column(
         "media_id",
-        sa.String(10),
+        sa.Integer,
         sa.ForeignKey("media.id", ondelete="CASCADE"),
         nullable=False,
     ),

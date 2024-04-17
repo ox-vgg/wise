@@ -142,17 +142,25 @@ class MediaChunk:
     pts: float
 
 
-def get_segment_length(opts: StreamOutputOptions):
-    frames_per_chunk = opts.frames_per_chunk
-    rate = (
-        opts.frame_rate
-        if isinstance(opts, BasicVideoStreamOutputOptions)
-        else opts.sample_rate
-    )
-    if rate is None:
-        # Need to use the input media info to calculate the rate
-        raise NotImplementedError()
-    return frames_per_chunk / rate
+def get_segment_lengths(stream, stream_opts):
+    segment_lengths = []
+    for i, opts in enumerate(stream_opts):
+        output_stream_info = stream.get_out_stream_info(i)
+        frames_per_chunk = opts.frames_per_chunk
+        rate = (
+            output_stream_info.frame_rate
+            if isinstance(opts, BasicVideoStreamOutputOptions)
+            else output_stream_info.sample_rate
+        )
+        if rate is None:
+            # Need to use the input media info to calculate the rate
+            raise NotImplementedError()
+
+        if rate == 0:
+            segment_lengths.append(0)
+        else:
+            segment_lengths.append(frames_per_chunk / rate)
+    return segment_lengths
 
 
 class MediaDataset(torch_data.IterableDataset):
@@ -199,14 +207,13 @@ class MediaDataset(torch_data.IterableDataset):
         assert len(self._transforms) == len(self._output_stream_opts)
 
     def _get_media_iterator(self, id_list: List[Union[str, int]]):
-        stream_segment_lengths = [
-            get_segment_length(x) for x in self._output_stream_opts
-        ]
         for _id in id_list:
             path = self._filelist[_id]
             try:
                 reader = get_stream_reader(str(path), self._output_stream_opts)
-
+                stream_segment_lengths = get_segment_lengths(
+                    reader, self._output_stream_opts
+                )
                 reader.seek(self._offset)
                 for sidx, c in enumerate(reader.stream()):
                     # Might contain 1 or many output streams. Apply the corresponding transform
@@ -214,7 +221,8 @@ class MediaDataset(torch_data.IterableDataset):
                         (
                             MediaChunk(
                                 tensor=stream_transform(torch.Tensor(stream_chunk)),
-                                pts=sidx
+                                pts=self._offset
+                                + sidx
                                 * stream_segment_lengths[
                                     idx
                                 ],  # Only available in Pytorch 2.0+ stream_chunk.pts,

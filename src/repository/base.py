@@ -69,17 +69,21 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
             raise RuntimeError()
         return obj
 
+    # TODO: Need to be careful with update since we can also re-assign the id key
+    # 1. Could remove the id key and check, but how do we find the name of the id column?
+    # 2. Could let the database handle error with db specific
     def update(self, conn: sa.Connection, id: Any, *, data: EntityUpdate):
-        current_data = self.get(conn, id)
-        if current_data is None:
+        current_entity = self.get(conn, id)
+        if current_entity is None:
             raise EntityNotFoundException()
 
-        updated_data = current_data.model_copy(update=data.model_dump(exclude_unset=True))
+        update_data = data.model_dump(exclude_unset=True)
+        updated_entity = current_entity.model_copy(update=update_data)
 
         conn.execute(
             sa.update(self._table)
             .where(self._table.c.id == id)
-            .values(**updated_data.model_dump())
+            .values(**updated_entity.model_dump())
         )
 
     def delete(self, conn: sa.Connection, id: Any):
