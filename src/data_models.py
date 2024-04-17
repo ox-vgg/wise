@@ -13,6 +13,7 @@ class MediaType(str, enum.Enum):
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+    AV = "av"
 
 
 class QueryType(str, enum.Enum):
@@ -34,21 +35,20 @@ class MediaInfo(BaseModel):
     caption: str = ""
     copyright: str = ""
 
-class BaseSourceCollection(BaseModel):
-    id: Optional[str] = None
+
+class SourceCollection(BaseModel):
+    id: Optional[int] = None
     location: str
     type: SourceCollectionType
-
-class SourceCollection(BaseSourceCollection):
-    id: str
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class MediaMetadata(BaseModel):
-    id: Optional[str] = None
-    source_collection_id: str
+    id: Optional[int] = None
+    source_collection_id: int
+    media_type: MediaType
     path: str
-    md5sum: bytes
+    hash: bytes
     size_in_bytes: int
     date_modified: datetime.datetime
     format: str
@@ -60,17 +60,23 @@ class MediaMetadata(BaseModel):
 
 
 class VectorMetadata(BaseModel):
-    id: int
+    id: Optional[int] = None
     modality: MediaType
-    media_id: str
-    timestamp: Optional[float]
-    end_timestamp: Optional[float]
+    media_id: int
+    timestamp: Optional[float] = None
+    end_timestamp: Optional[float] = None
 
 
 class Project(BaseModel):
     id: str
     version: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class ExtraMediaMetadata(BaseModel):
+    media_id: int
+    external_id: Optional[str] = None
+    metadata: Dict[str, Any]  # TODO: narrow the type
 
 
 class URL(str):
