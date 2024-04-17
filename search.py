@@ -6,6 +6,7 @@ import math
 import sys
 import urllib.parse
 import time
+import itertools
 
 from rich import print as rprint
 from rich.console import Console
@@ -14,6 +15,20 @@ from rich.table import Table
 from src.dataloader import AVDataset
 from src.wise_project import WiseProject
 from src.search_index import SearchIndex
+
+def to_hhmmss(sec):
+    hh = int(sec / (60*60))
+    remaining_sec = sec - hh*60*60
+    mm = int(remaining_sec / 60)
+    remaining_sec = int(remaining_sec - mm*60)
+    return '%02d:%02d:%02d' % (hh, mm, remaining_sec)
+
+def clamp_str(text, MAX_CHARS):
+    if len(text) > MAX_CHARS:
+        text_short = '...' + text[ len(text)-MAX_CHARS : len(text) ]
+        return text_short
+    else:
+        return text
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='search',
@@ -44,6 +59,18 @@ if __name__ == '__main__':
                         type=int,
                         default=5,
                         help='show only the topk search results')
+
+    parser.add_argument('--merge-tolerance',
+                        required=False,
+                        type=int,
+                        default=10,
+                        help='tolerance (in seconds) for merging search results')
+
+    parser.add_argument('--max-filename-length',
+                        required=False,
+                        type=int,
+                        default=50,
+                        help='only show this many characters from the end in a filename')
 
     parser.add_argument('--project-dir',
                         required=True,
@@ -106,7 +133,6 @@ if __name__ == '__main__':
 
         # 3. Find nearest neighbours to the search query
         dist, ids = search_index.search(media_type, query_text, args.topk, query_type='text')
-        results = []
         table = Table(title='Search results for "' + query_text + '" in ' + media_type,
                       show_lines=False,
                       show_edge=False,
@@ -116,30 +142,80 @@ if __name__ == '__main__':
         table.add_column('Filename', justify='left', no_wrap=True)
         table.add_column('Time', justify='left', no_wrap=True)
         #table.add_column('Link', justify='left', no_wrap=True)
+        match_filename_list = []
+        match_pts_list = []
         for rank in range(0, len(ids)):
             feature_id = int(ids[rank])
             filename = reverse_internal_metadata[feature_id]['filename']
-            pts_str = '%.1f' % (reverse_internal_metadata[feature_id]['pts'])
-            results.append({
-                'rank':rank,
-                'filename':filename,
-                'pts':pts_str,
-                'distance':dist[rank]
-            })
-            #file_link = '[link]file://' + filename + '#t=' + pts_str + 'View[/link]!'
-            # FIXME: improve readability by removing the media_dir part from
-            # filename that was provided to the extract_feature.py script.
-            MAX_FILENAME_CHARS = 80
-            filename_short = filename
-            if len(filename_short) > MAX_FILENAME_CHARS:
-                filename_short = '...' + filename[ len(filename)-MAX_FILENAME_CHARS : len(filename) ]
-            table.add_row(str(rank),
-                          filename_short,
-                          pts_str)
+            pts = reverse_internal_metadata[feature_id]['pts']
+            pts_hhmmss = to_hhmmss(reverse_internal_metadata[feature_id]['pts'])
+            match_filename_list.append(filename)
+            match_pts_list.append(pts)
 
-        search_result.append(results)
+            # FIXME: improve readability by showing filenames relative to
+            # the --media-dir argument provided to extract_feature.py script.
+            table.add_row(str(rank),
+                          clamp_str(filename, args.max_filename_length),
+                          pts_hhmmss)
+
+        search_result.append({
+            'match_filename_list': match_filename_list,
+            'match_pts_list': match_pts_list
+        })
         console.print(table)
         print('\n')
+
+    if len(search_result) != 1:
+        # first merge based on filenames
+        filename_merge = set(search_result[0]['match_filename_list'])
+        for result_index in range(1, len(search_result)):
+            result_index_set = set(search_result[result_index]['match_filename_list'])
+            filename_merge = filename_merge.intersection(result_index_set)
+
+        # now merge based on timestamp of common filenames
+        merged_queries = []
+        for query_index in range(0, len(args.query)):
+            query_text = args.query[query_index]
+            media_type = args.media_type[query_index]
+            merged_queries.append('"' + query_text + '" in ' + media_type)
+        table = Table(title='Search results for ' + ' and '.join(merged_queries),
+                      show_lines=False,
+                      show_edge=False,
+                      box=None,
+                      safe_box=True)
+        table.add_column('Filename', justify='left', no_wrap=True)
+        table.add_column('Time Range', justify='left', no_wrap=True)
+
+        row_count = 0
+        for filename in filename_merge:
+            pts_merge = []
+            for result_index in range(0, len(search_result)):
+                result_pts = []
+                for filename_index in range(0, len(search_result[result_index]['match_filename_list'])):
+                    if filename == search_result[result_index]['match_filename_list'][filename_index]:
+                        pts = search_result[result_index]['match_pts_list'][filename_index]
+                        result_pts.append(pts)
+                pts_merge.append(result_pts)
+
+            # FIXME: Is there a more efficient way to do this?
+            for i in range(0, len(pts_merge)):
+                for j in range(i+1, len(pts_merge)):
+                    for pts_pairs in itertools.product(pts_merge[i], pts_merge[j]):
+                        del_pts = abs(pts_pairs[0] - pts_pairs[1])
+                        if del_pts <= args.merge_tolerance:
+                            if pts_pairs[0] > pts_pairs[1]:
+                                time_range = '%s - %s' % (to_hhmmss(pts_pairs[1]), to_hhmmss(pts_pairs[0]))
+                            else:
+                                time_range = '%s - %s' % (to_hhmmss(pts_pairs[0]), to_hhmmss(pts_pairs[1]))
+                            table.add_row(clamp_str(filename, args.max_filename_length),
+                                          time_range)
+                            row_count += 1
+        if row_count:
+            console.print(table)
+            print('\n')
+        else:
+            print('No search results for ' + ' and '.join(merged_queries))
+
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f'\nSearch completed in {int(elapsed_time)} sec.')
