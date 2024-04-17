@@ -36,21 +36,22 @@ python3 extract-features.py \
   --media-dir $HOME/wise-data/CondensedMovies-10/ \
   --project-dir $HOME/wise-projects/CondensedMovies-10/
 
-## 5. Create search index (TODO)
+## 5. Create search index
 python3 create-index.py \
   --project-dir $HOME/wise-projects/CondensedMovies-10/
 
-## 6. Search from command line (TODO)
+## 6. Search from command line
+# simple use cases
 python3 search.py \
-  --query-video "..." \
-  --query-audio "..." \
+  --query fighting --in video \
+  --query punching --in audio \
   --project-dir $HOME/wise-projects/CondensedMovies-10/
 
 ## 7. Search using web interface (TODO)
 python3 serve.py \
   --project-dir $HOME/wise-projects/CondensedMovies-10/
 
-## 8. Add or remove media
+## 8. Add or remove media (TODO)
 python3 add-media.py \
   --media-source PATH \
   --project-dir $HOME/wise-projects/CondensedMovies-10/
@@ -69,14 +70,15 @@ python3 wise.py [init|index|search|serve|add|del|] ...
 
 ## Test
 
-All tests can be discovered and run as follows.
-```
-cd $HOME/wise
-python -m unittest discover -s src/
-```
-
 Individual tests can be executed as follows.
 ```
 cd $HOME/wise
 python -m unittest src/feature/test_feature_extractor.py
+python -m unittest src/feature/store/test_feature_store.py
+```
+
+All tests can be discovered and run as follows.
+```
+cd $HOME/wise
+python -m unittest discover -s src/
 ```
