@@ -3,6 +3,7 @@ import numpy as np
 import webdataset as wds
 import glob
 import io
+import sys
 
 from .feature_store import FeatureStore
 
@@ -41,19 +42,32 @@ class WebdatasetStore(FeatureStore):
                                            maxcount=self.shard_maxcount,
                                            maxsize=self.shard_maxsize)
         self.shardWriter.verbose = verbose
-        
+
     def enable_read(self, shard_shuffle=False, shuffle_values=False, shuffle_bufsize=10000):
         self.shard_shuffle = shard_shuffle
         self.shuffle_values = shuffle_values
         self.shuffle_bufsize = shuffle_bufsize
 
         # load the number of feature count and feature dimension
-        wds_tar_pattern = os.path.join(self.store_data_dir, self.store_name + '-*.tar')
-        self.wds_tar_list = []
-        for tar_file in glob.iglob(pathname=wds_tar_pattern, recursive=False):
-            self.wds_tar_list.append(tar_file)
-        self.wds_tar_list.sort()
-        temp_shard_reader = wds.WebDataset(self.wds_tar_list, shardshuffle=False)
+        wds_tar_prefix = os.path.join(self.store_data_dir, self.store_name + '-')
+        wds_tar_pattern = wds_tar_prefix + '*.tar'
+        self.tar_index = [sys.maxsize, -1]
+        self.tar_index_str = ['', '']
+        for tar_filename in glob.iglob(pathname=wds_tar_pattern, recursive=False):
+            tar_filename_tok = tar_filename.split(wds_tar_prefix)
+            tar_index = tar_filename_tok[1].split('.tar')[0]
+            if int(tar_index) < self.tar_index[0]:
+                self.tar_index[0] = int(tar_index)
+                self.tar_index_str[0] = tar_index
+            if int(tar_index) > self.tar_index[1]:
+                self.tar_index[1] = int(tar_index)
+                self.tar_index_str[1] = tar_index
+        tar_index_range = '{%s..%s}' % (self.tar_index_str[0], self.tar_index_str[1])
+        self.wds_src_url = wds_tar_prefix + tar_index_range + '.tar'
+        self.feature_count = 0
+        temp_shard_reader = wds.WebDataset(self.wds_src_url,
+                                           shardshuffle=False,
+                                           repeat=False)
         self.feature_count = 0
         for _ in temp_shard_reader:
             self.feature_count += 1
@@ -61,6 +75,7 @@ class WebdatasetStore(FeatureStore):
             feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
             self.feature_dim = feature_vector.shape[1]
             break
+        temp_shard_reader.close()
 
     def add(self, id, features):
         if not self.shardWriter:
@@ -73,10 +88,13 @@ class WebdatasetStore(FeatureStore):
 
     def __iter__(self):
         if self.shuffle_values:
-            shard_reader = wds.WebDataset(self.wds_tar_list,
-                                      shardshuffle=self.shard_shuffle).shuffle(self.shuffle_bufsize)
+            shard_reader = wds.WebDataset(self.wds_src_url,
+                                          shardshuffle=self.shard_shuffle,
+                                          repeat=False).shuffle(self.shuffle_bufsize)
         else:
-            shard_reader = wds.WebDataset(self.wds_tar_list, shardshuffle=self.shard_shuffle)
+            shard_reader = wds.WebDataset(self.wds_src_url,
+                                          shardshuffle=self.shard_shuffle,
+                                          repeat=False)
         for payload in shard_reader:
             feature_id = int(payload['__key__'])
             feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
