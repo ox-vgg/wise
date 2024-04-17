@@ -84,10 +84,13 @@ class SearchIndex:
             raise ValueError('query_type={query_type} not implemented')
 
         if media_type == 'audio':
-            media_query_text = [ (self.prompt[media_type] + x) for x in query]
+            if isinstance(query, str):
+                media_query_text = [query]
+            else:
+                media_query_text = [ (self.prompt[media_type] + x) for x in query]
         else:
             media_query_text = [ (self.prompt[media_type] + query) ]
-        print(f'Querying {media_type} with "{media_query_text}"')
+        #print(f'Querying {media_type} with "{media_query_text}"')
         query_features = self.feature_extractor.extract_text_features(media_query_text)
         dist, ids  = self.index.search(query_features, topk)
         return dist[0], ids[0]

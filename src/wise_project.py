@@ -4,39 +4,39 @@ class WiseProject:
     def __init__(self, project_dir: Path, create_project=False):
         self.project_dir = Path(project_dir)
         self.store_dir = self.project_dir / 'store'
-        self.media_store = self.project_dir / 'media'
+        self.media_dir = self.project_dir / 'media'
         self.media_type_list = ['image', 'video', 'audio']
 
         if not self.project_dir.exists():
             if create_project:
                 # create the root folders
                 self.store_dir.mkdir(parents=True, exist_ok=True)
-                self.media_store.mkdir(parents=True, exist_ok=True)
+                self.media_dir.mkdir(parents=True, exist_ok=True)
             else:
                 raise ValueError(f'project folder {self.project_dir} does not exist')
 
     def store_dir(self):
         return self.store_dir
 
-    def media_store(self):
-        return self.media_store
+    def media_dir(self):
+        return self.media_dir
 
     def features_root(self, feature_extractor_id):
         return self.store_dir / feature_extractor_id
 
-    def features_store(self, feature_extractor_id):
+    def features_dir(self, feature_extractor_id):
         return self.features_root(feature_extractor_id) / 'features'
 
-    def create_features_store(self, feature_extractor_id):
-        features_store = self.features_store(feature_extractor_id)
+    def create_features_dir(self, feature_extractor_id):
+        features_store = self.features_dir(feature_extractor_id)
         if not features_store.exists():
             features_store.mkdir(parents=True, exist_ok=True)
         return features_store
 
-    def index_store(self, feature_extractor_id):
-        return self.featutes_root(feature_extractor_id) / 'index'
+    def index_dir(self, feature_extractor_id):
+        return self.features_root(feature_extractor_id) / 'index'
 
-    def create_index_store(self, feature_extractor_id):
+    def create_index_dir(self, feature_extractor_id):
         index_store = self.features_root(feature_extractor_id) / 'index'
         if not index_store.exists():
             index_store.mkdir(parents=True, exist_ok=True)
