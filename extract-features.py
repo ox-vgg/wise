@@ -12,7 +12,7 @@ import numpy as np
 from src.dataloader import AVDataset
 from src.wise_project import WiseProject
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
-from src.feature.store.webdataset_store import WebdatasetStore
+from src.feature.store.feature_store_factory import FeatureStoreFactory
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='extract-features',
@@ -51,6 +51,14 @@ if __name__ == '__main__':
                         default=0,
                         help='number of workers used by data loader')
 
+    parser.add_argument('--feature-store',
+                        required=False,
+                        type=str,
+                        default='webdataset',
+                        dest='feature_store_type',
+                        choices=['webdataset', 'numpy'],
+                        help='extracted features are stored using this data structure')
+
     parser.add_argument('--project-dir',
                         required=True,
                         type=str,
@@ -88,11 +96,12 @@ if __name__ == '__main__':
         print(f'Using {feature_extractor_id} for {media_type}')
 
         ## 2.2 Create folders to store features, metadata and search index
-        project.create_features_store(feature_extractor_id)
+        project.create_features_dir(feature_extractor_id)
 
         ## 2.3 Initialise feature store to store features
-        feature_store_list[media_type] = WebdatasetStore(media_type,
-                                                         project.features_store(feature_extractor_id))
+        feature_store_list[media_type] = FeatureStoreFactory.create_store(args.feature_store_type,
+                                                                          media_type,
+                                                                          project.features_dir(feature_extractor_id))
         feature_store_list[media_type].enable_write(args.shard_maxcount,
                                                     args.shard_maxsize)
 
@@ -127,7 +136,7 @@ if __name__ == '__main__':
     av_data_loader = torch_data.DataLoader(stream, batch_size=None, num_workers=args.num_workers)
     for mid, video, audio in tqdm(av_data_loader):
         media_segment = { 'video':video, 'audio':audio }
-        
+
         for media_type in feature_extractor_id_list:
             if mid not in internal_metadata[media_type]:
                 internal_metadata[media_type][mid] = {
@@ -139,7 +148,7 @@ if __name__ == '__main__':
                 continue
             segment_tensor = media_segment[media_type].tensor
             segment_pts    = media_segment[media_type].pts
-            
+
             if media_type == 'video':
                 segment_feature = feature_extractor_list[media_type].extract_image_features(segment_tensor)
                 # FIXME: temporary hack to sequentially save a batch of 8 frames
@@ -169,7 +178,7 @@ if __name__ == '__main__':
 
         # close all feature store
         feature_store_list[media_type].close()
-        print(f'Saved {media_type} features to {project.features_store(feature_extractor_id)}')
+        print(f'Saved {media_type} features to {project.features_dir(feature_extractor_id)}')
 
         internal_metadata_fn = project.features_root(feature_extractor_id) / 'internal-metadata.json'
         with open(internal_metadata_fn.as_posix(), 'w') as f:

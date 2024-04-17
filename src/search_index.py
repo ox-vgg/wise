@@ -3,7 +3,7 @@ from tqdm import tqdm
 from pathlib import Path
 
 from .feature.feature_extractor_factory import FeatureExtractorFactory
-from .feature.store.webdataset_store import WebdatasetStore
+from .feature.store.feature_store_factory import FeatureStoreFactory
 
 class SearchIndex:
     def __init__(self, media_type, feature_extractor_id, index_dir, feature_dir=None):
@@ -32,7 +32,7 @@ class SearchIndex:
         self.index_type = index_type
 
         # TODO: Implement a FeatureStoreFactory to load features from any type of store
-        feature_store = WebdatasetStore(self.media_type, self.feature_dir)
+        feature_store = FeatureStoreFactory.load_store(self.media_type, self.feature_dir)
         feature_store.enable_read(shard_shuffle = False)
 
         feature_count = feature_store.feature_count
@@ -91,5 +91,3 @@ class SearchIndex:
         query_features = self.feature_extractor.extract_text_features(media_query_text)
         dist, ids  = self.index.search(query_features, topk)
         return dist[0], ids[0]
-
-        

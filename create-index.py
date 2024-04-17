@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     for media_type in project_assets:
         for feature_extractor_id in project_assets[media_type]:
-            project.create_index_store(feature_extractor_id)
+            project.create_index_dir(feature_extractor_id)
             feature_dir = project_assets[media_type][feature_extractor_id]['features_dir']
             index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
 
