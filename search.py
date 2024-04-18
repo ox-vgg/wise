@@ -16,6 +16,22 @@ from src.dataloader import AVDataset
 from src.wise_project import WiseProject
 from src.search_index import SearchIndex
 
+from src import db
+from src.data_models import (
+    MediaMetadata,
+    SourceCollection,
+    ExtraMediaMetadata,
+    VectorMetadata,
+    MediaType,
+    SourceCollectionType,
+)
+from src.repository import (
+    SourceCollectionRepo,
+    MediaRepo,
+    VectorRepo,
+    MediaMetadataRepo,
+)
+
 def to_hhmmss(sec):
     hh = int(sec / (60*60))
     remaining_sec = sec - hh*60*60
@@ -97,8 +113,13 @@ if __name__ == '__main__':
         print(f'  [{i}] "{args.query[i]}" in {args.media_type[i]}')
     print('\n')
 
-    project = WiseProject(args.project_dir)
+    project = WiseProject(args.project_dir, create_project=False)
     project_assets = project.discover_assets()
+
+    DB_SCHEME = "sqlite+pysqlite://"
+    PROJECT_DIR = Path(args.project_dir)
+    DB_URI = f"{DB_SCHEME}/{args.project_dir}/{PROJECT_DIR.stem}.db"
+    db_engine = db.init_project(DB_URI, echo=False)
 
     ## FIXME: develop a grammar to address all possible ways
     ## of describing the search query on images, audio and videos
@@ -111,27 +132,15 @@ if __name__ == '__main__':
         feature_extractor_id_list = list(project_assets[media_type].keys())
         feature_extractor_id = feature_extractor_id_list[0] # TODO: allow users to select the feature
 
-        # 1. load internal metadata
-        internal_metadata_fn = project_assets[media_type][feature_extractor_id]['features_root'] / 'internal-metadata.json'
-        with open(internal_metadata_fn.as_posix(), 'r') as f:
-            internal_metadata = json.load(f)
-            reverse_internal_metadata = {}
-        for mid in internal_metadata:
-            for i in range(0, len(internal_metadata[mid]['feature_id_list'])):
-                feature_id = internal_metadata[mid]['feature_id_list'][i]
-                reverse_internal_metadata[feature_id] = {
-                    'filename': internal_metadata[mid]['filename'],
-                    'pts': internal_metadata[mid]['pts'][i]
-                }
-
-        # 2. load search index
+        # 1. load search index
         index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
         search_index = SearchIndex(media_type,
                                    feature_extractor_id,
                                    index_dir)
-        search_index.load_index(args.index_type)
+        if not search_index.load_index(args.index_type):
+            continue
 
-        # 3. Find nearest neighbours to the search query
+        # 2. Find nearest neighbours to the search query
         dist, ids = search_index.search(media_type, query_text, args.topk, query_type='text')
         table = Table(title='Search results for "' + query_text + '" in ' + media_type,
                       show_lines=False,
@@ -141,22 +150,23 @@ if __name__ == '__main__':
         table.add_column('Rank', justify='right', no_wrap=True)
         table.add_column('Filename', justify='left', no_wrap=True)
         table.add_column('Time', justify='left', no_wrap=True)
-        #table.add_column('Link', justify='left', no_wrap=True)
+
         match_filename_list = []
         match_pts_list = []
-        for rank in range(0, len(ids)):
-            feature_id = int(ids[rank])
-            filename = reverse_internal_metadata[feature_id]['filename']
-            pts = reverse_internal_metadata[feature_id]['pts']
-            pts_hhmmss = to_hhmmss(reverse_internal_metadata[feature_id]['pts'])
-            match_filename_list.append(filename)
-            match_pts_list.append(pts)
+        with db_engine.connect() as conn:
+            for rank in range(0, len(ids)):
+                vector_id = int(ids[rank])
+                vector_metadata = VectorRepo.get(conn, vector_id)
+                media_metadata = MediaRepo.get(conn, vector_metadata.media_id)
+                filename = media_metadata.path
+                pts = vector_metadata.timestamp
+                pts_hhmmss = to_hhmmss(pts)
+                match_filename_list.append(filename)
+                match_pts_list.append(pts)
 
-            # FIXME: improve readability by showing filenames relative to
-            # the --media-dir argument provided to extract_feature.py script.
-            table.add_row(str(rank),
-                          clamp_str(filename, args.max_filename_length),
-                          pts_hhmmss)
+                table.add_row(str(rank),
+                              clamp_str(filename, args.max_filename_length),
+                              pts_hhmmss)
 
         search_result.append({
             'match_filename_list': match_filename_list,
