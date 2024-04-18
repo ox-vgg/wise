@@ -75,9 +75,11 @@ class SearchIndex:
         index_fn = self.get_index_filename(index_type)
         if not index_fn.exists():
             print(f'  index {index_fn} does not exist')
-            return
+            print(f'  use create-index.py script to create an index')
+            False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
         self.feature_extractor = FeatureExtractorFactory(self.feature_extractor_id)
+        return True
 
     def search(self, media_type, query, topk=5, query_type='text'):
         if query_type != 'text':
