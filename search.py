@@ -37,7 +37,8 @@ def to_hhmmss(sec):
     remaining_sec = sec - hh*60*60
     mm = int(remaining_sec / 60)
     remaining_sec = int(remaining_sec - mm*60)
-    return '%02d:%02d:%02d' % (hh, mm, remaining_sec)
+    ms = int(sec - (hh*60*60 + mm*60 + remaining_sec))
+    return '%02d:%02d:%02d.%03d' % (hh, mm, remaining_sec, ms)
 
 def clamp_str(text, MAX_CHARS):
     if len(text) > MAX_CHARS:
@@ -160,13 +161,14 @@ if __name__ == '__main__':
                 media_metadata = MediaRepo.get(conn, vector_metadata.media_id)
                 filename = media_metadata.path
                 pts = vector_metadata.timestamp
+                pts_str = '%.3f' % pts
                 pts_hhmmss = to_hhmmss(pts)
                 match_filename_list.append(filename)
                 match_pts_list.append(pts)
 
                 table.add_row(str(rank),
                               clamp_str(filename, args.max_filename_length),
-                              pts_hhmmss)
+                              pts_str)
 
         search_result.append({
             'match_filename_list': match_filename_list,
@@ -214,9 +216,9 @@ if __name__ == '__main__':
                         del_pts = abs(pts_pairs[0] - pts_pairs[1])
                         if del_pts <= args.merge_tolerance:
                             if pts_pairs[0] > pts_pairs[1]:
-                                time_range = '%s - %s' % (to_hhmmss(pts_pairs[1]), to_hhmmss(pts_pairs[0]))
+                                time_range = '%s - %s' % (pts_pairs[1], pts_pairs[0])
                             else:
-                                time_range = '%s - %s' % (to_hhmmss(pts_pairs[0]), to_hhmmss(pts_pairs[1]))
+                                time_range = '%s - %s' % (pts_pairs[0], pts_pairs[1])
                             table.add_row(clamp_str(filename, args.max_filename_length),
                                           time_range)
                             row_count += 1
