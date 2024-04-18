@@ -1,6 +1,7 @@
 import faiss
 from tqdm import tqdm
 from pathlib import Path
+import numpy as np
 
 from .feature.feature_extractor_factory import FeatureExtractorFactory
 from .feature.store.feature_store_factory import FeatureStoreFactory
@@ -31,7 +32,6 @@ class SearchIndex:
             return
         self.index_type = index_type
 
-        # TODO: Implement a FeatureStoreFactory to load features from any type of store
         feature_store = FeatureStoreFactory.load_store(self.media_type, self.feature_dir)
         feature_store.enable_read(shard_shuffle = False)
 
@@ -39,6 +39,11 @@ class SearchIndex:
         feature_dim   = feature_store.feature_dim
 
         index = faiss.IndexFlatIP(feature_dim)
+        if index_type == 'IndexFlatIP':
+            # IndexFlatIP does not support index.add_with_ids() therefore we use IndexIdMap
+            # see https://github.com/facebookresearch/faiss/wiki/Pre--and-post-processing
+            index_for_id_map = index
+            index = faiss.IndexIDMap(index_for_id_map)
         if index_type == 'IndexIVFFlat':
             quantizer = index
             cell_count = 10 * round(math.sqrt(feature_count))
@@ -62,7 +67,8 @@ class SearchIndex:
 
         with tqdm(total=feature_count) as pbar:
             for feature_id, feature_vector in feature_store:
-                index.add(feature_vector)
+                feature_id_ndarray = np.ndarray((1), buffer=np.array([feature_id]), dtype=int)
+                index.add_with_ids(feature_vector, feature_id_ndarray)
                 pbar.update(1)
 
         faiss.write_index(index, index_fn.as_posix())
