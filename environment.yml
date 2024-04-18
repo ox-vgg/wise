@@ -8,17 +8,18 @@ channels:
 
 dependencies:
   - python=3.10
-  - pip=23
-  - pytorch=1.13.1
-  - pytorch-cuda=11.6
-  - torchvision=0.14.1
-  - torchaudio=0.13.1
-  - faiss-gpu=1.7.4
-  - mkl=2021
-  - blas=1.0=mkl
+  - pip=24
+  - pytorch=2.2.2
+  - pytorch-cuda=12.1
+  - torchvision=0.17.2
+  - torchaudio=2.2.2
+  - faiss-gpu=1.8.0
+  - mkl=2023
+  - blas=*=mkl
   - conda-forge::ffmpeg
   - pip:
-      - -r requirements.txt
-
+    - -r requirements.txt
+    # Install msclap separately till we pip freeze
+    # pip install --no-deps msclap==1.3.3
 variables:
   PYTHONNOUSERSITE: 1
