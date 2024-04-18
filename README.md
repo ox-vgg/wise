@@ -16,15 +16,23 @@ git clone -b wise2-integration https://gitlab.com/vgg/wise/wise.git
 cd wise
 
 ## 2. Install software dependencies
-# Install conda / mamba
+## There are two ways to install software dependencies.
+## 2.1 Using Conda
+## 2.2 Using Python venv (requires Python >= 3.10)
+
+## 2.1 Installing software dependencies using Conda
 conda env create -f environment.yml
 conda activate wise
-# (Temporary workaround) Install msclap without dependencies, to avoid conflicting version of torch
-pip install --no-deps msclap==1.3.3
+pip install --no-deps msclap==1.3.3  # avoids installing conflicting version of torch
 
-# Fallback - not well tested
-# python3 -m venv wise-dep/
+## 2.2 Alternatively, you can also use Python's venv module which
+# supports creating lightweight “virtual environments”. The lines
+# below are commented out to avoid confusion.
+# python3 --version                  # must be >= 3.10
+# sudo apt install ffmpeg            # ffmpeg is required to load videos
+# python3 -m venv wise-dep/          # create virtual environment
 # source wise-dep/bin/activate
+# python -m pip install --upgrade pip
 # pip install -r requirements.txt
 # pip install --no-deps msclap==1.3.3
 # pip install -r torch-faiss-requirements.txt
