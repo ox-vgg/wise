@@ -243,7 +243,8 @@ if __name__ == "__main__":
                             ),
                         )
                         feature_store_list[media_type].add(
-                            feature_metadata.id, segment_feature
+                            feature_metadata.id,
+                            np.reshape(segment_feature[i], (1, segment_feature.shape[1]))
                         )
                 else:
                     # Add whole segment
