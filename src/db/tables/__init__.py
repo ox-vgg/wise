@@ -1,6 +1,6 @@
 import sqlalchemy as sa
 from ..base import project_metadata_obj, thumbs_metadata_obj
-from ...data_models import SourceCollectionType, MediaType
+from ...data_models import SourceCollectionType, MediaType, ModalityType
 
 source_collections_table = sa.Table(
     "source_collections",
@@ -21,7 +21,7 @@ media_table = sa.Table(
         nullable=False,
     ),
     sa.Column("path", sa.Unicode(1024), nullable=False),
-    sa.Column("hash", sa.LargeBinary(128), nullable=True),
+    sa.Column("checksum", sa.LargeBinary(128), nullable=True),
     sa.Column("size_in_bytes", sa.Integer, nullable=True),
     sa.Column("date_modified", sa.DateTime(True), nullable=True),
     sa.Column("media_type", sa.Enum(MediaType), nullable=False),
@@ -39,7 +39,7 @@ vectors_table = sa.Table(
     "vectors",
     project_metadata_obj,
     sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
-    sa.Column("modality", sa.Enum(MediaType), nullable=False),
+    sa.Column("modality", sa.Enum(ModalityType), nullable=False),
     sa.Column(
         "media_id",
         sa.Integer,

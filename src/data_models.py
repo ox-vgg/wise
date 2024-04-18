@@ -5,7 +5,7 @@ import datetime
 
 
 class SourceCollectionType(str, enum.Enum):
-    IMAGE_DIR = "image_dir"
+    DIR = "dir"
     WEBDATASET = "webdataset"
 
 
@@ -15,6 +15,11 @@ class MediaType(str, enum.Enum):
     AUDIO = "audio"
     AV = "av"
 
+class ModalityType(str, enum.Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
 
 class QueryType(str, enum.Enum):
     NATURAL_LANGUAGE_QUERY = "NATURAL_LANGUAGE_QUERY"
@@ -33,7 +38,7 @@ class MediaMetadata(BaseModel):
     id: Optional[int] = None
     source_collection_id: int
     path: str
-    hash: bytes
+    checksum: bytes
     size_in_bytes: int
     date_modified: datetime.datetime
     media_type: MediaType
@@ -47,7 +52,7 @@ class MediaMetadata(BaseModel):
 
 class VectorMetadata(BaseModel):
     id: Optional[int] = None
-    modality: MediaType
+    modality: ModalityType
     media_id: int
     timestamp: Optional[float] = None
     end_timestamp: Optional[float] = None

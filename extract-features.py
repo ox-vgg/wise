@@ -114,7 +114,7 @@ if __name__ == "__main__":
         with db_engine.begin() as conn:
             # Add each folder to source collection table
             data = SourceCollection(
-                location=media_dir, type=SourceCollectionType.IMAGE_DIR
+                location=media_dir, type=SourceCollectionType.DIR
             )
             media_source_collection = SourceCollectionRepo.create(conn, data=data)
             for media_include in args.media_include_list:
@@ -131,7 +131,7 @@ if __name__ == "__main__":
                                 media_path, media_source_collection.location
                             ),
                             media_type=media_metadata.media_type,
-                            hash=media_metadata.md5sum,
+                            checksum=media_metadata.md5sum,
                             size_in_bytes=os.path.getsize(media_path),
                             date_modified=os.path.getmtime(media_path),
                             format=media_metadata.format,
