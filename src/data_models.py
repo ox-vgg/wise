@@ -67,6 +67,12 @@ class VectorMetadata(BaseModel):
     end_timestamp: Optional[float] = None
 
 
+class ThumbnailMetadata(BaseModel):
+    id: Optional[int] = None
+    media_id: int
+    timestamp: Optional[float] = None
+
+
 class Project(BaseModel):
     id: str
     version: Optional[int] = None

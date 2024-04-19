@@ -5,7 +5,7 @@ from .dataset import get_media_metadata, AVDataset
 import numpy as np
 import torch
 import torch.utils.data as torch_data
-from torchvision import transforms
+import torchvision.transforms.v2 as transforms_v2
 import open_clip
 import typer
 from tqdm import tqdm
@@ -30,14 +30,14 @@ INTERNVIDEO_STD = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float3
 def get_input_transform_for_model(clip_model: CLIPModel):
     if clip_model == "internvideo":
         # Internvideo preprocessing
-        return transforms.Compose(
+        return transforms_v2.Compose(
             [
                 # Convert chunk to tensor to overcome issue with
                 # .numpy() method in tensor subclasses
-                transforms.Resize(224),
-                transforms.CenterCrop(224),
-                transforms.ConvertImageDtype(torch.float32, scale=True),
-                transforms.Normalize(
+                transforms_v2.Resize(224),
+                transforms_v2.CenterCrop(224),
+                transforms_v2.ToDtype(torch.float32, scale=True),
+                transforms_v2.Normalize(
                     mean=INTERNVIDEO_MEAN.tolist(), std=INTERNVIDEO_STD.tolist()
                 ),
                 # C x B x H x W
@@ -48,16 +48,17 @@ def get_input_transform_for_model(clip_model: CLIPModel):
     model_name, _ = clip_model.value.split(":", 1)
     logger.info(f"Loading CLIP (model: {model_name})...")
     model = open_clip.create_model(model_name, None)
-    preprocess = open_clip.transform.image_transform(
-        model.visual.image_size,
+    preprocess = open_clip.transform.image_transform_v2(
+        open_clip.transform.PreprocessCfg(**model.visual.preprocess_cfg),
         is_train=False,
     )
-    return transforms.Compose(
+
+    return transforms_v2.Compose(
         [
             # Convert chunk to tensor to overcome issue with
             # .numpy() method in tensor subclasses
             lambda x: x.squeeze(0),
-            transforms.ToPILImage(),
+            transforms_v2.ToPILImage(),
             preprocess,
             lambda x: x.unsqueeze(0),
         ]
@@ -94,6 +95,7 @@ def run(
     model: CLIPModel = typer.Option(
         ..., help="Pass in a open_clip model string (or) internvideo"
     ),
+    thumbnails: bool = typer.Option(True, help="Flag to control thumbnail extraction"),
 ):
     """
     Dummy CLI to test the dataloader
@@ -152,15 +154,14 @@ def run(
         audio_sample_rate=audio_sampling_rate,
         audio_preprocessing_function=None,
         offset=None,
+        thumbnails=thumbnails,
     )
 
     # Construct the dataloader
     loader = torch_data.DataLoader(stream, batch_size=None, num_workers=0)
     logger.info(f"Iterating over {len(input_files)} file(s)")
-    for mid, video, audio in tqdm(loader):
-        logger.debug(
-            f"{mid}, {video.tensor.shape}, {video.pts}, {audio.tensor.shape}, {audio.pts}"
-        )
+    for mid, *chunks in tqdm(loader):
+        logger.debug(f"{mid}, {[x and (x.tensor.shape, x.pts) for x in chunks]}")
         pass
 
 

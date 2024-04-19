@@ -163,6 +163,35 @@ def get_segment_lengths(stream, stream_opts):
     return segment_lengths
 
 
+def validate_segment_lengths_from_options(stream_opts: List[StreamOutputOptions]):
+    # Each stream should be aligned, or we will just miss one or the other.
+    segment_length = None
+    for opts in stream_opts:
+        frames = opts.frames_per_chunk
+        rate = (
+            opts.frame_rate
+            if isinstance(opts, BasicVideoStreamOutputOptions)
+            else opts.sample_rate
+        )
+
+        if rate is None:
+            # Need stream
+            raise NotImplementedError()
+
+        if rate == 0:
+            _segment_length = 0
+        else:
+            _segment_length = frames / rate
+
+        if segment_length == None:
+            segment_length = _segment_length
+        elif abs(segment_length - _segment_length) > 1e-2:
+            raise ValueError(
+                "Output streams have different rates configured. Will result in missing data!"
+            )
+    return segment_length
+
+
 class MediaDataset(torch_data.IterableDataset):
     """
     MediaDataset is a custom pytorch iterable-style dataset for reading
@@ -188,6 +217,7 @@ class MediaDataset(torch_data.IterableDataset):
         output_stream_opts=List[StreamOutputOptions],
         transforms: Optional[List[Callable[[torch.Tensor], torch.Tensor]]] = None,
         offset: Optional[float] = None,
+        thumbnails: bool = True,
     ):
         super(MediaDataset).__init__()
 
@@ -201,6 +231,21 @@ class MediaDataset(torch_data.IterableDataset):
             if transforms is not None
             else [IdentityTransform for _ in range(len(self._output_stream_opts))]
         )
+
+        self._segment_length = validate_segment_lengths_from_options(output_stream_opts)
+        if self._segment_length is None:
+            # No output stream configured, default to 4s for the sake of thumbnails
+            self._segment_length = 4
+
+        # Handle thumbnail for video and image
+        self._thumbnails = thumbnails
+        self._thumbnail_opts = BasicVideoStreamOutputOptions(
+            frames_per_chunk=self._segment_length * 2 if self._segment_length else 1,
+            frame_rate=2 if self._segment_length else None,
+            width=-2,
+            height=192,
+        )
+
         self._output_stream_opts = output_stream_opts
         self._offset = offset or 0.0
         # verify if length of output_stream_opts and transform matches up
@@ -210,31 +255,53 @@ class MediaDataset(torch_data.IterableDataset):
         for _id in id_list:
             path = self._filelist[_id]
             try:
-                reader = get_stream_reader(str(path), self._output_stream_opts)
-                stream_segment_lengths = get_segment_lengths(
-                    reader, self._output_stream_opts
+                # Get stream metadata
+                video_stream_info, audio_stream_info = get_media_info(str(path))
+
+                # Get media type
+                media_type = get_media_type(video_stream_info, audio_stream_info)
+
+                thumbnails = self._thumbnails
+                if media_type == SourceMediaType.AUDIO and thumbnails:
+                    logger.warning(
+                        "Cannot extract thumbnails for audio-only files, Ignoring parameter"
+                    )
+                    thumbnails = False
+
+                should_pad_output_with_none = (
+                    self._thumbnails == True and thumbnails == False
                 )
+                stream_transforms = list(self._transforms)
+                output_stream_opts = list(self._output_stream_opts)
+                if thumbnails:
+                    logger.debug("Adding thumbnails stream")
+                    output_stream_opts.append(self._thumbnail_opts)
+                    stream_transforms.append(IdentityTransform)
+
+                # Read the frames from starting offset
+                reader = get_stream_reader(str(path), output_stream_opts)
                 reader.seek(self._offset)
-                for sidx, c in enumerate(reader.stream()):
+
+                for c in reader.stream():
                     # Might contain 1 or many output streams. Apply the corresponding transform
                     stream_outputs = tuple(
                         (
                             MediaChunk(
                                 tensor=stream_transform(torch.Tensor(stream_chunk)),
-                                pts=self._offset
-                                + sidx
-                                * stream_segment_lengths[
-                                    idx
-                                ],  # Only available in Pytorch 2.0+ stream_chunk.pts,
+                                pts=stream_chunk.pts,
                             )
                             if stream_chunk is not None
                             else None
                         )
-                        for idx, (stream_chunk, stream_transform) in enumerate(
-                            zip(c, self._transforms)
+                        for (stream_chunk, stream_transform) in zip(
+                            c, stream_transforms
                         )
                     )
-                    yield _id, stream_outputs
+                    yield _id, (
+                        stream_outputs
+                        if should_pad_output_with_none == False
+                        else stream_outputs + (None,)
+                    )
             except Exception:
                 logger.exception(f'Exception when processing "{_id}: {path}"')
 
@@ -291,6 +358,7 @@ class AudioDataset(MediaDataset):
             output_stream_opts=stream_opts,
             transforms=transforms,
             offset=offset,
+            thumbnails=False,
         )
 
     def __iter__(self):
@@ -309,6 +377,7 @@ class VideoDataset(MediaDataset):
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         frame_rate: Optional[int] = None,
         offset: Optional[float] = None,
+        thumbnails: bool = True,
     ):
 
         stream_opts = [
@@ -322,12 +391,13 @@ class VideoDataset(MediaDataset):
             output_stream_opts=stream_opts,
             transforms=transforms,
             offset=offset,
+            thumbnails=thumbnails,
         )
 
     def __iter__(self):
         _iter = super(VideoDataset, self).__iter__()
-        for _id, (chunk,) in _iter:
-            yield _id, chunk
+        for _id, chunk in _iter:
+            yield _id, *chunk
 
 
 class ImageDataset(MediaDataset):
@@ -337,6 +407,7 @@ class ImageDataset(MediaDataset):
         input_files: Union[List[Path], Dict[str, Path]],
         *,
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        thumbnails: bool = True,
     ):
 
         stream_opts = [
@@ -348,12 +419,13 @@ class ImageDataset(MediaDataset):
             output_stream_opts=stream_opts,
             transforms=transforms,
             offset=None,
+            thumbnails=thumbnails,
         )
 
     def __iter__(self):
         _iter = super(ImageDataset, self).__iter__()
-        for _id, (chunk,) in _iter:
-            yield _id, chunk
+        for _id, chunk in _iter:
+            yield _id, *chunk
 
 
 class AVDataset(MediaDataset):
@@ -373,6 +445,7 @@ class AVDataset(MediaDataset):
         video_frame_rate: Optional[int] = None,
         audio_sample_rate: Optional[int] = None,
         offset: Optional[float] = None,
+        thumbnails: bool = True,
     ):
 
         stream_opts = [
@@ -385,6 +458,7 @@ class AVDataset(MediaDataset):
                 sample_rate=audio_sample_rate,
             ),
         ]
+
         transforms = [
             (
                 video_preprocessing_function
@@ -402,9 +476,10 @@ class AVDataset(MediaDataset):
             output_stream_opts=stream_opts,
             transforms=transforms,
             offset=offset,
+            thumbnails=thumbnails,
         )
 
     def __iter__(self):
         _iter = super(AVDataset, self).__iter__()
-        for _id, (video_chunk, audio_chunk) in _iter:
-            yield _id, video_chunk, audio_chunk
+        for _id, chunks in _iter:
+            yield _id, *chunks
