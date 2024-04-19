@@ -3,6 +3,9 @@ from pathlib import Path
 class WiseProject:
     def __init__(self, project_dir: Path, create_project=False):
         self.project_dir = Path(project_dir)
+        self.store_dir = self.project_dir / 'store'
+        self.media_dir = self.project_dir / 'media'
+        self.media_type_list = ['image', 'video', 'audio']
         self._thumbnail_dir = self.project_dir / "thumbnails"
 
         if not self.project_dir.exists():
