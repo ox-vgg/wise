@@ -1,48 +1,36 @@
 # WISE User Guide
 
+The [Installation](Install.md) page describes the process of installing the
+WISE software. This tutorial assumes that the WISE software has already been
+installed.
+
+First, we download a set of sample videos which can be used to test the
+audio and visual search capabilities of WISE.
+
 ```
-## 1. Get the code
-git clone -b wise2-integration https://gitlab.com/vgg/wise/wise.git
-cd wise
-
-## 2. Install software dependencies
-## There are two ways to install software dependencies.
-## 2.1 Using Conda
-## 2.2 Using Python venv (requires Python >= 3.10)
-
-## 2.1 Installing software dependencies using Conda
-conda env create -f environment.yml
-conda activate wise
-pip install --no-deps msclap==1.3.3  # avoids installing conflicting version of torch
-
-## 2.2 Alternatively, you can also use Python's venv module which
-# supports creating lightweight “virtual environments”. The lines
-# below are commented out to avoid confusion.
-# python3 --version                  # must be >= 3.10
-# sudo apt install ffmpeg            # ffmpeg is required to load videos
-# python3 -m venv wise-dep/          # create virtual environment
-# source wise-dep/bin/activate
-# python -m pip install --upgrade pip
-# pip install -r requirements.txt
-# pip install --no-deps msclap==1.3.3
-# pip install -r torch-faiss-requirements.txt
-
-## 3. Download some sample videos
+# We assume that the current directory contains
+# the WISE software source tree.
 mkdir -p wise-data/
 curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/Kinectics-6.tar.gz"
 tar -zxvf Kinectics-6.tar.gz -C wise-data/
+```
 
-## 4. Extract features
+Next, we extract visual and audio features and create a search index that will allows
+us to perform audio and visual search on the video collection.
+
+```
 mkdir -p wise-projects/
 python3 extract-features.py \
   --media-dir wise-data/Kinectics-6/ \
   --project-dir wise-projects/Kinectics-6/
 
-## 5. Create search index
 python3 create-index.py \
   --project-dir wise-projects/Kinectics-6/
+```
 
-## 6. Search
+We can now search the video collection as follows.
+
+```
 python3 search.py \
   --query cooking --in video \
   --query "music playing in background --in audio \
