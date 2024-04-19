@@ -223,8 +223,8 @@ if __name__ == "__main__":
         stream, batch_size=None, num_workers=args.num_workers
     )
     MAX_BULK_INSERT = 8192
-    with db_engine.connect() as conn:
-        for idx, (mid, video, audio, *rest) in enumerate(tqdm(av_data_loader)):
+    with db_engine.connect() as conn, tqdm(desc="Feature extraction") as pbar:
+        for idx, (mid, video, audio, *rest) in enumerate(av_data_loader):
             media_segment = {"video": video, "audio": audio}
 
             for media_type in feature_extractor_id_list:
@@ -305,6 +305,11 @@ if __name__ == "__main__":
                         _thumb_tensor[i],
                     )
 
+            # Update progress bar
+            _media = video or audio
+            if _media is not None:
+                pbar.update(_media.tensor.shape[0])
+
             if idx % MAX_BULK_INSERT == 0:
                 conn.commit()
 
@@ -313,5 +318,5 @@ if __name__ == "__main__":
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(
-        f"Feature extraction completed in {elapsed_time:.0f} sec. or {elapsed_time/60:.2f} min."
+        f"Feature extraction completed in {elapsed_time:.0f} sec ({elapsed_time/60:.2f} min)"
     )
