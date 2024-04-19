@@ -1,15 +1,20 @@
 import glob
 from pathlib import Path
+import enum
 
 from .webdataset_store import WebdatasetStore
 from .numpy_save_store import NumpySaveStore
 
+class FeatureStoreType(str, enum.Enum):
+    WEBDATASET = "webdataset"
+    NUMPY = "numpy"
+
 class FeatureStoreFactory:
     @classmethod
-    def create_store(cls, feature_store_type, media_type, features_dir):
-        if feature_store_type == 'webdataset':
+    def create_store(cls, feature_store_type: FeatureStoreType, media_type, features_dir):
+        if feature_store_type == FeatureStoreType.WEBDATASET:
             return WebdatasetStore(media_type, features_dir)
-        elif feature_store_type == 'numpy':
+        elif feature_store_type == FeatureStoreType.NUMPY:
             return NumpySaveStore(media_type, features_dir)
         else:
             raise ValueError(f'unknown feature_store_type {feature_store_type}')
