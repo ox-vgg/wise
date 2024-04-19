@@ -2,6 +2,10 @@ import hashlib
 from pathlib import Path
 from PIL import Image
 import mimetypes
+import logging
+from .streamreader import get_media_info
+
+logger = logging.getLogger(__name__)
 
 
 def md5(path: str):
@@ -26,7 +30,14 @@ def is_valid_image(p: Path):
 
 
 def is_valid_video(p: Path):
-    return mimetypes.guess_type(p)[0].startswith('video')
+    if not mimetypes.guess_type(p)[0].startswith('video'):
+        return False
+    try:
+        get_media_info(str(p))
+        return True
+    except Exception:
+        logger.warning(f'Skipping invalid video file: {p}')
+        return False
 
 
 Identity = lambda *args, **kwargs: (args, kwargs)
