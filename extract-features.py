@@ -1,9 +1,9 @@
-import typer
+import argparse
 import glob
 import os
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
 import torch.utils.data as torch_data
 from tqdm import tqdm
 import numpy as np
@@ -11,7 +11,7 @@ import numpy as np
 from src.dataloader import AVDataset, get_media_metadata
 from src.wise_project import WiseProject
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
-from src.feature.store.feature_store_factory import FeatureStoreFactory, FeatureStoreType
+from src.feature.store.feature_store_factory import FeatureStoreFactory
 from src import db
 from src.data_models import (
     MediaMetadata,
@@ -30,57 +30,82 @@ from src.repository import (
     ThumbnailMetadataRepo,
 )
 
-app = typer.Typer()
-
-@app.command(
-    help="Initialise a WISE project by extracting features from images, audio and videos.",
-    epilog="For more details about WISE, visit https://www.robots.ox.ac.uk/~vgg/software/wise/",
-    no_args_is_help=True,
-)
-def main(
-    media_dir_list: List[Path] = typer.Option(
-        ...,
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="extract-features",
+        description="Initialise a WISE project by extractng features from images, audio and videos.",
+        epilog="For more details about WISE, visit https://www.robots.ox.ac.uk/~vgg/software/wise/",
+    )
+    parser.add_argument(
         "--media-dir",
-        dir_okay=True,
-        file_okay=False,
-        exists=True,
-        help="Source images and videos from this folder",
-    ),
-    project_dir: Path = typer.Option(
-        dir_okay=True,
-        file_okay=False,
-        help="Folder where all project assets are stored",
-    ),
-    media_include_list: List[str] = typer.Option(
-        ["*.mkv"],
+        required=True,
+        action="append",
+        dest="media_dir_list",
+        type=str,
+        help="source images and video from this folder",
+    )
+
+    parser.add_argument(
         "--media-include",
-        help="Regular expression to include certain media files",
-    ),
-    num_workers: int = typer.Option(
-        0,
-        help="Number of workers (subprocesses) used by DataLoader. If set to 0, the main process is used for data loading.",
-        # TODO add code to automatically determine the number of workers to use if this value is omitted
-    ),
-    shard_maxcount: int = typer.Option(
-        2048,
-        help="Max number of entries in each shard of webdataset tar",
-    ),
-    shard_maxsize: int = typer.Option(
-        20 * 1024 * 1024,  # tar overheads results in 25MB shards
-        help="Max size (in bytes) of each shard of webdataset tar",
-    ),
-    feature_store_type: FeatureStoreType = typer.Option(
-        "webdataset",
+        required=False,
+        action="append",
+        dest="media_include_list",
+        default=["*.mp4"],
+        type=str,
+        help="regular expression to include certain media files",
+    )
+
+    parser.add_argument(
+        "--shard-maxcount",
+        required=False,
+        type=int,
+        default=2048,
+        help="max number of entries in each shard of webdataset tar",
+    )
+
+    parser.add_argument(
+        "--shard-maxsize",
+        required=False,
+        type=int,
+        default=20 * 1024 * 1024,  # tar overheads results in 25MB shards
+        help="max size (in bytes) of each shard of webdataset tar",
+    )
+
+    parser.add_argument(
+        "--num-workers",
+        required=False,
+        type=int,
+        default=0,
+        help="number of workers used by data loader",
+    )
+
+    parser.add_argument(
         "--feature-store",
-        help="Extracted features are stored using this data structure",
-    ),
-    thumbnails: bool = typer.Option(True),
-):
+        required=False,
+        type=str,
+        default="webdataset",
+        dest="feature_store_type",
+        choices=["webdataset", "numpy"],
+        help="extracted features are stored using this data structure",
+    )
+
+    parser.add_argument(
+        "--project-dir",
+        required=True,
+        type=str,
+        help="folder where all project assets are stored",
+    )
+    parser.add_argument(
+        "--thumbnails", default=True, action=argparse.BooleanOptionalAction
+    )
+
+    args = parser.parse_args()
     # TODO: allow adding new files to an existing project
-    project = WiseProject(str(project_dir), create_project=True)
+    project = WiseProject(args.project_dir, create_project=True)
 
     DB_SCHEME = "sqlite+pysqlite://"
-    DB_URI = f"{DB_SCHEME}/{project_dir}/{project_dir.stem}.db"
+    PROJECT_DIR = Path(args.project_dir)
+    DB_URI = f"{DB_SCHEME}/{args.project_dir}/{PROJECT_DIR.stem}.db"
     db_engine = db.init_project(DB_URI, echo=False)
 
     start_time = time.time()
@@ -88,14 +113,14 @@ def main(
     ## 1. Create a list of input files
     media_filelist: Dict[int, str] = {}
 
-    for media_dir in media_dir_list:
+    for media_dir in args.media_dir_list:
         with db_engine.begin() as conn:
             # Add each folder to source collection table
             data = SourceCollection(
-                location=str(media_dir), type=SourceCollectionType.IMAGE_DIR
+                location=media_dir, type=SourceCollectionType.IMAGE_DIR
             )
             media_source_collection = SourceCollectionRepo.create(conn, data=data)
-            for media_include in media_include_list:
+            for media_include in args.media_include_list:
                 media_search_dir = os.path.join(media_dir, "**/" + media_include)
                 for media_path in glob.iglob(pathname=media_search_dir, recursive=True):
                     # Get metadata for each file and add it to media table
@@ -154,22 +179,22 @@ def main(
 
         ## 2.3 Initialise feature store to store features
         feature_store_list[media_type] = FeatureStoreFactory.create_store(
-            feature_store_type,
+            args.feature_store_type,
             media_type,
             project.features_dir(feature_extractor_id),
         )
         feature_store_list[media_type].enable_write(
-            shard_maxcount, shard_maxsize
+            args.shard_maxcount, args.shard_maxsize
         )
 
-    if thumbnails:
+    if args.thumbnails:
         feature_store_list["thumbnails"] = FeatureStoreFactory.create_store(
-            feature_store_type,
+            args.feature_store_type,
             "thumbs",
             project.thumbnail_dir(),
         )
         feature_store_list["thumbnails"].enable_write(
-            shard_maxcount, shard_maxsize
+            args.shard_maxcount, args.shard_maxsize
         )
 
     ## 4. Initialise data loader
@@ -189,13 +214,13 @@ def main(
         audio_sample_rate=audio_sampling_rate,
         audio_preprocessing_function=feature_extractor_list["audio"].preprocess_audio,
         offset=None,
-        thumbnails=thumbnails,
+        thumbnails=args.thumbnails,
     )
 
     ## 5. extract video and audio features
-    print(f"Initializing data loader with {num_workers} workers ...")
+    print(f"Initializing data loader with {args.num_workers} workers ...")
     av_data_loader = torch_data.DataLoader(
-        stream, batch_size=None, num_workers=num_workers
+        stream, batch_size=None, num_workers=args.num_workers
     )
     MAX_BULK_INSERT = 8192
     with db_engine.connect() as conn:
@@ -290,6 +315,3 @@ def main(
     print(
         f"Feature extraction completed in {elapsed_time:.0f} sec. or {elapsed_time/60:.2f} min."
     )
-
-if __name__ == "__main__":
-    app()
