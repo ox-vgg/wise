@@ -2,8 +2,8 @@
 The FeatureStore provides storage for features extracted from video frames and audio samples.
 WISE currently supports the following two types of FeatureStore:
 
- - NumpySaveStore  : 
- - WebdatasetStore : 
+ - NumpySaveStore  : stores features across multiple `.npz` files 
+ - WebdatasetStore : stores features across multiple `.tar` files
 
 The [NumpySaveStore](src/feature/store/numpy_save_store.py) uses [`numpy.savez()`](https://numpy.org/doc/stable/reference/generated/numpy.savez.html)
 to store extracted features as numpy ndarray in `.npz` files. The [WebdatasetStore](src/feature/store/webdataset_store.py)
