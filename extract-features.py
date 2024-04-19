@@ -18,6 +18,7 @@ from src.data_models import (
     SourceCollection,
     ExtraMediaMetadata,
     VectorMetadata,
+    ThumbnailMetadata,
     MediaType,
     SourceCollectionType,
 )
@@ -26,6 +27,7 @@ from src.repository import (
     MediaRepo,
     VectorRepo,
     MediaMetadataRepo,
+    ThumbnailMetadataRepo,
 )
 
 if __name__ == "__main__":
@@ -92,6 +94,9 @@ if __name__ == "__main__":
         required=True,
         type=str,
         help="folder where all project assets are stored",
+    )
+    parser.add_argument(
+        "--thumbnails", default=True, action=argparse.BooleanOptionalAction
     )
 
     args = parser.parse_args()
@@ -182,6 +187,16 @@ if __name__ == "__main__":
             args.shard_maxcount, args.shard_maxsize
         )
 
+    if args.thumbnails:
+        feature_store_list["thumbnails"] = FeatureStoreFactory.create_store(
+            args.feature_store_type,
+            "thumbs",
+            project.thumbnail_dir(),
+        )
+        feature_store_list["thumbnails"].enable_write(
+            args.shard_maxcount, args.shard_maxsize
+        )
+
     ## 4. Initialise data loader
     audio_sampling_rate = 48_000  # (48 kHz)
     video_frame_rate = 2  # fps
@@ -199,6 +214,7 @@ if __name__ == "__main__":
         audio_sample_rate=audio_sampling_rate,
         audio_preprocessing_function=feature_extractor_list["audio"].preprocess_audio,
         offset=None,
+        thumbnails=args.thumbnails,
     )
 
     ## 5. extract video and audio features
@@ -208,7 +224,7 @@ if __name__ == "__main__":
     )
     MAX_BULK_INSERT = 8192
     with db_engine.connect() as conn:
-        for idx, (mid, video, audio) in enumerate(tqdm(av_data_loader)):
+        for idx, (mid, video, audio, *rest) in enumerate(tqdm(av_data_loader)):
             media_segment = {"video": video, "audio": audio}
 
             for media_type in feature_extractor_id_list:
@@ -244,24 +260,51 @@ if __name__ == "__main__":
                         )
                         feature_store_list[media_type].add(
                             feature_metadata.id,
-                            np.reshape(segment_feature[i], (1, segment_feature.shape[1]))
+                            np.reshape(
+                                segment_feature[i], (1, segment_feature.shape[1])
+                            ),
                         )
                 else:
                     # Add whole segment
-                    start_time = segment_pts
-                    end_time = segment_pts + audio_segment_length
+                    _start_time = segment_pts
+                    _end_time = segment_pts + audio_segment_length
                     feature_metadata = VectorRepo.create(
                         conn,
                         data=VectorMetadata(
                             modality=media_type,
                             media_id=mid,
-                            timestamp=start_time,
-                            end_timestamp=end_time,
+                            timestamp=_start_time,
+                            end_timestamp=_end_time,
                         ),
                     )
                     feature_store_list[media_type].add(
                         feature_metadata.id, segment_feature
                     )
+
+            if len(rest) > 0:
+                # Handle thumbnails
+                _thumbnails = rest[0]
+                if _thumbnails == None:
+                    continue
+
+                _thumb_tensor = _thumbnails.tensor
+                _thumb_pts = _thumbnails.pts
+
+                # Store in thumbnail store
+                # (thumbnail will be N x 3 x 192 x W)
+                for i in range(_thumb_tensor.shape[0]):
+                    thumbnail_metadata = ThumbnailMetadataRepo.create(
+                        conn,
+                        data=ThumbnailMetadata(
+                            media_id=mid,
+                            timestamp=_thumb_pts + i * 0.5,
+                        ),
+                    )
+                    feature_store_list["thumbnails"].add(
+                        thumbnail_metadata.id,
+                        _thumb_tensor[i],
+                    )
+
             if idx % MAX_BULK_INSERT == 0:
                 conn.commit()
 
@@ -270,5 +313,5 @@ if __name__ == "__main__":
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(
-        f"Feature extraction completed in {int(elapsed_time)} sec. or {int(elapsed_time/60)} min."
+        f"Feature extraction completed in {elapsed_time:.0f} sec. or {elapsed_time/60:.2f} min."
     )

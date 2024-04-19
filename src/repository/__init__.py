@@ -8,6 +8,7 @@ from ..data_models import (
     MediaMetadata,
     VectorMetadata,
     ExtraMediaMetadata,
+    ThumbnailMetadata,
 )
 from .. import db
 
@@ -25,3 +26,7 @@ VectorRepo = SQLAlchemyRepository[VectorMetadata, VectorMetadata, VectorMetadata
 MediaMetadataRepo = SQLAlchemyRepository[
     ExtraMediaMetadata, ExtraMediaMetadata, ExtraMediaMetadata
 ](db.imported_metadata_table, ExtraMediaMetadata)
+
+ThumbnailMetadataRepo = SQLAlchemyRepository[
+    ThumbnailMetadata, ThumbnailMetadata, ThumbnailMetadata
+](db.thumbnails_table, ThumbnailMetadata)

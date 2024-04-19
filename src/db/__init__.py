@@ -1,6 +1,13 @@
 from sqlalchemy import create_engine, Engine, MetaData
 from .base import wise_metadata_obj, project_metadata_obj
-from .tables import project_table, source_collections_table, media_table, vectors_table, imported_metadata_table
+from .tables import (
+    project_table,
+    source_collections_table,
+    media_table,
+    vectors_table,
+    imported_metadata_table,
+    thumbnails_table,
+)
 
 
 def _init(dburi: str, metadata_obj: MetaData, **kwargs) -> Engine:

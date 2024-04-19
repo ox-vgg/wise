@@ -57,6 +57,19 @@ vectors_table = sa.Table(
     sa.Column("end_timestamp", sa.Float(), nullable=True),
 )
 
+thumbnails_table = sa.Table(
+    "thumbnails",
+    project_metadata_obj,
+    sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
+    sa.Column(
+        "media_id",
+        sa.Integer,
+        sa.ForeignKey("media.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("timestamp", sa.Float(), nullable=True),
+)
+
 imported_metadata_table = sa.Table(
     "imported_metadata",
     project_metadata_obj,
