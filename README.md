@@ -11,6 +11,7 @@ Here are some documents for users and developers of WISE.
  - Developer Resources
    - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
    - [Tests](docs/Tests.md) : describes the software testing process for WISE
+   - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
 
 **Note: This software is under active development and is not suitable for general users or production usage.**
 
