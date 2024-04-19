@@ -9,6 +9,7 @@ from tqdm import tqdm
 import numpy as np
 
 from src.dataloader import AVDataset, get_media_metadata
+from src.dataloader.utils import VIDEO_EXTENSIONS, is_valid_image, is_valid_video
 from src.wise_project import WiseProject
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
 from src.feature.store.feature_store_factory import FeatureStoreFactory, FeatureStoreType
@@ -52,7 +53,7 @@ def main(
         help="Folder where all project assets are stored",
     ),
     media_include_list: List[str] = typer.Option(
-        ["*.mkv"],
+        [f"*.{ext}" for ext in VIDEO_EXTENSIONS],
         "--media-include",
         help="Regular expression to include certain media files",
     ),
@@ -97,7 +98,10 @@ def main(
             media_source_collection = SourceCollectionRepo.create(conn, data=data)
             for media_include in media_include_list:
                 media_search_dir = os.path.join(media_dir, "**/" + media_include)
-                for media_path in glob.iglob(pathname=media_search_dir, recursive=True):
+                media_paths = list(glob.iglob(pathname=media_search_dir, recursive=True))
+                media_paths = [Path(x) for x in media_paths]
+                media_paths = [str(x) for x in media_paths if x.is_file() and (is_valid_image(x) or is_valid_video(x))]
+                for media_path in media_paths:
                     # Get metadata for each file and add it to media table
                     # Get media_path relative to
                     media_metadata = get_media_metadata(media_path)
@@ -128,6 +132,9 @@ def main(
                     # )
                     # MediaMetadataRepo.create(conn, data=extra_metadata)
                     media_filelist[metadata.id] = media_path
+
+    if len(media_filelist) == 0:
+        raise typer.BadParameter("No valid media files found")
 
     print(f"Extracting features from {len(media_filelist)} files")
 
