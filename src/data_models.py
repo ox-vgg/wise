@@ -22,20 +22,6 @@ class QueryType(str, enum.Enum):
     IMAGE_CLASSIFICATION_QUERY = "IMAGE_CLASSIFICATION_QUERY"
 
 
-# TODO
-class MediaInfo(BaseModel):
-    id: str
-    filename: str
-    media_type: str
-    width: int
-    height: int
-    format: str
-    duration: float
-    title: str = ""
-    caption: str = ""
-    copyright: str = ""
-
-
 class SourceCollection(BaseModel):
     id: Optional[int] = None
     location: str
@@ -46,11 +32,11 @@ class SourceCollection(BaseModel):
 class MediaMetadata(BaseModel):
     id: Optional[int] = None
     source_collection_id: int
-    media_type: MediaType
     path: str
     hash: bytes
     size_in_bytes: int
     date_modified: datetime.datetime
+    media_type: MediaType
     format: str
     width: int
     height: int
@@ -65,6 +51,10 @@ class VectorMetadata(BaseModel):
     media_id: int
     timestamp: Optional[float] = None
     end_timestamp: Optional[float] = None
+
+
+class VectorAndMediaMetadata(VectorMetadata, MediaMetadata):
+    pass
 
 
 class ThumbnailMetadata(BaseModel):

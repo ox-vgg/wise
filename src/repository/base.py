@@ -56,9 +56,51 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         for row in result.mappings():
             yield self.model.model_validate(row)
 
+    def list_by_column_match(
+            self,
+            conn,
+            *,
+            column_to_match: str,
+            value_to_match: Any,
+            select_columns: Optional[Tuple[str]] = None,
+            order_by_column: str,
+            desc: bool = False,
+            batch_size: int = 10000
+        ):
+        """
+        Performs a query equivalent to:
+        ```
+        SELECT {select_columns} FROM table WHERE {column_to_match} = {value_to_match}
+        ORDER BY {order_by_column} {DESC if desc else ASC}
+        ```
+
+        If select_columns is None, all columns in the table are selected (`SELECT * ...`)
+        """
+        select_columns = self._table if select_columns is None else self._table.c[select_columns]
+        result = conn.execution_options(stream_results=True).execute(
+            sa.select(select_columns)
+            .where(self._table.c[column_to_match] == value_to_match)
+            .order_by(
+                self._table.c[order_by_column].desc() if desc else self._table.c[order_by_column].asc()
+            )
+        )
+        while True:
+            chunk = result.mappings().fetchmany(batch_size)
+            if not chunk:
+                return
+
+            for row in chunk:
+                if select_columns:
+                    yield row
+                else:
+                    yield self.model.model_validate(row)
+
     def get_columns(self, conn: sa.Connection, column_names: Tuple[str]):
         result = conn.execute(sa.select(self._table.c[column_names]))
         yield from result.mappings()
+
+    def get_count(self, conn: sa.Connection) -> int:
+        return conn.execute(sa.select(sa.func.count(self._table.c.id))).scalar()
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
         result = conn.execute(

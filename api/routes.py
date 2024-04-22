@@ -1,20 +1,25 @@
 from contextlib import ExitStack
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union, BinaryIO
 import io
+import itertools
+import functools
 import logging
 from pathlib import Path
 import tarfile
 from PIL import Image
+import math
+import numpy as np
 from numpy import ndarray, array, zeros, average, expand_dims, float32
 from numpy.random import default_rng
 from numpy.linalg import norm
 from tempfile import NamedTemporaryFile
 from torch.hub import download_url_to_file
-from fastapi import APIRouter, HTTPException, Query, File, Form
+from fastapi import APIRouter, HTTPException, Query, File, Form, Request, status
 from fastapi.responses import (
     Response,
     FileResponse,
     PlainTextResponse,
+    JSONResponse,
     RedirectResponse,
     StreamingResponse,
 )
@@ -23,24 +28,35 @@ import typer
 import csv
 import json
 import os
+import sqlalchemy as sa
 
 from config import APIConfig
+from src.search_index import SearchIndex
 from src import db
-from src.projects import WiseTree, WiseProjectTree
-from src.repository import WiseProjectsRepo, MediaRepo, SourceCollectionRepo
-from src.data_models import MediaInfo, MediaMetadata, SourceCollectionType
-from src.ioutils import (
-    H5Datasets,
-    get_h5reader,
-    get_model_name,
-    get_counts,
-    is_valid_uri,
-    get_file_from_tar,
+from src.repository import (
+    WiseProjectsRepo,
+    SourceCollectionRepo,
+    MediaRepo,
+    VectorRepo,
+    ThumbnailMetadataRepo,
+    # query_by_timestamp,
+    get_featured_images,
+    get_full_metadata_batch,
 )
+from src.data_models import MediaMetadata, MediaType, SourceCollectionType, VectorAndMediaMetadata
+# from src.ioutils import (
+#     H5Datasets,
+#     get_h5reader,
+#     get_model_name,
+#     get_counts,
+#     is_valid_uri,
+#     get_file_from_tar,
+# )
 from src.inference import setup_clip, CLIPModel
 from src.enums import IndexType
-from src.search import read_index
+from src.search import read_index, brute_force_search
 from src.utils import convert_uint8array_to_base64
+from src.wise_project import WiseProject
 
 logger = logging.getLogger(__name__)
 
@@ -49,19 +65,55 @@ def raise_(ex):
     raise ex
 
 
+def send_bytes_range_requests(
+    file_obj: BinaryIO, start: int, end: int, chunk_size: int = 10_000
+):
+    """Send a file in chunks using Range Requests specification RFC7233
+
+    `start` and `end` parameters are inclusive due to specification
+    """
+    with file_obj as f:
+        f.seek(start)
+        while (pos := f.tell()) <= end:
+            read_size = min(chunk_size, end + 1 - pos)
+            yield f.read(read_size)
+
+
+def _get_range_header(range_header: str, file_size: int) -> tuple[int, int]:
+    def _invalid_range():
+        return HTTPException(
+            status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+            detail=f"Invalid request range (Range:{range_header!r})",
+        )
+
+    try:
+        h = range_header.replace("bytes=", "").split("-")
+        start = int(h[0]) if h[0] != "" else 0
+        end = int(h[1]) if h[1] != "" else file_size - 1
+    except ValueError:
+        raise _invalid_range()
+
+    if start > end or start < 0 or end > file_size - 1:
+        raise _invalid_range()
+    return start, end
+
 
 def get_project_router(config: APIConfig):
-    if config.project_id is None:
-        raise typer.BadParameter("project id is missing!")
+    if config.project_dir is None:
+        raise typer.BadParameter("project_dir is missing!")
 
-    engine = db.init(WiseTree.dburi)
-    with engine.connect() as conn:
-        project = WiseProjectsRepo.get(conn, config.project_id)
-        if project is None:
-            raise typer.BadParameter(f"Project {config.project_id} not found!")
+    project = WiseProject(config.project_dir, create_project=False)
+    if config.thumbnail_project_dir:
+        try:
+            WiseProject(config.thumbnail_project_dir, create_project=False)
+        except Exception as e:
+            logging.error(e)
+            raise typer.BadParameter(
+                f'Project from thumbnails "{config.thumbnail_project_dir}" not found!'
+            )
 
-    project_id = project.id
-    router = APIRouter(prefix=f"/{project_id}", tags=[f"{project_id}"])
+    project_name = config.project_dir.stem
+    router = APIRouter(prefix=f"/{project_name}", tags=[f"{project_name}"])
     router.include_router(_get_project_data_router(config))
     router.include_router(_get_report_image_router(config))
     router.include_router(_get_search_router(config))
@@ -74,81 +126,125 @@ def _get_project_data_router(config: APIConfig):
     Returns a router with API routes for reading the project data
 
     Provides
-    - /images/{_id} -> Access the original image from URL / disk
+    - /media/{_media_id} -> Access the original image/video/audio file from URL / disk
     - /thumbs/{_id} -> Read the thumbnail as bytes from dataset
-    - /metadata/{_id} -> Read the metadata associated with the specific sample
+    - /storyboard/{_media_id} -> Get a storyboard (a set of thumbnails used for the timeline hover previews in the video player UI)
+    - /metadata/{_media_id} -> Read the metadata associated with a media file
     - /info -> Read the project level metadata
     """
 
-    project_id = config.project_id
-    project_tree = WiseProjectTree(project_id)
-    vds_path = project_tree.latest
+    project = WiseProject(config.project_dir, create_project=False)
+    project_assets = project.discover_assets()
 
     router_cm = ExitStack()
     router = APIRouter(
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
-    thumbs_reader = router_cm.enter_context(
-        get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
-    )
-    project_engine = db.init_project(project_tree.dburi)
+    # thumbs_reader = router_cm.enter_context(
+    #     get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
+    # )
+    project_engine = db.init_project(project.dburi)
 
-    @router.get(
-        "/images/{image_id}",
-        response_class=FileResponse,
+    @router.api_route(
+        "/media/{media_id}",
+        response_class=Union[FileResponse, StreamingResponse],
         responses={404: {"content": "text/plain"}, 302: {}},
+        methods=['GET', 'HEAD'],
     )
-    def get_image(image_id: str):
+    def get_media_file(media_id: int, request: Request):
+        """
+        Returns a media file given the media_id.
+        If the requested file is an image, a FileResponse is returned.
+        If the requested file is a video or audio file, a StreamingResponse is returned using Range Requests of a given file
+        See: https://github.com/tiangolo/fastapi/discussions/7718#discussioncomment-5143493
+        """
         with project_engine.connect() as conn:
-            metadata = MediaRepo.get(conn, image_id)
+            metadata = MediaRepo.get(conn, media_id)
             if metadata is None:
                 return PlainTextResponse(
-                    status_code=404, content=f"{image_id} not found!"
+                    status_code=404, content=f"{media_id} not found!"
                 )
-            # Send the source_uri if present, or try to read from source
-            # we read from
-            # Maybe do a HEAD request to check existence before redirect
-            # so that we can try to serve the file from disk if present?
             # TODO (WISE 2) get source URI from imported_metadata table
-            if metadata.source_uri and is_valid_uri(metadata.source_uri):
-                return RedirectResponse(metadata.source_uri, status_code=302)
+            # # Send the source_uri if present, or try to read from source
+            # # we read from
+            # # Maybe do a HEAD request to check existence before redirect
+            # # so that we can try to serve the file from disk if present?
+            # if metadata.source_uri and is_valid_uri(metadata.source_uri):
+            #     return RedirectResponse(metadata.source_uri, status_code=302)
 
-            # Look up the source_collections table and find the location and type
             source_collection = SourceCollectionRepo.get(conn, metadata.source_collection_id)
             if source_collection is None:
                 return PlainTextResponse(
-                    status_code=404, content=f"{image_id} not found!"
+                    status_code=404, content=f"{media_id} not found!"
                 )
 
-            location = Path(source_collection.location)
+            file_path = Path(source_collection.location) / metadata.path
 
-            # Handle case where we read the image from disk, but it may not be there
-            if source_collection.type == SourceCollectionType.IMAGE_DIR:
-                # metadata.source_uri will be None, so we have to search for it on disk
-                file_path = location / metadata.path
-                if file_path.is_file():
-                    return FileResponse(
-                        file_path, media_type=f"image/{metadata.format.lower()}"
-                    )
-                return PlainTextResponse(
-                    status_code=404, content=f"{image_id} not found!"
-                )
+            if metadata.media_type in {MediaType.VIDEO, MediaType.AV, MediaType.AUDIO}:
+                file_size = file_path.stat().st_size
+                range_header = request.headers.get("range")
 
-            # Try to extract from local file if present
-            if not location.is_file() or not tarfile.is_tarfile(location):
-                return PlainTextResponse(
-                    status_code=404, content=f"{image_id} not found!"
-                )
-            try:
-                file_iter = get_file_from_tar(location, metadata.path.lstrip("#"))
+                content_type = f"{metadata.media_type.value}/{metadata.format}" if metadata.media_type == MediaType.AUDIO else f"video/mp4"
+                headers = {
+                    "content-type": content_type,
+                    "accept-ranges": "bytes",
+                    "content-encoding": "identity",
+                    "content-length": str(file_size),
+                    "access-control-expose-headers": (
+                        "content-type, accept-ranges, content-length, "
+                        "content-range, content-encoding"
+                    ),
+                }
+                start = 0
+                end = file_size - 1
+                status_code = status.HTTP_200_OK
+
+                if range_header is not None:
+                    start, end = _get_range_header(range_header, file_size)
+                    size = end - start + 1
+                    headers["content-length"] = str(size)
+                    headers["content-range"] = f"bytes {start}-{end}/{file_size}"
+                    status_code = status.HTTP_206_PARTIAL_CONTENT
+
                 return StreamingResponse(
-                    file_iter, media_type=f"image/{metadata.format.lower()}"
+                    send_bytes_range_requests(open(file_path, mode="rb"), start, end),
+                    headers=headers,
+                    status_code=status_code,
                 )
-            except Exception as e:
-                logger.exception(f"Exception when reading image {image_id}")
-                return PlainTextResponse(
-                    status_code=404, content=f"{image_id} not found!"
-                )
+            else:
+                # Image files
+
+                # Look up the source_collections table and find the location and type
+                # Handle case where we read the media file from disk, but it may not be there
+
+                location = Path(source_collection.location)
+                
+                if source_collection.type == SourceCollectionType.IMAGE_DIR:
+                    # metadata.source_uri will be None, so we have to search for it on disk
+                    file_path = location / metadata.path
+                    if file_path.is_file():
+                        return FileResponse(
+                            file_path, media_type=f"media/{metadata.format.lower()}"
+                        )
+                    return PlainTextResponse(
+                        status_code=404, content=f"{media_id} not found!"
+                    )
+
+                # Try to extract from local file if present
+                if not location.is_file() or not tarfile.is_tarfile(location):
+                    return PlainTextResponse(
+                        status_code=404, content=f"{media_id} not found!"
+                    )
+                try:
+                    file_iter = get_file_from_tar(location, metadata.path.lstrip("#"))
+                    return StreamingResponse(
+                        file_iter, media_type=f"media/{metadata.format.lower()}"
+                    )
+                except Exception as e:
+                    logger.exception(f"Exception when reading image {media_id}")
+                    return PlainTextResponse(
+                        status_code=404, content=f"{media_id} not found!"
+                    )
 
     @router.get(
         "/thumbs/{_id}",
@@ -167,14 +263,70 @@ def _get_project_data_router(config: APIConfig):
         except Exception as e:
             logger.error(f"Failed to get thumbnail {_id}, {e}")
             raise HTTPException(status_code=500)
+    
+    @router.get(
+        "/storyboard/{_video_media_id}",
+        response_class=JSONResponse,
+        responses={200: {"content": "application/json"}, 404: {"content": "application/json"}},
+    )
+    def get_storyboard(_video_media_id: int):
+        """
+        Generate JSON storyboard for a given video (as per this documentation: https://www.vidstack.io/docs/player/core-concepts/loading?styling=default-theme#json).
+        A storyboard image (like this example: https://media-files.vidstack.io/storyboard.jpg)
+        is generated based on the existing thumbnails of the video, and is included in the response.
+        This is used for the preview thumbnails in the frontend UI when hovering over the timeline in the video player.
+        """
+        with project_engine.connect() as conn:
+            thumbnail_rows = ThumbnailMetadataRepo.list_by_column_match(
+                conn,
+                column_to_match="media_id",
+                value_to_match=_video_media_id,
+                select_columns=("id", "timestamp"),
+                order_by_column="timestamp"
+            )
+            thumbnail_rows = list(thumbnail_rows)[::4] # Get every 4th item in the list
+                                            # (i.e. 1 thumbnail per 2 seconds of video if the sampling rate was 2fps)
+                                            # TODO make this change based on sampling rate
+            
+            # Get thumbnails
+            ids = [thumbnail_row['id'] for thumbnail_row in thumbnail_rows]
+            thumbs = thumbs_reader(ids) # list of ndarrays
+            thumbs = [Image.open(io.BytesIO(thumb)) for thumb in thumbs]
+            w, h = thumbs[0].size # Assumes all thumbnails have the same size
+
+            # Create storyboard
+            num_columns = 10
+            num_rows = math.ceil(len(thumbs) / num_columns)
+            storyboard = Image.new('RGB', (w*num_columns, h*num_rows))
+            tiles = []
+            for idx, (thumb, thumbnail_row) in enumerate(zip(thumbs, thumbnail_rows)):
+                x = (idx % num_columns) * w
+                y = (idx // num_columns) * h
+                storyboard.paste(thumbs[idx], (x, y))
+                tiles.append({
+                    "startTime": thumbnail_row['timestamp'],
+                    "x": x,
+                    "y": y
+                })
+            buffered = io.BytesIO()
+            storyboard.save(buffered, format='JPEG')
+
+            response = {
+                "url": convert_uint8array_to_base64(buffered.getvalue()),
+                "tileWidth": w,
+                "tileHeight": h,
+                "tiles": tiles
+            }
+            return JSONResponse(status_code=200, content=response)
+            # TODO add 404 response
 
     @router.get(
         "/metadata/{_id}",
         response_model=MediaMetadata,
-        response_model_exclude=set(["id", "source_collection_id"]),
+        response_model_exclude=set(["id", "source_collection_id", "size_in_bytes", "date_modified"]),
         responses={200: {"content": "application/json"}},
     )
-    def get_metadata(_id: str):
+    def get_metadata(_id: int):
         with project_engine.connect() as conn:
             metadata = MediaRepo.get(conn, _id)
             if metadata is None:
@@ -183,12 +335,18 @@ def _get_project_data_router(config: APIConfig):
 
     @router.get("/info")
     def get_info():
-        model_name = get_model_name(vds_path)
-        counts = get_counts(vds_path)
+        with project_engine.connect() as conn:
+            num_vectors = VectorRepo.get_count(conn)
+            num_media_files = MediaRepo.get_count(conn)
         return {
-            "id": project_id,
-            "model": model_name,
-            "num_images": counts[H5Datasets.IMAGE_FEATURES],
+            "project_name": config.project_dir.stem,
+            "models": {
+                media_type: [
+                    feature_extractor_id for feature_extractor_id in project_assets[media_type]
+                ] for media_type in project_assets
+            },
+            "num_vectors": num_vectors,
+            "num_media_files": num_media_files,
         }
 
     return router
@@ -201,171 +359,582 @@ def _get_report_image_router(config: APIConfig):
     )
 
     @router.post("/report")
-    def report_image(file_queries: List[bytes] = File([]), url_queries: List[str] = Form([]), text_queries: List[str] = Form([]),
-                     sourceURI: str = Form(), reasons: List[str] = Form([])):
+    def report_image(
+        file_queries: List[bytes] = File([]),
+        url_queries: List[str] = Form([]),
+        text_queries: List[str] = Form([]),
+        sourceURI: str = Form(),
+        reasons: List[str] = Form([]),
+    ):
         # TODO implement code to store data in database
         # For now, we are saving the reports in a CSV file
-        report_filename = 'data/reported_images.csv'
-        fieldnames = ['text_queries', 'url_queries', 'file_queries', 'sourceURI', 'reasons']
+        report_filename = "data/reported_images.csv"
+        fieldnames = [
+            "text_queries",
+            "url_queries",
+            "file_queries",
+            "sourceURI",
+            "reasons",
+        ]
 
         # Write header row if the file doesn't exist
         if not os.path.exists(report_filename):
-            with open(report_filename, 'a', newline='') as report_file:
+            with open(report_filename, "a", newline="") as report_file:
                 csv.writer(report_file).writerow(fieldnames)
 
         # Write data row
-        with open(report_filename, 'a', newline='') as report_file:
+        with open(report_filename, "a", newline="") as report_file:
             writer = csv.DictWriter(report_file, fieldnames=fieldnames)
-            writer.writerow({
-                'text_queries': json.dumps(text_queries),
-                'url_queries': json.dumps(url_queries),
-                'file_queries': json.dumps(
-                    # to prevent the CSV file from getting too large, we store a placeholder text ('uploaded image')
-                    # instead of storing the image file
-                    ['uploaded image' for _ in file_queries]),
-                'sourceURI': sourceURI,
-                'reasons': json.dumps(reasons)
-            })
+            writer.writerow(
+                {
+                    "text_queries": json.dumps(text_queries),
+                    "url_queries": json.dumps(url_queries),
+                    "file_queries": json.dumps(
+                        # to prevent the CSV file from getting too large, we store a placeholder text ('uploaded image')
+                        # instead of storing the image file
+                        ["uploaded image" for _ in file_queries]
+                    ),
+                    "sourceURI": sourceURI,
+                    "reasons": json.dumps(reasons),
+                }
+            )
 
-        return PlainTextResponse(
-            status_code=200, content="Image has been reported"
-        )
+        return PlainTextResponse(status_code=200, content="Image has been reported")
 
     return router
 
 
 def _get_search_router(config: APIConfig):
-    project_id = config.project_id
-    project_tree = WiseProjectTree(project_id)
+    project = WiseProject(config.project_dir)
     index_type = IndexType[config.index_type]
 
-    class SearchResponse(BaseModel):
+    # Metadata for a video/audio/image file, to be sent to the frontend
+    class MediaInfo(BaseModel):
+        id: str
+        filename: str
+        width: int
+        height: int
+        media_type: str
+        format: str
+        duration: float
+        title: str = ""
+        caption: str = ""
+        copyright: str = ""
+
+    # A search result containing the metadata fields from MediaInfo, as well as additional fields like `thumbnail` and `distance`
+    class MediaSearchResult(MediaInfo):
         link: str
         thumbnail: str
         distance: float
-        info: MediaInfo
 
         @field_validator("distance")
         @classmethod
         def round_distance(cls, v):
             return round(v, config.precision)
 
-    def make_basic_response(queries, dist, ids, get_metadata_fn):
-        return make_full_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn=None)
+    # A subclass of MediaSearchResult for images
+    class ImageSearchResult(MediaSearchResult):
+        pass
 
-    def make_full_response(queries, dist, ids, get_metadata_fn, get_thumbs_fn=None):
-        valid_indices = [[i for i, x in enumerate(top_ids) if x != -1] for top_ids in ids]
-        valid_ids = [[top_ids[x] for x in indices] for indices, top_ids in zip(valid_indices, ids)]
-        valid_dist = [[top_dist[x] for x in indices] for indices, top_dist in zip(valid_indices, dist)]
+    # A subclass of MediaSearchResult for pure audio files
+    class AudioSearchResult(MediaSearchResult):
+        pass
 
+    # A subclass of MediaSearchResult for videos
+    class VideoSearchResult(MediaSearchResult):
+        timeline_hover_thumbnails: str
+
+    # An audio or video segment
+    class MediaSegment(BaseModel):
+        vector_id: str
+        media_id: str
+        ts: float
+        te: float
+        link: str
+        distance: float
+
+        @field_validator("distance")
+        @classmethod
+        def round_distance(cls, v):
+            return round(v, config.precision)
+
+    # A subclass of MediaSegment for pure audio files
+    class AudioSegment(MediaSegment):
+        pass
+
+    # A subclass of MediaSegment for videos
+    class VideoSegment(MediaSegment):
+        thumbnail: str
+        thumbnail_score: float
+
+        @field_validator("thumbnail_score")
+        @classmethod
+        def round_distance(cls, v):
+            return round(v, config.precision)
+
+    class AudioResults(BaseModel):
+        total: int # maximum number of audio results that can be returned
+        unmerged_windows: List[AudioSegment] # e.g. 7-second windows
+        audios: List[AudioSearchResult]
+
+    class VideoAudioResults(BaseModel):
+        total: int # maximum number of unmerged_windows that can be returned
+        unmerged_windows: List[VideoSegment] # e.g. 7-second windows
+        merged_windows: List[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
+        videos: Dict[str, VideoSearchResult]
+
+    class VideoResults(BaseModel):
+        total: int # maximum number of unmerged_windows that can be returned
+        unmerged_windows: List[VideoSegment] # frames (CLIP) or unmerged 4-second segments (InternVideo/LanguageBind)
+        merged_windows: List[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
+        videos: Dict[str, VideoSearchResult]
+
+    class ImageResults(BaseModel):
+        total: int # maximum number of images that can be returned e.g. min(1000, num_images_in_project)
+        results: List[ImageSearchResult]
+
+    class SearchResponse(BaseModel):
+        time: float # backend search time in seconds
+        audio_results: Optional[AudioResults] # search results from pure audio files
+        video_audio_results: Optional[VideoAudioResults] # search results from audio stream of video files
+        video_results: Optional[VideoResults] # search results from video stream of video files
+        image_results: Optional[ImageResults] # search results from image files
+
+
+    def merge_close_segments(video_id: int, _keyframes: List[VideoSegment]):
+        merged_segments: List[VideoSegment] = []
+        start = None
+        current = None
+        best_thumbnail = None
+        best_thumbnail_score = 0
+        best_segment_score = 0
+        for k in _keyframes:
+            if start is None:
+                # Start a new group
+                start = k
+                current = k
+                best_thumbnail = k.thumbnail
+                best_thumbnail_score = k.thumbnail_score
+                best_segment_score = k.distance
+
+            elif (k.ts - current.te) <= 4:
+                current = k
+                if current.thumbnail_score > best_thumbnail_score:
+                    best_thumbnail_score = current.thumbnail_score
+                    best_thumbnail = current.thumbnail
+                if current.distance > best_segment_score:
+                    best_segment_score = current.distance
+
+            else:
+                merged_segments.append(
+                    VideoSegment(
+                        id=start.id,
+                        video_id=start.video_id,
+                        ts=start.ts,
+                        te=current.te,
+                        link=f"videos/{start.video_id}#t={start.ts},{current.te}",
+                        distance=best_segment_score,
+                        thumbnail=best_thumbnail,
+                        thumbnail_score=best_thumbnail_score,
+                    )
+                )
+                start = k
+                current = k
+                best_thumbnail_score = k.thumbnail_score
+                best_thumbnail = k.thumbnail
+                best_segment_score = k.distance
+
+        if start is not None:
+            merged_segments.append(
+                VideoSegment(
+                    id=start.id,
+                    video_id=start.video_id,
+                    ts=start.ts,
+                    te=current.te,
+                    link=f"videos/{start.video_id}#t={start.ts},{current.te}",
+                    distance=best_segment_score,
+                    thumbnail=best_thumbnail,
+                    thumbnail_score=best_thumbnail_score,
+                )
+            )
+
+        return merged_segments
+
+    def get_shots_from_segments(segments: List[VideoSegment]):
+        # Sort by video_id, timestamp
+        sorted_segments = sorted(segments, key=lambda x: (x.video_id, x.ts))
+
+        # for each key, merge keyframes with <= 4s gap and keep track of best thumbnail per video
+        best_thumbnail = {}
+        all_merged_segments = []
+        for vid, g in itertools.groupby(sorted_segments, key=lambda x: x.video_id):
+            merged_segments = merge_close_segments(vid, list(g))
+            best_thumbnail[vid] = sorted(
+                merged_segments, key=lambda x: x.thumbnail_score, reverse=True
+            )[0]
+            all_merged_segments.extend(merged_segments)
+
+        # sort the merged segments by distance
+        all_merged_segments = sorted(
+            all_merged_segments,
+            key=lambda x: x.distance,
+            reverse=True,
+        )
+        return all_merged_segments, best_thumbnail
+
+    def construct_video_search_response(
+        top_dist: List[float],
+        top_ids: List[int],
+        get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
+        get_thumbs_fn: Callable[[List[int]], List[Tuple[Optional[bytes], float]]] = None
+    ):
         if get_thumbs_fn is None:
-            get_thumbs_fn = lambda x: [None for _ in range(len(x))]
+            get_thumbs_fn = lambda x: [(None, top_dist[i]) for i in range(len(x))]
 
-        return {
-            _q: [
-                SearchResponse(
-                    thumbnail=convert_uint8array_to_base64(_thumb) if _thumb is not None else "",
-                    link=f"{_metadata.source_uri if _metadata.source_uri else f'images/{_metadata.id}'}",
-                    distance=_dist,
-                    info=MediaInfo(
-                        id=str(_metadata.id),
-                        filename=_metadata.path,
-                        media_type=str(_metadata.media_type),
-                        width=_metadata.width,
-                        height=_metadata.height,
-                        format=_metadata.format,
-                        duration=_metadata.duration,
-                    ),
+        videos = {}
+        shots = []
+        segments = []
+        thumbnails_to_send = min(50, len(top_ids))
+        for _dist, _metadata, (_thumb, _thumb_score) in zip(
+            top_dist,
+            get_metadata_fn(top_ids),
+            itertools.chain(
+                get_thumbs_fn(top_ids[:thumbnails_to_send]),
+                [(None, top_dist[i]) for i in range(thumbnails_to_send, len(top_ids))],
+            ),
+        ):
+            video_id = str(_metadata.media_id)
+            if video_id not in videos:
+                videos[video_id] = VideoSearchResult(
+                    link=f"media/{video_id}",
+                    filename=_metadata.filename,
+                    width=_metadata.width,
+                    height=_metadata.height,
+                    media_type=_metadata.media_type,
+                    format=_metadata.format,
+                    duration=_metadata.duration,
+                    thumbnail="",
+                    timeline_hover_thumbnails=f"storyboard/{video_id}",
                 )
-                for _dist, _metadata, _thumb in zip(
-                    top_dist,
-                    map(
-                        lambda _id: get_metadata_fn(_id),
-                        top_ids,
-                    ),
-                    get_thumbs_fn(top_ids),
+            ts = _metadata.timestamp
+            te = _metadata.end_timestamp
+            if ts is None:
+                logger.error(f"ts is None for vector {_metadata.id}")
+            if te is None:
+                te = ts
+
+            if ts == te:
+                te = ts + 4.0
+
+            segment = VideoSegment(
+                id=str(_metadata.id),
+                video_id=video_id,
+                ts=float(ts),
+                te=float(te),
+                link=f"videos/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'videos/{video_id}{_metadata.path}'}",
+                distance=_dist,
+                thumbnail=(
+                    f"thumbs/{_metadata.id}"
+                    if _thumb is None
+                    else convert_uint8array_to_base64(_thumb)
+                ),
+                thumbnail_score=_thumb_score,
+            )
+
+            segments.append(segment)
+
+        shots, best_thumbnails = get_shots_from_segments(segments)
+        for v in videos:
+            videos[v].thumbnail = best_thumbnails[v].thumbnail
+
+        video_results = VideoResults(
+            total=300, # TODO change this
+            unmerged_segments=segments,
+            shots=shots,
+            videos=videos,
+        )
+
+        return SearchResponse(
+            time=0.0, # TODO change this
+            video_results=video_results,
+        )
+
+    def _get_query_features(
+        extract_features_from_image, extract_features_from_text, query_prefix, q
+    ):
+        feature_vectors = []
+        weights = []
+
+        for query_dict in q:
+            query = query_dict["val"]
+            feature_vector = None
+            if isinstance(query, bytes):
+                with Image.open(io.BytesIO(query)) as im:
+                    im = im.convert('RGB')
+                    feature_vector = extract_features_from_image([im])
+                    weights.append(
+                        config.negative_queries_weight
+                        if query_dict["type"] == "negative"
+                        else 1
+                    )
+            elif isinstance(query, ndarray):
+                feature_vector = query
+                weights.append(
+                    config.negative_queries_weight
+                    if query_dict["type"] == "negative"
+                    else 1
                 )
-            ]
-            for _q, top_dist, top_ids in zip(queries, valid_dist, valid_ids)
-        }
+            elif query.startswith(("http://", "https://")):
+                logger.info("Downloading", query, "to file")
+                with NamedTemporaryFile() as tmpfile:
+                    download_url_to_file(query, tmpfile.name)
+                    with Image.open(tmpfile.name) as im:
+                        im = im.convert('RGB')
+                        feature_vector = extract_features_from_image([im])
+                        weights.append(
+                            config.negative_queries_weight
+                            if query_dict["type"] == "negative"
+                            else 1
+                        )
+            else:
+                prefixed_queries = f"{query_prefix} {query.strip()}".strip()
+                feature_vector = extract_features_from_text(prefixed_queries)
+                weights.append(
+                    config.text_queries_weight
+                    * (  # assign higher weight to natural language queries
+                        config.negative_queries_weight
+                        if query_dict["type"] == "negative"
+                        else 1
+                    )
+                )
+            if query_dict["type"] == "negative":
+                feature_vector = -feature_vector
+            feature_vectors.append(feature_vector)
+        weights = array(weights, dtype=float32)
+        average_features = average(feature_vectors, axis=0, weights=weights)
+        average_features /= norm(average_features, axis=-1, keepdims=True)
+
+        return average_features
 
     _prefix = config.query_prefix.strip()
-    project_engine = db.init_project(project_tree.dburi)
+    project_assets = project.discover_assets()
+    project_engine = db.init_project(project.dburi)
 
-    # TODO Big assumption - all datasets were written with same model name
-    # Should Read / Write to project db instead
-
-    # Get model name
-    vds_path = project_tree.latest
-    model_name = CLIPModel[get_model_name(vds_path)]
-
-    # load the feature search index
-    index_filename = project_tree.index(index_type)
-    if not index_filename.is_file():
-        raise FileNotFoundError(f"faiss index file {index_filename} was not found. "
-            "If you have not created a search index yet, you can create one using the `python3 wise.py index` command")
-    logger.info(f"Loading faiss index from {index_filename}")
-    index = read_index(index_filename, readonly=True)
-    if hasattr(index, "nprobe"):
+    media_type = 'video' # TODO change this later
+    feature_extractor_id_list = list(project_assets[media_type].keys())
+    feature_extractor_id = feature_extractor_id_list[0] # TODO: allow users to select the feature
+    
+    # Load the faiss search index
+    index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
+    search_index = SearchIndex(media_type,
+                                feature_extractor_id,
+                                index_dir)
+    logger.info(f"Loading faiss index from {search_index.get_index_filename(config.index_type)}")
+    if not search_index.load_index(config.index_type):
+        raise RuntimeError("Unable to load faiss index")
+    if hasattr(search_index.index, "nprobe"):
         # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
-        index.parallel_mode = 1
-        index.nprobe = getattr(config, "nprobe", 32)
+        search_index.index.parallel_mode = 1
+        search_index.index.nprobe = getattr(config, "nprobe", 32)
 
     if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
         try:
             logger.info(f"Enabling direct map on search index for faster internal search.")
-            index.make_direct_map(True)
+            search_index.index.make_direct_map(True)
         except Exception as e:
             logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
     else:
         logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
 
     # Get counts
-    counts = get_counts(vds_path)
-    assert counts[H5Datasets.IMAGE_FEATURES] == counts[H5Datasets.IDS]
-    num_files = counts[H5Datasets.IMAGE_FEATURES]
+    with project_engine.connect() as conn:
+        num_vectors = VectorRepo.get_count(conn)
 
-    _, _, extract_image_features, extract_text_features = setup_clip(model_name)
-
-    router_cm = ExitStack()
-    thumbs_reader = router_cm.enter_context(
-        get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
+    extract_text_features = search_index.feature_extractor.extract_text_features
+    extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
+        search_index.feature_extractor.preprocess_image(x)
     )
 
+    router_cm = ExitStack()
+    # _thumbs_reader = router_cm.enter_context(
+    #     get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
+    # )
+
+    def _thumbs_with_score(conn, q, dist):
+        def inner(ids):
+            return zip(_thumbs_reader(ids), dist)
+
+        return inner
+
+    if config.thumbnail_project_dir:
+        # from project load up the model
+        thumbnail_project_tree = WiseProjectTree(config.thumbnail_project_id)
+        thumbnail_project_engine = db.init_project(thumbnail_project_tree.dburi)
+
+        # TODO Big assumption - all datasets were written with same model name
+        # Should Read / Write to project db instead
+        # Get model name
+        thumbnail_vds = thumbnail_project_tree.latest
+        thumbnail_model_name = CLIPModel[get_model_name(thumbnail_vds)]
+
+        (
+            _,
+            _,
+            extract_image_features_for_thumbnail,
+            extract_text_features_for_thumbnail,
+        ) = setup_clip(thumbnail_model_name)
+
+        # load the feature and thumbnail reader
+        _thumbnail_feature_reader, _thumbnail_thumbs_reader = [
+            router_cm.enter_context(get_h5reader(thumbnail_vds)(x))
+            for x in (H5Datasets.IMAGE_FEATURES, H5Datasets.THUMBNAILS)
+        ]
+
+        get_query_features_for_thumbnail = functools.partial(
+            _get_query_features,
+            extract_image_features_for_thumbnail,
+            extract_text_features_for_thumbnail,
+            "this is a photo of",
+        )
+
+        # set up the functions
+        def _get_matching_thumbnails(
+            conn: sa.Connection,
+            _q: Dict[str, Union[str, ndarray, bytes]],
+            _dist,
+        ):
+            def inner(_ids: List[int]):
+                # Read metadata from current project, get timestamp
+                id_map = {}
+                with thumbnail_project_engine.connect() as tconn:
+                    for m in get_records(conn, [1 + x for x in _ids]):
+                        # Make range query to thumbnail project to get equivalent thumbnail ids
+                        ts = m.metadata.get(
+                            "start_timestamp", m.metadata.get("timestamp", 0)
+                        )
+                        te = m.metadata.get(
+                            "end_timestamp", m.metadata.get("timestamp", 9999)
+                        )
+
+                        tmid = query_by_timestamp(
+                            tconn, location=m.location, timestamp=[ts, te]
+                        )
+                        id_map[m.id - 1] = [(x - 1) for x in tmid]
+
+                # Get features from h5
+                thumbnail_ids = [x for v in id_map.values() for x in v]
+                thumbnail_features = _thumbnail_feature_reader(thumbnail_ids)
+
+                # compute dot product
+                query_feature = get_query_features_for_thumbnail(_q)
+
+                offset = 0
+
+                thumbnail_id_map = []
+                own_thumbnail_ids = []
+                own_counter = 0
+                external_thumbnail_ids = []
+                external_counter = 0
+                final_scores = []
+                # TODO Fails with IndexIVF
+                for i, (k, v) in enumerate(id_map.items()):
+                    if len(v) == 0:
+                        # Thumbnail not found in the other project
+                        # Use own thumbnail
+                        own_thumbnail_ids.append(k)
+                        thumbnail_id_map.append(("own", own_counter))
+                        final_scores.append(_dist[i])
+                        own_counter += 1
+                    else:
+                        start = offset
+                        end = offset + len(v)
+
+                        tdist, tids = brute_force_search(
+                            [np.stack(thumbnail_features[start:end])],
+                            query_feature,
+                            top_k=1,
+                        )
+                        tidx = int(tids[0, 0])
+                        final_scores.append(round(float(tdist[0, 0]), 3))
+                        external_thumbnail_ids.append(v[tidx])
+                        thumbnail_id_map.append(("external", external_counter))
+                        external_counter += 1
+
+                        offset = end
+
+                # get thumbnails
+                if len(own_thumbnail_ids) == 0:
+                    return list(
+                        zip(
+                            _thumbnail_thumbs_reader(external_thumbnail_ids),
+                            final_scores,
+                        )
+                    )
+                elif len(external_thumbnail_ids) == 0:
+                    return list(zip(_thumbs_reader(own_thumbnail_ids), final_scores))
+
+                # Both cases
+                own_thumbnails = _thumbs_reader(own_thumbnail_ids)
+                external_thumbnails = _thumbnail_thumbs_reader(external_thumbnail_ids)
+                _thumbnail_container = lambda x: (
+                    external_thumbnails if x == "external" else own_thumbnails
+                )
+                return list(
+                    zip(
+                        [_thumbnail_container(x)[idx] for (x, idx) in thumbnail_id_map],
+                        final_scores,
+                    )
+                )
+
+            return inner
+
+        thumbs_reader = _get_matching_thumbnails
+    else:
+        thumbs_reader = _thumbs_with_score
+
+    get_query_features = functools.partial(
+        _get_query_features, extract_image_features, extract_text_features, _prefix
+    )
     router = APIRouter(
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
 
-    # TODO (WISE 2) update this to use vector ids instead of image ids
-    def reconstruct_internal_img_feature(image_ids: List[int]) -> List[Union[ndarray, bytes]]:
-        reconstructed_features = index.reconstruct_batch(image_ids)
+    def reconstruct_internal_img_feature(vector_ids: List[int]) -> List[Union[ndarray, bytes]]:
+        reconstructed_features = search_index.index.reconstruct_batch(vector_ids)
         features_list = []
         for i in range(0, reconstructed_features.shape[0]):
             features_list.append( expand_dims(reconstructed_features[i,], axis=0) )
         return features_list
 
-    def load_internal_images(image_ids: List[str]) -> List[Union[ndarray, bytes]]:
-        if len(image_ids) == 0:
-            return []
-        internal_images_loaded = [] # a list of ndarrays (feature vectors) or bytes (from image file)
+    def load_internal_images(vector_ids: List[int]) -> List[Union[ndarray, bytes]]:
+        # a list of ndarrays (feature vectors) or bytes (from image file)
+        internal_images_loaded = []
         with project_engine.connect() as conn:
-            for image_id in image_ids:
+            for image_id in vector_ids:
                 # Try to read feature vector from h5 dataset
                 try:
-                    with get_h5reader(vds_path)(H5Datasets.IMAGE_FEATURES) as image_features_reader:
-                        image_features = image_features_reader([image_id])[0] # This is an np.ndarray of shape: (output_dim,) e.g. (768,)
-                        image_features = expand_dims(image_features, axis=0) # Add batch dimension so the shape becomes (1, output_dim) e.g. (1, 768)
+                    with get_h5reader(vds_path)(
+                        H5Datasets.IMAGE_FEATURES
+                    ) as image_features_reader:
+                        # This is an np.ndarray of shape: (output_dim,) e.g. (768,)
+                        image_features = image_features_reader([image_id])[0]
+                        # Add batch dimension so the shape becomes (1, output_dim) e.g. (1, 768)
+                        image_features = expand_dims(image_features, axis=0)  
                         internal_images_loaded.append(image_features)
                         continue
                 except Exception:
-                    logger.info(f"Could not retrieve feature vector for image {image_id} from h5 dataset. Attempting to re-compute features from original image")
+                    logger.info(
+                        f"Could not retrieve feature vector for image {image_id} from h5 dataset. Attempting to re-compute features from original image"
+                    )
                     pass
                 
+                # Fallback: read the original image from disk and re-compute the features
+                # Get metadata from media and source_collections table to locate the file
                 metadata = MediaRepo.get(conn, image_id)
                 if metadata is None:
-                    raise FileNotFoundError(f"Image {image_id} not found in metadata database")
-
-                # Look up the source_collections table and find the location and type
+                    raise FileNotFoundError(
+                        f"Image {image_id} not found in metadata database"
+                    )
                 source_collection = SourceCollectionRepo.get(conn, metadata.source_collection_id)
                 if source_collection is None:
                     raise LookupError(f"Source collection not found for image {image_id}")
@@ -377,39 +946,44 @@ def _get_search_router(config: APIConfig):
                     # metadata.source_uri will be None, so we have to search for it on disk
                     file_path = location / metadata.path
                     if file_path.is_file():
-                        with open(file_path, 'rb') as f:
+                        with open(file_path, "rb") as f:
                             internal_images_loaded.append(f.read())
                     else:
-                        raise FileNotFoundError(f"Image file for image {image_id} does not exist or is not a regular file")
+                        raise FileNotFoundError(
+                            f"Image file for image {image_id} does not exist or is not a regular file"
+                        )
                 else:
                     # Try to extract from local file if present
                     if not location.is_file() or not tarfile.is_tarfile(location):
-                        raise FileNotFoundError(f"WebDataset tar file (for image {image_id}) does not exist or is not a tar file")
+                        raise FileNotFoundError(
+                            f"WebDataset tar file (for image {image_id}) does not exist or is not a tar file"
+                        )
                     try:
                         with tarfile.open(location, "r") as t:
                             buf = t.extractfile(metadata.path.lstrip("#"))
                             internal_images_loaded.append(buf.read())
                     except Exception as e:
                         logger.exception(f"Exception when reading image {image_id}")
-                        raise FileNotFoundError(f"Error extracting image {image_id} from WebDataset tar file")
+                        raise FileNotFoundError(
+                            f"Error extracting image {image_id} from WebDataset tar file"
+                        )
         return internal_images_loaded
 
-    # Create a random array of featured images
+    # Create a random array of featured images (1 per video)
     with project_engine.connect() as conn:
-        # Get all image ids from the metadata table
-        # TODO (WISE 2) update this to get vector ids corresponding to the the image ids
-        ids = array([row['id'] for row in MediaRepo.get_columns(conn, ('id',))])
+        ids = array(get_featured_images(conn))
 
         # Select a random subset of up to 10000 image ids (for performance reasons)
         default_rng(seed=42).shuffle(ids)
         ids = ids[:10000]
 
-    @router.get('/featured', response_model=Dict[str, List[SearchResponse]])
+    @router.get("/featured", response_model=SearchResponse)
     async def handle_get_featured(
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbs: bool = Query(True),
-        random_seed: int = Query(123) # This seed is used to randomly select the set of images used for the featured images
+        # This seed is used to randomly select the set of images used for the featured images
+        random_seed: int = Query(123),
     ):
         with project_engine.connect() as conn:
             # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
@@ -418,28 +992,33 @@ def _get_search_router(config: APIConfig):
             selected_ids = selected_ids[:1000]
             selected_ids = expand_dims(selected_ids, axis=0)
 
-            dist = zeros(selected_ids.shape) # Use 0 as a filler value for the distance array since this is not relevant for the featured images
+            # Use 0 as a filler value for the distance array since this is not relevant for the featured images
+            dist = zeros(selected_ids.shape)  
 
-            def get_metadata(_id):
-                m = MediaRepo.get(conn, int(_id))
-                if m is None:
-                    raise RuntimeError()
-                return m
+            _get_metadata = functools.partial(get_full_metadata_batch, conn)
+            # def _get_metadata(_id: int):
+            #     m = MetadataRepo.get(conn, int(_id) + 1)
+            #     if m is None:
+            #         raise RuntimeError()
 
-            if not thumbs:
-                response = make_basic_response(
-                    ['featured'], dist[[0], start:end], selected_ids[[0], start:end], get_metadata
-                )
-            else:
-                response = make_full_response(
-                    ['featured'],
-                    dist[[0], start:end],
-                    selected_ids[[0], start:end],
-                    get_metadata,
-                    thumbs_reader,
-                )
+            #     if m.metadata.get("title") is None:
+            #         d = DatasetRepo.get(conn, int(m.dataset_id))
+            #         if d is None:
+            #             raise RuntimeError()
+            #         video_filename = Path(d.location).name
+            #         m.metadata["title"] = video_filename
+
+            #     return m
+
+            get_thumbs = _thumbs_with_score(conn, [], dist[0, start:end])
+            response = construct_video_search_response(
+                dist[0, start:end],
+                selected_ids[0, start:end],
+                _get_metadata,
+                None if not thumbs else get_thumbs,
+            )
+
         return response
-
 
     @router.get("/search", response_model=Dict[str, List[SearchResponse]])
     async def handle_get_search(
@@ -451,53 +1030,48 @@ def _get_search_router(config: APIConfig):
         if len(q) == 0:
             raise HTTPException(400, {"message": "Missing search query"})
 
-        end = min(end, num_files)
+        end = min(end, num_vectors)
         if start > end:
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        if (end - start) > 50 and thumbs == True:
-            raise HTTPException(
-                400,
-                {
-                    "message": "Cannot return more than 50 results at a time when thumbs=1"
-                },
-            )
+        # if (end - start) > 50 and thumbs == True:
+        #     raise HTTPException(
+        #         400,
+        #         {
+        #             "message": "Cannot return more than 50 results at a time when thumbs=1"
+        #         },
+        #     )
+    
+        for query in q:
+            if query.strip() in config.query_blocklist:
+                message = (
+                    "One of the search terms you entered has been blocked"
+                    if len(q) > 1
+                    else "The search term you entered has been blocked"
+                )
+                raise HTTPException(403, {"message": message})
 
-        if len(q) == 1 and q[0].startswith(("http://", "https://")):
-            query = q[0]
-            logger.info("Downloading", query, "to file")
-            with NamedTemporaryFile() as tmpfile:
-                download_url_to_file(query, tmpfile.name)
-                with Image.open(tmpfile.name) as im:
-                    query_features = extract_image_features([im])
+        q = [dict(type="positive", val=query) for query in q]
 
-            return similarity_search(q=["image"], features=query_features, start=start, end=end, thumbs=thumbs)
-        else:
-            for query in q:
-                if query.strip() in config.query_blocklist:
-                    message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
-                    raise HTTPException(
-                        403, {"message": message}
-                    )
-            prefixed_queries = [f"{_prefix} {x.strip()}".strip() for x in q]
-            text_features = extract_text_features(prefixed_queries)
-            return similarity_search(q=q, features=text_features, start=start, end=end, thumbs=thumbs)
+        return similarity_search(
+            q=q, start=start, end=end, thumbs=thumbs
+        )
 
-    @router.post("/search", response_model=Dict[str, List[SearchResponse]])
+    @router.post("/search", response_model=SearchResponse)
     async def handle_post_search_multimodal(
         # Positive queries
         text_queries: List[str] = Query(default=[]),
-        file_queries: List[bytes] = File([]), # user-uploaded images
-        url_queries: List[str] = Form([]), # URLs to online images
-        internal_image_queries: List[int] = Query(default=[]), # ids to internal images
-
+        file_queries: List[bytes] = File([]),  # user-uploaded images
+        url_queries: List[str] = Form([]),  # URLs to online images
+        internal_image_queries: List[int] = Query(default=[]),  # ids to internal images
         # Negative queries
         negative_text_queries: List[str] = Query(default=[]),
-        negative_file_queries: List[bytes] = File([]), # user-uploaded images
-        negative_url_queries: List[str] = Form([]), # URLs to online images
-        negative_internal_image_queries: List[int] = Query(default=[]), # ids to internal images
-
+        negative_file_queries: List[bytes] = File([]),  # user-uploaded images
+        negative_url_queries: List[str] = Form([]),  # URLs to online images
+        negative_internal_image_queries: List[int] = Query(
+            default=[]
+        ),  # ids to internal images
         # Other parameters
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
@@ -509,7 +1083,7 @@ def _get_search_router(config: APIConfig):
         input images/text, and then using this as the query vector.
         """
         try:
-            if not hasattr(index, 'direct_map') or index.direct_map.type == index.direct_map.NoMap:
+            if not hasattr(search_index.index, 'direct_map') or search_index.index.direct_map.type == search_index.index.direct_map.NoMap:
                 # load saved features from HDF file (slower)
                 internal_image_queries = load_internal_images(internal_image_queries)
                 negative_internal_image_queries = load_internal_images(negative_internal_image_queries)
@@ -523,88 +1097,96 @@ def _get_search_router(config: APIConfig):
                 status_code=500, content=f"Error processing internal image queries"
             )
 
-        q = file_queries + url_queries + text_queries + internal_image_queries
-        q = [dict(type='positive', val=query) for query in q]
+        for tq in text_queries:
+            if tq.strip() in config.query_blocklist:
+                message = (
+                    "One of the search terms you entered has been blocked"
+                    if len(text_queries) > 1
+                    else "The search term you entered has been blocked"
+                )
+                raise HTTPException(403, {"message": message})
 
-        negative_q = negative_file_queries + negative_url_queries + negative_text_queries + negative_internal_image_queries
-        q = q + [dict(type='negative', val=query) for query in negative_q]
+        q = file_queries + url_queries + text_queries + internal_image_queries
+        q = [dict(type="positive", val=query) for query in q]
+
+        negative_q = (
+            negative_file_queries
+            + negative_url_queries
+            + negative_text_queries
+            + negative_internal_image_queries
+        )
+        q = q + [dict(type="negative", val=query) for query in negative_q]
 
         if len(q) == 0:
             raise HTTPException(400, {"message": "Missing search query"})
         elif len(q) > 5:
             raise HTTPException(400, {"message": "Too many query items"})
 
-        end = min(end, num_files)
+        end = min(end, num_vectors)
         if start > end:
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        if (end - start) > 50 and thumbs == True:
-            raise HTTPException(
-                400, {"message": "Cannot return more than 50 results at a time when thumbs=1"}
+        # if (end - start) > 50 and thumbs == True:
+        #     raise HTTPException(
+        #         400,
+        #         {
+        #             "message": "Cannot return more than 50 results at a time when thumbs=1"
+        #         },
+        #     )
+
+        return similarity_search(
+            q,
+            start=start,
+            end=end,
+            thumbs=thumbs,
+        )
+
+    def similarity_search(
+        q: List[Dict[str, Union[ndarray, bytes, str]]],
+        start: int,
+        end: int,
+        thumbs: bool,
+    ):
+        features = get_query_features(q)
+        dist, ids = search_index.index.search(features, end)
+
+        top_ids, top_dist = ids[0, start:end], dist[0, start:end]
+
+        valid_indices = [i for i, x in enumerate(top_ids) if x != -1]
+
+        valid_ids = [int(top_ids[x]) for x in valid_indices]
+        valid_dist = [float(top_dist[x]) for x in valid_indices]
+
+        if index_type != IndexType.IndexFlatIP:
+            convert_l2_to_cosine = lambda x: 1 - (x / 2.0)
+            valid_dist = [convert_l2_to_cosine(x) for x in valid_dist]
+
+        with project_engine.connect() as conn:
+            _get_metadata = functools.partial(get_full_metadata_batch, conn)
+            # def _get_metadata(_id: int):
+            #     m = MediaRepo.get(conn, int(_id))
+            #     if m is None:
+            #         raise RuntimeError()
+
+            #     if m.metadata.get("title") is None:
+            #         d = DatasetRepo.get(conn, int(m.dataset_id))
+            #         if d is None:
+            #             raise RuntimeError()
+            #         video_filename = Path(d.location).name
+            #         m.metadata["title"] = video_filename
+
+            #     return m
+
+            get_thumbs = thumbs_reader(conn, q, valid_dist)
+
+            response = construct_video_search_response(
+                valid_dist,
+                valid_ids,
+                _get_metadata,
+                None if not thumbs else get_thumbs,
             )
 
-        feature_vectors = []
-        weights = []
-        for query_dict in q:
-            query = query_dict['val']
-            feature_vector = None
-            if isinstance(query, bytes):
-                with Image.open(io.BytesIO(query)) as im:
-                    feature_vector = extract_image_features([im])
-                    weights.append(config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
-            elif isinstance(query, ndarray):
-                feature_vector = query
-                weights.append(config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
-            elif query.startswith(("http://", "https://")):
-                logger.info("Downloading", query, "to file")
-                with NamedTemporaryFile() as tmpfile:
-                    download_url_to_file(query, tmpfile.name)
-                    with Image.open(tmpfile.name) as im:
-                        feature_vector = extract_image_features([im])
-                        weights.append(config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
-            else:
-                if query.strip() in config.query_blocklist:
-                    message = "One of the search terms you entered has been blocked" if len(q) > 1 else "The search term you entered has been blocked"
-                    raise HTTPException(
-                        403, {"message": message}
-                    )
-                prefixed_queries = f"{_prefix} {query.strip()}".strip()
-                feature_vector = extract_text_features(prefixed_queries)
-                weights.append(
-                    config.text_queries_weight * # assign higher weight to natural language queries
-                    (config.negative_queries_weight if query_dict['type'] == 'negative' else 1)
-                )
-            if query_dict['type'] == 'negative':
-                feature_vector = -feature_vector
-            feature_vectors.append(feature_vector)
-        weights = array(weights, dtype=float32)
-        average_features = average(feature_vectors, axis=0, weights=weights)
-        average_features /= norm(average_features, axis=-1, keepdims=True)
-        return similarity_search(q=["multimodal"], features=average_features, start=start, end=end, thumbs=thumbs)
-
-    def similarity_search(q: List[str], features: ndarray, start: int, end: int, thumbs: bool):
-        dist, ids = index.search(features, end)
-        with project_engine.connect() as conn:
-            def get_metadata(_id):
-                m = MediaRepo.get(conn, int(_id))
-                if m is None:
-                    raise RuntimeError()
-                return m
-
-
-            if not thumbs:
-                response = make_basic_response(
-                    q, dist[[0], start:end], ids[[0], start:end], get_metadata
-                )
-            else:
-                response = make_full_response(
-                    q,
-                    dist[[0], start:end],
-                    ids[[0], start:end],
-                    get_metadata,
-                    thumbs_reader,
-                )
         return response
 
     return router
