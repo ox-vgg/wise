@@ -102,11 +102,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # TODO: allow adding new files to an existing project
     project = WiseProject(args.project_dir, create_project=True)
-
-    DB_SCHEME = "sqlite+pysqlite://"
-    PROJECT_DIR = Path(args.project_dir)
-    DB_URI = f"{DB_SCHEME}/{args.project_dir}/{PROJECT_DIR.stem}.db"
-    db_engine = db.init_project(DB_URI, echo=False)
+    db_engine = db.init_project(project.dburi, echo=False)
 
     start_time = time.time()
 

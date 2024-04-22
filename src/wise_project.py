@@ -1,5 +1,6 @@
 from pathlib import Path
 
+DB_SCHEME = "sqlite+pysqlite://"
 class WiseProject:
     def __init__(self, project_dir: Path, create_project=False):
         self.project_dir = Path(project_dir)
@@ -16,6 +17,10 @@ class WiseProject:
                 self._thumbnail_dir.mkdir(exist_ok=True)
             else:
                 raise ValueError(f'project folder {self.project_dir} does not exist')
+
+    @property
+    def dburi(self):
+        return f"{DB_SCHEME}/{self.project_dir.absolute()}/{self.project_dir.stem}.db"
 
     def store_dir(self):
         return self.store_dir
