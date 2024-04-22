@@ -68,6 +68,7 @@ thumbnails_table = sa.Table(
         nullable=False,
     ),
     sa.Column("timestamp", sa.Float(), nullable=True),
+    sa.Column("content", sa.LargeBinary(), nullable=False),
 )
 
 imported_metadata_table = sa.Table(

@@ -16,6 +16,7 @@ from .streamreader import (
 from .utils import md5
 from pydantic import dataclasses, ConfigDict
 import torch
+import torchvision as tv
 import torch.utils.data as torch_data
 
 logger = logging.getLogger(__name__)
@@ -136,9 +137,13 @@ def IdentityTransform(x: torch.Tensor):
     return x
 
 
+def JpegTransform(x: torch.Tensor):
+    return [tv.io.encode_jpeg(t, quality=80) for t in x]
+
+
 @dataclasses.dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class MediaChunk:
-    tensor: torch.Tensor
+    tensor: torch.Tensor | list[torch.Tensor]
     pts: float
 
 
@@ -276,7 +281,7 @@ class MediaDataset(torch_data.IterableDataset):
                 if thumbnails:
                     logger.debug("Adding thumbnails stream")
                     output_stream_opts.append(self._thumbnail_opts)
-                    stream_transforms.append(IdentityTransform)
+                    stream_transforms.append(JpegTransform)
 
                 # Read the frames from starting offset
                 reader = get_stream_reader(str(path), output_stream_opts)

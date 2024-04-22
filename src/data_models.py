@@ -61,6 +61,7 @@ class ThumbnailMetadata(BaseModel):
     id: Optional[int] = None
     media_id: int
     timestamp: Optional[float] = None
+    content: bytes
 
 
 class Project(BaseModel):

@@ -183,16 +183,6 @@ if __name__ == "__main__":
             args.shard_maxcount, args.shard_maxsize
         )
 
-    if args.thumbnails:
-        feature_store_list["thumbnails"] = FeatureStoreFactory.create_store(
-            args.feature_store_type,
-            "thumbs",
-            project.thumbnail_dir(),
-        )
-        feature_store_list["thumbnails"].enable_write(
-            args.shard_maxcount, args.shard_maxsize
-        )
-
     ## 4. Initialise data loader
     audio_sampling_rate = 48_000  # (48 kHz)
     video_frame_rate = 2  # fps
@@ -245,7 +235,7 @@ if __name__ == "__main__":
 
                 # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
                 if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
-                    for i in range(segment_feature.shape[0]):
+                    for i in range(len(segment_feature)):
                         feature_metadata = VectorRepo.create(
                             conn,
                             data=VectorMetadata(
@@ -256,9 +246,7 @@ if __name__ == "__main__":
                         )
                         feature_store_list[media_type].add(
                             feature_metadata.id,
-                            np.reshape(
-                                segment_feature[i], (1, segment_feature.shape[1])
-                            ),
+                            np.expand_dims(segment_feature[i], axis=0),
                         )
                 else:
                     # Add whole segment
@@ -283,22 +271,20 @@ if __name__ == "__main__":
                 if _thumbnails == None:
                     continue
 
-                _thumb_tensor = _thumbnails.tensor
+                _thumb_jpegs = _thumbnails.tensor
                 _thumb_pts = _thumbnails.pts
 
                 # Store in thumbnail store
                 # (thumbnail will be N x 3 x 192 x W)
-                for i in range(_thumb_tensor.shape[0]):
+                for i in range(len(_thumb_jpegs)):
+                    # convert thumb tensor to jpeg
                     thumbnail_metadata = ThumbnailMetadataRepo.create(
                         conn,
                         data=ThumbnailMetadata(
                             media_id=mid,
                             timestamp=_thumb_pts + i * 0.5,
+                            content=bytes(_thumb_jpegs[i].numpy().data),
                         ),
-                    )
-                    feature_store_list["thumbnails"].add(
-                        thumbnail_metadata.id,
-                        _thumb_tensor[i],
                     )
 
             # Update progress bar
