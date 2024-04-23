@@ -25,11 +25,9 @@ class FeatureStoreFactory:
         shard_ext_list = []
         shard_file_pattern = features_dir / (media_type + '-*.*')
         for filename in glob.iglob(pathname=shard_file_pattern.as_posix(), recursive=False):
-            print(filename)
             suffix = Path(filename).suffix
             if suffix not in shard_ext_list:
                 shard_ext_list.append(suffix)
-        print(shard_ext_list)
         if len(shard_ext_list) != 1:
             raise ValueError(f'failed to infer type of {media_type} feature store in {features_dir}')
         if shard_ext_list[0] == '.tar':
