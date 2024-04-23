@@ -1,13 +1,6 @@
 import sqlalchemy as sa
-from ..base import wise_metadata_obj, project_metadata_obj
+from ..base import project_metadata_obj, thumbs_metadata_obj
 from ...data_models import SourceCollectionType, MediaType
-
-project_table = sa.Table(
-    "projects",
-    wise_metadata_obj,
-    sa.Column("id", sa.Unicode(256), primary_key=True),
-    sa.Column("version", sa.Integer, nullable=False, server_default="0"),
-)
 
 source_collections_table = sa.Table(
     "source_collections",
@@ -57,20 +50,6 @@ vectors_table = sa.Table(
     sa.Column("end_timestamp", sa.Float(), nullable=True),
 )
 
-thumbnails_table = sa.Table(
-    "thumbnails",
-    project_metadata_obj,
-    sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
-    sa.Column(
-        "media_id",
-        sa.Integer,
-        sa.ForeignKey("media.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.Column("timestamp", sa.Float(), nullable=True),
-    sa.Column("content", sa.LargeBinary(), nullable=False),
-)
-
 imported_metadata_table = sa.Table(
     "imported_metadata",
     project_metadata_obj,
@@ -82,6 +61,20 @@ imported_metadata_table = sa.Table(
     ),
     sa.Column("external_id", sa.Unicode(2048), nullable=True),
     sa.Column("metadata", sa.JSON, nullable=False, default={}),
+)
+
+thumbnails_table = sa.Table(
+    "thumbnails",
+    thumbs_metadata_obj,
+    sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
+    sa.Column(
+        "media_id",
+        sa.Integer,
+        index=True,
+        nullable=False,
+    ),
+    sa.Column("timestamp", sa.Float(), index=True, nullable=True),
+    sa.Column("content", sa.LargeBinary(), nullable=False),
 )
 
 # TODO (WISE 2) remove references to old metadata_table

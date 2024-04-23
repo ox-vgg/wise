@@ -34,7 +34,6 @@ from config import APIConfig
 from src.search_index import SearchIndex
 from src import db
 from src.repository import (
-    WiseProjectsRepo,
     SourceCollectionRepo,
     MediaRepo,
     VectorRepo,

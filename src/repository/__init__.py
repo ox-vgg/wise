@@ -17,7 +17,6 @@ from ..data_models import (
 from .. import db
 
 
-WiseProjectsRepo = WiseProjectsSQLAlchemyRepository(db.project_table, Project)
 SourceCollectionRepo = SQLAlchemyRepository[
     SourceCollection, SourceCollection, SourceCollection
 ](db.source_collections_table, SourceCollection)

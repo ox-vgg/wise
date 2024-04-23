@@ -103,6 +103,7 @@ if __name__ == "__main__":
     # TODO: allow adding new files to an existing project
     project = WiseProject(args.project_dir, create_project=True)
     db_engine = db.init_project(project.dburi, echo=False)
+    thumbs_engine = db.init_thumbs(project.thumbs_uri, echo=False)
 
     start_time = time.time()
 
@@ -209,7 +210,7 @@ if __name__ == "__main__":
         stream, batch_size=None, num_workers=args.num_workers
     )
     MAX_BULK_INSERT = 8192
-    with db_engine.connect() as conn, tqdm(desc="Feature extraction") as pbar:
+    with db_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn, tqdm(desc="Feature extraction") as pbar:
         for idx, (mid, video, audio, *rest) in enumerate(av_data_loader):
             media_segment = {"video": video, "audio": audio}
 
@@ -279,7 +280,7 @@ if __name__ == "__main__":
                 for i in range(len(_thumb_jpegs)):
                     # convert thumb tensor to jpeg
                     thumbnail_metadata = ThumbnailMetadataRepo.create(
-                        conn,
+                        thumbs_conn,
                         data=ThumbnailMetadata(
                             media_id=mid,
                             timestamp=_thumb_pts + i * 0.5,
@@ -294,8 +295,10 @@ if __name__ == "__main__":
 
             if idx % MAX_BULK_INSERT == 0:
                 conn.commit()
+                thumbs_conn.commit()
 
         conn.commit()
+        thumbs_conn.commit()
 
     end_time = time.time()
     elapsed_time = end_time - start_time
