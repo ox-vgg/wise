@@ -37,7 +37,7 @@ from src.repository import (
     SourceCollectionRepo,
     MediaRepo,
     VectorRepo,
-    ThumbnailMetadataRepo,
+    ThumbnailRepo,
     # query_by_timestamp,
     get_featured_images,
     get_full_metadata_batch,
@@ -276,7 +276,7 @@ def _get_project_data_router(config: APIConfig):
         This is used for the preview thumbnails in the frontend UI when hovering over the timeline in the video player.
         """
         with project_engine.connect() as conn:
-            thumbnail_rows = ThumbnailMetadataRepo.list_by_column_match(
+            thumbnail_rows = ThumbnailRepo.list_by_column_match(
                 conn,
                 column_to_match="media_id",
                 value_to_match=_video_media_id,

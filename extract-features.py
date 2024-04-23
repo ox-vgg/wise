@@ -27,7 +27,7 @@ from src.repository import (
     MediaRepo,
     VectorRepo,
     MediaMetadataRepo,
-    ThumbnailMetadataRepo,
+    ThumbnailRepo,
 )
 
 if __name__ == "__main__":
@@ -279,7 +279,7 @@ if __name__ == "__main__":
                 # (thumbnail will be N x 3 x 192 x W)
                 for i in range(len(_thumb_jpegs)):
                     # convert thumb tensor to jpeg
-                    thumbnail_metadata = ThumbnailMetadataRepo.create(
+                    thumbnail_metadata = ThumbnailRepo.create(
                         thumbs_conn,
                         data=ThumbnailMetadata(
                             media_id=mid,
