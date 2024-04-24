@@ -1,3 +1,4 @@
+import math
 import faiss
 from tqdm import tqdm
 from pathlib import Path
@@ -5,6 +6,7 @@ import numpy as np
 
 from .feature.feature_extractor_factory import FeatureExtractorFactory
 from .feature.store.feature_store_factory import FeatureStoreFactory
+from .feature.store.webdataset_store import WebdatasetStore
 
 class SearchIndex:
     def __init__(self, media_type, feature_extractor_id, index_dir, feature_dir=None):
@@ -51,7 +53,7 @@ class SearchIndex:
             index = faiss.IndexIVFFlat(quantizer, feature_dim, cell_count)
 
             print(f'  loading a random sample of {train_count} features from {feature_count} features ...')
-            shuffled_features = WebdatasetStore(media_type, feature_dir)
+            shuffled_features = WebdatasetStore(self.media_type, self.feature_dir)
             shuffled_features.enable_read(shard_shuffle=True)
 
             train_features = np.ndarray((train_count, feature_dim), dtype=np.float32)
@@ -61,7 +63,7 @@ class SearchIndex:
                 feature_index += 1
 
             assert not index.is_trained
-            print(f'  training {args.index_type} faiss index with {train_count} features ...')
+            print(f'  training {index_type} faiss index with {train_count} features ...')
             index.train(train_features)
             assert index.is_trained
 
