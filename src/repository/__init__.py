@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import sqlalchemy as sa
 
 from .base import SQLAlchemyRepository
@@ -37,6 +37,7 @@ ThumbnailRepo = SQLAlchemyRepository[
 
 _vtable = db.vectors_table
 _mtable = db.media_table
+_thumbs_table = db.thumbnails_table
 
 def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorAndMediaMetadata]:
     # TODO add docstring
@@ -54,6 +55,22 @@ def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorA
     res = conn.execute(stmt)
 
     return [VectorAndMediaMetadata.model_validate(row) for row in res.mappings()]
+
+def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp: float) -> Optional[bytes]:
+    """
+    Get the thumbnail for a given `media_id` and `timestamp` (finds the first thumbnail within between `timestamp` and `timestamp + 4`)
+    If no thumbnail was found, the return value is None
+    """
+    start_timestamp_expr = _thumbs_table.c.timestamp >= timestamp
+    end_timestamp_expr = _thumbs_table.c.timestamp < timestamp + 4
+    stmt = (
+        sa.select(_thumbs_table.c.content)
+        .where(_thumbs_table.c.media_id == media_id)
+        .where((start_timestamp_expr & end_timestamp_expr))
+        .order_by(_thumbs_table.c.timestamp)
+    )
+    result = conn.execute(stmt)
+    return result.scalar()
 
 def get_featured_images(conn: sa.Connection) -> List[int]:
     # Get the ids of the 12th second from each video

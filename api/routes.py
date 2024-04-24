@@ -41,16 +41,9 @@ from src.repository import (
     # query_by_timestamp,
     get_featured_images,
     get_full_metadata_batch,
+    get_thumbnail_by_timestamp,
 )
 from src.data_models import MediaMetadata, MediaType, SourceCollectionType, VectorAndMediaMetadata
-# from src.ioutils import (
-#     H5Datasets,
-#     get_h5reader,
-#     get_model_name,
-#     get_counts,
-#     is_valid_uri,
-#     get_file_from_tar,
-# )
 from src.inference import setup_clip, CLIPModel
 from src.enums import IndexType
 from src.search import read_index, brute_force_search
@@ -139,10 +132,8 @@ def _get_project_data_router(config: APIConfig):
     router = APIRouter(
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
-    # thumbs_reader = router_cm.enter_context(
-    #     get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
-    # )
     project_engine = db.init_project(project.dburi)
+    thumbs_engine = db.init_thumbs(project.thumbs_uri)
 
     @router.api_route(
         "/media/{media_id}",
@@ -251,17 +242,16 @@ def _get_project_data_router(config: APIConfig):
         responses={200: {"content": "image/jpeg"}, 404: {"content": "text/plain"}},
     )
     def get_thumbnail(_id: int):
-        try:
+        # TODO update this to get the thumbnail by first getting the timestamp given a vector id, and then getting the thumbnail from the timestamp
+        with thumbs_engine.connect() as thumbs_conn:
+            thumbnail_metadata = ThumbnailRepo.get(thumbs_conn, _id)
+            if thumbnail_metadata is None:
+                raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
             return Response(
-                content=bytes(thumbs_reader([_id])[0]),
+                content=thumbnail_metadata.content,
                 media_type="image/jpeg",
                 status_code=200,
             )
-        except IndexError:
-            return PlainTextResponse(status_code=404, content=f"{_id} not found!")
-        except Exception as e:
-            logger.error(f"Failed to get thumbnail {_id}, {e}")
-            raise HTTPException(status_code=500)
     
     @router.get(
         "/storyboard/{_video_media_id}",
@@ -275,22 +265,25 @@ def _get_project_data_router(config: APIConfig):
         is generated based on the existing thumbnails of the video, and is included in the response.
         This is used for the preview thumbnails in the frontend UI when hovering over the timeline in the video player.
         """
-        with project_engine.connect() as conn:
+        with thumbs_engine.connect() as thumbs_conn:
             thumbnail_rows = ThumbnailRepo.list_by_column_match(
-                conn,
+                thumbs_conn,
                 column_to_match="media_id",
                 value_to_match=_video_media_id,
-                select_columns=("id", "timestamp"),
+                select_columns=("id", "timestamp", "content"),
                 order_by_column="timestamp"
             )
-            thumbnail_rows = list(thumbnail_rows)[::4] # Get every 4th item in the list
+            thumbnail_rows = list(thumbnail_rows)
+            if len(thumbnail_rows) == 0:
+                raise HTTPException(status_code=404, detail=f"Thumbnails not found for media_id={_video_media_id}!")
+
+            thumbnail_rows = thumbnail_rows[::4] # Get every 4th item in the list
                                             # (i.e. 1 thumbnail per 2 seconds of video if the sampling rate was 2fps)
                                             # TODO make this change based on sampling rate
             
             # Get thumbnails
             ids = [thumbnail_row['id'] for thumbnail_row in thumbnail_rows]
-            thumbs = thumbs_reader(ids) # list of ndarrays
-            thumbs = [Image.open(io.BytesIO(thumb)) for thumb in thumbs]
+            thumbs = [Image.open(io.BytesIO(thumbnail_row['content'])) for thumbnail_row in thumbnail_rows]
             w, h = thumbs[0].size # Assumes all thumbnails have the same size
 
             # Create storyboard
@@ -317,7 +310,6 @@ def _get_project_data_router(config: APIConfig):
                 "tiles": tiles
             }
             return JSONResponse(status_code=200, content=response)
-            # TODO add 404 response
 
     @router.get(
         "/metadata/{_id}",
@@ -424,7 +416,7 @@ def _get_search_router(config: APIConfig):
     class MediaSearchResult(MediaInfo):
         link: str
         thumbnail: str
-        distance: float
+        distance: Optional[float] = None
 
         @field_validator("distance")
         @classmethod
@@ -527,11 +519,11 @@ def _get_search_router(config: APIConfig):
             else:
                 merged_segments.append(
                     VideoSegment(
-                        id=start.id,
-                        video_id=start.video_id,
+                        vector_id=start.vector_id,
+                        media_id=start.media_id,
                         ts=start.ts,
                         te=current.te,
-                        link=f"videos/{start.video_id}#t={start.ts},{current.te}",
+                        link=f"videos/{start.media_id}#t={start.ts},{current.te}",
                         distance=best_segment_score,
                         thumbnail=best_thumbnail,
                         thumbnail_score=best_thumbnail_score,
@@ -546,11 +538,11 @@ def _get_search_router(config: APIConfig):
         if start is not None:
             merged_segments.append(
                 VideoSegment(
-                    id=start.id,
-                    video_id=start.video_id,
+                    vector_id=start.vector_id,
+                    media_id=start.media_id,
                     ts=start.ts,
                     te=current.te,
-                    link=f"videos/{start.video_id}#t={start.ts},{current.te}",
+                    link=f"videos/{start.media_id}#t={start.ts},{current.te}",
                     distance=best_segment_score,
                     thumbnail=best_thumbnail,
                     thumbnail_score=best_thumbnail_score,
@@ -561,12 +553,12 @@ def _get_search_router(config: APIConfig):
 
     def get_shots_from_segments(segments: List[VideoSegment]):
         # Sort by video_id, timestamp
-        sorted_segments = sorted(segments, key=lambda x: (x.video_id, x.ts))
+        sorted_segments = sorted(segments, key=lambda x: (x.media_id, x.ts))
 
         # for each key, merge keyframes with <= 4s gap and keep track of best thumbnail per video
         best_thumbnail = {}
         all_merged_segments = []
-        for vid, g in itertools.groupby(sorted_segments, key=lambda x: x.video_id):
+        for vid, g in itertools.groupby(sorted_segments, key=lambda x: x.media_id):
             merged_segments = merge_close_segments(vid, list(g))
             best_thumbnail[vid] = sorted(
                 merged_segments, key=lambda x: x.thumbnail_score, reverse=True
@@ -594,19 +586,21 @@ def _get_search_router(config: APIConfig):
         shots = []
         segments = []
         thumbnails_to_send = min(50, len(top_ids))
+        all_metadata = get_metadata_fn(top_ids)
         for _dist, _metadata, (_thumb, _thumb_score) in zip(
             top_dist,
-            get_metadata_fn(top_ids),
+            all_metadata,
             itertools.chain(
-                get_thumbs_fn(top_ids[:thumbnails_to_send]),
+                get_thumbs_fn(all_metadata[:thumbnails_to_send]),
                 [(None, top_dist[i]) for i in range(thumbnails_to_send, len(top_ids))],
             ),
         ):
             video_id = str(_metadata.media_id)
             if video_id not in videos:
                 videos[video_id] = VideoSearchResult(
+                    id=video_id,
                     link=f"media/{video_id}",
-                    filename=_metadata.filename,
+                    filename=_metadata.path,
                     width=_metadata.width,
                     height=_metadata.height,
                     media_type=_metadata.media_type,
@@ -626,8 +620,8 @@ def _get_search_router(config: APIConfig):
                 te = ts + 4.0
 
             segment = VideoSegment(
-                id=str(_metadata.id),
-                video_id=video_id,
+                vector_id=str(_metadata.id),
+                media_id=video_id,
                 ts=float(ts),
                 te=float(te),
                 link=f"videos/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'videos/{video_id}{_metadata.path}'}",
@@ -648,14 +642,17 @@ def _get_search_router(config: APIConfig):
 
         video_results = VideoResults(
             total=300, # TODO change this
-            unmerged_segments=segments,
-            shots=shots,
+            unmerged_windows=segments,
+            merged_windows=shots,
             videos=videos,
         )
 
         return SearchResponse(
             time=0.0, # TODO change this
+            audio_results=None,
+            video_audio_results=None,
             video_results=video_results,
+            image_results=None,
         )
 
     def _get_query_features(
@@ -718,6 +715,7 @@ def _get_search_router(config: APIConfig):
     _prefix = config.query_prefix.strip()
     project_assets = project.discover_assets()
     project_engine = db.init_project(project.dburi)
+    thumbs_engine = db.init_thumbs(project.thumbs_uri)
 
     media_type = 'video' # TODO change this later
     feature_extractor_id_list = list(project_assets[media_type].keys())
@@ -755,139 +753,147 @@ def _get_search_router(config: APIConfig):
     )
 
     router_cm = ExitStack()
-    # _thumbs_reader = router_cm.enter_context(
-    #     get_h5reader(vds_path)(H5Datasets.THUMBNAILS)
-    # )
 
-    def _thumbs_with_score(conn, q, dist):
-        def inner(ids):
-            return zip(_thumbs_reader(ids), dist)
+    def _thumbs_with_score(conn, dist):
+        def inner(vector_and_media_metadata_list: List[VectorAndMediaMetadata]):
+            return zip(
+                [
+                    get_thumbnail_by_timestamp(
+                        conn,
+                        media_id=vector_and_media_metadata.media_id,
+                        timestamp=vector_and_media_metadata.timestamp
+                    ) for vector_and_media_metadata in vector_and_media_metadata_list
+                ],
+                dist
+            )
 
         return inner
 
     if config.thumbnail_project_dir:
-        # from project load up the model
-        thumbnail_project_tree = WiseProjectTree(config.thumbnail_project_id)
-        thumbnail_project_engine = db.init_project(thumbnail_project_tree.dburi)
+        # TODO update the code below
+        raise NotImplementedError()
+        # # from project load up the model
+        # thumbnail_project_tree = WiseProjectTree(config.thumbnail_project_id)
+        # thumbnail_project_engine = db.init_project(thumbnail_project_tree.dburi)
 
-        # TODO Big assumption - all datasets were written with same model name
-        # Should Read / Write to project db instead
-        # Get model name
-        thumbnail_vds = thumbnail_project_tree.latest
-        thumbnail_model_name = CLIPModel[get_model_name(thumbnail_vds)]
+        # # TODO Big assumption - all datasets were written with same model name
+        # # Should Read / Write to project db instead
+        # # Get model name
+        # thumbnail_vds = thumbnail_project_tree.latest
+        # thumbnail_model_name = CLIPModel[get_model_name(thumbnail_vds)]
 
-        (
-            _,
-            _,
-            extract_image_features_for_thumbnail,
-            extract_text_features_for_thumbnail,
-        ) = setup_clip(thumbnail_model_name)
+        # (
+        #     _,
+        #     _,
+        #     extract_image_features_for_thumbnail,
+        #     extract_text_features_for_thumbnail,
+        # ) = setup_clip(thumbnail_model_name)
 
-        # load the feature and thumbnail reader
-        _thumbnail_feature_reader, _thumbnail_thumbs_reader = [
-            router_cm.enter_context(get_h5reader(thumbnail_vds)(x))
-            for x in (H5Datasets.IMAGE_FEATURES, H5Datasets.THUMBNAILS)
-        ]
+        # # load the feature and thumbnail reader
+        # _thumbnail_feature_reader, _thumbnail_thumbs_reader = [
+        #     router_cm.enter_context(get_h5reader(thumbnail_vds)(x))
+        #     for x in (H5Datasets.IMAGE_FEATURES, H5Datasets.THUMBNAILS)
+        # ]
 
-        get_query_features_for_thumbnail = functools.partial(
-            _get_query_features,
-            extract_image_features_for_thumbnail,
-            extract_text_features_for_thumbnail,
-            "this is a photo of",
-        )
+        # get_query_features_for_thumbnail = functools.partial(
+        #     _get_query_features,
+        #     extract_image_features_for_thumbnail,
+        #     extract_text_features_for_thumbnail,
+        #     "this is a photo of",
+        # )
 
-        # set up the functions
-        def _get_matching_thumbnails(
-            conn: sa.Connection,
-            _q: Dict[str, Union[str, ndarray, bytes]],
-            _dist,
-        ):
-            def inner(_ids: List[int]):
-                # Read metadata from current project, get timestamp
-                id_map = {}
-                with thumbnail_project_engine.connect() as tconn:
-                    for m in get_records(conn, [1 + x for x in _ids]):
-                        # Make range query to thumbnail project to get equivalent thumbnail ids
-                        ts = m.metadata.get(
-                            "start_timestamp", m.metadata.get("timestamp", 0)
-                        )
-                        te = m.metadata.get(
-                            "end_timestamp", m.metadata.get("timestamp", 9999)
-                        )
+        # # set up the functions
+        # def _get_matching_thumbnails(
+        #     conn: sa.Connection,
+        #     _q: Dict[str, Union[str, ndarray, bytes]],
+        #     _dist,
+        # ):
+        #     def inner(_ids: List[int]):
+        #         # Read metadata from current project, get timestamp
+        #         id_map = {}
+        #         with thumbnail_project_engine.connect() as tconn:
+        #             for m in get_records(conn, [1 + x for x in _ids]):
+        #                 # Make range query to thumbnail project to get equivalent thumbnail ids
+        #                 ts = m.metadata.get(
+        #                     "start_timestamp", m.metadata.get("timestamp", 0)
+        #                 )
+        #                 te = m.metadata.get(
+        #                     "end_timestamp", m.metadata.get("timestamp", 9999)
+        #                 )
 
-                        tmid = query_by_timestamp(
-                            tconn, location=m.location, timestamp=[ts, te]
-                        )
-                        id_map[m.id - 1] = [(x - 1) for x in tmid]
+        #                 tmid = query_by_timestamp(
+        #                     tconn, location=m.location, timestamp=[ts, te]
+        #                 )
+        #                 id_map[m.id - 1] = [(x - 1) for x in tmid]
 
-                # Get features from h5
-                thumbnail_ids = [x for v in id_map.values() for x in v]
-                thumbnail_features = _thumbnail_feature_reader(thumbnail_ids)
+        #         # Get features from h5
+        #         thumbnail_ids = [x for v in id_map.values() for x in v]
+        #         thumbnail_features = _thumbnail_feature_reader(thumbnail_ids)
 
-                # compute dot product
-                query_feature = get_query_features_for_thumbnail(_q)
+        #         # compute dot product
+        #         query_feature = get_query_features_for_thumbnail(_q)
 
-                offset = 0
+        #         offset = 0
 
-                thumbnail_id_map = []
-                own_thumbnail_ids = []
-                own_counter = 0
-                external_thumbnail_ids = []
-                external_counter = 0
-                final_scores = []
-                # TODO Fails with IndexIVF
-                for i, (k, v) in enumerate(id_map.items()):
-                    if len(v) == 0:
-                        # Thumbnail not found in the other project
-                        # Use own thumbnail
-                        own_thumbnail_ids.append(k)
-                        thumbnail_id_map.append(("own", own_counter))
-                        final_scores.append(_dist[i])
-                        own_counter += 1
-                    else:
-                        start = offset
-                        end = offset + len(v)
+        #         thumbnail_id_map = []
+        #         own_thumbnail_ids = []
+        #         own_counter = 0
+        #         external_thumbnail_ids = []
+        #         external_counter = 0
+        #         final_scores = []
+        #         # TODO Fails with IndexIVF
+        #         for i, (k, v) in enumerate(id_map.items()):
+        #             if len(v) == 0:
+        #                 # Thumbnail not found in the other project
+        #                 # Use own thumbnail
+        #                 own_thumbnail_ids.append(k)
+        #                 thumbnail_id_map.append(("own", own_counter))
+        #                 final_scores.append(_dist[i])
+        #                 own_counter += 1
+        #             else:
+        #                 start = offset
+        #                 end = offset + len(v)
 
-                        tdist, tids = brute_force_search(
-                            [np.stack(thumbnail_features[start:end])],
-                            query_feature,
-                            top_k=1,
-                        )
-                        tidx = int(tids[0, 0])
-                        final_scores.append(round(float(tdist[0, 0]), 3))
-                        external_thumbnail_ids.append(v[tidx])
-                        thumbnail_id_map.append(("external", external_counter))
-                        external_counter += 1
+        #                 tdist, tids = brute_force_search(
+        #                     [np.stack(thumbnail_features[start:end])],
+        #                     query_feature,
+        #                     top_k=1,
+        #                 )
+        #                 tidx = int(tids[0, 0])
+        #                 final_scores.append(round(float(tdist[0, 0]), 3))
+        #                 external_thumbnail_ids.append(v[tidx])
+        #                 thumbnail_id_map.append(("external", external_counter))
+        #                 external_counter += 1
 
-                        offset = end
+        #                 offset = end
 
-                # get thumbnails
-                if len(own_thumbnail_ids) == 0:
-                    return list(
-                        zip(
-                            _thumbnail_thumbs_reader(external_thumbnail_ids),
-                            final_scores,
-                        )
-                    )
-                elif len(external_thumbnail_ids) == 0:
-                    return list(zip(_thumbs_reader(own_thumbnail_ids), final_scores))
+        #         # get thumbnails
+        #         if len(own_thumbnail_ids) == 0:
+        #             return list(
+        #                 zip(
+        #                     _thumbnail_thumbs_reader(external_thumbnail_ids),
+        #                     final_scores,
+        #                 )
+        #             )
+        #         elif len(external_thumbnail_ids) == 0:
+        #             return list(zip(_thumbs_reader(own_thumbnail_ids), final_scores))
 
-                # Both cases
-                own_thumbnails = _thumbs_reader(own_thumbnail_ids)
-                external_thumbnails = _thumbnail_thumbs_reader(external_thumbnail_ids)
-                _thumbnail_container = lambda x: (
-                    external_thumbnails if x == "external" else own_thumbnails
-                )
-                return list(
-                    zip(
-                        [_thumbnail_container(x)[idx] for (x, idx) in thumbnail_id_map],
-                        final_scores,
-                    )
-                )
+        #         # Both cases
+        #         own_thumbnails = _thumbs_reader(own_thumbnail_ids)
+        #         external_thumbnails = _thumbnail_thumbs_reader(external_thumbnail_ids)
+        #         _thumbnail_container = lambda x: (
+        #             external_thumbnails if x == "external" else own_thumbnails
+        #         )
+        #         return list(
+        #             zip(
+        #                 [_thumbnail_container(x)[idx] for (x, idx) in thumbnail_id_map],
+        #                 final_scores,
+        #             )
+        #         )
 
-            return inner
+        #     return inner
 
-        thumbs_reader = _get_matching_thumbnails
+        # thumbs_reader = _get_matching_thumbnails
     else:
         thumbs_reader = _thumbs_with_score
 
@@ -984,7 +990,7 @@ def _get_search_router(config: APIConfig):
         # This seed is used to randomly select the set of images used for the featured images
         random_seed: int = Query(123),
     ):
-        with project_engine.connect() as conn:
+        with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
             selected_ids = ids.copy()
             default_rng(seed=random_seed).shuffle(selected_ids)
@@ -1009,7 +1015,7 @@ def _get_search_router(config: APIConfig):
 
             #     return m
 
-            get_thumbs = _thumbs_with_score(conn, [], dist[0, start:end])
+            get_thumbs = _thumbs_with_score(thumbs_conn, dist[0, start:end])
             response = construct_video_search_response(
                 dist[0, start:end],
                 selected_ids[0, start:end],
@@ -1019,7 +1025,7 @@ def _get_search_router(config: APIConfig):
 
         return response
 
-    @router.get("/search", response_model=Dict[str, List[SearchResponse]])
+    @router.get("/search", response_model=SearchResponse)
     async def handle_get_search(
         q: List[str] = Query(default=[]),
         start: int = Query(0, ge=0, le=980),
@@ -1161,7 +1167,7 @@ def _get_search_router(config: APIConfig):
             convert_l2_to_cosine = lambda x: 1 - (x / 2.0)
             valid_dist = [convert_l2_to_cosine(x) for x in valid_dist]
 
-        with project_engine.connect() as conn:
+        with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             _get_metadata = functools.partial(get_full_metadata_batch, conn)
             # def _get_metadata(_id: int):
             #     m = MediaRepo.get(conn, int(_id))
@@ -1177,7 +1183,7 @@ def _get_search_router(config: APIConfig):
 
             #     return m
 
-            get_thumbs = thumbs_reader(conn, q, valid_dist)
+            get_thumbs = thumbs_reader(thumbs_conn, valid_dist)
 
             response = construct_video_search_response(
                 valid_dist,
