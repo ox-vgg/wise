@@ -17,7 +17,6 @@ from ..data_models import (
 from .. import db
 
 
-WiseProjectsRepo = WiseProjectsSQLAlchemyRepository(db.project_table, Project)
 SourceCollectionRepo = SQLAlchemyRepository[
     SourceCollection, SourceCollection, SourceCollection
 ](db.source_collections_table, SourceCollection)
@@ -31,7 +30,7 @@ MediaMetadataRepo = SQLAlchemyRepository[
     ExtraMediaMetadata, ExtraMediaMetadata, ExtraMediaMetadata
 ](db.imported_metadata_table, ExtraMediaMetadata)
 
-ThumbnailMetadataRepo = SQLAlchemyRepository[
+ThumbnailRepo = SQLAlchemyRepository[
     ThumbnailMetadata, ThumbnailMetadata, ThumbnailMetadata
 ](db.thumbnails_table, ThumbnailMetadata)
 
