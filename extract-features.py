@@ -27,7 +27,7 @@ from src.repository import (
     MediaRepo,
     VectorRepo,
     MediaMetadataRepo,
-    ThumbnailMetadataRepo,
+    ThumbnailRepo,
 )
 
 if __name__ == "__main__":
@@ -102,11 +102,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # TODO: allow adding new files to an existing project
     project = WiseProject(args.project_dir, create_project=True)
-
-    DB_SCHEME = "sqlite+pysqlite://"
-    PROJECT_DIR = Path(args.project_dir)
-    DB_URI = f"{DB_SCHEME}/{args.project_dir}/{PROJECT_DIR.stem}.db"
-    db_engine = db.init_project(DB_URI, echo=False)
+    db_engine = db.init_project(project.dburi, echo=False)
+    thumbs_engine = db.init_thumbs(project.thumbs_uri, echo=False)
 
     start_time = time.time()
 
@@ -187,16 +184,6 @@ if __name__ == "__main__":
             args.shard_maxcount, args.shard_maxsize
         )
 
-    if args.thumbnails:
-        feature_store_list["thumbnails"] = FeatureStoreFactory.create_store(
-            args.feature_store_type,
-            "thumbs",
-            project.thumbnail_dir(),
-        )
-        feature_store_list["thumbnails"].enable_write(
-            args.shard_maxcount, args.shard_maxsize
-        )
-
     ## 4. Initialise data loader
     audio_sampling_rate = 48_000  # (48 kHz)
     video_frame_rate = 2  # fps
@@ -223,7 +210,7 @@ if __name__ == "__main__":
         stream, batch_size=None, num_workers=args.num_workers
     )
     MAX_BULK_INSERT = 8192
-    with db_engine.connect() as conn, tqdm(desc="Feature extraction") as pbar:
+    with db_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn, tqdm(desc="Feature extraction") as pbar:
         for idx, (mid, video, audio, *rest) in enumerate(av_data_loader):
             media_segment = {"video": video, "audio": audio}
 
@@ -249,7 +236,7 @@ if __name__ == "__main__":
 
                 # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
                 if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
-                    for i in range(segment_feature.shape[0]):
+                    for i in range(len(segment_feature)):
                         feature_metadata = VectorRepo.create(
                             conn,
                             data=VectorMetadata(
@@ -260,9 +247,7 @@ if __name__ == "__main__":
                         )
                         feature_store_list[media_type].add(
                             feature_metadata.id,
-                            np.reshape(
-                                segment_feature[i], (1, segment_feature.shape[1])
-                            ),
+                            np.expand_dims(segment_feature[i], axis=0),
                         )
                 else:
                     # Add whole segment
@@ -287,22 +272,20 @@ if __name__ == "__main__":
                 if _thumbnails == None:
                     continue
 
-                _thumb_tensor = _thumbnails.tensor
+                _thumb_jpegs = _thumbnails.tensor
                 _thumb_pts = _thumbnails.pts
 
                 # Store in thumbnail store
                 # (thumbnail will be N x 3 x 192 x W)
-                for i in range(_thumb_tensor.shape[0]):
-                    thumbnail_metadata = ThumbnailMetadataRepo.create(
-                        conn,
+                for i in range(len(_thumb_jpegs)):
+                    # convert thumb tensor to jpeg
+                    thumbnail_metadata = ThumbnailRepo.create(
+                        thumbs_conn,
                         data=ThumbnailMetadata(
                             media_id=mid,
                             timestamp=_thumb_pts + i * 0.5,
+                            content=bytes(_thumb_jpegs[i].numpy().data),
                         ),
-                    )
-                    feature_store_list["thumbnails"].add(
-                        thumbnail_metadata.id,
-                        _thumb_tensor[i],
                     )
 
             # Update progress bar
@@ -312,8 +295,10 @@ if __name__ == "__main__":
 
             if idx % MAX_BULK_INSERT == 0:
                 conn.commit()
+                thumbs_conn.commit()
 
         conn.commit()
+        thumbs_conn.commit()
 
     end_time = time.time()
     elapsed_time = end_time - start_time

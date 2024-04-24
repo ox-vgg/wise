@@ -116,11 +116,7 @@ if __name__ == '__main__':
 
     project = WiseProject(args.project_dir, create_project=False)
     project_assets = project.discover_assets()
-
-    DB_SCHEME = "sqlite+pysqlite://"
-    PROJECT_DIR = Path(args.project_dir)
-    DB_URI = f"{DB_SCHEME}/{args.project_dir}/{PROJECT_DIR.stem}.db"
-    db_engine = db.init_project(DB_URI, echo=False)
+    db_engine = db.init_project(project.dburi, echo=False)
 
     ## FIXME: develop a grammar to address all possible ways
     ## of describing the search query on images, audio and videos

@@ -43,11 +43,11 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
         app.include_router(get_project_router(config))
         logger.info(f"Loading html user interface from {theme_asset_dir}")
         app.mount(
-            f"/{config.project_id}/",
+            f"/{config.project_dir.stem}/",
             StaticFiles(directory=theme_asset_dir, html=True),
             name="assets",
         )
-        log_custom_format(f'Open http://{config.hostname}:{config.port}/{config.project_id}/ in your browser')
+        log_custom_format(f'Open http://{config.hostname}:{config.port}/{config.project_dir.stem}/ in your browser')
         if callback:
             callback()
 
@@ -59,13 +59,13 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
 
 
 def serve(
-    project_id: str,
+    project_dir: Path,
     theme_asset_dir: Path,
     index_type: Optional[str] = None,
     query_blocklist_file: Path = None,
     callback: Callable = None # You can pass in a callback function to be called when the server has started
 ):
-    options = {"project_id": project_id} if project_id else {}
+    options = {"project_dir": project_dir} if project_dir else {}
     if index_type:
         options.update({"index_type": index_type})
     if query_blocklist_file:

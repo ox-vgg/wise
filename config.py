@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Literal, Set
+from typing import Literal, Set, Optional
+from pathlib import Path
 
 
 class APIConfig(BaseSettings):
@@ -15,4 +16,5 @@ class APIConfig(BaseSettings):
     index_use_direct_map: int = 0
     nprobe: int = 1024
     query_blocklist: Set[str] = set()
-    project_id: str
+    project_dir: Path
+    thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
