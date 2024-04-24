@@ -209,7 +209,7 @@ def _get_project_data_router(config: APIConfig):
 
                 location = Path(source_collection.location)
                 
-                if source_collection.type == SourceCollectionType.IMAGE_DIR:
+                if source_collection.type == SourceCollectionType.DIR:
                     # metadata.source_uri will be None, so we have to search for it on disk
                     file_path = location / metadata.path
                     if file_path.is_file():
@@ -946,7 +946,7 @@ def _get_search_router(config: APIConfig):
 
                 location = Path(source_collection.location)
 
-                if source_collection.type == SourceCollectionType.IMAGE_DIR:
+                if source_collection.type == SourceCollectionType.DIR:
                     # Try to read image from disk if present
                     # metadata.source_uri will be None, so we have to search for it on disk
                     file_path = location / metadata.path
