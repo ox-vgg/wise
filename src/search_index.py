@@ -3,6 +3,7 @@ import faiss
 from tqdm import tqdm
 from pathlib import Path
 import numpy as np
+import math
 
 from .feature.feature_extractor_factory import FeatureExtractorFactory
 from .feature.store.feature_store_factory import FeatureStoreFactory
@@ -50,7 +51,7 @@ class SearchIndex:
             quantizer = index
             cell_count = 10 * round(math.sqrt(feature_count))
             train_count = min(feature_count, 100 * cell_count)
-            index = faiss.IndexIVFFlat(quantizer, feature_dim, cell_count)
+            index = faiss.IndexIVFFlat(quantizer, feature_dim, cell_count, faiss.METRIC_INNER_PRODUCT)
 
             print(f'  loading a random sample of {train_count} features from {feature_count} features ...')
             shuffled_features = WebdatasetStore(self.media_type, self.feature_dir)
