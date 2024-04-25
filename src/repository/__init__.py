@@ -2,7 +2,6 @@ from typing import List, Optional
 import sqlalchemy as sa
 
 from .base import SQLAlchemyRepository
-from .projects import WiseProjectsSQLAlchemyRepository
 
 # from .extra_metadata import ExtraMediaMetadataSQLAlchemyRepository
 from ..data_models import (

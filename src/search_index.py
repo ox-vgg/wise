@@ -1,4 +1,3 @@
-import math
 import faiss
 from tqdm import tqdm
 from pathlib import Path

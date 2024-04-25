@@ -30,9 +30,6 @@ media_table = sa.Table(
     sa.Column("height", sa.Integer, nullable=False),
     sa.Column("num_frames", sa.Integer, nullable=True),  # only applies to video files
     sa.Column("duration", sa.Float, nullable=True),  # only applies to video files
-    # TODO (WISE 2) remove references to these old columns in other files:
-    # sa.Column("source_uri", sa.Unicode(4096), nullable=True),
-    # sa.Column("metadata", sa.JSON, nullable=False, default={}),
 )
 
 vectors_table = sa.Table(
@@ -76,24 +73,3 @@ thumbnails_table = sa.Table(
     sa.Column("timestamp", sa.Float(), index=True, nullable=True),
     sa.Column("content", sa.LargeBinary(), nullable=False),
 )
-
-# TODO (WISE 2) remove references to old metadata_table
-# metadata_table = sa.Table(
-#     "metadata",
-#     project_metadata_obj,
-#     sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
-#     sa.Column(
-#         "dataset_id",
-#         sa.Integer,
-#         sa.ForeignKey("source_collections.id", ondelete="CASCADE"),
-#         nullable=False,
-#     ),
-#     sa.Column("dataset_row", sa.Integer, nullable=False),
-#     sa.Column("path", sa.Unicode(1024), nullable=False),
-#     sa.Column("size_in_bytes", sa.Integer, nullable=False),
-#     sa.Column("format", sa.String(5), nullable=False),
-#     sa.Column("width", sa.Integer, default=-1, nullable=False),
-#     sa.Column("height", sa.Integer, default=-1, nullable=False),
-#     sa.Column("source_uri", sa.Unicode(4096), nullable=True),
-#     sa.Column("metadata", sa.JSON, nullable=False, default={}),
-# )
