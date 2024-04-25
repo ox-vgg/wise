@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+import time
 from typing import Callable, Dict, List, Optional, Tuple, Union, BinaryIO
 import io
 import itertools
@@ -973,6 +974,17 @@ def _get_search_router(config: APIConfig):
                             f"Error extracting image {image_id} from WebDataset tar file"
                         )
         return internal_images_loaded
+    
+    def add_response_time(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            start_time = time.perf_counter()
+            response = await func(*args, **kwargs)
+            end_time = time.perf_counter()
+            response.time = end_time - start_time
+            return response
+
+        return wrapper
 
     # Create a random array of featured images (1 per video)
     with project_engine.connect() as conn:
@@ -983,6 +995,7 @@ def _get_search_router(config: APIConfig):
         ids = ids[:10000]
 
     @router.get("/featured", response_model=SearchResponse)
+    @add_response_time
     async def handle_get_featured(
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
@@ -1026,6 +1039,7 @@ def _get_search_router(config: APIConfig):
         return response
 
     @router.get("/search", response_model=SearchResponse)
+    @add_response_time
     async def handle_get_search(
         q: List[str] = Query(default=[]),
         start: int = Query(0, ge=0, le=980),
@@ -1064,6 +1078,7 @@ def _get_search_router(config: APIConfig):
         )
 
     @router.post("/search", response_model=SearchResponse)
+    @add_response_time
     async def handle_post_search_multimodal(
         # Positive queries
         text_queries: List[str] = Query(default=[]),
