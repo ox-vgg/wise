@@ -49,7 +49,10 @@ class SearchIndex:
             index = faiss.IndexIDMap(index_for_id_map)
         if index_type == 'IndexIVFFlat':
             quantizer = index
-            cell_count = 10 * round(math.sqrt(feature_count))
+            if feature_count < 200000:
+                cell_count = 3 * round(math.sqrt(feature_count))
+            else:
+                cell_count = 10 * round(math.sqrt(feature_count))
             train_count = min(feature_count, 100 * cell_count)
             index = faiss.IndexIVFFlat(quantizer, feature_dim, cell_count, faiss.METRIC_INNER_PRODUCT)
 
@@ -62,9 +65,11 @@ class SearchIndex:
             for feature_id, feature_vector in shuffled_features:
                 train_features[feature_index,:] = feature_vector
                 feature_index += 1
+                if feature_index == train_count:
+                    break
 
             assert not index.is_trained
-            print(f'  training {index_type} faiss index with {train_count} features ...')
+            print(f'  training {index_type} faiss index with {train_count} features with {cell_count} clusters ...')
             index.train(train_features)
             assert index.is_trained
 
