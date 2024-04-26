@@ -39,8 +39,28 @@ _mtable = db.media_table
 _thumbs_table = db.thumbnails_table
 
 def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorAndMediaMetadata]:
-    # TODO add docstring
-    # ids refers to vector ids
+    """
+    Get the vector and media metadata for a batch of vector ids.
+
+    Parameters
+    ----------
+    conn : sqlalchemy.Connection
+        Database connection for the internal metadata database
+    ids : list of int
+        List of vector ids
+
+    Returns
+    -------
+    list of VectorAndMediaMetadata
+        Returns a list of VectorAndMediaMetadata objects (a combination of the
+        VectorMetadata and corresponding MediaMetadata). Each item in the list
+        corresponds to the an id from the input `ids`.
+
+    Raises
+    ------
+    RuntimeError
+        If the metadata for one or more ids could not be retrieved, e.g. due to the ids being invalid.
+    """
     ordering = sa.case(
         {id: index for index, id in enumerate(ids)},
         value=_vtable.c.id,
@@ -52,13 +72,29 @@ def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorA
         .order_by(ordering)
     )
     res = conn.execute(stmt)
-
-    return [VectorAndMediaMetadata.model_validate(row) for row in res.mappings()]
+    res = [VectorAndMediaMetadata.model_validate(row) for row in res.mappings()]
+    if len(res) != len(ids):
+        raise RuntimeError(f"Unable to retrieve metadata for all ids. Retrieved metadata for {len(res)}/{len(ids)} ids")
+    return res
 
 def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp: float) -> Optional[bytes]:
     """
-    Get the thumbnail for a given `media_id` and `timestamp` (finds the first thumbnail within between `timestamp` and `timestamp + 4`)
-    If no thumbnail was found, the return value is None
+    Get the thumbnail from a video given a `media_id` and a `timestamp` (finds the first thumbnail between `timestamp` and `timestamp + 4`).
+
+    Parameters
+    ----------
+    conn : sqlalchemy.Connection
+        Database connection for the thumbnail database
+    media_id : int
+        Media id of the video file you want to get the thumbnail from
+    timestamp : float
+        Timestamp within the video
+
+    Returns
+    -------
+    Optional[bytes]
+        Returns the raw bytes of the thumbnail in JPEG format.
+        If no thumbnail was found, the return value is None.
     """
     start_timestamp_expr = _thumbs_table.c.timestamp >= timestamp
     end_timestamp_expr = _thumbs_table.c.timestamp < timestamp + 4
@@ -72,12 +108,25 @@ def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp:
     return result.scalar()
 
 def get_featured_images(conn: sa.Connection) -> List[int]:
-    # Get the ids of the 12th second from each video
+    """
+    Get a set of featured images to be shown on the frontend.
+    Returns a list of vector ids of the 12th second from each video.
+
+    Parameters
+    ----------
+    conn : sqlalchemy.Connection
+        Database connection for the internal metadata database
+    
+    Returns
+    -------
+    list of int
+        List of vector ids from the 12th second from each video
+    """
     stmt = (
         sa.select(_vtable.c.id)
         .select_from(_vtable.join(_mtable))
         .where(_vtable.c.timestamp >= 12)
-        .where(_vtable.c.timestamp < 13)
+        .where(_vtable.c.timestamp < 12.5)
     )
     return conn.execute(stmt).scalars().all()
 

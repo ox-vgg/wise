@@ -1,6 +1,6 @@
 from contextlib import ExitStack
 import time
-from typing import Callable, Dict, List, Optional, Tuple, Union, BinaryIO
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union, BinaryIO
 import io
 import itertools
 import functools
@@ -657,8 +657,11 @@ def _get_search_router(config: APIConfig):
         )
 
     def _get_query_features(
-        extract_features_from_image, extract_features_from_text, query_prefix, q
-    ):
+        extract_features_from_image: Callable[[List[Image.Image]], ndarray],
+        extract_features_from_text: Callable[[List[str]], ndarray],
+        query_prefix: str,
+        q: List[Dict[str, Union[ndarray, bytes, str]]],
+    ) -> ndarray:
         feature_vectors = []
         weights = []
 
@@ -755,7 +758,7 @@ def _get_search_router(config: APIConfig):
 
     router_cm = ExitStack()
 
-    def _thumbs_with_score(conn, dist):
+    def _thumbs_with_score(conn: sa.Connection, dist: List[float]):
         def inner(vector_and_media_metadata_list: List[VectorAndMediaMetadata]):
             return zip(
                 [
@@ -975,7 +978,7 @@ def _get_search_router(config: APIConfig):
                         )
         return internal_images_loaded
     
-    def add_response_time(func):
+    def add_response_time(func: Callable[..., Awaitable[SearchResponse]]):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             start_time = time.perf_counter()
@@ -988,7 +991,7 @@ def _get_search_router(config: APIConfig):
 
     # Create a random array of featured images (1 per video)
     with project_engine.connect() as conn:
-        ids = array(get_featured_images(conn))
+        ids = get_featured_images(conn)
 
         # Select a random subset of up to 10000 image ids (for performance reasons)
         default_rng(seed=42).shuffle(ids)
@@ -1008,10 +1011,9 @@ def _get_search_router(config: APIConfig):
             selected_ids = ids.copy()
             default_rng(seed=random_seed).shuffle(selected_ids)
             selected_ids = selected_ids[:1000]
-            selected_ids = expand_dims(selected_ids, axis=0)
 
             # Use 0 as a filler value for the distance array since this is not relevant for the featured images
-            dist = zeros(selected_ids.shape)  
+            dist = [0.0] * len(selected_ids)
 
             _get_metadata = functools.partial(get_full_metadata_batch, conn)
             # def _get_metadata(_id: int):
@@ -1028,10 +1030,10 @@ def _get_search_router(config: APIConfig):
 
             #     return m
 
-            get_thumbs = _thumbs_with_score(thumbs_conn, dist[0, start:end])
+            get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end])
             response = construct_video_search_response(
-                dist[0, start:end],
-                selected_ids[0, start:end],
+                dist[start:end],
+                selected_ids[start:end],
                 _get_metadata,
                 None if not thumbs else get_thumbs,
             )
@@ -1177,10 +1179,6 @@ def _get_search_router(config: APIConfig):
 
         valid_ids = [int(top_ids[x]) for x in valid_indices]
         valid_dist = [float(top_dist[x]) for x in valid_indices]
-
-        if index_type != IndexType.IndexFlatIP:
-            convert_l2_to_cosine = lambda x: 1 - (x / 2.0)
-            valid_dist = [convert_l2_to_cosine(x) for x in valid_dist]
 
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             _get_metadata = functools.partial(get_full_metadata_batch, conn)
