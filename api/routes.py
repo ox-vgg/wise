@@ -1181,10 +1181,6 @@ def _get_search_router(config: APIConfig):
         valid_ids = [int(top_ids[x]) for x in valid_indices]
         valid_dist = [float(top_dist[x]) for x in valid_indices]
 
-        if index_type != IndexType.IndexFlatIP:
-            convert_l2_to_cosine = lambda x: 1 - (x / 2.0)
-            valid_dist = [convert_l2_to_cosine(x) for x in valid_dist]
-
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             _get_metadata = functools.partial(get_full_metadata_batch, conn)
             # def _get_metadata(_id: int):
