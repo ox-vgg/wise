@@ -100,6 +100,15 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    # sanity check: remove duplicate entries in command line args
+    if len(args.media_include_list) > 1:
+        unique_media_include_list = list(set(args.media_include_list))
+        setattr(args, 'media_include_list', unique_media_include_list)
+    if len(args.media_dir_list) > 1:
+        unique_media_dir_list = list(set(args.media_dir_list))
+        setattr(args, 'media_dir_list', unique_media_dir_list)
+
     # TODO: allow adding new files to an existing project
     project = WiseProject(args.project_dir, create_project=True)
     db_engine = db.init_project(project.dburi, echo=False)
@@ -213,7 +222,6 @@ if __name__ == "__main__":
     with db_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn, tqdm(desc="Feature extraction") as pbar:
         for idx, (mid, video, audio, *rest) in enumerate(av_data_loader):
             media_segment = {"video": video, "audio": audio}
-
             for media_type in feature_extractor_id_list:
                 if media_segment[media_type] is None:
                     continue
