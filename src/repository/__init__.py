@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 import sqlalchemy as sa
 
 from .base import SQLAlchemyRepository
@@ -77,7 +77,7 @@ def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorA
         raise RuntimeError(f"Unable to retrieve metadata for all ids. Retrieved metadata for {len(res)}/{len(ids)} ids")
     return res
 
-def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp: float) -> Optional[bytes]:
+def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp: float, get_id_only: bool = False) -> Optional[Union[bytes, int]]:
     """
     Get the thumbnail from a video given a `media_id` and a `timestamp` (finds the first thumbnail between `timestamp` and `timestamp + 4`).
 
@@ -89,17 +89,21 @@ def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp:
         Media id of the video file you want to get the thumbnail from
     timestamp : float
         Timestamp within the video
+    get_id_only : bool, optional
+        If set to True, the integer id of the matching thumbnail is returned.
+        If set to False (default), the raw bytes of the thumbnail is returned.
 
     Returns
     -------
-    Optional[bytes]
+    Optional[Union[bytes, int]]
         Returns the raw bytes of the thumbnail in JPEG format.
+        If `get_id_only` was set to True, then the integer id of the thumbnail is returned instead.
         If no thumbnail was found, the return value is None.
     """
     start_timestamp_expr = _thumbs_table.c.timestamp >= timestamp
     end_timestamp_expr = _thumbs_table.c.timestamp < timestamp + 4
     stmt = (
-        sa.select(_thumbs_table.c.content)
+        sa.select(_thumbs_table.c.content if not get_id_only else _thumbs_table.c.id)
         .where(_thumbs_table.c.media_id == media_id)
         .where((start_timestamp_expr & end_timestamp_expr))
         .order_by(_thumbs_table.c.timestamp)

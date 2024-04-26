@@ -1,6 +1,6 @@
 from contextlib import ExitStack
 import time
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union, BinaryIO
+from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Tuple, Union, BinaryIO
 import io
 import itertools
 import functools
@@ -243,7 +243,7 @@ def _get_project_data_router(config: APIConfig):
         responses={200: {"content": "image/jpeg"}, 404: {"content": "text/plain"}},
     )
     def get_thumbnail(_id: int):
-        # TODO update this to get the thumbnail by first getting the timestamp given a vector id, and then getting the thumbnail from the timestamp
+        # Get a thumbnail given a thumbnail id
         with thumbs_engine.connect() as thumbs_conn:
             thumbnail_metadata = ThumbnailRepo.get(thumbs_conn, _id)
             if thumbnail_metadata is None:
@@ -578,23 +578,16 @@ def _get_search_router(config: APIConfig):
         top_dist: List[float],
         top_ids: List[int],
         get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
-        get_thumbs_fn: Callable[[List[int]], List[Tuple[Optional[bytes], float]]] = None
+        get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
     ):
-        if get_thumbs_fn is None:
-            get_thumbs_fn = lambda x: [(None, top_dist[i]) for i in range(len(x))]
-
         videos = {}
         shots = []
         segments = []
-        thumbnails_to_send = min(50, len(top_ids))
         all_metadata = get_metadata_fn(top_ids)
         for _dist, _metadata, (_thumb, _thumb_score) in zip(
             top_dist,
             all_metadata,
-            itertools.chain(
-                get_thumbs_fn(all_metadata[:thumbnails_to_send]),
-                [(None, top_dist[i]) for i in range(thumbnails_to_send, len(top_ids))],
-            ),
+            get_thumbs_fn(all_metadata),
         ):
             video_id = str(_metadata.media_id)
             if video_id not in videos:
@@ -627,11 +620,7 @@ def _get_search_router(config: APIConfig):
                 te=float(te),
                 link=f"videos/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'videos/{video_id}{_metadata.path}'}",
                 distance=_dist,
-                thumbnail=(
-                    f"thumbs/{_metadata.id}"
-                    if _thumb is None
-                    else convert_uint8array_to_base64(_thumb)
-                ),
+                thumbnail=_thumb,
                 thumbnail_score=_thumb_score,
             )
 
@@ -758,19 +747,25 @@ def _get_search_router(config: APIConfig):
 
     router_cm = ExitStack()
 
-    def _thumbs_with_score(conn: sa.Connection, dist: List[float]):
+    def _thumbs_with_score(conn: sa.Connection, dist: List[float], thumbnails_to_send: int):
         def inner(vector_and_media_metadata_list: List[VectorAndMediaMetadata]):
-            return zip(
-                [
-                    get_thumbnail_by_timestamp(
-                        conn,
-                        media_id=vector_and_media_metadata.media_id,
-                        timestamp=vector_and_media_metadata.timestamp
-                    ) for vector_and_media_metadata in vector_and_media_metadata_list
-                ],
-                dist
-            )
-
+            thumbs = [
+                get_thumbnail_by_timestamp(
+                    conn,
+                    media_id=vector_and_media_metadata.media_id,
+                    timestamp=vector_and_media_metadata.timestamp,
+                    get_id_only=i >= thumbnails_to_send
+                )
+                for i, vector_and_media_metadata
+                in enumerate(vector_and_media_metadata_list)
+            ]
+            thumbs = [
+                (
+                    f"thumbs/{_thumb}" if isinstance(_thumb, int)
+                    else convert_uint8array_to_base64(_thumb)
+                ) for _thumb in thumbs
+            ]
+            return zip(thumbs, dist)
         return inner
 
     if config.thumbnail_project_dir:
@@ -1002,7 +997,7 @@ def _get_search_router(config: APIConfig):
     async def handle_get_featured(
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: bool = Query(True),
+        thumbnails_to_send: int = Query(0),
         # This seed is used to randomly select the set of images used for the featured images
         random_seed: int = Query(123),
     ):
@@ -1030,12 +1025,12 @@ def _get_search_router(config: APIConfig):
 
             #     return m
 
-            get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end])
+            get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_video_search_response(
                 dist[start:end],
                 selected_ids[start:end],
                 _get_metadata,
-                None if not thumbs else get_thumbs,
+                get_thumbs,
             )
 
         return response
@@ -1046,7 +1041,7 @@ def _get_search_router(config: APIConfig):
         q: List[str] = Query(default=[]),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: bool = Query(True),
+        thumbnails_to_send: int = Query(0),
     ):
         if len(q) == 0:
             raise HTTPException(400, {"message": "Missing search query"})
@@ -1076,7 +1071,7 @@ def _get_search_router(config: APIConfig):
         q = [dict(type="positive", val=query) for query in q]
 
         return similarity_search(
-            q=q, start=start, end=end, thumbs=thumbs
+            q=q, start=start, end=end, thumbnails_to_send=thumbnails_to_send
         )
 
     @router.post("/search", response_model=SearchResponse)
@@ -1097,7 +1092,7 @@ def _get_search_router(config: APIConfig):
         # Other parameters
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
-        thumbs: bool = Query(True),
+        thumbnails_to_send: int = Query(0),
     ):
         """
         Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
@@ -1161,14 +1156,14 @@ def _get_search_router(config: APIConfig):
             q,
             start=start,
             end=end,
-            thumbs=thumbs,
+            thumbnails_to_send=thumbnails_to_send,
         )
 
     def similarity_search(
         q: List[Dict[str, Union[ndarray, bytes, str]]],
         start: int,
         end: int,
-        thumbs: bool,
+        thumbnails_to_send: int = 0,
     ):
         features = get_query_features(q)
         dist, ids = search_index.index.search(features, end)
@@ -1196,13 +1191,13 @@ def _get_search_router(config: APIConfig):
 
             #     return m
 
-            get_thumbs = thumbs_reader(thumbs_conn, valid_dist)
+            get_thumbs = thumbs_reader(thumbs_conn, valid_dist, thumbnails_to_send)
 
             response = construct_video_search_response(
                 valid_dist,
                 valid_ids,
                 _get_metadata,
-                None if not thumbs else get_thumbs,
+                get_thumbs,
             )
 
         return response
