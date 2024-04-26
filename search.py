@@ -117,7 +117,6 @@ def process_query(search_index_list, query_specs, args):
                 media_metadata = MediaRepo.get(conn, vector_metadata.media_id)
                 filename = media_metadata.path
                 pts = vector_metadata.timestamp
-                pts_str = '%.1f' % pts
                 pts_hhmmss = to_hhmmss(pts)
                 match_filename_list.append(filename)
                 match_pts_list.append(pts)
@@ -128,6 +127,80 @@ def process_query(search_index_list, query_specs, args):
             'search_time_sec': (end_time - start_time)
         })
     return search_result
+
+# merge results for each media_type (i.e. video, audio) separately
+def merge0(query_specs, result, args):
+    for query_index in range(0, len(query_specs['query'])):
+        media_type = query_specs['media_type'][query_index]
+        merge_tolerance = getattr(args, 'merge_tolerance_' + media_type)
+        filename_list = result[query_index]['match_filename_list']
+        pts_list = result[query_index]['match_pts_list']
+        merged_filename_list, merged_pts_list = merge_one_result(filename_list,
+                                                                 pts_list,
+                                                                 merge_tolerance)
+        result[query_index]['match_filename_list'] = merged_filename_list
+        result[query_index]['match_pts_list'] = merged_pts_list
+    return result
+
+# merge results all available media_type (i.e. video, audio) into a single result
+def merge1(query_specs, result, args):
+    if len(result) != 2:
+        print('merge1() can be applied to only two lists')
+    N0 = len(result[0]['match_filename_list'])
+    N1 = len(result[1]['match_filename_list'])
+    merged_filename_list = []
+    merged_pts_list = []
+    for index_pair in itertools.product( range(0,N0), range(0,N1) ):
+        index0 = index_pair[0]
+        index1 = index_pair[1]
+        filename0 = result[0]['match_filename_list'][index0]
+        filename1 = result[1]['match_filename_list'][index1]
+        if filename0 == filename1:
+            merged_filename_list.append(filename0)
+            pts0 = result[0]['match_pts_list'][index0]
+            pts1 = result[1]['match_pts_list'][index1]
+            merged_pts = pts0 + pts1
+            merged_pts.sort()
+            if len(merged_pts) == 1:
+                merged_pts_list.append([ merged_pts[0] ])
+            else:
+                merged_pts_list.append([ merged_pts[0], merged_pts[ len(merged_pts)-1 ] ])
+    merged_result = [ {
+        'match_filename_list': merged_filename_list,
+        'match_pts_list': merged_pts_list,
+        'search_time_sec': result[0]['search_time_sec'] + result[1]['search_time_sec']
+    }]
+    merged_query_specs = {
+        'query':[ ' and '.join(query_specs['query']) ],
+        'media_type':[ ' and '.join(query_specs['media_type']) ]
+    }
+    return merged_query_specs, merged_result
+
+def merge_one_result(filename_list, pts_list, tolerance):
+    N = len(filename_list)
+    merged_filename_list = []
+    merged_pts_list = []
+    skip_index_list = []
+    for i in range(0, N):
+        if i in skip_index_list:
+            continue
+
+        # for each unique filename, find all the pts
+        filename_i = filename_list[i]
+        pts_i = [ pts_list[i] ] # will contain all other instances in lower ranks
+        for j in range(i+1, N):
+            if j in skip_index_list:
+                continue
+            if filename_i == filename_list[j]:
+                pts_i.append(pts_list[j])
+                skip_index_list.append(j)
+        pts_i.sort()
+        if len(pts_i) > 1:
+            merged_pts_list.append( [ pts_i[0], pts_i[ len(pts_i) - 1 ] ] )
+        else:
+            merged_pts_list.append( [ pts_i[0] ] )
+        merged_filename_list.append(filename_i)
+    return merged_filename_list, merged_pts_list
 
 def show_result(query_specs, result, args):
     console = Console()
@@ -145,14 +218,19 @@ def show_result(query_specs, result, args):
         table.add_column('Time', justify='left', no_wrap=True)
 
         for rank in range(0, len(result[query_index]['match_filename_list'])):
-            pts_str = '%.3f' % (result[query_index]['match_pts_list'][rank])
+            pts = result[query_index]['match_pts_list'][rank]
+            if isinstance(pts, list):
+                if len(pts) == 2:
+                    pts_str = '%.1f - %.1f' % (pts[0], pts[1])
+                else:
+                    pts_str = '%.1f' % (pts[0])
+            else:
+                pts_str = '%.1f' % (pts)
             filename = result[query_index]['match_filename_list'][rank]
             table.add_row(str(rank),
-                          clamp_str(filename, args.max_filename_length),
+                          clamp_str(filename, getattr(args, 'max_filename_length')),
                           pts_str)
         console.print(table)
-        if len(query_specs['query']) > 1:
-            print('\n')
         total_search_time += result[query_index]['search_time_sec']
     print('(search completed in %.3f sec.)' % (total_search_time))
 
@@ -163,7 +241,14 @@ def export_result_as_csv(csv_filename, query_specs, search_result, args):
             query_text = query_specs['query'][query_index]
             media_type = query_specs['media_type'][query_index]
             for rank in range(0, len(search_result[query_index]['match_filename_list'])):
-                pts_str = '%.1f' % (search_result[query_index]['match_pts_list'][rank])
+                pts = search_result[query_index]['match_pts_list'][rank]
+                if isinstance(pts, list):
+                    if len(pts) == 1:
+                        pts_str = '%.1f' % (pts[0])
+                    else:
+                        pts_str = '%.1f - %.1f' % (pts[0], pts[1])
+                else:
+                    pts_str = '%.1f' % (search_result[query_index]['match_pts_list'][rank])
                 filename = search_result[query_index]['match_filename_list'][rank]
                 f.write(f'"{query_text}",{media_type},{rank},{filename},{pts_str}\n')
 
@@ -202,6 +287,18 @@ if __name__ == '__main__':
                         type=int,
                         default=50,
                         help='only show this many characters from the end in a filename')
+
+    parser.add_argument('--merge-tolerance-video',
+                        required=False,
+                        type=int,
+                        default=2,
+                        help='tolerance (in seconds) for merging video based search results')
+
+    parser.add_argument('--merge-tolerance-audio',
+                        required=False,
+                        type=int,
+                        default=8,
+                        help='tolerance (in seconds) for merging audio based search results')
 
     parser.add_argument('--export-csv',
                         required=False,
@@ -265,14 +362,18 @@ if __name__ == '__main__':
             'media_type': args.media_type
         }
         search_result = process_query(search_index_list, query_specs, args)
-        show_result(query_specs, search_result, args)
+        merge0_search_result = merge0(query_specs, search_result, args)
+        show_result(query_specs, merge0_search_result, args)
+        merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
+        print('\n')
+        show_result(merge1_query_specs, merge1_search_result, args)
+
         if args.export_csv:
             export_result_as_csv(args.export_csv,
                                  query_specs,
-                                 search_result,
+                                 merged_search_result,
                                  args)
             print(f'saved results to {args.export_csv}')
-
     else:
         print('Starting WISE search console ...')
         print('Some examples queries (press Ctrl + D to exit):')
@@ -286,13 +387,17 @@ if __name__ == '__main__':
         while True:
             try:
                 cmd = input('[%d] > ' % (cmd_id))
-                repl_args = parse_user_input(cmd)
-                search_result = process_query(search_index_list, repl_args, args)
-                show_result(repl_args, search_result, args)
-                if 'export-csv' in repl_args:
-                    csv_filename = repl_args['export-csv']
+                query_specs = parse_user_input(cmd)
+                search_result = process_query(search_index_list, query_specs, args)
+                merge0_search_result = merge0(query_specs, search_result, args)
+                show_result(query_specs, merge0_search_result, args)
+                merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
+                print('\n')
+                show_result(merge1_query_specs, merge1_search_result, args)
+                if 'export-csv' in query_specs:
+                    csv_filename = query_specs['export-csv']
                     export_result_as_csv(csv_filename,
-                                         repl_args,
+                                         query_specs,
                                          search_result,
                                          args)
                     print(f'saved results to {csv_filename}')
