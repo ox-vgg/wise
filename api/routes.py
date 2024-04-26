@@ -758,7 +758,7 @@ def _get_search_router(config: APIConfig):
 
     router_cm = ExitStack()
 
-    def _thumbs_with_score(conn: sa.Connection, dist):
+    def _thumbs_with_score(conn: sa.Connection, dist: List[float]):
         def inner(vector_and_media_metadata_list: List[VectorAndMediaMetadata]):
             return zip(
                 [
