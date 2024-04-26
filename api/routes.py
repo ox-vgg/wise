@@ -991,7 +991,7 @@ def _get_search_router(config: APIConfig):
 
     # Create a random array of featured images (1 per video)
     with project_engine.connect() as conn:
-        ids = array(get_featured_images(conn))
+        ids = get_featured_images(conn)
 
         # Select a random subset of up to 10000 image ids (for performance reasons)
         default_rng(seed=42).shuffle(ids)
@@ -1011,10 +1011,9 @@ def _get_search_router(config: APIConfig):
             selected_ids = ids.copy()
             default_rng(seed=random_seed).shuffle(selected_ids)
             selected_ids = selected_ids[:1000]
-            selected_ids = expand_dims(selected_ids, axis=0)
 
             # Use 0 as a filler value for the distance array since this is not relevant for the featured images
-            dist = zeros(selected_ids.shape)  
+            dist = [0.0] * len(selected_ids)
 
             _get_metadata = functools.partial(get_full_metadata_batch, conn)
             # def _get_metadata(_id: int):
@@ -1031,10 +1030,10 @@ def _get_search_router(config: APIConfig):
 
             #     return m
 
-            get_thumbs = _thumbs_with_score(thumbs_conn, dist[0, start:end])
+            get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end])
             response = construct_video_search_response(
-                dist[0, start:end],
-                selected_ids[0, start:end],
+                dist[start:end],
+                selected_ids[start:end],
                 _get_metadata,
                 None if not thumbs else get_thumbs,
             )

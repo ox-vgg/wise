@@ -52,8 +52,10 @@ def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorA
         .order_by(ordering)
     )
     res = conn.execute(stmt)
-
-    return [VectorAndMediaMetadata.model_validate(row) for row in res.mappings()]
+    res = [VectorAndMediaMetadata.model_validate(row) for row in res.mappings()]
+    if len(res) != len(ids):
+        raise RuntimeError(f"Unable to retrieve metadata for all ids. Retrieved metadata for {len(res)}/{len(ids)} ids")
+    return res
 
 def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp: float) -> Optional[bytes]:
     """
