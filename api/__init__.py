@@ -79,5 +79,17 @@ def serve(
 
     config = APIConfig.model_validate(options)  # type: ignore
 
+    # Temporary Fix: set the project_name in frontend/dist/index.html
+    print(f'WARNING: WISE currently does not support serving multiple projects simultaneously.')
+    index_filename = './frontend/dist/index.html'
+    with open(index_filename, 'r') as f:
+        index_html_content = f.readlines()
+    with open(index_filename, 'w') as f2:
+        for i, line in enumerate(index_html_content):
+            if i == 6:
+                f2.write(f'<base href="/{project_dir.stem}/">\n')
+            else:
+                f2.write(line)
+
     app = create_app(config, theme_asset_dir, callback)
     uvicorn.run(app, host=config.hostname, port=config.port, log_level="info")
