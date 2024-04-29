@@ -401,7 +401,7 @@ def _get_search_router(config: APIConfig):
     index_type = IndexType[config.index_type]
 
     # Metadata for a video/audio/image file, to be sent to the frontend
-    class MediaInfo(BaseModel):
+    class MediaMetadata(BaseModel):
         id: str
         filename: str
         width: int
@@ -414,7 +414,7 @@ def _get_search_router(config: APIConfig):
         copyright: str = ""
 
     # A search result containing the metadata fields from MediaInfo, as well as additional fields like `thumbnail` and `distance`
-    class MediaSearchResult(MediaInfo):
+    class MediaInfo(MediaMetadata):
         link: str
         thumbnail: str
         distance: Optional[float] = None
@@ -424,16 +424,16 @@ def _get_search_router(config: APIConfig):
         def round_distance(cls, v):
             return round(v, config.precision)
 
-    # A subclass of MediaSearchResult for images
-    class ImageSearchResult(MediaSearchResult):
+    # A subclass of MediaInfo for images
+    class ImageInfo(MediaInfo):
         pass
 
-    # A subclass of MediaSearchResult for pure audio files
-    class AudioSearchResult(MediaSearchResult):
+    # A subclass of MediaInfo for pure audio files
+    class AudioInfo(MediaInfo):
         pass
 
-    # A subclass of MediaSearchResult for videos
-    class VideoSearchResult(MediaSearchResult):
+    # A subclass of MediaInfo for videos
+    class VideoInfo(MediaInfo):
         timeline_hover_thumbnails: str
 
     # An audio or video segment
@@ -467,23 +467,23 @@ def _get_search_router(config: APIConfig):
     class AudioResults(BaseModel):
         total: int # maximum number of audio results that can be returned
         unmerged_windows: List[AudioSegment] # e.g. 7-second windows
-        audios: List[AudioSearchResult]
+        audios: Dict[str, AudioInfo]
 
     class VideoAudioResults(BaseModel):
         total: int # maximum number of unmerged_windows that can be returned
         unmerged_windows: List[VideoSegment] # e.g. 7-second windows
         merged_windows: List[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
-        videos: Dict[str, VideoSearchResult]
+        videos: Dict[str, VideoInfo]
 
     class VideoResults(BaseModel):
         total: int # maximum number of unmerged_windows that can be returned
         unmerged_windows: List[VideoSegment] # frames (CLIP) or unmerged 4-second segments (InternVideo/LanguageBind)
         merged_windows: List[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
-        videos: Dict[str, VideoSearchResult]
+        videos: Dict[str, VideoInfo]
 
     class ImageResults(BaseModel):
         total: int # maximum number of images that can be returned e.g. min(1000, num_images_in_project)
-        results: List[ImageSearchResult]
+        results: List[ImageInfo]
 
     class SearchResponse(BaseModel):
         time: float # backend search time in seconds
@@ -524,7 +524,7 @@ def _get_search_router(config: APIConfig):
                         media_id=start.media_id,
                         ts=start.ts,
                         te=current.te,
-                        link=f"videos/{start.media_id}#t={start.ts},{current.te}",
+                        link=f"media/{start.media_id}#t={start.ts},{current.te}",
                         distance=best_segment_score,
                         thumbnail=best_thumbnail,
                         thumbnail_score=best_thumbnail_score,
@@ -543,7 +543,7 @@ def _get_search_router(config: APIConfig):
                     media_id=start.media_id,
                     ts=start.ts,
                     te=current.te,
-                    link=f"videos/{start.media_id}#t={start.ts},{current.te}",
+                    link=f"media/{start.media_id}#t={start.ts},{current.te}",
                     distance=best_segment_score,
                     thumbnail=best_thumbnail,
                     thumbnail_score=best_thumbnail_score,
@@ -591,7 +591,7 @@ def _get_search_router(config: APIConfig):
         ):
             video_id = str(_metadata.media_id)
             if video_id not in videos:
-                videos[video_id] = VideoSearchResult(
+                videos[video_id] = VideoInfo(
                     id=video_id,
                     link=f"media/{video_id}",
                     filename=_metadata.path,
@@ -618,7 +618,7 @@ def _get_search_router(config: APIConfig):
                 media_id=video_id,
                 ts=float(ts),
                 te=float(te),
-                link=f"videos/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'videos/{video_id}{_metadata.path}'}",
+                link=f"media/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'media/{video_id}{_metadata.path}'}",
                 distance=_dist,
                 thumbnail=_thumb,
                 thumbnail_score=_thumb_score,
@@ -917,6 +917,7 @@ def _get_search_router(config: APIConfig):
             for image_id in vector_ids:
                 # Try to read feature vector from h5 dataset
                 try:
+                    # TODO (WISE 2) update the code below
                     with get_h5reader(vds_path)(
                         H5Datasets.IMAGE_FEATURES
                     ) as image_features_reader:
