@@ -1,15 +1,110 @@
 import { useState } from 'react';
-import { nanoid } from 'nanoid';
-import { DataServiceOutput, InternalSearchDataServiceOutput, ProcessedSearchResult, Query, SearchResponse, SearchResponseJSONObject } from './misc/types.ts';
+import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo } from './misc/types.ts';
 import config from './config.ts';
-import { fetchWithTimeout, chunk, getArrayOfEmptyArrays } from './misc/utils.ts';
+import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
 
-const NUM_PAGES = Math.ceil(config.MAX_SEARCH_RESULTS / config.PAGE_SIZE);
+// const NUM_PAGES = Math.ceil(config.MAX_SEARCH_RESULTS / config.PAGE_SIZE);
 
 const MAX_FEATURED_IMAGES = 1000; // TODO set this based on actual number of featured images
 const FEATURED_IMAGES_RANDOM_SEED = Math.floor(Math.random()*100); // Generate a random number between 0-100 to be used as the random seed when fetching the featured images
 
-const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<SearchResponseJSONObject[]> => {
+const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[]) => {
+  return new Map(
+    Object.entries(videos).map(([mediaId, videoInfo]) => {
+      if (!videoInfo.link.startsWith('http')) {
+        videoInfo.link = config.API_BASE_URL + videoInfo.link; // Fixes video URLs for dev mode
+      }
+
+      // const title = videoInfo.filename;
+      if (!videoInfo.timeline_hover_thumbnails.startsWith('http')) {
+        videoInfo.timeline_hover_thumbnails = config.API_BASE_URL + videoInfo.timeline_hover_thumbnails; // Fixes URLs for dev mode
+      }
+      if (!videoInfo.thumbnail.startsWith('http') && !videoInfo.thumbnail.startsWith('data:')) {
+        videoInfo.thumbnail = config.API_BASE_URL + videoInfo.thumbnail; // Fixes URLs for dev mode
+      }
+
+      return [
+        mediaId,
+        {
+          ...videoInfo,
+          shots: shots.filter(shot => shot.media_id === mediaId), // populate shots
+          title: videoInfo.filename,
+        }
+      ] as [string, ProcessedVideoInfo]
+    })
+    // Sort videos
+    .sort(([, videoInfoA], [, videoInfoB]) => {
+      const distanceA = Math.max(...videoInfoA.shots.map(shot => shot.distance));
+      const distanceB = Math.max(...videoInfoB.shots.map(shot => shot.distance));
+      return distanceB - distanceA;
+    })
+  );
+}
+
+const processUnmergedSegments = (unmergedSegments: VideoSegment[], processedVideos: Map<string, ProcessedVideoInfo>): ProcessedVideoSegment[] => {
+  // Populate video info
+  return unmergedSegments.map(segment => {
+    if (segment.link && !segment.link.startsWith('http')) {
+      segment.link = config.API_BASE_URL + segment.link; // Fixes video URLs for dev mode
+    }
+    if (!segment.thumbnail.startsWith('http') && !segment.thumbnail.startsWith('data:')) {
+      segment.thumbnail = config.API_BASE_URL + segment.thumbnail; // Fixes URLs for dev mode
+    }
+    return {
+      ...segment,
+      videoInfo: processedVideos.get(segment.media_id)!
+    }
+  });
+}
+
+const processShots = (shots: VideoSegment[], processedVideos: Map<string, ProcessedVideoInfo>): ProcessedVideoSegment[] => {
+  // Populate video info
+  return shots.map(shot => {
+    if (shot.link && !shot.link.startsWith('http')) {
+      shot.link = config.API_BASE_URL + shot.link; // Fixes video URLs for dev mode
+    }
+    if (!shot.thumbnail.startsWith('http') && !shot.thumbnail.startsWith('data:')) {
+      shot.thumbnail = config.API_BASE_URL + shot.thumbnail; // Fixes URLs for dev mode
+    }
+
+    return {
+      ...shot,
+      videoInfo: processedVideos.get(shot.media_id)!
+    }
+  });
+}
+
+const processSearchResults = (results: SearchResponse): ProcessedSearchResults => {
+  console.log('Search response', results);
+  if (!results.video_results) throw new Error("Cannot process search results");
+  
+  let processedVideos = processVideos(results.video_results.videos, results.video_results.merged_windows);
+  let processedUnmergedSegments = processUnmergedSegments(results.video_results.unmerged_windows, processedVideos);
+  let processedShots = processShots(results.video_results.merged_windows, processedVideos)
+  for (let [mediaId, processedVideo] of processedVideos) {
+    processedVideo.shots = processedShots.filter(shot => shot.media_id === mediaId)
+  }
+  
+  return {
+    Video: {
+      unmerged_windows: processedUnmergedSegments,
+      merged_windows: processedShots,
+      videos: processedVideos,
+    },
+    VideoAudio: {
+      unmerged_windows: [],
+      merged_windows: [],
+      videos: new Map(),
+    },
+    Audio: {
+      unmerged_windows: [],
+      merged_windows: [],
+      videos: new Map(),
+    }
+  } as ProcessedSearchResults;
+};
+
+const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<ProcessedSearchResults> => {
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(MAX_FEATURED_IMAGES, pageEnd*config.PAGE_SIZE);
 
@@ -27,17 +122,16 @@ const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<Search
       throw new Error(`Failed to fetch featured images. ${response.status} - ${response.statusText}`);
     }
     return response.json() as Promise<SearchResponse>;
-  }).then(
-    (response: SearchResponse) => Object.values(response)[0] // Get value corresponding to first key
-  ).then((results: SearchResponseJSONObject[]) => {
-    // Populate title field with filename if it doesn't exist
-    results.forEach(result => {
-      if (!result.info.title) {
-        result.info.title = result.info.filename;
-      }
-    });
-    return results;
-  });
+  }).then(processSearchResults);
+  // .then((results: SearchResponseJSONObject[]) => {
+  //   // Populate title field with filename if it doesn't exist
+  //   results.forEach(result => {
+  //     if (!result.info.title) {
+  //       result.info.title = result.info.filename;
+  //     }
+  //   });
+  //   return results;
+  // });
 }
 
 const convertQueriesToFormData = (queries: Query[]) => {
@@ -47,8 +141,16 @@ const convertQueriesToFormData = (queries: Query[]) => {
       let query_type = 'file_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
       formData.append(query_type, (q.value as unknown) as File);
+    } else if (q.type === 'AUDIO_FILE') {
+      let query_type = 'audio_file_queries';
+      if (q.isNegative) query_type = 'negative_' + query_type
+      formData.append(query_type, (q.value as unknown) as File);
     } else if (q.type === 'URL') {
       let query_type = 'url_queries';
+      if (q.isNegative) query_type = 'negative_' + query_type
+      formData.append(query_type, q.value);
+    } else if (q.type === 'AUDIO_URL') {
+      let query_type = 'audio_url_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
       formData.append(query_type, q.value);
     } else if (q.type === 'INTERNAL_IMAGE') {
@@ -66,7 +168,7 @@ const convertQueriesToFormData = (queries: Query[]) => {
   return formData;
 }
 
-const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number): Promise<SearchResponseJSONObject[]> => {
+const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number): Promise<ProcessedSearchResults> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
@@ -113,17 +215,16 @@ const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number
       }
     }
     return response.json() as Promise<SearchResponse>;
-  }).then(
-    (response: SearchResponse) => Object.values(response)[0] // Get value corresponding to first key
-  ).then((results: SearchResponseJSONObject[]) => {
-    // Populate title field with filename if it doesn't exist
-    results.forEach(result => {
-      if (!result.info.title) {
-        result.info.title = result.info.filename;
-      }
-    });
-    return results;
-  });
+  }).then(processSearchResults);
+  // .then((results: SearchResponseJSONObject[]) => {
+  //   // Populate title field with filename if it doesn't exist
+  //   results.forEach(result => {
+  //     if (!result.info.title) {
+  //       result.info.title = result.info.filename;
+  //     }
+  //   });
+  //   return results;
+  // });
 }
 
 
@@ -135,13 +236,18 @@ export const useDataService = (): DataServiceOutput => {
     searchLatency: NaN,
     totalResults: NaN
   });
-  // pagedResults will be an array of arrays (each sub-array represents the results in a given page)
-  const [ pagedResults, setPagedResults ] = useState<ProcessedSearchResult[][]>(getArrayOfEmptyArrays(NUM_PAGES));
-  const [ pageNum, setPageNum ] = useState(0);
+  // // pagedResults will be an array of arrays (each sub-array represents the results in a given page)
+  // const [ pagedResults, setPagedResults ] = useState<any[][]>(getArrayOfEmptyArrays(NUM_PAGES));
+  // const [ pageNum, setPageNum ] = useState(0);
+  const [ searchResponse, setSearchResponse ] = useState<ProcessedSearchResults>({
+    Video: { unmerged_windows: [], merged_windows: [], videos: new Map() },
+    VideoAudio: { unmerged_windows: [], merged_windows: [], videos: new Map() },
+    Audio: { unmerged_windows: [], merged_windows: [], videos: new Map() },
+  });
 
   // Get featured images to display on home page
   const fetchFeaturedImagesAndSetState = () => {
-    return fetchFeaturedImages(0, config.NUM_PAGES_PER_REQUEST).then((images: SearchResponseJSONObject[]) => {
+    return fetchFeaturedImages(0, config.NUM_PAGES_PER_REQUEST).then((_searchResponse: ProcessedSearchResults) => {
       setSearchingState({
         queries: [],
         isFeaturedImages: true,
@@ -149,44 +255,45 @@ export const useDataService = (): DataServiceOutput => {
         searchLatency: NaN,
         totalResults: MAX_FEATURED_IMAGES
       });
-      setPageNum(0);
+      setSearchResponse(_searchResponse);
+      // setPageNum(0);
 
-      // Page slicing
-      const _pagedResults = getArrayOfEmptyArrays(NUM_PAGES);
-      const resultPages = chunk(images, config.PAGE_SIZE);
-      _pagedResults.splice(0, resultPages.length, ...resultPages);
+      // // Page slicing
+      // const _pagedResults = getArrayOfEmptyArrays(NUM_PAGES);
+      // const resultPages = chunk(images, config.PAGE_SIZE);
+      // _pagedResults.splice(0, resultPages.length, ...resultPages);
 
-      setPagedResults(_pagedResults);
-      return;
+      // setPagedResults(_pagedResults);
+      // return;
     });
   };
 
-  // Navigate to a different page for the current query
-  const changePageNum = async (page: number) => {
-    setPageNum(page);
+  // // Navigate to a different page for the current query
+  // const changePageNum = async (page: number) => {
+  //   setPageNum(page);
     
-    // Fetch page if the page hasn't been fetched yet (multiple pages are fetched at once based on config.NUM_PAGES_PER_REQUEST)
-    if (pagedResults[page].length === 0) {
-      const fetchStartPageNum =
-        Math.floor(page / config.NUM_PAGES_PER_REQUEST) * config.NUM_PAGES_PER_REQUEST;
-      const fetchEndPageNum = fetchStartPageNum + config.NUM_PAGES_PER_REQUEST;
+  //   // Fetch page if the page hasn't been fetched yet (multiple pages are fetched at once based on config.NUM_PAGES_PER_REQUEST)
+  //   if (pagedResults[page].length === 0) {
+  //     const fetchStartPageNum =
+  //       Math.floor(page / config.NUM_PAGES_PER_REQUEST) * config.NUM_PAGES_PER_REQUEST;
+  //     const fetchEndPageNum = fetchStartPageNum + config.NUM_PAGES_PER_REQUEST;
 
-      let searchResponseJSON: SearchResponseJSONObject[];
-      if (searchingState.isFeaturedImages) {
-        searchResponseJSON = await fetchFeaturedImages(fetchStartPageNum, fetchEndPageNum);
-      } else {
-        searchResponseJSON = await fetchSearchResults(searchingState.queries, fetchStartPageNum, fetchEndPageNum);
-      }
+  //     let searchResponseJSON: SearchResponseJSONObject[];
+  //     if (searchingState.isFeaturedImages) {
+  //       searchResponseJSON = await fetchFeaturedImages(fetchStartPageNum, fetchEndPageNum);
+  //     } else {
+  //       searchResponseJSON = await fetchSearchResults(searchingState.queries, fetchStartPageNum, fetchEndPageNum);
+  //     }
   
-      // Page slicing
-      setPagedResults(_pagedResults => {
-        _pagedResults = [..._pagedResults];
-        const resultPages = chunk(searchResponseJSON, config.PAGE_SIZE);
-        _pagedResults.splice(fetchStartPageNum, config.NUM_PAGES_PER_REQUEST, ...resultPages);
-        return _pagedResults;
-      });
-    }
-  }
+  //     // Page slicing
+  //     setPagedResults(_pagedResults => {
+  //       _pagedResults = [..._pagedResults];
+  //       const resultPages = chunk(searchResponseJSON, config.PAGE_SIZE);
+  //       _pagedResults.splice(fetchStartPageNum, config.NUM_PAGES_PER_REQUEST, ...resultPages);
+  //       return _pagedResults;
+  //     });
+  //   }
+  // }
 
   // Get results for a new search query
   const performNewSearch = async (queries: Query[]) => {
@@ -195,7 +302,7 @@ export const useDataService = (): DataServiceOutput => {
       isSearching: true
     }));
     const time0 = performance.now();
-    let searchResponseJSON: SearchResponseJSONObject[];
+    let searchResponseJSON: ProcessedSearchResults;
     try {
       searchResponseJSON = await fetchSearchResults(queries, 0, config.NUM_PAGES_PER_REQUEST);
     } catch (e) {
@@ -213,15 +320,16 @@ export const useDataService = (): DataServiceOutput => {
       searchLatency: time1 - time0,
       totalResults: config.MAX_SEARCH_RESULTS
     });
-    setPageNum(0);
+    setSearchResponse(searchResponseJSON);
+    // setPageNum(0);
 
-    // Page slicing
-    const _pagedResults = getArrayOfEmptyArrays(NUM_PAGES);
-    const resultPages = chunk(searchResponseJSON, config.PAGE_SIZE);
-    _pagedResults.splice(0, resultPages.length, ...resultPages);
+    // // Page slicing
+    // const _pagedResults = getArrayOfEmptyArrays(NUM_PAGES);
+    // const resultPages = chunk(searchResponseJSON, config.PAGE_SIZE);
+    // _pagedResults.splice(0, resultPages.length, ...resultPages);
 
-    setPagedResults(_pagedResults);
-    return;
+    // setPagedResults(_pagedResults);
+    // return;
   };
 
   // Report an image
@@ -244,59 +352,14 @@ export const useDataService = (): DataServiceOutput => {
 
 
   return {
-    searchResults: pagedResults[pageNum],
+    searchResults: searchResponse,
     isSearching: searchingState.isSearching,
     searchLatency: searchingState.searchLatency,
     totalResults: searchingState.totalResults,
-    pageNum,
-    changePageNum,
+    // pageNum,
+    // changePageNum,
     performNewSearch,
     fetchFeaturedImagesAndSetState,
     reportImage
   }
 }
-
-
-
-export const useInternalSearchDataService = (): InternalSearchDataServiceOutput => {
-  const [ searchingState, setSearchingState ] = useState<{
-    internalImageId?: string,
-    isSearching: boolean,
-    searchResults: ProcessedSearchResult[]
-  }>({
-    internalImageId: undefined,
-    isSearching: false,
-    searchResults: []
-  });
-
-  const performInternalSearch = async (internalImageId: string) => {
-    setSearchingState({
-      internalImageId: internalImageId,
-      isSearching: true,
-      searchResults: []
-    });
-    let searchResponseJSON: SearchResponseJSONObject[];
-    try {
-      searchResponseJSON = await fetchSearchResults([{id: nanoid(), type: 'INTERNAL_IMAGE', displayText: '', value: internalImageId}], 0, 1);
-    } catch (e) {
-      setSearchingState({
-        internalImageId: internalImageId,
-        isSearching: false,
-        searchResults: []
-      });
-      throw e;
-    }
-    setSearchingState({
-      internalImageId: internalImageId,
-      isSearching: false,
-      searchResults: searchResponseJSON.filter(x => x.info.id !== internalImageId)
-    });
-    return;
-  };
-
-  return {
-    ...searchingState,
-    performInternalSearch
-  }
-}
-

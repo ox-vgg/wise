@@ -102,7 +102,7 @@ export const App: React.FunctionComponent = () => {
     }]);
   }  
 
-  return <Layout style={(dataService.searchResults.length === 0) ? {background: 'transparent'} : {}}>
+  return <Layout style={(dataService.searchResults.Video.unmerged_windows.length === 0) ? {background: 'transparent'} : {}}>
     <WiseHeader multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                 searchText={searchText} setSearchText={setSearchText}
                 submitSearch={submitSearch}

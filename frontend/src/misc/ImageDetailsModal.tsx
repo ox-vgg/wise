@@ -1,113 +1,186 @@
-import { useEffect } from "react";
+import { useRef } from "react";
 import { Button, Dropdown, Modal } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
-import sanitizeHtml from 'sanitize-html';
-import { ImageDetailsModalProps, ProcessedSearchResult } from "./types";
-import { useInternalSearchDataService } from "../DataService";
-import './ImageDetailsModal.scss';
+// import sanitizeHtml from "sanitize-html";
+import '@vidstack/react/player/styles/default/theme.css';
+import '@vidstack/react/player/styles/default/layouts/video.css';
+import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vidstack/react';
+import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
-const ImageDetailsModal = ({imageDetails, setImageDetails, setSelectedImageId}: ImageDetailsModalProps) => {
+import "./ImageDetailsModal.scss";
+import { ImageDetailsModalProps, ProcessedVideoSegment } from "./types";
+import VideoOccurrencesView from "./VideoOccurrencesView";
+
+const ImageDetailsModal = ({
+  imageDetails,
+  setImageDetails,
+  setSelectedImageId,
+}: ImageDetailsModalProps) => {
   let title;
-  let caption, author, copyright;
+  // let caption, author, copyright;
 
-  const isImageDetails = imageDetails && Object.keys(imageDetails).length > 0;
-
-  const internalSearchDataService = useInternalSearchDataService();
-  let relatedImages: ProcessedSearchResult[] = [];
-
-  if (isImageDetails) {
-    title = <Button type="text" href="" onClick={(e) => {e.preventDefault()}} size="large">
-      <b>{imageDetails.info.title}</b>
-      <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-    </Button>;
-    ({ caption, author, copyright } = imageDetails.info);
+  console.log(imageDetails)
+  
+  const playerRef = useRef<MediaPlayerInstance>(null);
+  
+  if (imageDetails) {
+    title = (
+      <Button
+        type="text"
+        // href={imageDetails.videoInfo.externalLink}
+        target='_blank'
+        size="large"
+      >
+        <b>{imageDetails.videoInfo.title}</b>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="24"
+          viewBox="0 0 24 24"
+          width="24"
+        >
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+        </svg>
+      </Button>
+    );
+    // ({ caption, author, copyright } = imageDetails.info);
 
     // const width = imageDetails.info.width;
     // const height = imageDetails.info.height;
+  }
+  // Remove end time from timestamp (e.g. change "#t=16.0,20.0" to "#t=16.0") to prevent video from automatically pausing
+  const videoSrc = imageDetails?.link.replace(/(#t=[\d\.]+),[\d\.]+$/, '$1');
+  
+  const setStartTimestamp = () => {
+    // This is needed because the video player doesn't automatically play the video from the start time in the URL (e.g. #t=16.0)
+    if (imageDetails && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
+  }
 
-    if (internalSearchDataService.internalImageId === imageDetails.info.id) {
-      relatedImages = internalSearchDataService.searchResults;
+  const handleClickOccurrence = (videoSegment: ProcessedVideoSegment) => {
+    if (imageDetails?.vector_id === videoSegment.vector_id) {
+      if (imageDetails && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
+    } else {
+      setImageDetails(videoSegment);
     }
   }
 
-  useEffect(() => {
-    if (isImageDetails) {
-      internalSearchDataService.performInternalSearch(imageDetails.info.id);
-    }
-  }, [imageDetails])
-
   return (
-    <Modal title={title}
-      open={isImageDetails} closable={true} maskClosable={true}
+    <Modal
+      title={title}
+      open={!!imageDetails}
+      closable={true}
+      maskClosable={true}
+      destroyOnClose={true}
       footer={
         <>
-          <Dropdown menu={{
-            items: [{
-              label: 'Report image',
-              key: imageDetails.info?.id
-            }],
-            onClick: ({key}) => { setSelectedImageId(key) }
-          }}
-            placement="topLeft" trigger={['click']} arrow>
-            <Button shape="circle" icon={<MoreOutlined />} style={{float: 'left'}} />
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  label: "Report image",
+                  key: imageDetails?.videoInfo.filename || '',
+                },
+              ],
+              onClick: ({ key }) => {
+                setSelectedImageId(key);
+              },
+            }}
+            placement="topLeft"
+            trigger={["click"]}
+            arrow
+          >
+            <Button
+              shape="circle"
+              icon={<MoreOutlined />}
+              style={{ float: "left" }}
+            />
           </Dropdown>
-          <Button type="primary" onClick={() => setImageDetails({})}>Close</Button>
+          <Button type="primary" onClick={() => setImageDetails()}>
+            Close
+          </Button>
         </>
       }
-      onCancel={() => setImageDetails({})}
-      width='90vw'
       zIndex={500} // The default zIndex is 1000. Setting this to 500 allows the ReportImageModal to be shown on top / in front of this modal, rather than behind
+      onCancel={() => setImageDetails()}
+      width="90vw"
       className="wise-image-details-modal"
     >
-      <div className="wise-image-details-modal-main-section">
-        <a>
-          <img src={imageDetails.link || undefined}
-            key={imageDetails.link || undefined}
-            title={imageDetails.info?.title + (imageDetails.distance ? ` | Distance = ${imageDetails.distance.toFixed(2)}` : '')}
+      <div className="wise-image-wrapper">
+        {imageDetails && ['av', 'video'].includes(imageDetails.videoInfo.media_type) ? (
+          <MediaPlayer
+            src={videoSrc}
+            viewType="video"
+            playsInline
+            autoPlay
+            ref={playerRef}
+            onLoadedMetadata={setStartTimestamp}
+            clipEndTime={imageDetails.videoInfo.duration} // This is needed due to a bug with the chapter markers https://github.com/vidstack/player/issues/1022
+          >
+            {/* 
+            TODO - chapter markers by default use thumbnails from storyboard - change this to use thumbnails from search results instead
+            */}
+            <MediaProvider>
+              <Track content={{
+                // @ts-ignore
+                cues: [...imageDetails.videoInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
+                    startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
+                                                                add 0.1s to the timestamp due to CSS rule
+                                                                requiring the matching chapter elements to be 'even' rather than odd */
+                    endTime: shot.te,
+                    text: 'Match found'
+                  })),
+              }} kind="chapters" lang="en-US" default />;
+
+            </MediaProvider>
+            <DefaultVideoLayout
+              thumbnails={imageDetails.videoInfo.timeline_hover_thumbnails}
+              icons={defaultLayoutIcons} noScrubGesture={false} seekStep={5} />
+          </MediaPlayer>
+        ) : (
+          <img
+            src={imageDetails?.link}
+            // title={
+            //   imageDetails?.videoInfo.filename +
+            //   (imageDetails?.distance
+            //     ? ` | Distance = ${imageDetails.distance.toFixed(2)}`
+            //     : "")
+            // }
           />
-        </a>
-        <div className="wise-image-details-metadata">
-          <p>
-            <b>Description</b><br />
-            <span dangerouslySetInnerHTML={{__html: sanitizeHtml(caption || '')}} />
-          </p>
-          <p>
-            <b>Author</b><br />
-            <span dangerouslySetInnerHTML={{__html: sanitizeHtml(author || '')}} />
-          </p>
-          <p>
-            <b>License</b><br />
-            <span dangerouslySetInnerHTML={{__html: sanitizeHtml(copyright || '')}} />
-          </p>
-        </div>
+        )}
       </div>
-      <div style={{borderTop: '1px solid #e3e3e3', marginTop: 20, marginBottom: 20}} />
-      <div className="wise-image-grid">
-        {
-          relatedImages.map(x => {
-            const title = x.info.title;
-            const width = x.info.width;
-            const height = x.info.height;
-            
-            return (
-              <div key={x.info.id}
-                style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
-                className='wise-image-wrapper'
-              >
-                <i style={{paddingBottom: `${height/width*100}%`}}></i>
-                <a onClick={() => setImageDetails(x)}>
-                  <img src={x.thumbnail}
-                      title={x.info.title + (x.distance ? ` | Distance = ${x.distance.toFixed(2)}` : '')}
-                      className="wise-image"
-                  ></img>
-                </a>
-                <div className="wise-image-hover-display">{title}</div>
-              </div>
-            )
-          })
-        }
-      </div>
+      {
+        imageDetails ?
+        <VideoOccurrencesView videoInfo={imageDetails.videoInfo}
+          handleClickOccurrence={handleClickOccurrence}
+          customHeaderSingular='search match in this video'
+          customHeaderPlural='search matches in this video'
+        />
+        : <></>
+      }
+      <p>
+        <b>Filename</b>
+        <br />
+        <span>{imageDetails?.videoInfo.filename}</span>
+      </p>
+
+      {/* <div className="wise-image-details-metadata">
+        <p>
+          <b>Description</b>
+          <br />
+          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(caption) }} />
+        </p>
+        <p>
+          <b>Author</b>
+          <br />
+          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(author) }} />
+        </p>
+        <p>
+          <b>License</b>
+          <br />
+          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(copyright) }} />
+        </p>
+      </div> */}
     </Modal>
-  )
-}
+  );
+};
 export default ImageDetailsModal;
