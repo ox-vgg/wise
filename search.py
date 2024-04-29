@@ -47,6 +47,8 @@ def clamp_str(text, MAX_CHARS):
     else:
         return text
 
+"""A parser for user input obtained from the WISE search console
+"""
 def parse_user_input(cmd):
     repl_args = { 'query':[], 'in':[] }
     # a basic parser
@@ -93,6 +95,29 @@ def parse_user_input(cmd):
         del repl_args['in']
     return repl_args
 
+""" Merge search results for each modality (i.e. audio, video, etc) separately.
+
+    Parameters
+    ----------
+    search_index_list : a list containing instances of SearchIndex
+
+    query_specs : a dictionary structured as shown in the example below
+      {
+        'query':[ "query-text-1", "query-text-2"],
+        'media_type': [ "video", "audio"],
+        'topk': 10
+      }
+
+    args : command line arguments
+
+    Returns
+    -------
+    result : a list of length 2 and structured as follows
+      [
+        { 'match_filename_list': [...], 'match_pts_list': [...], 'search_time_sec': ... },
+        { 'match_filename_list': [...], 'match_pts_list': [...], 'search_time_sec': ...  }
+      ]
+"""
 def process_query(search_index_list, query_specs, args):
     search_result = []
     topk = args.topk
@@ -129,6 +154,29 @@ def process_query(search_index_list, query_specs, args):
     return search_result
 
 # merge results for each media_type (i.e. video, audio) separately
+""" Merge search results for each modality (i.e. audio, video, etc) separately.
+
+    Parameters
+    ----------
+    query_specs : a dictionary structured as shown in the example below
+      {
+        'query':[ "query-text-1", "query-text-2"],
+        'media_type': [ "video", "audio"],
+        'topk': 10
+      }
+
+    result : a list of length 2 and structured as follows
+      [
+        { 'match_filename_list': [...], 'match_pts_list': [...] },
+        { 'match_filename_list': [...], 'match_pts_list': [...] }
+      ]
+
+    args : command line arguments
+
+    Returns
+    -------
+    merged search result in the same format as the "result" argument
+"""
 def merge0(query_specs, result, args):
     for query_index in range(0, len(query_specs['query'])):
         media_type = query_specs['media_type'][query_index]
@@ -142,10 +190,44 @@ def merge0(query_specs, result, args):
         result[query_index]['match_pts_list'] = merged_pts_list
     return result
 
-# merge results all available media_type (i.e. video, audio) into a single result
+""" Merge two search results either from same modality (e.g. video) or from
+    two different modalities (e.g. video and audio)
+
+    Parameters
+    ----------
+    query_specs : a dictionary structured as shown in the example below
+      {
+        'query':[ "query-text-1", "query-text-2"],
+        'media_type': [ "video", "audio"],
+        'topk': 10
+      }
+
+    result : a list of length 2 and structured as follows
+      [
+        { 'match_filename_list': [...], 'match_pts_list': [...] },
+        { 'match_filename_list': [...], 'match_pts_list': [...] }
+      ]
+
+
+    args : command line arguments
+
+    Returns
+    -------
+    merged_query_specs : a dictionary similar to query_specs but reflecting
+        the result of merging process. For example, 'media_type' becomes
+        'video and audio'
+
+    merged_result : a list of length 1 and formatted as follows
+      [ {
+        'match_filename_list': [ ... ],
+        'match_pts_list': [ ... ],
+        'search_time_sec': ...
+      }]
+"""
 def merge1(query_specs, result, args):
     if len(result) != 2:
-        print('merge1() can be applied to only two lists')
+        print('merge1() can be only applied if result contains two entries')
+        return
     N0 = len(result[0]['match_filename_list'])
     N1 = len(result[1]['match_filename_list'])
     merged_filename_list = []
@@ -176,6 +258,37 @@ def merge1(query_specs, result, args):
     }
     return merged_query_specs, merged_result
 
+""" Merge search results from one of the modalities (e.g. audio, video, etc.).
+    The merge operation retains the rank of a search result and merges all lower
+    ranking results with the same filename.
+
+    Parameters
+    ----------
+    filename_list : a list of filenames ordered by the rank of search results
+
+    pts_list : a list of presentation timestamp corresponding to audio
+      and/or video filenames contained in filename_list
+
+    tolerance : entries with timestamp difference less than the tolerance
+      gets merged
+
+    Returns
+    -------
+    merged_filename_list : merged list of filenames
+    merged_pts_list : presentation timestamp range corresponding to
+      merged_filename_list
+    merged_query_specs : a dictionary similar to query_specs but reflecting
+        the result of merging process. For example, 'media_type' becomes
+        'video and audio'
+
+    merged_result : a list of length 1 and formatted as follows
+      [ {
+        'match_filename_list': [ ... ],
+        'match_pts_list': [ ... ],
+        'search_time_sec': ...
+      }]
+
+"""
 def merge_one_result(filename_list, pts_list, tolerance):
     N = len(filename_list)
     merged_filename_list = []
@@ -364,9 +477,10 @@ if __name__ == '__main__':
         search_result = process_query(search_index_list, query_specs, args)
         merge0_search_result = merge0(query_specs, search_result, args)
         show_result(query_specs, merge0_search_result, args)
-        merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
-        print('\n')
-        show_result(merge1_query_specs, merge1_search_result, args)
+        if len(merge0_search_result) == 2:
+            merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
+            print('\n')
+            show_result(merge1_query_specs, merge1_search_result, args)
 
         if args.export_csv:
             export_result_as_csv(args.export_csv,
