@@ -324,19 +324,22 @@ def _get_project_data_router(config: APIConfig):
             if metadata is None:
                 raise HTTPException(status_code=404, detail=f"Metadata not found!")
             return metadata
+    
+    # Pre-compute project info
+    with project_engine.connect() as conn:
+        num_vectors = VectorRepo.get_count(conn)
+        num_media_files = MediaRepo.get_count(conn)
+    models = {
+        media_type: [
+            feature_extractor_id for feature_extractor_id in project_assets[media_type]
+        ] for media_type in project_assets
+    }
 
     @router.get("/info")
     def get_info():
-        with project_engine.connect() as conn:
-            num_vectors = VectorRepo.get_count(conn)
-            num_media_files = MediaRepo.get_count(conn)
         return {
             "project_name": config.project_dir.stem,
-            "models": {
-                media_type: [
-                    feature_extractor_id for feature_extractor_id in project_assets[media_type]
-                ] for media_type in project_assets
-            },
+            "models": models,
             "num_vectors": num_vectors,
             "num_media_files": num_media_files,
         }
