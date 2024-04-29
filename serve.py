@@ -1,9 +1,15 @@
 import typer
 from pathlib import Path
 from typing import Optional
+import logging
 
 from src.wise_project import WiseProject
 from src.enums import IndexType
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
+)
 
 app = typer.Typer()
 
@@ -39,7 +45,7 @@ def main(
 
     project = WiseProject(project_dir, create_project=False)
     project_assets = project.discover_assets()
-    print(project_assets)
+    # print(project_assets)
 
     # project_tree = WiseProjectTree(project_id)
     # if index_type:
