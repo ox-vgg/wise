@@ -72,4 +72,5 @@ thumbnails_table = sa.Table(
     ),
     sa.Column("timestamp", sa.Float(), index=True, nullable=True),
     sa.Column("content", sa.LargeBinary(), nullable=False),
+    sa.schema.Index("ix_thumbnails_media_id_and_timestamp", "media_id", "timestamp"),
 )
