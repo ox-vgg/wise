@@ -10,9 +10,9 @@ audio and visual search capabilities of WISE.
 ```
 # We assume that the current directory contains
 # the WISE software source tree.
-mkdir -p wise-data/
+mkdir -p wise-data/Kinectics-6
 curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/Kinectics-6.tar.gz"
-tar -zxvf Kinectics-6.tar.gz -C wise-data/
+tar -zxvf Kinectics-6.tar.gz -C wise-data/Kinectics-6
 ```
 
 Next, we extract visual and audio features and create a search index that will allows
@@ -73,6 +73,12 @@ Searching /data/beegfs/ultrafast/home/adutta/temp/wise/Kinectics-6/ for
  Rank  Filename                                         Time      
     0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5 
 ```
+
+The range value shown in the `Time` column (e.g. `0.0 - 9.5`) is obtained
+by merging two or more results from the initial ranked list. The ranked
+results that do not get merged are reported as a single timestamp
+(e.g. `4.0`) which is same as it was in the original unmerged ranked list of
+nearest neighbours.
 
 If you want to try a large number of search queries, you can
 try the WISE search console which is much faster as it needs to
