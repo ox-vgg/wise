@@ -159,3 +159,43 @@ query_text,media_type,rank,filename,timestamp
 All the subsequent queries in the search console gets completed almost
 instantly because the required assets (e.g. model files) have already
 been loaded into the computer memory.
+
+## Search Using Query Sentences Stored in a File
+
+For large scale evaluation, it is more more convenient to feed the
+search queries to the WISE software from a text file. To demonstrate
+this functionality, we first create a CSV file in which all the search
+query sentences are stored one per line of the text file with a header
+line of "query_id,query_text" as shown below.
+
+```
+$ cat queries.csv
+query_id,query_text
+1,cooking
+2,walking
+```
+
+The header line must be present in the input CSV file. Now, we can
+search using these queries as follows.
+
+```
+$ python search.py \
+  --in video \
+  --result-format csv \
+  --export-csv results.csv \
+  --topk 5 \
+  --queries-from queries.csv \
+  --project-dir wise-projects/Kinectics-6/
+```
+
+The search results are exported to a csv file as shown below.
+
+```
+$ cat results.csv
+query_id,query_text,media_type,rank,filename,start_time,end_time,score
+1,"cooking",video,0,"frying-vegetables/mwkOrWZxvrU_000006_000016.mp4",0.5,1.5,0.218
+1,"cooking",video,1,"frying-vegetables/mT7vy1-KP_Q_000398_000408.mp4",4.0,4.0,0.211
+1,"cooking",video,2,"frying-vegetables/lUyXiF6KfgU_000296_000306.mp4",8.5,8.5,0.210
+2,"walking",video,0,"jogging/UQsA-W-q3oA_000002_000012.mp4",2.5,9.0,0.168
+2,"walking",video,1,"jogging/RpjJ3VoLFmQ_000084_000094.mp4",1.0,6.5,0.165
+```
