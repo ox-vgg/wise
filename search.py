@@ -135,6 +135,7 @@ def process_query(search_index_list, query_specs, args):
                                                          query_type='text')
         match_filename_list = []
         match_pts_list = []
+        match_score_list = []
         with db_engine.connect() as conn:
             for rank in range(0, len(ids)):
                 vector_id = int(ids[rank])
@@ -145,10 +146,12 @@ def process_query(search_index_list, query_specs, args):
                 pts_hhmmss = to_hhmmss(pts)
                 match_filename_list.append(filename)
                 match_pts_list.append(pts)
+                match_score_list.append(dist[rank])
         end_time = time.time()
         search_result.append({
             'match_filename_list': match_filename_list,
             'match_pts_list': match_pts_list,
+            'match_score_list': match_score_list,
             'search_time_sec': (end_time - start_time)
         })
     return search_result
@@ -167,8 +170,8 @@ def process_query(search_index_list, query_specs, args):
 
     result : a list of length 2 and structured as follows
       [
-        { 'match_filename_list': [...], 'match_pts_list': [...] },
-        { 'match_filename_list': [...], 'match_pts_list': [...] }
+        { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] },
+        { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] }
       ]
 
     args : command line arguments
@@ -183,11 +186,15 @@ def merge0(query_specs, result, args):
         merge_tolerance = getattr(args, 'merge_tolerance_' + media_type)
         filename_list = result[query_index]['match_filename_list']
         pts_list = result[query_index]['match_pts_list']
-        merged_filename_list, merged_pts_list = merge_one_result(filename_list,
-                                                                 pts_list,
-                                                                 merge_tolerance)
+        score_list = result[query_index]['match_score_list']
+        merged_filename_list, merged_pts_list, merged_score_list = merge_one_result(
+            filename_list,
+            pts_list,
+            score_list,
+            merge_tolerance)
         result[query_index]['match_filename_list'] = merged_filename_list
         result[query_index]['match_pts_list'] = merged_pts_list
+        result[query_index]['match_score_list'] = merged_score_list
     return result
 
 """ Merge two search results either from same modality (e.g. video) or from
@@ -204,8 +211,8 @@ def merge0(query_specs, result, args):
 
     result : a list of length 2 and structured as follows
       [
-        { 'match_filename_list': [...], 'match_pts_list': [...] },
-        { 'match_filename_list': [...], 'match_pts_list': [...] }
+        { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] },
+        { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] }
       ]
 
 
@@ -221,6 +228,7 @@ def merge0(query_specs, result, args):
       [ {
         'match_filename_list': [ ... ],
         'match_pts_list': [ ... ],
+        'match_score_list': [ ... ],
         'search_time_sec': ...
       }]
 """
@@ -231,14 +239,22 @@ def merge1(query_specs, result, args):
     N0 = len(result[0]['match_filename_list'])
     N1 = len(result[1]['match_filename_list'])
     merged_filename_list = []
+    merged_score_list = []
     merged_pts_list = []
     for index_pair in itertools.product( range(0,N0), range(0,N1) ):
         index0 = index_pair[0]
         index1 = index_pair[1]
         filename0 = result[0]['match_filename_list'][index0]
         filename1 = result[1]['match_filename_list'][index1]
+        score0 = result[0]['match_score_list'][index0]
+        score1 = result[1]['match_score_list'][index1]
         if filename0 == filename1:
             merged_filename_list.append(filename0)
+            if score0 > score1:
+                merged_score = score0
+            else:
+                merged_score = score1
+            merged_score_list.append(merged_score)
             pts0 = result[0]['match_pts_list'][index0]
             pts1 = result[1]['match_pts_list'][index1]
             merged_pts = pts0 + pts1
@@ -250,6 +266,7 @@ def merge1(query_specs, result, args):
     merged_result = [ {
         'match_filename_list': merged_filename_list,
         'match_pts_list': merged_pts_list,
+        'match_score_list': merged_score_list,
         'search_time_sec': result[0]['search_time_sec'] + result[1]['search_time_sec']
     }]
     merged_query_specs = {
@@ -267,6 +284,9 @@ def merge1(query_specs, result, args):
     filename_list : a list of filenames ordered by the rank of search results
 
     pts_list : a list of presentation timestamp corresponding to audio
+      and/or video filenames contained in filename_list
+
+    pts_list : a list of similarity score between search query and the audio
       and/or video filenames contained in filename_list
 
     tolerance : entries with timestamp difference less than the tolerance
@@ -289,10 +309,11 @@ def merge1(query_specs, result, args):
       }]
 
 """
-def merge_one_result(filename_list, pts_list, tolerance):
+def merge_one_result(filename_list, pts_list, score_list, tolerance):
     N = len(filename_list)
     merged_filename_list = []
     merged_pts_list = []
+    merged_score_list = []
     skip_index_list = []
     for i in range(0, N):
         if i in skip_index_list:
@@ -313,7 +334,8 @@ def merge_one_result(filename_list, pts_list, tolerance):
         else:
             merged_pts_list.append( [ pts_i[0] ] )
         merged_filename_list.append(filename_i)
-    return merged_filename_list, merged_pts_list
+        merged_score_list.append(score_list[i])
+    return merged_filename_list, merged_pts_list, merged_score_list
 
 def show_result(query_specs, result, args):
     console = Console()
@@ -329,6 +351,7 @@ def show_result(query_specs, result, args):
         table.add_column('Rank', justify='right', no_wrap=True)
         table.add_column('Filename', justify='left', no_wrap=True)
         table.add_column('Time', justify='left', no_wrap=True)
+        table.add_column('Score', justify='left', no_wrap=True)
 
         for rank in range(0, len(result[query_index]['match_filename_list'])):
             pts = result[query_index]['match_pts_list'][rank]
@@ -340,9 +363,11 @@ def show_result(query_specs, result, args):
             else:
                 pts_str = '%.1f' % (pts)
             filename = result[query_index]['match_filename_list'][rank]
+            score_str = '%.3f' % (result[query_index]['match_score_list'][rank])
             table.add_row(str(rank),
                           clamp_str(filename, getattr(args, 'max_filename_length')),
-                          pts_str)
+                          pts_str,
+                          score_str)
         console.print(table)
         total_search_time += result[query_index]['search_time_sec']
     print('(search completed in %.3f sec.)' % (total_search_time))
@@ -363,7 +388,8 @@ def export_result_as_csv(csv_filename, query_specs, search_result, args):
                 else:
                     pts_str = '%.1f' % (search_result[query_index]['match_pts_list'][rank])
                 filename = search_result[query_index]['match_filename_list'][rank]
-                f.write(f'"{query_text}",{media_type},{rank},{filename},{pts_str}\n')
+                score_str = '%.3f' % (search_result[query_index]['match_score_list'][rank])
+                f.write(f'"{query_text}",{media_type},{rank},{filename},{pts_str},{score_str}\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='search',
