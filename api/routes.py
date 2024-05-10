@@ -10,6 +10,9 @@ import tarfile
 from PIL import Image
 import math
 import numpy as np
+from collections import defaultdict
+import torch
+import torchaudio
 from numpy import ndarray, array, zeros, average, expand_dims, float32
 from numpy.random import default_rng
 from numpy.linalg import norm
@@ -578,6 +581,7 @@ def _get_search_router(config: APIConfig):
         return all_merged_segments, best_thumbnail
 
     def construct_video_search_response(
+        search_in: MediaType,
         top_dist: List[float],
         top_ids: List[int],
         get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
@@ -633,26 +637,43 @@ def _get_search_router(config: APIConfig):
         for v in videos:
             videos[v].thumbnail = best_thumbnails[v].thumbnail
 
-        video_results = VideoResults(
-            total=300, # TODO change this
-            unmerged_windows=segments,
-            merged_windows=shots,
-            videos=videos,
-        )
-
-        return SearchResponse(
-            time=0.0, # TODO change this
-            audio_results=None,
-            video_audio_results=None,
-            video_results=video_results,
-            image_results=None,
-        )
+        if search_in == MediaType.VIDEO:
+            video_results = VideoResults(
+                total=300, # TODO change this
+                unmerged_windows=segments,
+                merged_windows=shots,
+                videos=videos,
+            )
+            return SearchResponse(
+                time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
+                audio_results=None,
+                video_audio_results=None,
+                video_results=video_results,
+                image_results=None,
+            )
+        elif search_in == MediaType.AV:
+            video_audio_results = VideoAudioResults(
+                total=300, # TODO change this
+                unmerged_windows=segments,
+                merged_windows=shots,
+                videos=videos,
+            )
+            return SearchResponse(
+                time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
+                audio_results=None,
+                video_audio_results=video_audio_results,
+                video_results=None,
+                image_results=None,
+            )
+        else:
+            raise NotImplementedError()
 
     def _get_query_features(
-        extract_features_from_image: Callable[[List[Image.Image]], ndarray],
-        extract_features_from_text: Callable[[List[str]], ndarray],
         query_prefix: str,
         q: List[Dict[str, Union[ndarray, bytes, str]]],
+        extract_features_from_text: Callable[[List[str]], ndarray] = None,
+        extract_features_from_image: Callable[[List[Image.Image]], ndarray] = None,
+        extract_features_from_audio: Callable[[List[torch.Tensor]], ndarray] = None,
     ) -> ndarray:
         feature_vectors = []
         weights = []
@@ -660,46 +681,78 @@ def _get_search_router(config: APIConfig):
         for query_dict in q:
             query = query_dict["val"]
             feature_vector = None
-            if isinstance(query, bytes):
-                with Image.open(io.BytesIO(query)) as im:
-                    im = im.convert('RGB')
-                    feature_vector = extract_features_from_image([im])
-                    weights.append(
-                        config.negative_queries_weight
-                        if query_dict["type"] == "negative"
-                        else 1
-                    )
-            elif isinstance(query, ndarray):
-                feature_vector = query
-                weights.append(
-                    config.negative_queries_weight
-                    if query_dict["type"] == "negative"
-                    else 1
-                )
-            elif query.startswith(("http://", "https://")):
-                logger.info("Downloading", query, "to file")
-                with NamedTemporaryFile() as tmpfile:
-                    download_url_to_file(query, tmpfile.name)
-                    with Image.open(tmpfile.name) as im:
+            if query_dict['modality'] == 'image':
+                if isinstance(query, bytes):
+                    with Image.open(io.BytesIO(query)) as im:
                         im = im.convert('RGB')
                         feature_vector = extract_features_from_image([im])
                         weights.append(
                             config.negative_queries_weight
-                            if query_dict["type"] == "negative"
+                            if query_dict["sign"] == "negative"
                             else 1
                         )
-            else:
+                elif isinstance(query, ndarray):
+                    feature_vector = query
+                    weights.append(
+                        config.negative_queries_weight
+                        if query_dict["sign"] == "negative"
+                        else 1
+                    )
+                elif query.startswith(("http://", "https://")):
+                    logger.info("Downloading", query, "to file")
+                    with NamedTemporaryFile() as tmpfile:
+                        download_url_to_file(query, tmpfile.name)
+                        with Image.open(tmpfile.name) as im:
+                            im = im.convert('RGB')
+                            feature_vector = extract_features_from_image([im])
+                            weights.append(
+                                config.negative_queries_weight
+                                if query_dict["sign"] == "negative"
+                                else 1
+                            )
+            elif query_dict['modality'] == 'audio':
+                if isinstance(query, bytes):
+                    im = io.BytesIO(query)
+                    feature_vector = extract_features_from_audio([im])
+                    weights.append(
+                        config.negative_queries_weight
+                        if query_dict["sign"] == "negative"
+                        else 1
+                    )
+                elif isinstance(query, ndarray):
+                    feature_vector = query
+                    weights.append(
+                        config.negative_queries_weight
+                        if query_dict["sign"] == "negative"
+                        else 1
+                    )
+                elif query.startswith(("http://", "https://")):
+                    logger.info("Downloading", query, "to file")
+                    with NamedTemporaryFile() as tmpfile:
+                        download_url_to_file(query, tmpfile.name)
+                        with open(tmpfile.name, mode='rb') as f:
+                            file_bytes_io = io.BytesIO(f.read())
+                            feature_vector = extract_features_from_audio([file_bytes_io])
+                            weights.append(
+                                config.negative_queries_weight
+                                if query_dict["sign"] == "negative"
+                                else 1
+                            )
+            elif query_dict['modality'] == 'text':
                 prefixed_queries = f"{query_prefix} {query.strip()}".strip()
                 feature_vector = extract_features_from_text(prefixed_queries)
                 weights.append(
                     config.text_queries_weight
                     * (  # assign higher weight to natural language queries
                         config.negative_queries_weight
-                        if query_dict["type"] == "negative"
+                        if query_dict["sign"] == "negative"
                         else 1
                     )
                 )
-            if query_dict["type"] == "negative":
+            else:
+                raise ValueError(f"Unsupported modality: {query_dict['modality']}")
+                
+            if query_dict["sign"] == "negative":
                 feature_vector = -feature_vector
             feature_vectors.append(feature_vector)
         weights = array(weights, dtype=float32)
@@ -713,40 +766,39 @@ def _get_search_router(config: APIConfig):
     project_engine = db.init_project(project.dburi)
     thumbs_engine = db.init_thumbs(project.thumbs_uri)
 
-    media_type = 'video' # TODO change this later
-    feature_extractor_id_list = list(project_assets[media_type].keys())
-    feature_extractor_id = feature_extractor_id_list[0] # TODO: allow users to select the feature
-    
-    # Load the faiss search index
-    index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
-    search_index = SearchIndex(media_type,
-                                feature_extractor_id,
-                                index_dir)
-    logger.info(f"Loading faiss index from {search_index.get_index_filename(config.index_type)}")
-    if not search_index.load_index(config.index_type):
-        raise RuntimeError("Unable to load faiss index")
-    if hasattr(search_index.index, "nprobe"):
-        # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
-        search_index.index.parallel_mode = 1
-        search_index.index.nprobe = getattr(config, "nprobe", 32)
+    """
+    Load search indices for all feature extractors.
+    `search_indices` is a dictionary of dictionaries, e.g. `search_indices[media_type][feature_extractor_id]`
+    contains a `SearchIndex` object for a given media type and feature extractor id
+    """
+    search_indices = defaultdict(dict)
+    for media_type in project_assets:
+        for feature_extractor_id in project_assets[media_type]:
+            index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
+            search_index = SearchIndex(media_type,
+                                        feature_extractor_id,
+                                        index_dir)
+            search_indices[media_type][feature_extractor_id] = search_index
+            logger.info(f"Loading faiss index from {search_index.get_index_filename(config.index_type)}")
+            if not search_index.load_index(config.index_type):
+                raise RuntimeError("Unable to load faiss index")
+            if hasattr(search_index.index, "nprobe"):
+                # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
+                search_index.index.parallel_mode = 1
+                search_index.index.nprobe = getattr(config, "nprobe", 32)
 
-    if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
-        try:
-            logger.info(f"Enabling direct map on search index for faster internal search.")
-            search_index.index.make_direct_map(True)
-        except Exception as e:
-            logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
-    else:
-        logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
+            if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
+                try:
+                    logger.info(f"Enabling direct map on search index for faster internal search.")
+                    search_index.index.make_direct_map(True)
+                except Exception as e:
+                    logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
+            else:
+                logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
 
     # Get counts
     with project_engine.connect() as conn:
         num_vectors = VectorRepo.get_count(conn)
-
-    extract_text_features = search_index.feature_extractor.extract_text_features
-    extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
-        search_index.feature_extractor.preprocess_image(x)
-    )
 
     router_cm = ExitStack()
 
@@ -899,14 +951,11 @@ def _get_search_router(config: APIConfig):
     else:
         thumbs_reader = _thumbs_with_score
 
-    get_query_features = functools.partial(
-        _get_query_features, extract_image_features, extract_text_features, _prefix
-    )
     router = APIRouter(
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
 
-    def reconstruct_internal_img_feature(vector_ids: List[int]) -> List[Union[ndarray, bytes]]:
+    def reconstruct_internal_img_feature(search_index: SearchIndex, vector_ids: List[int]) -> List[Union[ndarray, bytes]]:
         reconstructed_features = search_index.index.reconstruct_batch(vector_ids)
         features_list = []
         for i in range(0, reconstructed_features.shape[0]):
@@ -1031,10 +1080,11 @@ def _get_search_router(config: APIConfig):
 
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_video_search_response(
-                dist[start:end],
-                selected_ids[start:end],
-                _get_metadata,
-                get_thumbs,
+                search_in=MediaType.VIDEO,
+                top_dist=dist[start:end],
+                top_ids=selected_ids[start:end],
+                get_metadata_fn=_get_metadata,
+                get_thumbs_fn=get_thumbs,
             )
 
         return response
@@ -1055,13 +1105,6 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        # if (end - start) > 50 and thumbs == True:
-        #     raise HTTPException(
-        #         400,
-        #         {
-        #             "message": "Cannot return more than 50 results at a time when thumbs=1"
-        #         },
-        #     )
     
         for query in q:
             if query.strip() in config.query_blocklist:
@@ -1072,24 +1115,49 @@ def _get_search_router(config: APIConfig):
                 )
                 raise HTTPException(403, {"message": message})
 
-        q = [dict(type="positive", val=query) for query in q]
+        q = [dict(sign="positive", val=query) for query in q]
+
+        # Pick the first feature extractor for videos
+        search_in = MediaType.VIDEO
+        feature_extractor_id = list(search_indices[search_in].keys())[0]
+        search_index = search_indices[search_in][feature_extractor_id]
+
+        extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
+        extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
+            search_index.feature_extractor.preprocess_image(x)
+        )
 
         return similarity_search(
-            q=q, start=start, end=end, thumbnails_to_send=thumbnails_to_send
+            q=q,
+            search_in=search_in,
+            search_index=search_index,
+            start=start, end=end, thumbnails_to_send=thumbnails_to_send,
+            extract_text_features=extract_text_features, extract_image_features=extract_image_features,
         )
 
     @router.post("/search", response_model=SearchResponse)
     @add_response_time
     async def handle_post_search_multimodal(
+        # Which media type to search on
+        # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+        # "audio" refers to pure audio files, and "image" refers to images
+        search_in: MediaType = Query(default=MediaType.VIDEO),
+        # Name of feature extractor to use
+        feature_extractor_id: str = Query(default=None),
+
         # Positive queries
         text_queries: List[str] = Query(default=[]),
-        file_queries: List[bytes] = File([]),  # user-uploaded images
-        url_queries: List[str] = Form([]),  # URLs to online images
+        image_file_queries: List[bytes] = File([]),  # user-uploaded images
+        audio_file_queries: List[bytes] = File([]),  # user-uploaded audio files
+        image_url_queries: List[str] = Form([]),  # URLs to online images
+        audio_url_queries: List[str] = Form([]),  # URLs to online audio files
         internal_image_queries: List[int] = Query(default=[]),  # ids to internal images
         # Negative queries
         negative_text_queries: List[str] = Query(default=[]),
-        negative_file_queries: List[bytes] = File([]),  # user-uploaded images
-        negative_url_queries: List[str] = Form([]),  # URLs to online images
+        negative_image_file_queries: List[bytes] = File([]),  # user-uploaded images
+        negative_audio_file_queries: List[bytes] = File([]),  # user-uploaded audio files
+        negative_image_url_queries: List[str] = Form([]),  # URLs to online images
+        negative_audio_url_queries: List[str] = Form([]),  # URLs to online audio files
         negative_internal_image_queries: List[int] = Query(
             default=[]
         ),  # ids to internal images
@@ -1103,6 +1171,35 @@ def _get_search_router(config: APIConfig):
         Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
         input images/text, and then using this as the query vector.
         """
+        media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
+        if feature_extractor_id is None:
+            # Pick the first feature extractor for the given media type
+            feature_extractor_id = list(search_indices[media_type].keys())[0]
+        elif feature_extractor_id not in search_indices[media_type]:
+            raise HTTPException(400, {"message": f"Invalid combination of feature_extractor_id: {feature_extractor_id} and media type: {media_type}"})
+        
+        search_index = search_indices[media_type][feature_extractor_id]
+
+        extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
+        extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
+            search_index.feature_extractor.preprocess_image(x)
+        )
+        def load_audio(x: List[io.BytesIO]) -> torch.Tensor:
+            # TODO add support for loading multiple audio files
+            if len(x) == 0:
+                raise ValueError("No audio file was specified")
+            elif len(x) > 1:
+                raise NotImplementedError("Please specify 1 audio file only")
+            
+            target_sample_rate = 48_000 # TODO set this based on model?
+            audio_file = x[0]
+            waveform, original_sample_rate = torch.load(audio_file)
+            waveform = torchaudio.functional.resample(waveform, orig_freq=original_sample_rate, new_freq=target_sample_rate)
+            return waveform
+        extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = lambda x: search_index.feature_extractor.extract_audio_features(
+            search_index.feature_extractor.preprocess_audio(load_audio(x))
+        )
+
         try:
             if not hasattr(search_index.index, 'direct_map') or search_index.index.direct_map.type == search_index.index.direct_map.NoMap:
                 # load saved features from HDF file (slower)
@@ -1110,8 +1207,8 @@ def _get_search_router(config: APIConfig):
                 negative_internal_image_queries = load_internal_images(negative_internal_image_queries)
             else:
                 # reconstruct features from faiss index (faster)
-                internal_image_queries = reconstruct_internal_img_feature(internal_image_queries)
-                negative_internal_image_queries = reconstruct_internal_img_feature(negative_internal_image_queries)
+                internal_image_queries = reconstruct_internal_img_feature(search_index, internal_image_queries)
+                negative_internal_image_queries = reconstruct_internal_img_feature(search_index, negative_internal_image_queries)
         except Exception as e:
             logger.exception(e)
             return PlainTextResponse(
@@ -1127,49 +1224,68 @@ def _get_search_router(config: APIConfig):
                 )
                 raise HTTPException(403, {"message": message})
 
-        q = file_queries + url_queries + text_queries + internal_image_queries
-        q = [dict(type="positive", val=query) for query in q]
+        q = [dict(sign="positive", modality="text", val=query) for query in text_queries]
+        q += [dict(sign="positive", modality="image", val=query) for query in (
+            image_file_queries + image_url_queries + internal_image_queries
+        )]
+        q += [dict(sign="positive", modality="audio", val=query) for query in (
+            audio_file_queries + audio_url_queries
+        )]
 
-        negative_q = (
-            negative_file_queries
-            + negative_url_queries
-            + negative_text_queries
-            + negative_internal_image_queries
-        )
-        q = q + [dict(type="negative", val=query) for query in negative_q]
+        q += [dict(sign="negative", modality="text", val=query) for query in negative_text_queries]
+        q += [dict(sign="negative", modality="image", val=query) for query in (
+            negative_image_file_queries + negative_image_url_queries + negative_internal_image_queries
+        )]
+        q += [dict(sign="negative", modality="audio", val=query) for query in (
+            negative_audio_file_queries + negative_audio_url_queries
+        )]
 
         if len(q) == 0:
             raise HTTPException(400, {"message": "Missing search query"})
         elif len(q) > 5:
             raise HTTPException(400, {"message": "Too many query items"})
 
+        if search_in == MediaType.VIDEO:
+            if len([query for query in q if query['modality'] == 'audio']) > 0:
+                raise HTTPException(400, {
+                    "message": "Cannot search on visual stream of video files using an audio query"
+                })
+        elif search_in == MediaType.AUDIO or search_in == MediaType.AV:
+            if len([query for query in q if query['modality'] == 'image']) > 0:
+                raise HTTPException(400, {
+                    "message": "Cannot search on audio using an image query"
+                })
+
         end = min(end, num_vectors)
         if start > end:
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        # if (end - start) > 50 and thumbs == True:
-        #     raise HTTPException(
-        #         400,
-        #         {
-        #             "message": "Cannot return more than 50 results at a time when thumbs=1"
-        #         },
-        #     )
 
         return similarity_search(
             q,
+            search_in=search_in,
+            search_index=search_index,
             start=start,
             end=end,
             thumbnails_to_send=thumbnails_to_send,
+            extract_text_features=extract_text_features,
+            extract_image_features=extract_image_features,
+            extract_audio_features=extract_audio_features,
         )
 
     def similarity_search(
         q: List[Dict[str, Union[ndarray, bytes, str]]],
+        search_in: MediaType,
+        search_index: SearchIndex,
         start: int,
         end: int,
         thumbnails_to_send: int = 0,
+        extract_text_features: Callable[[List[str]], ndarray] = None,
+        extract_image_features: Callable[[List[Image.Image]], ndarray] = None,
+        extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
     ):
-        features = get_query_features(q)
+        features = _get_query_features(_prefix, q, extract_text_features, extract_image_features, extract_audio_features)
         dist, ids = search_index.index.search(features, end)
 
         top_ids, top_dist = ids[0, start:end], dist[0, start:end]
@@ -1198,10 +1314,11 @@ def _get_search_router(config: APIConfig):
             get_thumbs = thumbs_reader(thumbs_conn, valid_dist, thumbnails_to_send)
 
             response = construct_video_search_response(
-                valid_dist,
-                valid_ids,
-                _get_metadata,
-                get_thumbs,
+                search_in=search_in,
+                top_dist=valid_dist,
+                top_ids=valid_ids,
+                get_metadata_fn=_get_metadata,
+                get_thumbs_fn=get_thumbs,
             )
 
         return response
