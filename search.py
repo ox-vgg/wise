@@ -148,6 +148,10 @@ def process_query(search_index_list, query_specs, args):
         with db_engine.connect() as conn:
             for rank in range(0, len(ids)):
                 vector_id = int(ids[rank])
+                # if faiss cannot return topk number of results, it marks
+                # the end of result by setting ids to -1
+                if vector_id == -1:
+                    break
                 vector_metadata = VectorRepo.get(conn, vector_id)
                 media_metadata = MediaRepo.get(conn, vector_metadata.media_id)
                 filename = media_metadata.path
