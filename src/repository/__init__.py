@@ -129,8 +129,8 @@ def get_featured_images(conn: sa.Connection) -> List[int]:
     stmt = (
         sa.select(_vtable.c.id)
         .select_from(_vtable.join(_mtable))
-        .where(_vtable.c.timestamp >= 12)
-        .where(_vtable.c.timestamp < 12.5)
+        .where(_vtable.c.timestamp >= 4)
+        .where(_vtable.c.timestamp < 4.5)
     )
     return conn.execute(stmt).scalars().all()
 
