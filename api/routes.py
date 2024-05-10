@@ -740,7 +740,7 @@ def _get_search_router(config: APIConfig):
                             )
             elif query_dict['modality'] == 'text':
                 prefixed_queries = f"{query_prefix} {query.strip()}".strip()
-                feature_vector = extract_features_from_text(prefixed_queries)
+                feature_vector = extract_features_from_text([prefixed_queries])
                 weights.append(
                     config.text_queries_weight
                     * (  # assign higher weight to natural language queries
@@ -761,7 +761,12 @@ def _get_search_router(config: APIConfig):
 
         return average_features
 
-    _prefix = config.query_prefix.strip()
+    _prefix = {
+        MediaType.IMAGE: config.query_prefix.strip(),
+        MediaType.VIDEO: config.query_prefix.strip(),
+        MediaType.AV: "This is the sound of", # TODO add this to config
+        MediaType.AUDIO: "This is the sound of",
+    }
     project_assets = project.discover_assets()
     project_engine = db.init_project(project.dburi)
     thumbs_engine = db.init_thumbs(project.thumbs_uri)
@@ -1285,7 +1290,7 @@ def _get_search_router(config: APIConfig):
         extract_image_features: Callable[[List[Image.Image]], ndarray] = None,
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
     ):
-        features = _get_query_features(_prefix, q, extract_text_features, extract_image_features, extract_audio_features)
+        features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
         dist, ids = search_index.index.search(features, end)
 
         top_ids, top_dist = ids[0, start:end], dist[0, start:end]
