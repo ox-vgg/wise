@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Dropdown, Pagination, Segmented, Select, Tooltip } from 'antd';
+import { Dropdown, Pagination, Segmented, Tooltip } from 'antd';
 import { AppstoreOutlined, BarsOutlined, FlagFilled, LoadingOutlined, MinusCircleFilled, PictureOutlined, PlusCircleFilled } from '@ant-design/icons';
 import { nanoid } from 'nanoid';
 
@@ -13,12 +13,12 @@ import VideoOccurrencesView from './misc/VideoOccurrencesView.tsx';
 
 const FRONTEND_PAGE_SIZE = 50;
 
-const SearchResults: React.FunctionComponent<SearchResultsProps> = (
-  {dataService, isHomePage, projectInfo, setSearchText, multimodalQueries, setMultimodalQueries, submitSearch}: SearchResultsProps
-) => {
+const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
+  dataService, isHomePage, projectInfo, setSearchText,
+  multimodalQueries, setMultimodalQueries, viewModality, submitSearch
+}: SearchResultsProps) => {
   const { searchResults, isSearching, searchLatency /*, totalResults */ } = dataService;
   const [viewMode, setViewMode] = useState<string | number>('Segments');
-  const [viewModality, setViewModality] = useState<string>('Video');
   const [pageNum, changePageNum] = useState(0);
   useEffect(() => {
     // When searchResults changes (i.e. a new search is performed), reset page number
@@ -203,7 +203,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
     loadingMessage = <p className="wise-loading-message">Search completed in {(searchLatency / 1000).toFixed(1)} seconds of {numMediaFilesString} videos</p>;
   }
 
-  const isLoadingFeaturedImages = (isHomePage && searchResults.Video.unmerged_windows.length === 0);
+  const isLoadingFeaturedImages = (isHomePage && searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0);
   
   let pagination = (<Pagination
     total={totalResultsCount}
@@ -219,17 +219,6 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
   return <>
     {loadingMessage}
     
-    <Select
-      value={viewModality}
-      onChange={setViewModality}
-      style={{marginTop: '20px'}}
-      options={[
-        { label: 'Video (visual stream)', value: 'Video' },
-        { label: 'Audio stream of video', value: 'VideoAudio', disabled: true },
-        { label: 'Pure audio files', value: 'Audio', disabled: true },
-      ]}
-    />
-
     <Segmented
       options={[
         { label: 'Frames', value: 'UnmergedSegments', icon: <PictureOutlined /> },
@@ -241,13 +230,13 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = (
     />
 
     <section id="search-results">
-      {(searchResults.Video.unmerged_windows.length === 0) ? 
+      {(searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0) ? 
         <div className="wise-large-loading-screen"><LoadingOutlined /></div> : <></>
       }
       <div id="wise-image-grid" className="wise-image-grid">
         {searchResultsHTML}
       </div>
-      {(searchResults.Video.unmerged_windows.length === 0) ? <></> : pagination}
+      {(searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0) ? <></> : pagination}
     </section>
     <ReportImageModal dataService={dataService} isHomePage={isHomePage}
                       selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId} />

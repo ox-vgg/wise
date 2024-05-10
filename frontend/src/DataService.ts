@@ -76,20 +76,13 @@ const processShots = (shots: VideoSegment[], processedVideos: Map<string, Proces
 
 const processSearchResults = (results: SearchResponse): ProcessedSearchResults => {
   console.log('Search response', results);
-  if (!results.video_results) throw new Error("Cannot process search results");
+  if (!(results.video_results || results.video_audio_results)) throw new Error("Cannot process search results");
   
-  let processedVideos = processVideos(results.video_results.videos, results.video_results.merged_windows);
-  let processedUnmergedSegments = processUnmergedSegments(results.video_results.unmerged_windows, processedVideos);
-  let processedShots = processShots(results.video_results.merged_windows, processedVideos)
-  for (let [mediaId, processedVideo] of processedVideos) {
-    processedVideo.shots = processedShots.filter(shot => shot.media_id === mediaId)
-  }
-  
-  return {
+  let processedSearchResults = {
     Video: {
-      unmerged_windows: processedUnmergedSegments,
-      merged_windows: processedShots,
-      videos: processedVideos,
+      unmerged_windows: [],
+      merged_windows: [],
+      videos: new Map(),
     },
     VideoAudio: {
       unmerged_windows: [],
@@ -102,6 +95,24 @@ const processSearchResults = (results: SearchResponse): ProcessedSearchResults =
       videos: new Map(),
     }
   } as ProcessedSearchResults;
+  if (results.video_results) {
+    processedSearchResults.Video.videos = processVideos(results.video_results.videos, results.video_results.merged_windows);
+    processedSearchResults.Video.unmerged_windows = processUnmergedSegments(results.video_results.unmerged_windows, processedSearchResults.Video.videos);
+    processedSearchResults.Video.merged_windows = processShots(results.video_results.merged_windows, processedSearchResults.Video.videos);
+    for (let [mediaId, processedVideo] of processedSearchResults.Video.videos) {
+      processedVideo.shots = processedSearchResults.Video.merged_windows.filter(shot => shot.media_id === mediaId)
+    }
+  }
+  if (results.video_audio_results) {
+    processedSearchResults.VideoAudio.videos = processVideos(results.video_audio_results.videos, results.video_audio_results.merged_windows);
+    processedSearchResults.VideoAudio.unmerged_windows = processUnmergedSegments(results.video_audio_results.unmerged_windows, processedSearchResults.VideoAudio.videos);
+    processedSearchResults.VideoAudio.merged_windows = processShots(results.video_audio_results.merged_windows, processedSearchResults.VideoAudio.videos);
+    for (let [mediaId, processedVideo] of processedSearchResults.VideoAudio.videos) {
+      processedVideo.shots = processedSearchResults.VideoAudio.merged_windows.filter(shot => shot.media_id === mediaId)
+    }
+  }
+  
+  return processedSearchResults;
 };
 
 const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<ProcessedSearchResults> => {
@@ -137,16 +148,16 @@ const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<Proces
 const convertQueriesToFormData = (queries: Query[]) => {
   let formData = new FormData();
   for (const q of queries) {
-    if (q.type === 'FILE') {
-      let query_type = 'file_queries';
+    if (q.type === 'IMAGE_FILE') {
+      let query_type = 'image_file_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
       formData.append(query_type, (q.value as unknown) as File);
     } else if (q.type === 'AUDIO_FILE') {
       let query_type = 'audio_file_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
       formData.append(query_type, (q.value as unknown) as File);
-    } else if (q.type === 'URL') {
-      let query_type = 'url_queries';
+    } else if (q.type === 'IMAGE_URL') {
+      let query_type = 'image_url_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
       formData.append(query_type, q.value);
     } else if (q.type === 'AUDIO_URL') {
@@ -168,7 +179,7 @@ const convertQueriesToFormData = (queries: Query[]) => {
   return formData;
 }
 
-const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number): Promise<ProcessedSearchResults> => {
+const fetchSearchResults = (queries: Query[], viewModality: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResults> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
@@ -181,10 +192,15 @@ const fetchSearchResults = (queries: Query[], pageStart: number, pageEnd: number
     formData = convertQueriesToFormData(otherQueries);
   }
 
+  let searchIn = 'undefined';
+  if (viewModality == 'Video') searchIn = 'video';
+  if (viewModality == 'VideoAudio') searchIn = 'av';
+
   const urlParams = new URLSearchParams([
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
+    ['search_in', searchIn],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value as string])
   ]);
@@ -296,7 +312,7 @@ export const useDataService = (): DataServiceOutput => {
   // }
 
   // Get results for a new search query
-  const performNewSearch = async (queries: Query[]) => {
+  const performNewSearch = async (queries: Query[], viewModality: string) => {
     setSearchingState((_searchingState) => ({
       ..._searchingState,
       isSearching: true
@@ -304,7 +320,7 @@ export const useDataService = (): DataServiceOutput => {
     const time0 = performance.now();
     let searchResponseJSON: ProcessedSearchResults;
     try {
-      searchResponseJSON = await fetchSearchResults(queries, 0, config.NUM_PAGES_PER_REQUEST);
+      searchResponseJSON = await fetchSearchResults(queries, viewModality, 0, config.NUM_PAGES_PER_REQUEST);
     } catch (e) {
       setSearchingState((_searchingState) => ({
         ..._searchingState,

@@ -54,6 +54,8 @@
     line-height: 1;
 
     #wise-logo {
+      margin-right: 25px;
+
       & > svg {
         height: 40px;
         pointer-events: none;
@@ -81,7 +83,7 @@
     }
 
     & > form {
-      margin-left: 50px;
+      margin-left: 5px;
 
       & > .ant-input-affix-wrapper {
         // width: var(--wise-search-input-width);

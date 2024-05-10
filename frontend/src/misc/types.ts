@@ -3,13 +3,13 @@ import { UploadFile } from "antd";
 
 export type Query = {
   id: string;
-  type: 'TEXT' | 'URL' | 'AUDIO_URL';
+  type: 'TEXT' | 'IMAGE_URL' | 'AUDIO_URL';
   displayText?: string;
   value: string;
   isNegative?: boolean;
 } | {
   id: string;
-  type: 'FILE' | 'AUDIO_FILE';
+  type: 'IMAGE_FILE' | 'AUDIO_FILE';
   displayText: string;
   value: UploadFile;
   isNegative?: boolean;
@@ -134,7 +134,7 @@ export interface DataServiceOutput {
   totalResults: number;
   // pageNum: number;
   // changePageNum: (x: number) => void;
-  performNewSearch: (queries: Query[]) => Promise<void>;
+  performNewSearch: (queries: Query[], viewModality: string) => Promise<void>;
   fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
 }
@@ -174,6 +174,7 @@ export interface SearchDropdownProps {
   searchText: string;
   setSearchText: (x: string) => void;
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
+  viewModality: string;
   submitSearch: () => void;
   clearSearchBar: () => void;
   isHomePage?: boolean;
@@ -183,6 +184,8 @@ export interface WiseHeaderProps {
   setMultimodalQueries: (x: Query[]) => void;
   searchText: string;
   setSearchText: (x: string) => void;
+  viewModality: string;
+  setViewModality: (x: string) => void;
   submitSearch: () => void;
   refsForTour: RefsForTour;
   isHomePage?: boolean;
@@ -200,6 +203,7 @@ export interface SearchResultsProps {
   setSearchText: (x: string) => void;
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
+  viewModality: string;
   submitSearch: () => void;
 };
 

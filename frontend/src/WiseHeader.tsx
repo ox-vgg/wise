@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
-import { Alert, Button, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
-import { AudioFilled, CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, /*PlaySquareOutlined,*/ PlusOutlined, SearchOutlined, SoundOutlined, UploadOutlined } from '@ant-design/icons';
+import { Alert, Button, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
+import { CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
@@ -91,15 +91,15 @@ const MediaSearchForm: React.FunctionComponent<MediaSearchFormProps> = ({
   const [urlText, setUrlText] = useState('');
   const [visualSearchErrorMessage, setVisualSearchErrorMessage] = useState('');
 
-  const getFileList = (queryList: Query[]) => queryList.filter(query => query.type === 'FILE' || query.type === 'AUDIO_FILE').map(query => query.value as UploadFile);
+  const getFileList = (queryList: Query[]) => queryList.filter(query => query.type === 'IMAGE_FILE' || query.type === 'AUDIO_FILE').map(query => query.value as UploadFile);
   const beforeUpload = (file: any) => {
     let fileList = getFileList(multimodalQueries);
     console.log('beforeUpload', file, fileList);
     if (fileList.length > 4) {
-      setVisualSearchErrorMessage('Error: you can only upload a maximum of 5 images');
+      setVisualSearchErrorMessage('Error: you can only upload a maximum of 5 files');
       throw new Error('Too many files selected');
     }
-    setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: (modality == 'audio') ? 'AUDIO_FILE' : 'FILE', displayText: file.name, value: file }]);
+    setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: (modality == 'audio') ? 'AUDIO_FILE' : 'IMAGE_FILE', displayText: file.name, value: file }]);
     setVisualSearchErrorMessage('');
     return true;
   }
@@ -131,7 +131,7 @@ const MediaSearchForm: React.FunctionComponent<MediaSearchFormProps> = ({
       return;
     }
 
-    setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: (modality == 'audio') ? 'AUDIO_URL' : 'URL', displayText: urlTextTrimmed, value: urlTextTrimmed }]);
+    setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: (modality == 'audio') ? 'AUDIO_URL' : 'IMAGE_URL', displayText: urlTextTrimmed, value: urlTextTrimmed }]);
     setUrlText('');
     setVisualSearchErrorMessage('');
     formRef.current?.setFieldsValue({'image-url': ''});
@@ -167,14 +167,14 @@ const MediaSearchForm: React.FunctionComponent<MediaSearchFormProps> = ({
         </Form.Item>
       </Space.Compact>
       {
-        modality === 'audio' &&
-        <>
-          <Divider>OR</Divider>
-          <Space>
-            <Button type="primary" shape="circle" icon={<AudioFilled />} size="large" />
-            <span>Record audio</span>
-          </Space>
-        </>
+        // modality === 'audio' &&
+        // <>
+        //   <Divider>OR</Divider>
+        //   <Space>
+        //     <Button type="primary" shape="circle" icon={<AudioFilled />} size="large" />
+        //     <span>Record audio</span>
+        //   </Space>
+        // </>
       }
       {
         visualSearchErrorMessage && <Alert message={visualSearchErrorMessage} type="error" showIcon />
@@ -196,7 +196,7 @@ const SearchExamples: React.FunctionComponent<SearchExamplesProps> = ({
     let urlTextTrimmed = example.url.trim();
     let searchTextTrimmed = example.text.trim();
     setMultimodalQueries([
-      { id: nanoid(), type: 'URL', displayText: urlTextTrimmed, value: urlTextTrimmed },
+      { id: nanoid(), type: 'IMAGE_URL', displayText: urlTextTrimmed, value: urlTextTrimmed },
       { id: nanoid(), type: 'TEXT', displayText: searchTextTrimmed, value: searchTextTrimmed }
     ]);
     setSearchText('');
@@ -260,6 +260,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   multimodalQueries, setMultimodalQueries,
   searchText, setSearchText,
   handleTextInputChange,
+  viewModality,
   submitSearch, clearSearchBar,
   isHomePage
 }, ref) => {
@@ -311,6 +312,13 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
     }
   }, [multimodalQueries, searchText]);
 
+  let _modalities = modalities;
+  if (viewModality == 'Video') {
+    _modalities = _modalities.filter(modality => modality.id != 'audio');
+  } else if (viewModality == 'VideoAudio') {
+    _modalities = _modalities.filter(modality => modality.id != 'image');
+  }
+
   return (
     <div style={dropdownStyle}>
       <p style={{marginTop: 0, color: token.colorTextDescription}}>
@@ -324,7 +332,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
       </p>
       <Space style={{marginBottom: 15}}>
         {
-          modalities.map(modality => (
+          _modalities.map(modality => (
             <Button type="text" size="large" id={`wise-header-${modality.id}-modality-button`}
               key={modality.id}
               className={(isModalitySelected && selectedModality === modality.id) ? 'selected' : isModalitySelected ? 'inactive' : undefined}
@@ -388,15 +396,17 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
 
 const QUERY_COLORS = {
   'TEXT': 'geekblue',
-  'FILE': 'green',
-  'URL': 'green',
+  'IMAGE_FILE': 'green',
+  'IMAGE_URL': 'green',
   'INTERNAL_IMAGE': 'green',
   'AUDIO_FILE': 'orange',
   'AUDIO_URL': 'orange'
 }
 
 const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
-  multimodalQueries, setMultimodalQueries, searchText, setSearchText, submitSearch, refsForTour, isHomePage = false, isSearching = false
+  multimodalQueries, setMultimodalQueries, searchText, setSearchText,
+  viewModality, setViewModality,
+  submitSearch, refsForTour, isHomePage = false, isSearching = false
 }: WiseHeaderProps) => {
   // This state is set to true when the dropdown is triggered (by hovering over the search bar), and false when the mouse moves outside the search bar
   const [isSearchDropdownTriggered, setIsSearchDropdownTriggered] = useState(false);
@@ -430,6 +440,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   const handleDragEnter = (e: DragEvent) => {
     if (e.dataTransfer?.types.includes('Files')) {
       refsForTour.searchBar.current.focus();
+      // TODO automatically select modality based on file/mime type?
       searchDropdownRef.current?.selectModality('image')
     }
   }
@@ -441,17 +452,22 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     }
   }, [handleDragEnter]);
 
+  useEffect(() => {
+    // Trigger a search if viewModality was changed
+    submitSearch();
+  }, [viewModality]);
+
   const multimodalQueryTags = multimodalQueries.map((query, index) => {
     let icon = <></>;
-    if (query.type === 'FILE') icon = <img src={URL.createObjectURL((query.value as unknown) as File)} />;
-    else if (query.type === 'URL') icon = <img src={query.value} />;
+    if (query.type === 'IMAGE_FILE') icon = <img src={URL.createObjectURL((query.value as unknown) as File)} />;
+    else if (query.type === 'IMAGE_URL') icon = <img src={query.value} />;
     else if (query.type === 'AUDIO_FILE') icon = <SoundOutlined />;
     else if (query.type === 'AUDIO_URL') icon = <SoundOutlined />;
     else if (query.type === 'INTERNAL_IMAGE') icon = <img src={config.API_BASE_URL + 'thumbs/' + query.value} />;
 
     const tag = <Tag closable
                   key={query.id}
-                  className={(query.type === 'FILE' || query.type === 'URL' || query.type === 'INTERNAL_IMAGE') ? 'wise-search-tag-image' : undefined}
+                  className={(query.type === 'IMAGE_FILE' || query.type === 'IMAGE_URL' || query.type === 'INTERNAL_IMAGE') ? 'wise-search-tag-image' : undefined}
                   color={QUERY_COLORS[query.type]}
                   icon={icon}
                   onClose={(e) => handleTagClose(e, index)}
@@ -459,9 +475,9 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                   {(query.isNegative ? '(Negative) ' : '') + query.displayText}
                 </Tag>
     
-    if (query.type === 'FILE') {
+    if (query.type === 'IMAGE_FILE') {
       return <Popover content={icon} key={query.id} title="Uploaded image" overlayClassName="wise-search-image-preview">{tag}</Popover>
-    } else if (query.type === 'URL') {
+    } else if (query.type === 'IMAGE_URL') {
       return <Popover content={icon} key={query.id} title="Online image" overlayClassName="wise-search-image-preview">{tag}</Popover>
     } else if (query.type === 'AUDIO_FILE') {
       const popoverPreview = <audio controls src={URL.createObjectURL((query.value as unknown) as File)} />
@@ -482,12 +498,25 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
         <a href="./" id="wise-logo">
           <WiseLogo />
         </a>
+        <Tooltip title="Choose the media track / media type to search on">
+          <Select
+            size="large"
+            variant="borderless"
+            value={viewModality}
+            onChange={setViewModality}
+            options={[
+              { label: <Space><VideoCameraTwoTone />Visual</Space>, value: 'Video' },
+              { label: <Space><SoundTwoTone />Audio</Space>, value: 'VideoAudio' },
+            ]}
+          />
+        </Tooltip>
         <Dropdown
           overlayClassName="wise-search-dropdown"
           dropdownRender={_ => 
             <SearchDropdown multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                             searchText={searchText} setSearchText={setSearchText}
                             handleTextInputChange={handleTextInputChange}
+                            viewModality={viewModality}
                             submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
                             isHomePage={isHomePage}
                             ref={searchDropdownRef} />
