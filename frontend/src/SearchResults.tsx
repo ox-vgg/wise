@@ -105,23 +105,25 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
               style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
               className={'wise-image-wrapper ' + ((dropdownImageId === searchResult.vector_id) ? 'wise-image-dropdown-open' : '')}
           >
-            <Tooltip title="Find visually similar images">
-              <img src="internal_search_icon.png" className="wise-internal-image-search-button"
-                    onClick={() => handleInternalSearchButtonClick(searchResult.vector_id)} />
-            </Tooltip>
-            <Tooltip title="More options">
-              <Dropdown menu={{
-                items: dropdownItems,
-                onClick: handleDropdownItemClick
-              }}
-                onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.vector_id) }}
-                placement="bottomRight" trigger={['click']} arrow>
-                <img src="more_icon.png"
-                      className="wise-image-more-button"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
-                      />
-              </Dropdown>
-            </Tooltip>
+            <div style={{display: 'none'}}>
+              <Tooltip title="Find visually similar images">
+                <img src="internal_search_icon.png" className="wise-internal-image-search-button"
+                      onClick={() => handleInternalSearchButtonClick(searchResult.vector_id)} />
+              </Tooltip>
+              <Tooltip title="More options">
+                <Dropdown menu={{
+                  items: dropdownItems,
+                  onClick: handleDropdownItemClick
+                }}
+                  onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.vector_id) }}
+                  placement="bottomRight" trigger={['click']} arrow>
+                  <img src="more_icon.png"
+                        className="wise-image-more-button"
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
+                        />
+                </Dropdown>
+              </Tooltip>
+            </div>
             <i style={{paddingBottom: `${height/width*100}%`}}></i>
             <a onClick={() => setImageDetails(searchResult)}>
               {/* <img src={searchResult.thumbnail}
