@@ -28,8 +28,24 @@ python3 create-index.py \
   --project-dir wise-projects/Kinectics-6/
 ```
 
-We can now search the video collection as follows.
+We can now search the video collection either using the web-based interface, or using the CLI as described below:
 
+## Search using web-based interface
+
+Start the web server using the command below:
+```
+python3 serve.py --project-dir wise-projects/Kinectics-6/
+```
+Once the server has been started, go to http://localhost:9670/Kinetics-6/ in your browser. This will open up a search interface like this:
+
+![Screenshot of WISE search UI](./assets/search_ui_screenshot.png)
+
+- You can change some configurations, such as the port number and index type, in [config.py](../config.py)
+- You can optionally provide a query blacklist/blocklist (i.e. a list of queries that users should be blocked from searching) using --query-blacklist /path/to/blacklist.txt
+- For more details on the options available, run `python3 serve.py --help`
+
+
+## Search using CLI
 ```
 python search.py \
   --query "cooking" --in video \
