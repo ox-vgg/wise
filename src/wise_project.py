@@ -1,20 +1,23 @@
 from pathlib import Path
 
 DB_SCHEME = "sqlite+pysqlite://"
+
 class WiseProject:
     def __init__(self, project_dir: Path, create_project=False):
         self.project_dir = Path(project_dir)
-        self.store_dir = self.project_dir / 'store'
-        self.media_dir = self.project_dir / 'media'
-        self.media_type_list = ['image', 'video', 'audio']
+        self.store_dir = self.project_dir / "store"
+        self.media_dir = self.project_dir / "media"
+        self.metadata_dir = self.project_dir / "metadata"
+        self.media_type_list = ["image", "video", "audio"]
 
         if not self.project_dir.exists():
             if create_project:
                 # create the root folders
                 self.store_dir.mkdir(parents=True, exist_ok=True)
                 self.media_dir.mkdir(parents=True, exist_ok=True)
+                self.metadata_dir.mkdir(parents=True, exist_ok=True)
             else:
-                raise ValueError(f'project folder {self.project_dir} does not exist')
+                raise ValueError(f"project folder {self.project_dir} does not exist")
 
     @property
     def thumbs_uri(self):
@@ -22,7 +25,7 @@ class WiseProject:
 
     @property
     def dburi(self):
-        return f"{DB_SCHEME}/{self.project_dir.absolute()}/{self.project_dir.stem}.db"
+        return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
     def store_dir(self):
         return self.store_dir
