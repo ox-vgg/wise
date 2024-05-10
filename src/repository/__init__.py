@@ -79,7 +79,7 @@ def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorA
 
 def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp: float, get_id_only: bool = False) -> Optional[Union[bytes, int]]:
     """
-    Get the thumbnail from a video given a `media_id` and a `timestamp` (finds the first thumbnail between `timestamp` and `timestamp + 4`).
+    Get the thumbnail from a video given a `media_id` and a `timestamp` (finds the first thumbnail between `timestamp - 0.25` and `timestamp + 2`).
 
     Parameters
     ----------
@@ -100,11 +100,9 @@ def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp:
         If `get_id_only` was set to True, then the integer id of the thumbnail is returned instead.
         If no thumbnail was found, the return value is None.
     """
-    # Thumbnails will be within 0.25 seconds on each side since we are
-    # extracting it every 0.5 seconds.
-    # TODO Convert it to a project configuration and pass it down
+    # TODO Convert timestamp search interval to a project configuration and pass it down
     start_timestamp_expr = _thumbs_table.c.timestamp >= timestamp - 0.25
-    end_timestamp_expr = _thumbs_table.c.timestamp <= timestamp + 0.25
+    end_timestamp_expr = _thumbs_table.c.timestamp <= timestamp + 2
     stmt = (
         sa.select(_thumbs_table.c.content if not get_id_only else _thumbs_table.c.id)
         .where(_thumbs_table.c.media_id == media_id)
