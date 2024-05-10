@@ -198,7 +198,7 @@ search using these queries as follows.
 $ python search.py \
   --in video \
   --result-format csv \
-  --export-csv results.csv \
+  --save-to-file results.csv \
   --topk 5 \
   --queries-from queries.csv \
   --project-dir wise-projects/Kinectics-6/
