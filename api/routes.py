@@ -241,18 +241,20 @@ def _get_project_data_router(config: APIConfig):
                     )
 
     @router.get(
-        "/thumbs/{_id}",
+        "/thumbnail",
         response_class=Response,
         responses={200: {"content": "image/jpeg"}, 404: {"content": "text/plain"}},
     )
-    def get_thumbnail(_id: int):
+    def get_thumbnail(media_id: int, timestamp: float):
         # Get a thumbnail given a thumbnail id
         with thumbs_engine.connect() as thumbs_conn:
-            thumbnail_metadata = ThumbnailRepo.get(thumbs_conn, _id)
-            if thumbnail_metadata is None:
+            thumbnail = get_thumbnail_by_timestamp(
+                thumbs_conn, media_id=media_id, timestamp=timestamp
+            )
+            if thumbnail is None:
                 raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
             return Response(
-                content=thumbnail_metadata.content,
+                content=thumbnail,
                 media_type="image/jpeg",
                 status_code=200,
             )
@@ -808,24 +810,28 @@ def _get_search_router(config: APIConfig):
     router_cm = ExitStack()
 
     def _thumbs_with_score(conn: sa.Connection, dist: List[float], thumbnails_to_send: int):
+        def _thumbnail_url(_m: VectorAndMediaMetadata):
+            return f"thumbnail?media_id={_m.media_id}&timestamp={_m.timestamp}"
+
+        def _thumbnail(_conn: sa.Connection, _m: VectorAndMediaMetadata):
+            thumbnail = get_thumbnail_by_timestamp(
+                _conn, media_id=_m.id, timestamp=_m.timestamp
+            )
+            return convert_uint8array_to_base64(thumbnail)
+
         def inner(vector_and_media_metadata_list: List[VectorAndMediaMetadata]):
             thumbs = [
-                get_thumbnail_by_timestamp(
-                    conn,
-                    media_id=vector_and_media_metadata.media_id,
-                    timestamp=vector_and_media_metadata.timestamp,
-                    get_id_only=i >= thumbnails_to_send
-                )
-                for i, vector_and_media_metadata
-                in enumerate(vector_and_media_metadata_list)
-            ]
-            thumbs = [
                 (
-                    f"thumbs/{_thumb}" if isinstance(_thumb, int)
-                    else convert_uint8array_to_base64(_thumb)
-                ) for _thumb in thumbs
+                    _thumbnail(conn, vector_and_media_metadata)
+                    if i < thumbnails_to_send
+                    else _thumbnail_url(vector_and_media_metadata)
+                )
+                for i, vector_and_media_metadata in enumerate(
+                    vector_and_media_metadata_list
+                )
             ]
             return zip(thumbs, dist)
+
         return inner
 
     if config.thumbnail_project_dir:

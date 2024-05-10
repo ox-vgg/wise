@@ -74,7 +74,7 @@ const processShots = (shots: VideoSegment[], processedVideos: Map<string, Proces
   });
 }
 
-const processSearchResults = (results: SearchResponse): ProcessedSearchResults => {
+const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean = false): ProcessedSearchResults => {
   console.log('Search response', results);
   if (!(results.video_results || results.video_audio_results)) throw new Error("Cannot process search results");
   
@@ -101,6 +101,11 @@ const processSearchResults = (results: SearchResponse): ProcessedSearchResults =
     processedSearchResults.Video.merged_windows = processShots(results.video_results.merged_windows, processedSearchResults.Video.videos);
     for (let [mediaId, processedVideo] of processedSearchResults.Video.videos) {
       processedVideo.shots = processedSearchResults.Video.merged_windows.filter(shot => shot.media_id === mediaId)
+    }
+
+    // This ensures that when the user changes the 'viewModality' selection on the home page from 'Visual' to 'Audio', they still see the same set of featured videos
+    if (isFeaturedImages) {
+      processedSearchResults.VideoAudio = processedSearchResults.Video;
     }
   }
   if (results.video_audio_results) {
@@ -133,7 +138,7 @@ const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<Proces
       throw new Error(`Failed to fetch featured images. ${response.status} - ${response.statusText}`);
     }
     return response.json() as Promise<SearchResponse>;
-  }).then(processSearchResults);
+  }).then((results) => processSearchResults(results, true));
   // .then((results: SearchResponseJSONObject[]) => {
   //   // Populate title field with filename if it doesn't exist
   //   results.forEach(result => {
