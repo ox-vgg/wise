@@ -10,6 +10,7 @@ import itertools
 import readline
 import csv
 import io
+
 from rich import print as rprint
 from rich.console import Console
 from rich.table import Table
@@ -94,6 +95,9 @@ def parse_user_input(cmd):
             parse_token_value = False
         else:
             tok_index += 1
+    if not parse_token_name and parse_token_value:
+        repl_args[last_token_name] = ''
+
     if 'in' in repl_args:
         # we avoid using 'in' as it is a reserved word in python
         repl_args['media_type'] = repl_args['in']
@@ -151,7 +155,7 @@ def process_query(search_index_list, query_specs, args):
                 pts_hhmmss = to_hhmmss(pts)
                 match_filename_list.append(filename)
                 match_pts_list.append(pts)
-                match_score_list.append(dist[rank])
+                match_score_list.append(float(dist[rank]))
         end_time = time.time()
         search_result.append({
             'match_filename_list': match_filename_list,
@@ -187,7 +191,11 @@ def process_query(search_index_list, query_specs, args):
 def merge0(query_specs, result, args):
     for query_index in range(0, len(query_specs['query'])):
         media_type = query_specs['media_type'][query_index]
-        merge_tolerance = getattr(args, 'merge_tolerance_' + media_type)
+        merge_tolerance_id = 'merge_tolerance_' + media_type
+        merge_tolerance = getattr(args, merge_tolerance_id)
+        if merge_tolerance_id in query_specs:
+            merge_tolerance = float(query_specs[merge_tolerance_id])
+
         filename_list = result[query_index]['match_filename_list']
         pts_list = result[query_index]['match_pts_list']
         score_list = result[query_index]['match_score_list']
@@ -261,7 +269,10 @@ def merge1(query_specs, result, args):
             merged_score_list.append(merged_score)
             pts0 = result[0]['match_pts_list'][index0]
             pts1 = result[1]['match_pts_list'][index1]
-            merged_pts = pts0 + pts1
+            if isinstance(pts0, list) and isinstance(pts1, list):
+                merged_pts = pts0 + pts1
+            else:
+                merged_pts = [pts0, pts1]
             merged_pts.sort()
             if len(merged_pts) == 1:
                 merged_pts_list.append([ merged_pts[0] ])
@@ -273,10 +284,10 @@ def merge1(query_specs, result, args):
         'match_score_list': merged_score_list,
         'search_time_sec': result[0]['search_time_sec'] + result[1]['search_time_sec']
     }]
-    merged_query_specs = {
-        'query':[ ' and '.join(query_specs['query']) ],
-        'media_type':[ ' and '.join(query_specs['media_type']) ]
-    }
+    merged_query_specs = query_specs # to retain user provided arguments like --save-to-file
+    merged_query_specs['query'] = [ ' and '.join(query_specs['query']) ]
+    merged_query_specs['query_id'] = [ '-'.join(query_specs['query_id']) ]
+    merged_query_specs['media_type'] = [ ' and '.join(query_specs['media_type']) ]
     return merged_query_specs, merged_result
 
 """ Merge search results from one of the modalities (e.g. audio, video, etc.).
@@ -325,18 +336,31 @@ def merge_one_result(filename_list, pts_list, score_list, tolerance):
 
         # for each unique filename, find all the pts
         filename_i = filename_list[i]
-        pts_i = [ pts_list[i] ] # will contain all other instances in lower ranks
+        pts_index_list = [i] # will contain all pts corresponding to filename_i
         for j in range(i+1, N):
             if j in skip_index_list:
                 continue
             if filename_i == filename_list[j]:
-                pts_i.append(pts_list[j])
-                skip_index_list.append(j)
-        pts_i.sort()
-        if len(pts_i) > 1:
-            merged_pts_list.append( [ pts_i[0], pts_i[ len(pts_i) - 1 ] ] )
+                pts_index_list.append(j)
+        merge_pts_index_list = set() # will contain all the pts index that can be merged
+        merge_pts_index_list.add(pts_index_list[0])
+        for pts_index_pair in itertools.combinations( range(0, len(pts_index_list)), 2):
+            pts_index1 = pts_index_list[ pts_index_pair[0] ]
+            pts_index2 = pts_index_list[ pts_index_pair[1] ]
+            del_pts = math.fabs(pts_list[pts_index1] - pts_list[pts_index2])
+            if del_pts <= tolerance:
+                merge_pts_index_list.add(pts_index1)
+                merge_pts_index_list.add(pts_index2)
+
+        to_merge_pts_list = []
+        for pts_index in merge_pts_index_list:
+            to_merge_pts_list.append( pts_list[pts_index] )
+            skip_index_list.append( pts_index )
+        to_merge_pts_list.sort()
+        if len(to_merge_pts_list) > 1:
+            merged_pts_list.append( [ to_merge_pts_list[0], to_merge_pts_list[ len(to_merge_pts_list) - 1 ] ] )
         else:
-            merged_pts_list.append( [ pts_i[0] ] )
+            merged_pts_list.append( [ to_merge_pts_list[0] ] )
         merged_filename_list.append(filename_i)
         merged_score_list.append(score_list[i])
     return merged_filename_list, merged_pts_list, merged_score_list
@@ -369,13 +393,24 @@ def show_result(query_specs, result, args):
     result_format = 'table'
     if hasattr(args, 'result_format') and args.result_format is not None:
         result_format = args.result_format
+    if 'result-format' in query_specs:
+        result_format = query_specs['result-format']
     if result_format == 'csv':
         show_result_as_csv(query_specs, result, args)
     else:
         show_result_as_table(query_specs, result, args)
 
 def show_result_as_table(query_specs, result, args):
-    console = Console()
+    out = sys.stdout
+    writing_to_file = False
+    if hasattr(args, 'save_to_file') and args.save_to_file is not None:
+        out = io.open(args.save_to_file, 'a')
+        writing_to_file = True
+    elif 'save-to-file' in query_specs:
+        out = io.open(query_specs['save-to-file'], 'a')
+        writing_to_file = True
+
+    console = Console(file=out, no_color=True)
     total_search_time = 0
     for query_index in range(0, len(query_specs['query'])):
         query_text = query_specs['query'][query_index]
@@ -406,8 +441,10 @@ def show_result_as_table(query_specs, result, args):
                           pts_str,
                           score_str)
         console.print(table)
+        console.print('')
         total_search_time += result[query_index]['search_time_sec']
-    print('(search completed in %.3f sec.)' % (total_search_time))
+    if len(result) == 1:
+        console.print('(search completed in %.3f sec.)' % (total_search_time))
 
 def show_result_as_csv(query_specs, result, args):
     # Note: The CSV header is written by caller because the csv header needs
@@ -415,9 +452,13 @@ def show_result_as_csv(query_specs, result, args):
     # show_result_as_csv() is executed
     out = sys.stdout
     writing_to_file = False
-    if hasattr(args, 'export_csv') and args.export_csv is not None:
-        out = io.open(args.export_csv, 'a')
+    if hasattr(args, 'save_to_file') and args.save_to_file is not None:
+        out = io.open(args.save_to_file, 'a')
         writing_to_file = True
+    elif 'save-to-file' in query_specs:
+        out = io.open(query_specs['save-to-file'], 'a')
+        writing_to_file = True
+
     for query_index in range(0, len(query_specs['query'])):
         query_text = query_specs['query'][query_index]
         media_type = query_specs['media_type'][query_index]
@@ -473,10 +514,14 @@ if __name__ == '__main__':
                         default=50,
                         help='only show this many characters from the end in a filename')
 
+    parser.add_argument('--no-merge',
+                        action='store_true',
+                        help='avoid merging of search results corresponding to adjacent audio-visual segments')
+
     parser.add_argument('--merge-tolerance-video',
                         required=False,
                         type=int,
-                        default=2,
+                        default=4,
                         help='tolerance (in seconds) for merging video based search results')
 
     parser.add_argument('--merge-tolerance-audio',
@@ -492,10 +537,10 @@ if __name__ == '__main__':
                         type=str,
                         help='show results in tabular format (default) or as comma separated values (csv)')
 
-    parser.add_argument('--export-csv',
+    parser.add_argument('--save-to-file',
                         required=False,
                         type=str,
-                        help='save results to this CSV file')
+                        help='save results to this file instead of showing it on console')
 
     parser.add_argument('--queries-from',
                         required=False,
@@ -519,11 +564,12 @@ if __name__ == '__main__':
     # Print the CSV header only once.
     # If this task is delegated to the show_result_as_csv() method,
     # the CSV header may get printed multiple times.
-    if args.result_format == 'csv':
-        if hasattr(args, 'export_csv') and args.export_csv is not None:
-            with open(args.export_csv, 'w') as f:
+    if hasattr(args, 'save_to_file') and args.save_to_file is not None:
+        with open(args.save_to_file, 'w') as f:
+            if args.result_format == 'csv':
                 f.write(EXPORT_CSV_HEADER + '\n')
-        else:
+    else:
+        if args.result_format == 'csv':
             print(f'{EXPORT_CSV_HEADER}')
 
     ## load search assets
@@ -567,7 +613,7 @@ if __name__ == '__main__':
             only_query = args.query[0]
             setattr(args, 'query', [only_query, only_query])
 
-        if args.result_format != 'csv':
+        if args.result_format != 'csv' and not args.save_to_file:
             print(f'Searching {args.project_dir} for')
             for i in range(0, len(args.query)):
                 print(f'  [{i}] "{args.query[i]}" in {args.media_type[i]}')
@@ -578,19 +624,14 @@ if __name__ == '__main__':
             'media_type': args.media_type
         }
         search_result = process_query(search_index_list, query_specs, args)
-        merge0_search_result = merge0(query_specs, search_result, args)
+        if args.no_merge:
+            merge0_search_result = search_result
+        else:
+            merge0_search_result = merge0(query_specs, search_result, args)
         show_result(query_specs, merge0_search_result, args)
-        if len(merge0_search_result) == 2:
+        if len(merge0_search_result) == 2 and args.queries_from is None:
             merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
             show_result(merge1_query_specs, merge1_search_result, args)
-
-        if args.export_csv:
-            export_result_as_csv(args.export_csv,
-                                 query_specs,
-                                 merge0_search_result,
-                                 args)
-            if args.result_format != 'csv':
-                print(f'saved results to {args.export_csv}')
 
     ## Case-2: Search queries contained in a CSV file
     elif hasattr(args, 'queries_from') and args.queries_from is not None:
@@ -599,7 +640,7 @@ if __name__ == '__main__':
             header = next(query_reader)
             for row in query_reader:
                 if len(row) != 2:
-                    print(f'Skipping query: "{query_specs}". Format each line as: query-id, query-text')
+                    print(f'Skipping query: "{row}". Format each line as: query-id, query-text')
                     continue
                 query_id = row[0]
                 query_text = row[1]
@@ -609,12 +650,14 @@ if __name__ == '__main__':
                     'media_type': args.media_type
                 }
                 search_result = process_query(search_index_list, query_specs, args)
-                merge0_search_result = merge0(query_specs, search_result, args)
+                if args.no_merge:
+                    merge0_search_result = search_result
+                else:
+                    merge0_search_result = merge0(query_specs, search_result, args)
                 show_result(query_specs, merge0_search_result, args)
                 if len(merge0_search_result) == 2 and args.queries_from is None:
                     merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
                     show_result(merge1_query_specs, merge1_search_result, args)
-
 
     ## Case-3: Search query not provided, start search console
     else:
@@ -623,7 +666,7 @@ if __name__ == '__main__':
         print('  1. find cooking videos with music playing in background')
         print('     > --query "cooking" --in video --query music --in audio')
         print('  2. find videos showing train, show only top 3 results and export results to a file')
-        print('     > --query train --in video --topk 3 --export-csv train.csv')
+        print('     > --query train --in video --topk 3 --result-format csv --save-to-file train.csv')
 
         cmd_id = 0
         # Start the WISE search console Read-Evaluate-Print loop (REPL)
@@ -633,19 +676,24 @@ if __name__ == '__main__':
                 query_specs = parse_user_input(cmd)
                 query_specs['query_id'] = [ str(x) for x in range(0, len(query_specs['query'])) ]
                 search_result = process_query(search_index_list, query_specs, args)
-                merge0_search_result = merge0(query_specs, search_result, args)
+                print(args.no_merge)
+                print(query_specs)
+                if 'save-to-file' in query_specs:
+                    with open(query_specs['save-to-file'], 'w') as f:
+                        if 'result-format' in query_specs and query_specs['result-format'] == 'csv':
+                            f.write(EXPORT_CSV_HEADER + '\n')
+                else:
+                    if 'result-format' in query_specs and query_specs['result-format'] == 'csv':
+                        print(f'{EXPORT_CSV_HEADER}')
+
+                if args.no_merge or ('no-merge' in query_specs):
+                    merge0_search_result = search_result
+                else:
+                    merge0_search_result = merge0(query_specs, search_result, args)
                 show_result(query_specs, merge0_search_result, args)
                 if len(merge0_search_result) == 2:
                     merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
-                    print('\n')
                     show_result(merge1_query_specs, merge1_search_result, args)
-                if 'export-csv' in query_specs:
-                    csv_filename = query_specs['export-csv']
-                    export_result_as_csv(csv_filename,
-                                         query_specs,
-                                         search_result,
-                                         args)
-                    print(f'saved results to {csv_filename}')
                 cmd_id += 1
             except EOFError:
                 print('\nBye')

@@ -110,7 +110,7 @@ Some examples queries (press Ctrl + D to exit):
   1. find cooking videos with music playing in background
      > --query "cooking" --in video --query music --in audio
   2. find videos showing train, show only top 3 results and export results to a file
-     > --query train --in video --topk 3 --export-csv train.csv
+     > --query train --in video --topk 3 --result-format csv --save-to-file train.csv
 
 [0] > --query "cooking" --in video --query music --in audio --topk 20
              Search results for ""cooking"" in video              
@@ -144,7 +144,7 @@ To save your results to a CSV text file, you can add the `--export-csv`
 flag in the search console as shown below.
 
 ```
-[1] > --query "cooking" --in video --query music --in audio --topk 20 --export-csv cooking-music.csv
+[1] > --query "cooking" --in video --query music --in audio --topk 20 --result-format csv --save-to-file cooking-music.csv
 ...
 ...
 saved results to cooking-music.csv
