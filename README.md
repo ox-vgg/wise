@@ -6,8 +6,8 @@ WISE open source software is being developed and maintained
 by the Visual Geometry Group ([VGG](https://www.robots.ox.ac.uk/~vgg/software/wise/)).
 Here are some documents for users and developers of WISE.
 
- - [Install](docs/Install.md) : describes the process for installating WISE
- - [User Guide](docs/UserGuide.md) : demonstrated the usage of WISE using a sample video dataset
+ - [Install](docs/Install.md) : describes the process for installing WISE
+ - [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
  - Developer Resources
    - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
    - [Tests](docs/Tests.md) : describes the software testing process for WISE
