@@ -40,11 +40,12 @@ EXPORT_CSV_HEADER = 'query_id,query_text,media_type,rank,filename,start_time,end
 
 def to_hhmmss(sec):
     hh = int(sec / (60*60))
-    remaining_sec = sec - hh*60*60
-    mm = int(remaining_sec / 60)
-    remaining_sec = int(remaining_sec - mm*60)
-    ms = int(sec - (hh*60*60 + mm*60 + remaining_sec))
-    return '%02d:%02d:%02d.%03d' % (hh, mm, remaining_sec, ms)
+    ds = sec - hh*60*60
+    mm = int(ds / 60)
+    ds = ds - mm*60
+    ss = int(ds)
+    ms = int((ds - ss) * 100)
+    return '%02d:%02d:%02d.%02d' % (hh, mm, ss, ms)
 
 def clamp_str(text, MAX_CHARS):
     if len(text) > MAX_CHARS:
@@ -52,6 +53,25 @@ def clamp_str(text, MAX_CHARS):
         return text_short
     else:
         return text
+
+def format_timestamp(pts, human_readable=False):
+    if isinstance(pts, list):
+        if len(pts) == 2:
+            if human_readable:
+                pts_str = '%s - %s' % (to_hhmmss(pts[0]), to_hhmmss(pts[1]))
+            else:
+                pts_str = '%.1f - %.1f' % (pts[0], pts[1])
+        else:
+            if human_readable:
+                pts_str = '%s' % (to_hhmmss(pts[0]))
+            else:
+                pts_str = '%.1f' % (pts[0])
+    else:
+        if human_readable:
+            pts_str = '%s' % (to_hhmmss(pts))
+        else:
+            pts_str = '%.1f' % (pts)
+    return pts_str
 
 """A parser for user input obtained from the WISE search console
 """
@@ -431,13 +451,7 @@ def show_result_as_table(query_specs, result, args):
 
         for rank in range(0, len(result[query_index]['match_filename_list'])):
             pts = result[query_index]['match_pts_list'][rank]
-            if isinstance(pts, list):
-                if len(pts) == 2:
-                    pts_str = '%.1f - %.1f' % (pts[0], pts[1])
-                else:
-                    pts_str = '%.1f' % (pts[0])
-            else:
-                pts_str = '%.1f' % (pts)
+            pts_str = format_timestamp(pts, args.human_readable)
             filename = result[query_index]['match_filename_list'][rank]
             score_str = '%.3f' % (result[query_index]['match_score_list'][rank])
             table.add_row(str(rank),
@@ -551,6 +565,10 @@ if __name__ == '__main__':
                         type=str,
                         help='a CSV filename, must have a column header, each row must be [query_id, query_text]')
 
+    parser.add_argument('--human-readable',
+                        action='store_true',
+                        help='show values in human readable format (e.g. show 00:01:36.50 instead of 96.5 sec)')
+
     parser.add_argument('--project-dir',
                         required=True,
                         type=str,
@@ -639,9 +657,11 @@ if __name__ == '__main__':
 
     ## Case-2: Search queries contained in a CSV file
     elif hasattr(args, 'queries_from') and args.queries_from is not None:
+        start_time = time.time()
         with open(args.queries_from, 'r') as f:
             query_reader = csv.reader(f, delimiter=',', quotechar='"')
             header = next(query_reader)
+            query_count = 0
             for row in query_reader:
                 if len(row) != 2:
                     print(f'Skipping query: "{row}". Format each line as: query-id, query-text')
@@ -662,6 +682,10 @@ if __name__ == '__main__':
                 if len(merge0_search_result) == 2 and args.queries_from is None:
                     merge1_query_specs, merge1_search_result = merge1(query_specs, merge0_search_result, args)
                     show_result(merge1_query_specs, merge1_search_result, args)
+                query_count += 1
+        end_time = time.time()
+        elapsed = end_time - start_time
+        print(f'Processed {query_count} queries in {elapsed:.2f} sec. or {elapsed/60:.2f} min.')
 
     ## Case-3: Search query not provided, start search console
     else:
