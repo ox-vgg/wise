@@ -1,6 +1,15 @@
 # WISE Installation
 
-First, we fetch the WISE source code.
+The hardware and software requirements for installing WISE are as follows.
+
+ * A modern computer with GPU
+ * Ubuntu, Debian, or other similar OS
+ * Python version 3.10 (or higher)
+ * ffmpeg 4.4.2 (or higher)
+
+**Note: In future, WISE will support installing without a GPU.**
+
+To install WISE, we first download the WISE source code.
 
 ```
 ## 1. Get the code
