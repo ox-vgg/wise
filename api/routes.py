@@ -1204,7 +1204,7 @@ def _get_search_router(config: APIConfig):
             
             target_sample_rate = 48_000 # TODO set this based on model?
             audio_file = x[0]
-            waveform, original_sample_rate = torch.load(audio_file)
+            waveform, original_sample_rate = torchaudio.load(audio_file)
             waveform = torchaudio.functional.resample(waveform, orig_freq=original_sample_rate, new_freq=target_sample_rate)
             return waveform
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = lambda x: search_index.feature_extractor.extract_audio_features(
