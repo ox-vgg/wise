@@ -123,6 +123,10 @@ if __name__ == "__main__":
         unique_media_dir_list = list(set(args.media_dir_list))
         setattr(args, 'media_dir_list', unique_media_dir_list)
 
+    # we need a non-existing folder to initialise a new WISE project
+    if Path(args.project_dir).exists():
+        raise ValueError(f'project_dir {args.project_dir} already exists')
+
     # TODO: allow adding new files to an existing project
     project = WiseProject(args.project_dir, create_project=True)
     db_engine = db.init_project(project.dburi, echo=False)
