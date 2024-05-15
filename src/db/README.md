@@ -1,6 +1,6 @@
 # Internal Metadata Database
 
-The internal metadata database is an SQLite database storing information about the source collections (i.e. input folders or webdatasets), media files (e.g. images, videos, or audio files), vectors, and extra metadata. The database file is located in `{project_name}.db` within the project folder.
+The internal metadata database is an SQLite database storing information about the source collections (i.e. input folders or webdatasets), media files (e.g. images, videos, or audio files), vectors, and extra metadata. The database file is located in `metadata/internal.db` within the project folder.
 
 WISE uses [SQLAlchemy](https://www.sqlalchemy.org/) (Core API) to interact with this database, and [Pydantic](https://docs.pydantic.dev/latest/) to parse / validate the data going into the DB.
 

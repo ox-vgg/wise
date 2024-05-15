@@ -6,24 +6,26 @@ a WISE project is stored in a folder structure as shown below.
 ```
 user@temp:/data/wise/Kinectics-7$ tree
 .
-├── Kinectics-7.db
-└── store
-    ├── microsoft
-    │   └── clap
-    │       └── 2023
-    │           └── four-datasets
-    │               ├── features
-    │               │   └── audio-000000.tar
-    │               └── index
-    │                   └── audio-IndexFlatIP.faiss
-    └── mlfoundations
-        └── open_clip
-            └── xlm-roberta-large-ViT-H-14
-                └── frozen_laion5b_s13b_b90k
-                    ├── features
-                    │   └── video-000000.tar
-                    └── index
-                        └── video-IndexFlatIP.faiss
+├── metadata
+│   └── internal.db
+├── store
+│   ├── microsoft
+│   │   └── clap
+│   │       └── 2023
+│   │           └── four-datasets
+│   │               ├── features
+│   │               │   └── audio-000000.tar
+│   │               └── index
+│   │                   └── audio-IndexFlatIP.faiss
+│   └── mlfoundations
+│       └── open_clip
+│           └── xlm-roberta-large-ViT-H-14
+│               └── frozen_laion5b_s13b_b90k
+│                   ├── features
+│                   │   └── video-000000.tar
+│                   └── index
+│                       └── video-IndexFlatIP.faiss
+└── thumbs.db
 ```
 
 The `store` folder contains all the extracted features and their corresponding
