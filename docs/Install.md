@@ -3,6 +3,7 @@
 The hardware and software requirements for installing WISE are as follows.
 
  * A modern computer with Ubuntu, Debian, or other similar OS
+    * There may be installation issues on macOS and Windows. We recommend using a Linux environment (or WSL) for now
  * Python version 3.10 (or higher)
  * ffmpeg 4.4.2 (or higher)
 
