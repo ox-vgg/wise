@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo } from './misc/types.ts';
+import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
 
@@ -74,7 +74,7 @@ const processShots = (shots: VideoSegment[], processedVideos: Map<string, Proces
   });
 }
 
-const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean = false): ProcessedSearchResults => {
+const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean = false): ProcessedSearchResponse => {
   console.log('Search response', results);
   if (!(results.video_results || results.video_audio_results)) throw new Error("Cannot process search results");
   
@@ -93,7 +93,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
       unmerged_windows: [],
       merged_windows: [],
       videos: new Map(),
-    }
+    },
   } as ProcessedSearchResults;
   if (results.video_results) {
     processedSearchResults.Video.videos = processVideos(results.video_results.videos, results.video_results.merged_windows);
@@ -117,10 +117,13 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
     }
   }
   
-  return processedSearchResults;
+  return {
+    processedSearchResults,
+    time: results.time,
+  } as ProcessedSearchResponse;
 };
 
-const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<ProcessedSearchResults> => {
+const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(MAX_FEATURED_IMAGES, pageEnd*config.PAGE_SIZE);
 
@@ -184,7 +187,7 @@ const convertQueriesToFormData = (queries: Query[]) => {
   return formData;
 }
 
-const fetchSearchResults = (queries: Query[], viewModality: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResults> => {
+const fetchSearchResults = (queries: Query[], viewModality: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
@@ -268,15 +271,15 @@ export const useDataService = (): DataServiceOutput => {
 
   // Get featured images to display on home page
   const fetchFeaturedImagesAndSetState = () => {
-    return fetchFeaturedImages(0, config.NUM_PAGES_PER_REQUEST).then((_searchResponse: ProcessedSearchResults) => {
+    return fetchFeaturedImages(0, config.NUM_PAGES_PER_REQUEST).then((_searchResponse: ProcessedSearchResponse) => {
       setSearchingState({
         queries: [],
         isFeaturedImages: true,
         isSearching: false,
-        searchLatency: NaN,
+        searchLatency: _searchResponse.time,
         totalResults: MAX_FEATURED_IMAGES
       });
-      setSearchResponse(_searchResponse);
+      setSearchResponse(_searchResponse.processedSearchResults);
       // setPageNum(0);
 
       // // Page slicing
@@ -322,8 +325,7 @@ export const useDataService = (): DataServiceOutput => {
       ..._searchingState,
       isSearching: true
     }));
-    const time0 = performance.now();
-    let searchResponseJSON: ProcessedSearchResults;
+    let searchResponseJSON: ProcessedSearchResponse;
     try {
       searchResponseJSON = await fetchSearchResults(queries, viewModality, 0, config.NUM_PAGES_PER_REQUEST);
     } catch (e) {
@@ -333,15 +335,14 @@ export const useDataService = (): DataServiceOutput => {
       }));
       throw e;
     }
-    const time1 = performance.now();
     setSearchingState({
       queries: queries,
       isFeaturedImages: false,
       isSearching: false,
-      searchLatency: time1 - time0,
+      searchLatency: searchResponseJSON.time,
       totalResults: config.MAX_SEARCH_RESULTS
     });
-    setSearchResponse(searchResponseJSON);
+    setSearchResponse(searchResponseJSON.processedSearchResults);
     // setPageNum(0);
 
     // // Page slicing

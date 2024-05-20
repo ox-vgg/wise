@@ -202,7 +202,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   if (isSearching) {
     loadingMessage = <p className="wise-loading-message">Searching in {numMediaFilesString} videos <LoadingOutlined /></p>;
   } else if (!isHomePage && !isSearching) {
-    loadingMessage = <p className="wise-loading-message">Search completed in {(searchLatency / 1000).toFixed(1)} seconds of {numMediaFilesString} videos</p>;
+    loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds of {numMediaFilesString} videos</p>;
   }
 
   const isLoadingFeaturedImages = (isHomePage && searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0);

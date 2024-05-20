@@ -126,6 +126,10 @@ export type ProcessedSearchResults = {
     videos: Map<string, ProcessedVideoInfo>;
   };
 }
+export type ProcessedSearchResponse = {
+  processedSearchResults: ProcessedSearchResults;
+  time: number;
+}
 
 export interface DataServiceOutput {
   searchResults: ProcessedSearchResults;
