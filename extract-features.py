@@ -155,46 +155,47 @@ if __name__ == "__main__":
     ## 2. Initialise internal metadata database
     print('Initialising internal metadata database')
     media_filelist: Dict[int, str] = {} # maps media ids to filepaths
-    for media_dir, media_paths in valid_media_files.items():
-        with db_engine.begin() as conn:
-            # Add each folder to source collection table
-            data = SourceCollection(
-                location=media_dir, type=SourceCollectionType.DIR
-            )
-            media_source_collection = SourceCollectionRepo.create(conn, data=data)
-        
-            for media_path in media_paths:
-                # Get metadata for each file and add it to media table
-                # Get media_path relative to
-                media_metadata = get_media_metadata(media_path)
-                metadata = MediaRepo.create(
-                    conn,
-                    data=MediaMetadata(
-                        source_collection_id=media_source_collection.id,
-                        path=os.path.relpath(
-                            media_path, media_source_collection.location
-                        ),
-                        media_type=media_metadata.media_type,
-                        checksum=media_metadata.md5sum,
-                        size_in_bytes=os.path.getsize(media_path),
-                        date_modified=os.path.getmtime(media_path),
-                        format=media_metadata.format,
-                        width=media_metadata.width,
-                        height=media_metadata.height,
-                        num_frames=media_metadata.num_frames,
-                        duration=media_metadata.duration,
-                    ),
+    with tqdm(total=sum(len(media_paths) for media_paths in valid_media_files.values())) as pbar:
+        for media_dir, media_paths in valid_media_files.items():
+            with db_engine.begin() as conn:
+                # Add each folder to source collection table
+                data = SourceCollection(
+                    location=media_dir, type=SourceCollectionType.DIR
                 )
-                # extra_metadata = ExtraMediaMetadata(
-                #     media_id=metadata.id,
-                #     metadata={
-                #         "fps": media_metadata.fps,
-                #     }
-                #     | media_metadata.extra,
-                # )
-                # MediaMetadataRepo.create(conn, data=extra_metadata)
-                media_filelist[metadata.id] = media_path
-
+                media_source_collection = SourceCollectionRepo.create(conn, data=data)
+            
+                for media_path in media_paths:
+                    # Get metadata for each file and add it to media table
+                    # Get media_path relative to
+                    media_metadata = get_media_metadata(media_path)
+                    metadata = MediaRepo.create(
+                        conn,
+                        data=MediaMetadata(
+                            source_collection_id=media_source_collection.id,
+                            path=os.path.relpath(
+                                media_path, media_source_collection.location
+                            ),
+                            media_type=media_metadata.media_type,
+                            checksum=media_metadata.md5sum,
+                            size_in_bytes=os.path.getsize(media_path),
+                            date_modified=os.path.getmtime(media_path),
+                            format=media_metadata.format,
+                            width=media_metadata.width,
+                            height=media_metadata.height,
+                            num_frames=media_metadata.num_frames,
+                            duration=media_metadata.duration,
+                        ),
+                    )
+                    # extra_metadata = ExtraMediaMetadata(
+                    #     media_id=metadata.id,
+                    #     metadata={
+                    #         "fps": media_metadata.fps,
+                    #     }
+                    #     | media_metadata.extra,
+                    # )
+                    # MediaMetadataRepo.create(conn, data=extra_metadata)
+                    media_filelist[metadata.id] = media_path
+                    pbar.update(1)
 
     ## 3. Prepare for feature extraction and storage
     print(f"Extracting features from {len(media_filelist)} files")
