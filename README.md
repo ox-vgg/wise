@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>WISE 2 - WISE Image Search Engine</h1>
+  <h1>WISE 2 - WISE Search Engine</h1>
 
   <p>
     <img src="docs/assets/wise_logo.svg" alt="wise-logo" width="160px" height="70px"/>
@@ -54,23 +54,29 @@
   <summary><b>Safety features</b></summary>
   <ul>
     <li>Specify a list of search terms that users should be blocked from searching</li>
-    <li>'Report image' button allows users to report inappropriate/offensive/etc images</li>
+    <li>'Report image' button allows users to report inappropriate/offensive/etc images (temporarily removed; will be added back soon)</li>
   </ul>
 </details>
 
 
-### Roadmap
+## Roadmap
 
 We are planning on implementing the following features soon. Stay tuned!
 
-- Searching on image and audio files
-  
-  Currently, WISE 2 only supports searching on _video files_ (on both the audio and visual stream of video files).
-  Searching on images and pure audio files is not supported yet.
-  Please use [WISE 1.x.x](https://gitlab.com/vgg/wise/wise/-/tree/wise-1.2.0?ref_type%253Dtags) for now if you need to search on images.
-- Cross platform easy installation
-  
+<ul>
+  <li>
+    Searching on image and audio files
+    <br>
+    Currently, WISE 2 only supports searching on _video files_ (on both the audio and visual stream of video files).
+    Searching on images and pure audio files is not supported yet.
+    Please use [WISE 1.x.x](https://gitlab.com/vgg/wise/wise/-/tree/wise-1.2.0?ref_type%253Dtags) for now if you need to search on images.
+  </li>
+  <li>
+  Cross platform easy installation
+  <br>
   We are working on creating an easy-to-use installer which allows users to install WISE on Mac, Windows, and Linux without needing to use the command line.
+  </li>
+</ul>
 
 ## Documentation
 The WISE open source software is developed and maintained by the
