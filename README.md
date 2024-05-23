@@ -8,7 +8,6 @@
   </p>
 </div>
 
-
 ## Key Features
 
 <details open>
@@ -58,7 +57,6 @@
   </ul>
 </details>
 
-
 ## Roadmap
 
 We are planning on implementing the following features soon. Stay tuned!
@@ -79,17 +77,19 @@ We are planning on implementing the following features soon. Stay tuned!
 </ul>
 
 ## Documentation
+
 The WISE open source software is developed and maintained by the
 Visual Geometry Group ([VGG](https://www.robots.ox.ac.uk/~vgg/software/wise/)) at the University of Oxford.
 
 Here are some documents for users and developers of WISE.
 
- - [Install](docs/Install.md) : describes the process for installing WISE
- - [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
- - Developer Resources
-   - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
-   - [Tests](docs/Tests.md) : describes the software testing process for WISE
-   - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
+- [Install](docs/Install.md) : describes the process for installing WISE
+- [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
+- Developer Resources
+  - [Data Loading](docs/data-loading.md): describes interface for loading media files
+  - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
+  - [Tests](docs/Tests.md) : describes the software testing process for WISE
+  - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
 
 ## Contact
 

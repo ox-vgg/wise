@@ -48,9 +48,7 @@ from src.repository import (
     get_thumbnail_by_timestamp,
 )
 from src.data_models import MediaMetadata, MediaType, SourceCollectionType, VectorAndMediaMetadata
-from src.inference import setup_clip, CLIPModel
 from src.enums import IndexType
-from src.search import read_index, brute_force_search
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
 
