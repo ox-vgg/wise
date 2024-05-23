@@ -1,7 +1,7 @@
 .wise-image-details-modal {
   top: 5vh;
 
-  > .ant-modal-content {
+  .ant-modal-content {
     height: 90vh;
     display: flex;
     flex-direction: column;
@@ -13,7 +13,7 @@
     //   white-space: nowrap;
     //   width: 100%;
     // }
-    > .ant-modal-header > .ant-modal-title > a {
+    > .ant-modal-header > .ant-modal-title > .ant-btn {
       white-space: normal;
       height: unset;
       text-align: left;
@@ -118,7 +118,7 @@
   @media (max-width: 800px) {
     top: 2vh;
 
-    > .ant-modal-content > .ant-modal-body {
+    .ant-modal-content > .ant-modal-body {
       overflow: scroll;
 
       > .wise-image-wrapper {
