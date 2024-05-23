@@ -58,7 +58,7 @@ The search results, shown below, shows that this search query is able to find th
 someone cooking food with music playing in the background.
 
 ```
-Searching /data/beegfs/ultrafast/home/adutta/temp/wise/Kinectics-6/ for
+Searching /data/beegfs/ultrafast/home/adutta/temp/wise/Kinetics-6/ for
   [0] "cooking" in video
   [1] "music" in audio
 

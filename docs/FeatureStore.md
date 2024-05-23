@@ -20,7 +20,7 @@ from .feature.store.feature_store_factory import FeatureStoreFactory
 
 ...
 media_type = 'video' # or 'audio'
-feature_dir = '/data/projects/Kinectics-7/store/mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k/features/'
+feature_dir = '/data/projects/Kinetics-7/store/mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k/features/'
 feature_store = FeatureStoreFactory.load_store(media_type, feature_dir)
 feature_store.enable_read(shard_shuffle = False)
 
