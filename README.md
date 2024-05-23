@@ -14,28 +14,28 @@
 <details open>
   <summary><b>Natural language search</b></summary>
   Use natural language to describe what you want to search for.
-
+  <br>
   <img src="docs/assets/natural_language_search.png" width="700px">
-
+  <br>
   WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image (i.e. it searches by image content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions.
 </details>
 
 <details>
   <summary><b>Visual similarity search</b></summary>
   Upload an image or paste an image link to find similar images:
-
+  <br>
   <img src="docs/assets/visual_similarity_search.png" width="700px">
 </details>
 
 <details>
   <summary><b>Multi-modal search</b></summary>
   Combine images and text in your query. For example, if you upload a picture of a golden retriever and enter the text "in snow", WISE will find images of golden retrievers in snow.
-
+  <br>
   <img src="docs/assets/multimodal_search.png" width="700px">
 </details>
 
 <details>
-  <summary><b>Various multimodal models supported</b></summary>
+  <summary><b>Various multimodal / vision-language models supported</b></summary>
   Various models are supported including vision-language models from <a target="_blank" href="https://github.com/mlfoundations/open_clip">OpenCLIP</a> (including OpenAI CLIP) and the <a target="_blank" href="https://github.com/microsoft/CLAP">Microsoft CLAP</a> audio-language model.
 </details>
 
