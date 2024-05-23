@@ -58,36 +58,38 @@ The search results, shown below, shows that this search query is able to find th
 someone cooking food with music playing in the background.
 
 ```
-Searching /data/beegfs/ultrafast/home/adutta/temp/wise/Kinectics-6/ for
+Searching /data/beegfs/ultrafast/home/adutta/temp/wise/Kinetics-6/ for
   [0] "cooking" in video
   [1] "music" in audio
 
-              Search results for "cooking" in video               
- Rank  Filename                                         Time      
-    0  frying-vegetables/mwkOrWZxvrU_000006_000016.mp4  0.5 - 1.5 
-    1  frying-vegetables/mT7vy1-KP_Q_000398_000408.mp4  0.5 - 9.0 
-    2  frying-vegetables/lUyXiF6KfgU_000296_000306.mp4  5.0 - 8.5 
-    3  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5
 
-               Search results for "music" in audio                
- Rank  Filename                                         Time      
-    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 4.0 
-    1  jogging/OmWoDAQM1kk_000000_000010.mp4            0.0 - 4.0 
-    2  singing/vdnskiY-DRc_000023_000033.mp4            0.0 - 4.0 
-    3  singing/GO5DhmRmHco_000112_000122.mp4            0.0 - 4.0 
-    4  singing/arBpk6QCVFs_000064_000074.mp4            0.0 - 4.0 
-    5  singing/WKSxT9T-P_U_000157_000167.mp4            0.0 - 4.0 
-    6  shouting/9NdaqLe2gIs_000022_000032.mp4           0.0 - 4.0 
-    7  singing/I6NDj1EcP6w_000073_000083.mp4            4.0       
-    8  jogging/UQsA-W-q3oA_000002_000012.mp4            4.0       
-    9  frying-vegetables/5E20wCGF6Ig_000122_000132.mp4  0.0 - 4.0 
-   10  jogging/QY8RJBxbLnA_000116_000126.mp4            0.0 - 4.0 
-(search completed in 0.261 sec.)
+                           Search results for "cooking" in video                            
+ Rank  Filename                                         Time       Score  Original Ranks    
+    0  frying-vegetables/mwkOrWZxvrU_000006_000016.mp4  0.5 - 1.5  0.218  0,1,4             
+    1  frying-vegetables/mT7vy1-KP_Q_000398_000408.mp4  0.5 - 9.0  0.211  2,5,...,13,18 (9) 
+    2  frying-vegetables/lUyXiF6KfgU_000296_000306.mp4  5.0 - 8.5  0.210  3,7,14,16         
+    3  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5  0.208  6,15,17,19        
 
+                           Search results for "music" in audio                           
+ Rank  Filename                                         Time       Score  Original Ranks 
+    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 8.0  0.256  0,10           
+    1  jogging/OmWoDAQM1kk_000000_000010.mp4            0.0 - 8.0  0.237  1,3            
+    2  singing/vdnskiY-DRc_000023_000033.mp4            0.0 - 8.0  0.237  2,5            
+    3  singing/GO5DhmRmHco_000112_000122.mp4            0.0 - 8.0  0.206  4,6            
+    4  singing/arBpk6QCVFs_000064_000074.mp4            0.0 - 8.0  0.184  7,13           
+    5  singing/WKSxT9T-P_U_000157_000167.mp4            0.0 - 8.0  0.183  8,18           
+    6  shouting/9NdaqLe2gIs_000022_000032.mp4           0.0 - 8.0  0.181  9,11           
+    7  singing/I6NDj1EcP6w_000073_000083.mp4            4.0 - 8.0  0.163  12             
+    8  jogging/UQsA-W-q3oA_000002_000012.mp4            4.0 - 8.0  0.145  14             
+    9  frying-vegetables/5E20wCGF6Ig_000122_000132.mp4  0.0 - 8.0  0.143  15,19          
+   10  jogging/QY8RJBxbLnA_000116_000126.mp4            0.0 - 8.0  0.139  16,17          
 
-    Search results for "cooking and music" in video and audio     
- Rank  Filename                                         Time      
-    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5
+[0]
+                Search results for "cooking and music" in video and audio                
+ Rank  Filename                                         Time       Score  Original Ranks 
+    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5  0.464  0,3            
+
+(search completed in 0.249 sec.)
 ```
 
 The range value shown in the `Time` column (e.g. `0.0 - 9.5`) is obtained
@@ -112,64 +114,65 @@ Some examples queries (press Ctrl + D to exit):
   2. find videos showing train, show only top 3 results and export results to a file
      > --query train --in video --topk 3 --result-format csv --save-to-file train.csv
 
-[0] > --query "cooking" --in video --query music --in audio --topk 20
-             Search results for ""cooking"" in video              
- Rank  Filename                                         Time      
-    0  frying-vegetables/mwkOrWZxvrU_000006_000016.mp4  0.0 - 1.5 
-    1  frying-vegetables/lUyXiF6KfgU_000296_000306.mp4  5.0 - 9.5 
-    2  frying-vegetables/mT7vy1-KP_Q_000398_000408.mp4  0.5 - 9.0 
-    3  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5 
-               Search results for "music" in audio                
- Rank  Filename                                         Time      
-    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 4.0 
-    1  jogging/OmWoDAQM1kk_000000_000010.mp4            0.0 - 4.0 
-    2  singing/vdnskiY-DRc_000023_000033.mp4            0.0 - 4.0 
-    3  singing/GO5DhmRmHco_000112_000122.mp4            0.0 - 4.0 
-    4  singing/arBpk6QCVFs_000064_000074.mp4            0.0 - 4.0 
-    5  singing/WKSxT9T-P_U_000157_000167.mp4            0.0 - 4.0 
-    6  shouting/9NdaqLe2gIs_000022_000032.mp4           0.0 - 4.0 
-    7  singing/I6NDj1EcP6w_000073_000083.mp4            4.0       
-    8  jogging/UQsA-W-q3oA_000002_000012.mp4            4.0       
-    9  frying-vegetables/5E20wCGF6Ig_000122_000132.mp4  0.0 - 4.0 
-   10  jogging/QY8RJBxbLnA_000116_000126.mp4            0.0 - 4.0 
-(search completed in 0.273 sec.)
+[0] > --query "cooking" --in video --query "music" --in audio --topk 20
+                           Search results for "cooking" in video                            
+ Rank  Filename                                         Time       Score  Original Ranks    
+    0  frying-vegetables/mwkOrWZxvrU_000006_000016.mp4  0.5 - 1.5  0.218  0,1,4             
+    1  frying-vegetables/mT7vy1-KP_Q_000398_000408.mp4  0.5 - 9.0  0.211  2,5,...,13,18 (9) 
+    2  frying-vegetables/lUyXiF6KfgU_000296_000306.mp4  5.0 - 8.5  0.210  3,7,14,16         
+    3  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5  0.208  6,15,17,19        
 
+                           Search results for "music" in audio                           
+ Rank  Filename                                         Time       Score  Original Ranks 
+    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 8.0  0.256  0,10           
+    1  jogging/OmWoDAQM1kk_000000_000010.mp4            0.0 - 8.0  0.237  1,3            
+    2  singing/vdnskiY-DRc_000023_000033.mp4            0.0 - 8.0  0.237  2,5            
+    3  singing/GO5DhmRmHco_000112_000122.mp4            0.0 - 8.0  0.206  4,6            
+    4  singing/arBpk6QCVFs_000064_000074.mp4            0.0 - 8.0  0.184  7,13           
+    5  singing/WKSxT9T-P_U_000157_000167.mp4            0.0 - 8.0  0.183  8,18           
+    6  shouting/9NdaqLe2gIs_000022_000032.mp4           0.0 - 8.0  0.181  9,11           
+    7  singing/I6NDj1EcP6w_000073_000083.mp4            4.0 - 8.0  0.163  12             
+    8  jogging/UQsA-W-q3oA_000002_000012.mp4            4.0 - 8.0  0.145  14             
+    9  frying-vegetables/5E20wCGF6Ig_000122_000132.mp4  0.0 - 8.0  0.143  15,19          
+   10  jogging/QY8RJBxbLnA_000116_000126.mp4            0.0 - 8.0  0.139  16,17          
 
-   Search results for ""cooking" and music" in video and audio    
- Rank  Filename                                         Time      
-    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5 
+[0]
+                Search results for "cooking and music" in video and audio                
+ Rank  Filename                                         Time       Score  Original Ranks 
+    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5  0.464  0,3            
+
+(search completed in 0.295 sec.)
 ```
 
 To save your results to a CSV text file, you can add the `--export-csv`
 flag in the search console as shown below.
 
 ```
-[1] > --query "cooking" --in video --query music --in audio --topk 20 --result-format csv --save-to-file cooking-music.csv
-...
-...
-saved results to cooking-music.csv
+[1] > --query "cooking" --in video --query "music" --in audio --topk 20 --result-format csv --save-to-file cooking-music.csv
+saving results to file cooking-music.csv
 
-[2] > 
+[2] >
 (press Ctrl + D to exit)
 Bye
 
 $ cat cooking-music.csv
-query_text,media_type,rank,filename,timestamp
-""cooking"",video,0,frying-vegetables/mwkOrWZxvrU_000006_000016.mp4,0.0 - 1.5
-""cooking"",video,1,frying-vegetables/lUyXiF6KfgU_000296_000306.mp4,5.0 - 9.5
-""cooking"",video,2,frying-vegetables/mT7vy1-KP_Q_000398_000408.mp4,0.5 - 9.0
-""cooking"",video,3,frying-vegetables/hxK9mej0_zw_000086_000096.mp4,0.0 - 9.5
-"music",audio,0,frying-vegetables/hxK9mej0_zw_000086_000096.mp4,0.0 - 4.0
-"music",audio,1,jogging/OmWoDAQM1kk_000000_000010.mp4,0.0 - 4.0
-"music",audio,2,singing/vdnskiY-DRc_000023_000033.mp4,0.0 - 4.0
-"music",audio,3,singing/GO5DhmRmHco_000112_000122.mp4,0.0 - 4.0
-"music",audio,4,singing/arBpk6QCVFs_000064_000074.mp4,0.0 - 4.0
-"music",audio,5,singing/WKSxT9T-P_U_000157_000167.mp4,0.0 - 4.0
-"music",audio,6,shouting/9NdaqLe2gIs_000022_000032.mp4,0.0 - 4.0
-"music",audio,7,singing/I6NDj1EcP6w_000073_000083.mp4,4.0
-"music",audio,8,jogging/UQsA-W-q3oA_000002_000012.mp4,4.0
-"music",audio,9,frying-vegetables/5E20wCGF6Ig_000122_000132.mp4,0.0 - 4.0
-"music",audio,10,jogging/QY8RJBxbLnA_000116_000126.mp4,0.0 - 4.0
+query_id,query_text,media_type,rank,filename,start_time,end_time,score
+0,"cooking",video,0,"frying-vegetables/mwkOrWZxvrU_000006_000016.mp4",0.5,1.5,0.218
+0,"cooking",video,1,"frying-vegetables/mT7vy1-KP_Q_000398_000408.mp4",0.5,9.0,0.211
+0,"cooking",video,2,"frying-vegetables/lUyXiF6KfgU_000296_000306.mp4",5.0,8.5,0.210
+0,"cooking",video,3,"frying-vegetables/hxK9mej0_zw_000086_000096.mp4",0.0,9.5,0.208
+1,"music",audio,0,"frying-vegetables/hxK9mej0_zw_000086_000096.mp4",0.0,8.0,0.256
+1,"music",audio,1,"jogging/OmWoDAQM1kk_000000_000010.mp4",0.0,8.0,0.237
+1,"music",audio,2,"singing/vdnskiY-DRc_000023_000033.mp4",0.0,8.0,0.237
+1,"music",audio,3,"singing/GO5DhmRmHco_000112_000122.mp4",0.0,8.0,0.206
+1,"music",audio,4,"singing/arBpk6QCVFs_000064_000074.mp4",0.0,8.0,0.184
+1,"music",audio,5,"singing/WKSxT9T-P_U_000157_000167.mp4",0.0,8.0,0.183
+1,"music",audio,6,"shouting/9NdaqLe2gIs_000022_000032.mp4",0.0,8.0,0.181
+1,"music",audio,7,"singing/I6NDj1EcP6w_000073_000083.mp4",4.0,8.0,0.163
+1,"music",audio,8,"jogging/UQsA-W-q3oA_000002_000012.mp4",4.0,8.0,0.145
+1,"music",audio,9,"frying-vegetables/5E20wCGF6Ig_000122_000132.mp4",0.0,8.0,0.143
+1,"music",audio,10,"jogging/QY8RJBxbLnA_000116_000126.mp4",0.0,8.0,0.139
+0-1,"cooking and music",video and audio,0,"frying-vegetables/hxK9mej0_zw_000086_000096.mp4",0.0,9.5,0.464
 ```
 
 All the subsequent queries in the search console gets completed almost
