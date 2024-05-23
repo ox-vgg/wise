@@ -41,7 +41,7 @@ Once the server has been started, go to http://localhost:9670/Kinetics-6/ in you
 ![Screenshot of WISE search UI](./assets/search_ui_screenshot.png)
 
 - You can change some configurations, such as the port number and index type, in [config.py](../config.py)
-- You can optionally provide a query blacklist/blocklist (i.e. a list of queries that users should be blocked from searching) using --query-blacklist /path/to/blacklist.txt
+- You can optionally provide a query blacklist/blocklist (i.e. a list of queries that users should be blocked from searching) using `--query-blacklist /path/to/blacklist.txt`
 - For more details on the options available, run `python3 serve.py --help`
 
 
