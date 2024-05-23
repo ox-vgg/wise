@@ -21,11 +21,11 @@ app = typer.Typer()
 def main(
     project_dir: Path = typer.Option(help="Project directory path"),
     theme_asset_dir: Path = typer.Option(
-        'www/dynamic',
+        "frontend/dist",
         exists=True,
         dir_okay=True,
         file_okay=False,
-        help="Static HTML assets related to the user interface are served from this folder. There are two UIs included in WISE: 'www/dynamic' and 'www/imgrid'",
+        help="Static HTML assets related to the user interface are served from this folder.",
     ),
     index_type: Optional[IndexType] = typer.Option(
         None, help="The faiss index to use for serving"
