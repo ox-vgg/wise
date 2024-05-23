@@ -13,10 +13,11 @@
     //   white-space: nowrap;
     //   width: 100%;
     // }
-    > .ant-modal-header > .ant-modal-title > a {
+    > .ant-modal-header > .ant-modal-title > .ant-btn {
       white-space: normal;
       height: unset;
       text-align: left;
+      font-size: 17px;
       margin-left: -10px;
       margin-top: -5px;
       margin-right: 20px;
@@ -29,171 +30,116 @@
         margin-left: 5px;
       }
     }
-    
+
     > .ant-modal-body {
-      height: 100%;
+      flex-grow: 1;
+      position: relative;
       overflow: scroll;
 
-      > .wise-image-details-modal-main-section {
-        position: relative;
+      > .wise-image-wrapper {
+        width: 100%;
         height: calc(100% - 100px);
+        // height: fit-content;
+        display: inline-flex;
+        position: relative;
+        // position: absolute;
+        // left: 0;
+        // top: 0;
+        // flex-grow: 1;
 
-        > a {
-          width: calc(100% - 300px);
+        > img, video {
+          width: 100%;
           height: 100%;
-          // height: fit-content;
-          display: inline-flex;
-          position: absolute;
-          left: 0;
-          top: 0;
-          flex-grow: 1;
-          background-color: #f0f0f0;
-  
-          > img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+          object-fit: contain;
+        }
+
+        .vds-slider-chapters {
+          > .vds-slider-chapter {
+            margin-right: 0;
+            &, & > .vds-slider-track {
+              border-radius: 0;
+            }
+          }
+          > .vds-slider-chapter:nth-of-type(odd):hover {
+            transform: unset;
+          }
+
+          > .vds-slider-chapter:nth-of-type(even) {            
+            &::before, &::after {
+              content: '';
+              position: absolute;
+              width: 4px;
+              height: 18px;
+              z-index: 10;
+            }
+            &::before {
+              left: 0;
+              border-left: 3px solid white;
+            }
+
+            &::after {
+              right: 0;
+            }
+
+            &:hover {
+              // margin-left: 3px;
+              // margin-right: 3px;
+
+              &::before, &::after {
+                height: 10px;
+                border-top: 1px solid white;
+                border-bottom: 1px solid white;
+              }
+              &::after {
+                border-right: 3px solid white;
+              }
+            }
           }
         }
-  
-        > .wise-image-details-metadata {
-          width: 300px;
-          height: 100%;
-          padding: 10px 0 10px 25px;
-          box-sizing: border-box;
-          display: inline-block;
-          font-size: 11px;
-          overflow: scroll;
-          position: absolute;
-          right: 0;
-          top: 0;
-        }
       }
+
+      > .wise-image-details-metadata {
+        width: 300px;
+        height: 100%;
+        padding: 10px 0 10px 25px;
+        box-sizing: border-box;
+        display: inline-block;
+        font-size: 11px;
+        overflow: scroll;
+        position: absolute;
+        right: 0;
+        top: 0;
+      }
+
     }
   }
-  
+
   // Styles for smaller screens / mobile devices
   @media (max-width: 800px) {
     top: 2vh;
 
     .ant-modal-content > .ant-modal-body {
-      > .wise-image-details-modal-main-section {
-        > a {
-          width: 100%;
-          height: fit-content;
-          max-height: 80%;
-          position: unset;
-    
-          > img {
-            height: unset;
-          }
-        }
-    
-        > .wise-image-details-metadata {
-          width: 100%;
-          height: unset;
-          position: unset;
-          display: block;
-          right: unset;
-          top: unset;
-        }
-      }
-    }
-  }
-}
+      overflow: scroll;
 
-
-
-// TODO remove this later
-// Temporarily copied from SearchResults.scss
-.wise-image-grid {
-  display: flex;
-  flex-wrap: wrap;
-  width: 100%;
-
-  &::after {
-    content: '';
-    flex-grow: 999999999;
-  }
-
-  > .wise-image-wrapper {
-    margin: 2px;
-    background-color: #eee;
-    position: relative;
-    cursor: pointer;
-    box-sizing: border-box;
-    border: 0px solid #d6e4ff;
-    transition: all 0.1s;
-
-    &.wise-image-selected {
-      border-width: 12px;
-    }
-    
-    > i {
-      display: block;
-    }
-
-    > a {
-      color: unset;
-
-      > img.wise-image {
-        position: absolute;
-        top: 0;
+      > .wise-image-wrapper {
         width: 100%;
-        vertical-align: bottom;
+        height: fit-content;
+        max-height: 80%;
+        position: unset;
+
+        > img, video {
+          height: unset;
+        }
       }
-    }
 
-    // Additional rules to deal with very wide / panorama images causing issues
-    max-width: calc(50% - 4px);
-    max-height: 230px;
-    > a > img.wise-image {
-      height: 100%;
-      object-fit: contain;
-    }
-
-    > .wise-internal-image-search-button {
-      display: none;
-      position: absolute;
-      top: 4px;
-      right: 40px;
-      z-index: 1;
-      color: white;
-      width: 23px;
-      margin-right: -4px;
-    }
-    &:hover > .wise-internal-image-search-button, &.wise-image-dropdown-open > .wise-internal-image-search-button {
-      display: block;
-    }
-
-    > .wise-image-more-button {
-      display: none;
-      position: absolute;
-      top: 5px;
-      right: 3px;
-      z-index: 1;
-      padding: 2px;
-      // background-color: rgba(255,255,255,0.3);
-      width: 31px;
-    }
-    &:hover > .wise-image-more-button, &.wise-image-dropdown-open > .wise-image-more-button {
-      display: block;
-    }
-
-    > .wise-image-hover-display {
-      visibility: hidden;
-      position: absolute;
-      pointer-events: none;
-      bottom: 0;
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      font-size: 12px;
+      > .wise-image-details-metadata {
+        width: 100%;
+        height: unset;
+        position: unset;
+        display: block;
+        right: unset;
+        top: unset;
+      }
     }
     
     &:hover > .wise-image-hover-display, &.wise-image-dropdown-open > .wise-image-hover-display {
@@ -202,31 +148,12 @@
       background-color: rgba(0,0,0,0.35);
       color: white;
     }
-
-    > .wise-image-selected-icon-wrapper {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 100%;
-      height: 100%;
-      display: none;
-      justify-content: center;
-      align-items: center;
-      pointer-events: none;
-
-      > .wise-image-selected-icon {
-        color: white;
-        font-size: 36px;
-        -webkit-filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.3));
-        filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.3));
-      }
-    }
-    &.wise-image-selected > .wise-image-selected-icon-wrapper {
-      display: flex;
-      background-color: rgba(0,0,0,0.4);
-    }
-    &:hover > .wise-image-selected-icon-wrapper {
-      display: flex;
-    }
+  }
+  
+  &:hover > .wise-image-hover-display, &.wise-image-dropdown-open > .wise-image-hover-display {
+    display: block;
+    visibility: visible;
+    background-color: rgba(0,0,0,0.35);
+    color: white;
   }
 }

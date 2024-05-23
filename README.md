@@ -1,191 +1,99 @@
-
-
 <div align="center">
-  <h1>WISE Image Search Engine (WISE)</h1>
+  <h1>WISE 2 - WISE Search Engine</h1>
 
   <p>
     <img src="docs/assets/wise_logo.svg" alt="wise-logo" width="160px" height="70px"/>
     <br>
-    WISE is an AI-powered search engine for images, allowing you to quickly and easily search through large collections of images.
+    WISE is a search engine for images, videos, and audio powered by multimodal AI, allowing you to quickly and easily search through large collections of audiovisual media. You can search using natural language, an uploaded image/audio file, or a combination of these modalities.
   </p>
 </div>
 
+## Key Features
 
-[[_TOC_]]
-
-> The code and documentation contained in this repository is not stable yet for production usage. We are working on making it production ready.
-
-<hr>
-
-
-## Features
-
-- **Natural language search** - use natural language to describe what you want to search for
-
-  <img src="docs/assets/natural_language_search.png" width="600px">
-
+<details open>
+  <summary><b>Natural language search</b></summary>
+  Use natural language to describe what you want to search for.
+  <br>
+  <img src="docs/assets/natural_language_search.png" width="700px">
+  <br>
   WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image (i.e. it searches by image content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions.
+</details>
 
-- **Visual similarity search** - upload an image or paste an image link to find similar images
+<details>
+  <summary><b>Visual similarity search</b></summary>
+  Upload an image or paste an image link to find similar images:
+  <br>
+  <img src="docs/assets/visual_similarity_search.png" width="700px">
+</details>
 
-  <img src="docs/assets/visual_similarity_search.png" width="600px">
+<details>
+  <summary><b>Multi-modal search</b></summary>
+  Combine images and text in your query. For example, if you upload a picture of a golden retriever and enter the text "in snow", WISE will find images of golden retrievers in snow.
+  <br>
+  <img src="docs/assets/multimodal_search.png" width="700px">
+</details>
 
-- **Multi-modal search** - combine images and text in your query. For example, if you upload a picture of a golden retriever and enter the text "in snow", WISE will find images of golden retrievers in snow.
+<details>
+  <summary><b>Various multimodal / vision-language models supported</b></summary>
+  Various models are supported including vision-language models from <a target="_blank" href="https://github.com/mlfoundations/open_clip">OpenCLIP</a> (including OpenAI CLIP) and the <a target="_blank" href="https://github.com/microsoft/CLAP">Microsoft CLAP</a> audio-language model.
+</details>
 
-  <img src="docs/assets/multimodal_search.png" width="600px">
-
-- Searches can be performed via:
-
-  - CLI
-  - REST API
-  - Web frontend
-
+<details>
+  <summary><b>Different ways to perform searches</b></summary>
+  Searches can be performed via:
+  <ul>
+    <li>CLI</li>
+    <li>REST API</li>
+    <li>Web frontend</li>
+  </ul>
   (Note: currently the search functionality in the CLI may be missing some features.)
+</details>
 
-- Safety features
-  - Specify a list of search terms that users should be blocked from searching
-  - 'Report image' button allows users to report inappropriate/offensive/etc images
+<details>
+  <summary><b>Safety features</b></summary>
+  <ul>
+    <li>Specify a list of search terms that users should be blocked from searching</li>
+    <li>'Report image' button allows users to report inappropriate/offensive/etc images (temporarily removed; will be added back soon)</li>
+  </ul>
+</details>
 
-## How it works
+## Roadmap
 
-WISE uses vision-language models such as OpenAI [CLIP](https://openai.com/research/clip) (specifically [OpenCLIP](https://github.com/mlfoundations/open_clip), which is an open-source implementation of CLIP trained on the [LAION](https://laion.ai/blog/laion-5b/) dataset).
+We are planning on implementing the following features soon. Stay tuned!
 
-A vision-language model consists of a text encoder and image encoder that have been trained together, resulting in a model that is able to map both images and text onto the same feature space. Images and/or text that have similar semantics (meanings) are placed closer together in this feature space, while unrelated images/text are placed further apart.
+<ul>
+  <li>
+    Searching on image and audio files
+    <br>
+    Currently, WISE 2 only supports searching on _video files_ (on both the audio and visual stream of video files).
+    Searching on images and pure audio files is not supported yet.
+    Please use [WISE 1.x.x](https://gitlab.com/vgg/wise/wise/-/tree/wise-1.2.0?ref_type%253Dtags) for now if you need to search on images.
+  </li>
+  <li>
+  Cross platform easy installation
+  <br>
+  We are working on creating an easy-to-use installer which allows users to install WISE on Mac, Windows, and Linux without needing to use the command line.
+  </li>
+</ul>
 
-<img src="docs/assets/clip_diagram.png" width="600px">
+## Documentation
 
-When you enter a text query, WISE uses the text encoder to transform the input text into a feature vector. This feature vector is compared against the feature vectors of the images in the search collection, to find the nearest neighbours (using a distance metric such as cosine distance). The vectors that are closest to the feature vector of the text query, represent the images that are most relevant to the search query.
+The WISE open source software is developed and maintained by the
+Visual Geometry Group ([VGG](https://www.robots.ox.ac.uk/~vgg/software/wise/)) at the University of Oxford.
 
-A similar approach is used when an image is used as the query, except that the image encoder is used to encode the query, rather than the text encoder.
+Here are some documents for users and developers of WISE.
 
-The [Faiss](https://github.com/facebookresearch/faiss) library is used to perform approximate nearest neighbour search.
-
-For multi-modal queries (images + text), the feature vectors of the individual images/text that make up the query are added together, with higher weight assigned to the text query/queries. The weighted sum is then normalised and used as the query vector for the nearest neighbour search.
-
-## Installation
-
-### Setup virtual environment and install dependencies
-
-We recommend using `conda` / `mamba` to set up WISE. Alternatively, if both those options don't work for you, you could try using `pip`.
-
-#### Option 1: Installation using conda
-
-You will need either
-
-- [conda](https://conda.io/projects/conda/en/stable/user-guide/install/index.html) or
-- [mamba](https://mamba.readthedocs.io/en/latest/installation.html)
-
-installed on your system. We recommend you to use recent version of conda (22 or greater) / mamba (1.4+).
-
-Please Note:
-
-1. WISE might not work on lower versions of conda / mamba.
-2. If you are using WISE on non-intel platforms, edit `environment.yml` to remove the reference to `mkl`
-
-```bash
-git clone https://gitlab.com/vgg/wise/wise.git
-cd wise
-conda env create -f environment.yml
-conda activate wise
-```
-
-(For mamba, replace `conda` in the above command accordingly)
-
-#### Option 2: Installation using pip
-
-(You will need to have Python 3 and pip installed beforehand. Click [here](https://www.python.org/downloads/) to install both. We recommend using Python 3.9 or greater, and pip 22 or greater. WISE might not work on lower versions.)
-
-```bash
-git clone https://gitlab.com/vgg/wise/wise.git
-cd wise
-python3 -m venv env
-source env/bin/activate
-pip install -r requirements.txt
-pip install -r torch-faiss-requirements.txt
-```
-
-## Usage
-
-Before running the commands below, make sure you have `cd`'ed into the `wise` folder (if you haven't done so already), and activate the virtual environment by running `source env/bin/activate` (if you are using pip) or `conda activate wise` (if you are using conda).
-
-For more details on the commands available, run
-
-```bash
-python3 wise.py --help
-```
-
-### Initialise project with a collection of images
-
-The `init` command creates a new project. For each data source provided, features, thumbnails and metadata are extracted.
-
-```bash
-python3 wise.py init your-project-name \
-  --batch-size 16 --model "ViT-L-14:laion2b_s32b_b82k" \
-  --store-in /path/to/some/folder \
-  --source /path/to/a/folder/of/images \
-  --source /you/can/specify/multiple/sources \
-  --source "/path/to/a/webdataset{000..999}.tar"
-```
-
-Parameters:
-
-- `--source`: you can pass in a folder of images, or a [WebDataset](https://webdataset.github.io/webdataset/). You can also provide more than one `--source` as shown above
-- `--store-in`: folder where you would like the extracted features, indices, thumbnails, and metadata to be stored. (Make sure this is on a disk with sufficient space.) If unspecified, these files will be stored within the `~/.wise/projects/project-name` folder (in your home directory)
-- `--batch-size`: number of images in each batch to pass to the model. Default value: 1
-- `--model`: specify an OpenCLIP model to use for extracting features (for a full list of models available, run `python3 wise.py init --help`). Default value: `ViT-B-32:openai`.
-- For more details on the options available, run `python3 wise.py init --help`
-
-### Add more images to an existing project
-
-```bash
-python3 wise.py update your-project-name \
-  --batch-size 128 \
-  --source "/path/to/folder/or/webdataset"
-```
-
-- For more details on the options available, run `python3 wise.py init --help`
-
-### Create a search index based on approximate nearest neighbour search
-
-```bash
-python3 wise.py index your-project-name --index-type IndexIVFFlat
-# (for exhaustive search, use --index-type IndexFlatIP)
-```
-
-- For more details on the options available, run `python3 wise.py index --help`
-
-### Serve the web interface for the search engine
-
-```bash
-python3 wise.py serve your-project-name --index-type IndexIVFFlat
-```
-
-- For now you will need to replace the `<base href="/wikimedia/">` in `frontend/dist/index.html` with your project name, e.g. `<base href="/your-project-name-here/">`. This will be done automatically later on.
-- Once the server has been started, go to http://localhost:9670/your-project-name in your browser
-- You can optionally provide a query blocklist (i.e. a list of queries that users should be blocked from searching) using `--query-blocklist /path/to/blocklist.txt`
-- For more details on the options available, run `python3 wise.py serve --help`
-
-## Frontend
-
-WISE currently has two frontends, `imgrid` and `dynamic`. When running `python3 wise.py serve`, you can either pass in `--theme-asset-dir www/imgrid` or `--theme-asset-dir www/dynamic`. If left unspecified, the `dynamic` frontend is used by default.
-
-- `imgrid` is a simple frontend written in vanilla JavaScript and its source code is located in `www/imgrid`
-- `dynamic` is built using React and TypeScript and contains additional features. The source code for this frontend is located in the `frontend` folder. The production build is located in the `frontend/dist` folder and is also symlinked in `www/dynamic`.
-
-For more details on the `dynamic` frontend (e.g. if you want to make custom modifications to it), please see [`frontend/README.md`](frontend/README.md)
-
-You can also develop your own frontend that interacts with the WISE backend. The backend API endpoints are defined in `api/routes.py`.
-
-## Test
-
-WISE contains some automated tests to verify the software's
-functionality. We are still working on adding more tests for coverage
-
-```
-python -m pytest -s tests
-```
+- [Install](docs/Install.md) : describes the process for installing WISE
+- [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
+- Developer Resources
+  - [Data Loading](docs/data-loading.md): describes interface for loading media files
+  - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
+  - [Tests](docs/Tests.md) : describes the software testing process for WISE
+  - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
 
 ## Contact
+
+Please submit any bug reports and feature requests on the [Issues page](https://gitlab.com/vgg/wise/wise/-/issues).
 
 For any queries or feedback related to the WISE software, contact [Prasanna Sridhar](mailto:prasanna@robots.ox.ac.uk), [Horace Lee](mailto:horacelee@robots.ox.ac.uk) or [Abhishek Dutta](mailto:adutta@robots.ox.ac.uk).
 

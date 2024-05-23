@@ -3,13 +3,13 @@ import { UploadFile } from "antd";
 
 export type Query = {
   id: string;
-  type: 'TEXT' | 'URL';
+  type: 'TEXT' | 'IMAGE_URL' | 'AUDIO_URL';
   displayText?: string;
   value: string;
   isNegative?: boolean;
 } | {
   id: string;
-  type: 'FILE';
+  type: 'IMAGE_FILE' | 'AUDIO_FILE';
   displayText: string;
   value: UploadFile;
   isNegative?: boolean;
@@ -20,59 +20,127 @@ export type Query = {
   value: string; // this value represents the internal image id
   isNegative?: boolean;
 }
+    
 
-export type SearchResponseJSONObject = {
-  link: string;
-  thumbnail: string;
-  distance: number;
-  info: {
-    id: string;
-    filename: string;
-    width: number;
-    height: number;
-    title: string;
-    author?: string;
-    caption: string;
-    copyright: string;
-    is_nsfw?: boolean;
-  }
-};
-export type SearchResponse = Record<string, SearchResponseJSONObject[]>;
 
-export interface ProcessedSearchResult {
+type MediaMetadata = {
+  id: string;
+  filename: string;
+  width: number;
+  height: number;
+  media_type: string;
+  format: string;
+  duration: number;
+  title: string;
+  caption: string;
+  copyright: string;
+}
+// A search result containing the metadata fields from MediaMetadata, as well as additional fields like `thumbnail` and `distance`
+type MediaInfo = MediaMetadata & {
   link: string;
   thumbnail: string;
   distance?: number;
-  info: {
-    id: string;
-    filename: string;
-    width: number;
-    height: number;
-    title: string;
-    author?: string;
-    caption?: string;
-    copyright?: string;
-    is_nsfw?: boolean;
-  }
-};
+}
+export type ImageInfo = MediaInfo & {}
+export type AudioInfo = MediaInfo & {}
+export type VideoInfo = MediaInfo & {
+  timeline_hover_thumbnails: string;
+}
+
+type MediaSegment = {
+  vector_id: string;
+  media_id: string;
+  ts: number;
+  te: number;
+  link: string;
+  distance: number;
+}
+export type AudioSegment = MediaSegment & {}
+export type VideoSegment = MediaSegment & {
+  thumbnail: string;
+  thumbnail_score: number;
+}
+
+export type AudioResults = {
+  total: number;
+  unmerged_windows: AudioSegment[];
+  audios: Record<string, AudioInfo>;
+}
+export type VideoAudioResults = {
+  total: number;
+  unmerged_windows: VideoSegment[];
+  merged_windows: VideoSegment[];
+  videos: Record<string, VideoInfo>;
+}
+export type VideoResults = {
+  total: number;
+  unmerged_windows: VideoSegment[];
+  merged_windows: VideoSegment[];
+  videos: Record<string, VideoInfo>;
+}
+export type ImageResults = {
+  total: number;
+  results: ImageInfo[];
+}
+export type SearchResponse = {
+  time: number;
+  audio_results?: AudioResults;
+  video_audio_results?: VideoAudioResults;
+  video_results?: VideoResults;
+  image_results?: ImageResults;
+
+  // Delete later:
+  // unmerged_segments: VideoSegment[];
+  // shots: VideoSegment[];
+  // videos: Record<string, VideoInfo>;
+  // audio_segments?: VideoSegment[];
+  // audio_shots?: VideoSegment[];
+  // audio_videos?: Record<string, VideoInfo>;
+  // visual_segments?: VideoSegment[];
+  // visual_shots?: VideoSegment[];
+  // visual_videos?: Record<string, VideoInfo>;
+}
+
+// TODO update everything below
+export type ProcessedVideoSegment = VideoSegment & {
+  videoInfo: ProcessedVideoInfo;
+}
+export type ProcessedVideoInfo = VideoInfo & {
+  shots: VideoSegment[] | ProcessedVideoSegment[];
+  title: string;
+}
+export type ProcessedSearchResults = {
+  Video: {
+    unmerged_windows: ProcessedVideoSegment[];
+    merged_windows: ProcessedVideoSegment[];
+    videos: Map<string, ProcessedVideoInfo>;
+  };
+  VideoAudio: {
+    unmerged_windows: ProcessedVideoSegment[];
+    merged_windows: ProcessedVideoSegment[];
+    videos: Map<string, ProcessedVideoInfo>;
+  };
+  Audio: {
+    unmerged_windows: ProcessedVideoSegment[];
+    merged_windows: ProcessedVideoSegment[];
+    videos: Map<string, ProcessedVideoInfo>;
+  };
+}
+export type ProcessedSearchResponse = {
+  processedSearchResults: ProcessedSearchResults;
+  time: number;
+}
 
 export interface DataServiceOutput {
-  searchResults: ProcessedSearchResult[];
+  searchResults: ProcessedSearchResults;
   isSearching: boolean;
   searchLatency: number;
   totalResults: number;
-  pageNum: number;
-  changePageNum: (x: number) => void;
-  performNewSearch: (queries: Query[]) => Promise<void>;
+  // pageNum: number;
+  // changePageNum: (x: number) => void;
+  performNewSearch: (queries: Query[], viewModality: string) => Promise<void>;
   fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
-}
-
-export interface InternalSearchDataServiceOutput {
-  internalImageId?: string;
-  isSearching: boolean;
-  searchResults: ProcessedSearchResult[];
-  performInternalSearch: (internalImageId: string) => void;
 }
 
 interface RefsForTour {
@@ -82,8 +150,6 @@ interface RefsForTour {
   paginationControls: MutableRefObject<any>;
   reportImageButton: MutableRefObject<any>;
 }
-
-export type EmptyObject = Record<string, never>;
 
 
 /* ------ Component props ------ */
@@ -112,6 +178,7 @@ export interface SearchDropdownProps {
   searchText: string;
   setSearchText: (x: string) => void;
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
+  viewModality: string;
   submitSearch: () => void;
   clearSearchBar: () => void;
   isHomePage?: boolean;
@@ -121,6 +188,8 @@ export interface WiseHeaderProps {
   setMultimodalQueries: (x: Query[]) => void;
   searchText: string;
   setSearchText: (x: string) => void;
+  viewModality: string;
+  setViewModality: (x: string) => void;
   submitSearch: () => void;
   refsForTour: RefsForTour;
   isHomePage?: boolean;
@@ -138,16 +207,26 @@ export interface SearchResultsProps {
   setSearchText: (x: string) => void;
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
+  viewModality: string;
   submitSearch: () => void;
 };
+
 export interface ImageDetailsModalProps {
-  imageDetails: ProcessedSearchResult | EmptyObject;
-  setImageDetails: (x: ProcessedSearchResult | EmptyObject) => void;
-  setSelectedImageId: (x: string) => void;
-}
+  imageDetails?: ProcessedVideoSegment;
+  setImageDetails: (x?: ProcessedVideoSegment) => void;
+  setSelectedImageId: (imageId?: string) => void;
+};
+
 export interface ReportImageModalProps {
   dataService: DataServiceOutput;
   isHomePage: boolean;
   selectedImageId?: string;
   setSelectedImageId: (imageId?: string) => void;
+}
+
+export interface VideoOccurrencesViewProps {
+  videoInfo: ProcessedVideoInfo;
+  handleClickOccurrence: (videoSegment: ProcessedVideoSegment) => void;
+  customHeaderSingular?: string;
+  customHeaderPlural?: string;
 }

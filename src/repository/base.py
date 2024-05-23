@@ -56,9 +56,51 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         for row in result.mappings():
             yield self.model.model_validate(row)
 
+    def list_by_column_match(
+            self,
+            conn,
+            *,
+            column_to_match: str,
+            value_to_match: Any,
+            select_columns: Optional[Tuple[str]] = None,
+            order_by_column: str,
+            desc: bool = False,
+            batch_size: int = 10000
+        ):
+        """
+        Performs a query equivalent to:
+        ```
+        SELECT {select_columns} FROM table WHERE {column_to_match} = {value_to_match}
+        ORDER BY {order_by_column} {DESC if desc else ASC}
+        ```
+
+        If select_columns is None, all columns in the table are selected (`SELECT * ...`)
+        """
+        select_columns = self._table if select_columns is None else self._table.c[select_columns]
+        result = conn.execution_options(stream_results=True).execute(
+            sa.select(select_columns)
+            .where(self._table.c[column_to_match] == value_to_match)
+            .order_by(
+                self._table.c[order_by_column].desc() if desc else self._table.c[order_by_column].asc()
+            )
+        )
+        while True:
+            chunk = result.mappings().fetchmany(batch_size)
+            if not chunk:
+                return
+
+            for row in chunk:
+                if select_columns:
+                    yield row
+                else:
+                    yield self.model.model_validate(row)
+
     def get_columns(self, conn: sa.Connection, column_names: Tuple[str]):
         result = conn.execute(sa.select(self._table.c[column_names]))
         yield from result.mappings()
+
+    def get_count(self, conn: sa.Connection) -> int:
+        return conn.execute(sa.select(sa.func.count(self._table.c.id))).scalar()
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
         result = conn.execute(
@@ -69,17 +111,21 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
             raise RuntimeError()
         return obj
 
+    # TODO: Need to be careful with update since we can also re-assign the id key
+    # 1. Could remove the id key and check, but how do we find the name of the id column?
+    # 2. Could let the database handle error with db specific
     def update(self, conn: sa.Connection, id: Any, *, data: EntityUpdate):
-        current_data = self.get(conn, id)
-        if current_data is None:
+        current_entity = self.get(conn, id)
+        if current_entity is None:
             raise EntityNotFoundException()
 
-        updated_data = current_data.model_copy(update=data.model_dump(exclude_unset=True))
+        update_data = data.model_dump(exclude_unset=True)
+        updated_entity = current_entity.model_copy(update=update_data)
 
         conn.execute(
             sa.update(self._table)
             .where(self._table.c.id == id)
-            .values(**updated_data.model_dump())
+            .values(**updated_entity.model_dump())
         )
 
     def delete(self, conn: sa.Connection, id: Any):

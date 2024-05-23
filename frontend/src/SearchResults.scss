@@ -21,19 +21,17 @@
   }
 }
 
+.ant-segmented {
+  background: #f0f0f0;
+}
+
 section#search-results {
   display: block;
 
   .ant-pagination {
     margin: 10px 0;
-
-    &:first-of-type {
-      float: right;
-    }
-    &:last-of-type {
-      display: flex;
-      justify-content: center;
-    }
+    display: flex;
+    justify-content: center;
   }
 
   /*
@@ -65,7 +63,7 @@ section#search-results {
       > a {
         color: unset;
 
-        > img.wise-image {
+        > video.wise-video-preview {
           position: absolute;
           top: 0;
           width: 100%;
@@ -76,7 +74,7 @@ section#search-results {
       // Additional rules to deal with very wide / panorama images causing issues
       max-width: calc(50% - 4px);
       max-height: 230px;
-      > a > img.wise-image {
+      > a > video.wise-video-preview {
         height: 100%;
         object-fit: contain;
       }
@@ -129,6 +127,57 @@ section#search-results {
         visibility: visible;
         background-color: rgba(0,0,0,0.35);
         color: white;
+      }
+    }
+
+    > .wise-video-wrapper {
+      width: 100%;
+      padding: 5px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+      cursor: pointer;
+
+      > .wise-video-result-background {
+        position: absolute;
+        height: 100%;
+        width: 100%;
+        z-index: 0;
+        top: 0;
+        left: 0;
+
+        &:active {
+          background: rgba(0,0,0,0.1);
+        }
+      }
+
+      > .wise-video-thumbnail {
+        flex-shrink: 0;
+        height: 216px;
+        width: 384px;
+        object-fit: contain;
+        background-color: black;
+        border-radius: 10px;
+      }
+
+      > .wise-video-text-wrapper {
+        flex: 1;
+        width: 1px; // temporary hack TODO implement better fix later
+        margin-left: 20px;
+        
+        > h1 {
+          font-weight: normal;
+          font-size: 1.3em;
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+        > h1, > p {
+          margin-top: 0;
+          margin-bottom: 5px;
+        }
       }
     }
   }

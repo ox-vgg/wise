@@ -1,12 +1,25 @@
 import enum
 from pydantic import ConfigDict, BaseModel
 from typing import Optional, Dict, Any
+import datetime
 
 
-class DatasetType(str, enum.Enum):
-    IMAGE_DIR = "image_dir"
+class SourceCollectionType(str, enum.Enum):
+    DIR = "dir"
     WEBDATASET = "webdataset"
 
+
+class MediaType(str, enum.Enum):
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    AV = "av"
+
+class ModalityType(str, enum.Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
 
 class QueryType(str, enum.Enum):
     NATURAL_LANGUAGE_QUERY = "NATURAL_LANGUAGE_QUERY"
@@ -14,49 +27,58 @@ class QueryType(str, enum.Enum):
     IMAGE_CLASSIFICATION_QUERY = "IMAGE_CLASSIFICATION_QUERY"
 
 
-class ImageInfo(BaseModel):
-    id: str
-    filename: str
-    width: int
-    height: int
-    title: str = ""
-    caption: str = ""
-    copyright: str = ""
-
-
-class BaseDataset(BaseModel):
+class SourceCollection(BaseModel):
     id: Optional[int] = None
     location: str
-    type: DatasetType
-
-
-class DatasetCreate(BaseDataset):
-    pass
-
-
-class Dataset(BaseDataset):
-    id: int
+    type: SourceCollectionType
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
-class ImageMetadata(BaseModel):
+class MediaMetadata(BaseModel):
     id: Optional[int] = None
-    dataset_id: int = -1
-    dataset_row: Optional[int] = None
+    source_collection_id: int
     path: str
+    checksum: bytes
     size_in_bytes: int
+    date_modified: datetime.datetime
+    media_type: MediaType
     format: str
-    width: int = -1
-    height: int = -1
-    source_uri: Optional[str] = None
-    metadata: Dict[str, Any]  # TODO: tighter type
+    width: int
+    height: int
+    num_frames: int
+    duration: float
     model_config = ConfigDict(from_attributes=True)
+
+
+class VectorMetadata(BaseModel):
+    id: Optional[int] = None
+    modality: ModalityType
+    media_id: int
+    timestamp: Optional[float] = None
+    end_timestamp: Optional[float] = None
+
+
+class VectorAndMediaMetadata(VectorMetadata, MediaMetadata):
+    pass
+
+
+class ThumbnailMetadata(BaseModel):
+    id: Optional[int] = None
+    media_id: int
+    timestamp: Optional[float] = None
+    content: bytes
 
 
 class Project(BaseModel):
     id: str
     version: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class ExtraMediaMetadata(BaseModel):
+    media_id: int
+    external_id: Optional[str] = None
+    metadata: Dict[str, Any]  # TODO: narrow the type
 
 
 class URL(str):

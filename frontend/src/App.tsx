@@ -8,7 +8,7 @@ import './App.scss';
 import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
-import { Query } from './misc/types.ts';
+import { ProcessedSearchResults, Query } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
@@ -16,6 +16,7 @@ import { useDataService } from './DataService.ts';
 export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
+  const [viewModality, setViewModality] = useState<string>('Video');
 
   const dataService = useDataService();
   const [isHomePage, setIsHomePage] = useState(true);
@@ -60,7 +61,7 @@ export const App: React.FunctionComponent = () => {
   }, []);
 
   const _submitSearch = (queries: Query[]) => {
-    dataService.performNewSearch(queries).then(_ => {
+    dataService.performNewSearch(queries, viewModality).then(_ => {
       setIsHomePage(false); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
     }).catch((err) => {
       Modal.error({
@@ -102,9 +103,10 @@ export const App: React.FunctionComponent = () => {
     }]);
   }  
 
-  return <Layout style={(dataService.searchResults.length === 0) ? {background: 'transparent'} : {}}>
+  return <Layout style={(dataService.searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0) ? {background: 'transparent'} : {}}>
     <WiseHeader multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                 searchText={searchText} setSearchText={setSearchText}
+                viewModality={viewModality} setViewModality={setViewModality}
                 submitSearch={submitSearch}
                 refsForTour={refsForTour}
                 isHomePage={isHomePage} isSearching={dataService.isSearching}></WiseHeader>
@@ -114,6 +116,7 @@ export const App: React.FunctionComponent = () => {
       }
       <SearchResults dataService={dataService} isHomePage={isHomePage} projectInfo={projectInfo}
                       setSearchText={setSearchText} multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
+                      viewModality={viewModality}
                       submitSearch={submitSearch} />
     </Content>
   </Layout>
