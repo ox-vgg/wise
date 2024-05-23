@@ -3,12 +3,14 @@ import glob
 import os
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 import torch.utils.data as torch_data
 from tqdm import tqdm
 import numpy as np
+from collections import defaultdict
 
 from src.dataloader import AVDataset, get_media_metadata
+from src.dataloader.utils import VIDEO_EXTENSIONS, is_valid_image, is_valid_video
 from src.wise_project import WiseProject
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
 from src.feature.store.feature_store_factory import FeatureStoreFactory
@@ -50,7 +52,7 @@ if __name__ == "__main__":
         required=False,
         action="append",
         dest="media_include_list",
-        default=["*.mp4"],
+        default=[f"*.{ext}" for ext in VIDEO_EXTENSIONS],
         type=str,
         help="regular expression to include certain media files",
     )
@@ -134,19 +136,35 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    ## 1. Create a list of input files
-    media_filelist: Dict[int, str] = {}
-
+    ## 1. Check validity of input files
+    print("Checking for invalid media files")
+    # Create dictionary of media files; key: media_dir, value: list of filepaths
+    valid_media_files: defaultdict[str, List[str]] = defaultdict(list)
     for media_dir in args.media_dir_list:
-        with db_engine.begin() as conn:
-            # Add each folder to source collection table
-            data = SourceCollection(
-                location=media_dir, type=SourceCollectionType.DIR
-            )
-            media_source_collection = SourceCollectionRepo.create(conn, data=data)
-            for media_include in args.media_include_list:
-                media_search_dir = os.path.join(media_dir, "**/" + media_include)
-                for media_path in glob.iglob(pathname=media_search_dir, recursive=True):
+        for media_include in args.media_include_list:
+            media_search_dir = os.path.join(media_dir, "**/" + media_include)
+            media_paths = list(glob.iglob(pathname=media_search_dir, recursive=True))
+            media_paths = [Path(x) for x in media_paths]
+            media_paths = [str(x) for x in tqdm(media_paths) if x.is_file() and is_valid_video(x)]
+            if len(media_paths) > 0:
+                valid_media_files[media_dir] += media_paths
+
+    if len(valid_media_files) == 0:
+        raise ValueError("No valid media files found")
+
+    ## 2. Initialise internal metadata database
+    print('Initialising internal metadata database')
+    media_filelist: Dict[int, str] = {} # maps media ids to filepaths
+    with tqdm(total=sum(len(media_paths) for media_paths in valid_media_files.values())) as pbar:
+        for media_dir, media_paths in valid_media_files.items():
+            with db_engine.begin() as conn:
+                # Add each folder to source collection table
+                data = SourceCollection(
+                    location=media_dir, type=SourceCollectionType.DIR
+                )
+                media_source_collection = SourceCollectionRepo.create(conn, data=data)
+            
+                for media_path in media_paths:
                     # Get metadata for each file and add it to media table
                     # Get media_path relative to
                     media_metadata = get_media_metadata(media_path)
@@ -177,10 +195,10 @@ if __name__ == "__main__":
                     # )
                     # MediaMetadataRepo.create(conn, data=extra_metadata)
                     media_filelist[metadata.id] = media_path
+                    pbar.update(1)
 
+    ## 3. Prepare for feature extraction and storage
     print(f"Extracting features from {len(media_filelist)} files")
-
-    ## 2. Prepare for feature extraction and storage
     feature_extractor_id_list = {}
     if hasattr(args, 'video_feature_id') and args.video_feature_id is not None:
         feature_extractor_id_list['video'] = args.video_feature_id
@@ -198,16 +216,16 @@ if __name__ == "__main__":
     for media_type in feature_extractor_id_list:
         feature_extractor_id = feature_extractor_id_list[media_type]
 
-        ## 2.1 Initialise feature extractor
+        ## 3.1 Initialise feature extractor
         feature_extractor_list[media_type] = FeatureExtractorFactory(
             feature_extractor_id
         )
         print(f"Using {feature_extractor_id} for {media_type}")
 
-        ## 2.2 Create folders to store features, metadata and search index
+        ## 3.2 Create folders to store features, metadata and search index
         project.create_features_dir(feature_extractor_id)
 
-        ## 2.3 Initialise feature store to store features
+        ## 3.3 Initialise feature store to store features
         feature_store_list[media_type] = FeatureStoreFactory.create_store(
             args.feature_store_type,
             media_type,
