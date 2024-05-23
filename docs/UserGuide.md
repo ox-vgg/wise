@@ -10,9 +10,9 @@ audio and visual search capabilities of WISE.
 ```
 # We assume that the current directory contains
 # the WISE software source tree.
-mkdir -p wise-data/Kinectics-6
-curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/Kinectics-6.tar.gz"
-tar -zxvf Kinectics-6.tar.gz -C wise-data/Kinectics-6
+mkdir -p wise-data/Kinetics-6
+curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/Kinetics-6.tar.gz"
+tar -zxvf Kinetics-6.tar.gz -C wise-data/Kinetics-6
 ```
 
 Next, we extract visual and audio features and create a search index that will allows
@@ -21,11 +21,11 @@ us to perform audio and visual search on the video collection.
 ```
 mkdir -p wise-projects/
 python3 extract-features.py \
-  --media-dir wise-data/Kinectics-6/ \
-  --project-dir wise-projects/Kinectics-6/
+  --media-dir wise-data/Kinetics-6/ \
+  --project-dir wise-projects/Kinetics-6/
 
 python3 create-index.py \
-  --project-dir wise-projects/Kinectics-6/
+  --project-dir wise-projects/Kinetics-6/
 ```
 
 We can now search the video collection either using the web-based interface, or using the CLI as described below:
@@ -34,7 +34,7 @@ We can now search the video collection either using the web-based interface, or 
 
 Start the web server using the command below:
 ```
-python3 serve.py --project-dir wise-projects/Kinectics-6/
+python3 serve.py --project-dir wise-projects/Kinetics-6/
 ```
 Once the server has been started, go to http://localhost:9670/Kinetics-6/ in your browser. This will open up a search interface like this:
 
@@ -51,7 +51,7 @@ python search.py \
   --query "cooking" --in video \
   --query "music" --in audio \
   --topk 20 \
-  --project-dir wise-projects/Kinectics-6/
+  --project-dir wise-projects/Kinetics-6/
 ```
 
 The search results, shown below, shows that this search query is able to find the video that shows
@@ -87,7 +87,7 @@ Searching /data/beegfs/ultrafast/home/adutta/temp/wise/Kinectics-6/ for
 
     Search results for "cooking and music" in video and audio     
  Rank  Filename                                         Time      
-    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5 
+    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 9.5
 ```
 
 The range value shown in the `Time` column (e.g. `0.0 - 9.5`) is obtained
@@ -103,7 +103,7 @@ example of the same search query run in the search console.
 
 ```
 $ python search.py \
-  --project-dir wise-projects/Kinectics-6/
+  --project-dir wise-projects/Kinetics-6/
 
 Starting WISE search console ...
 Some examples queries (press Ctrl + D to exit):
@@ -201,7 +201,7 @@ $ python search.py \
   --save-to-file results.csv \
   --topk 5 \
   --queries-from queries.csv \
-  --project-dir wise-projects/Kinectics-6/
+  --project-dir wise-projects/Kinetics-6/
 ```
 
 The search results are exported to a csv file as shown below.
