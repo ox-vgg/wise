@@ -85,3 +85,11 @@ class ExtraMediaMetadata(BaseModel):
 
 class URL(str):
     pass
+
+class VideoShot(BaseModel):
+    id: int
+    media_id: int
+    ts: float
+    te: float
+
+    model_config = ConfigDict(from_attributes=True)

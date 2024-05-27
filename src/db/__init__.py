@@ -6,6 +6,7 @@ from .tables import (
     vectors_table,
     imported_metadata_table,
     thumbnails_table,
+    shots_table
 )
 
 _WISE_FTS_TABLE = 'metadata_fts'

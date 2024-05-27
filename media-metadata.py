@@ -24,15 +24,18 @@ from src.data_models import (
     VectorMetadata,
     MediaType,
     SourceCollectionType,
+    VideoShot
 )
 from src.repository import (
     SourceCollectionRepo,
     MediaRepo,
     VectorRepo,
     MediaMetadataRepo,
+    VideoShotsRepo,
 )
-
+from src import db
 import sqlalchemy as sa
+from tqdm import tqdm
 
 ##
 ## A. Command line interface (CLI) parser and handler
@@ -49,7 +52,7 @@ def main():
                                      files in the WISE project.''')
 
     parser.add_argument('command',
-                        choices=['import'],
+                        choices=['import', 'import-shots'],
                         nargs='?',
                         help='various modes of operation supported by the metadata script')
 
@@ -77,8 +80,57 @@ def main():
 
     if(args.command == 'import'):
         import_media_metadata(args)
+    elif(args.command == 'import-shots'):
+        import_shots(args)
     else:
         print(f'unknown command {args.command}')
+
+##
+## Import Shots
+##
+
+def import_shots(args):
+    project = WiseProject(args.project_dir, create_project=False)
+    db_engine = db.init_project(project.dburi, echo=False)
+
+    def add_shots(_metadata):
+        with db_engine.begin() as conn:
+            # delete all existing shots
+            VideoShotsRepo.delete_all(conn)
+
+        with db_engine.connect() as conn:
+            for idx, m in enumerate(tqdm(_metadata), start=1):
+                VideoShotsRepo.create(
+                    conn, 
+                    data=VideoShot(
+                        id=m['id'],
+                        media_id=m['media_id'],
+                        ts=m['timestamp'],
+                        te=m['end_timestamp'],
+                    )
+                )
+                if (idx % 1024) == 0:
+                    conn.commit()
+            conn.commit()
+    
+    csv_filename = Path(args.from_csv)
+    if not csv_filename.exists():
+        raise ValueError(f'csv file does not exist: {csv_filename}')
+    
+    csv_colnames = get_csv_header(csv_filename)
+    if 'media_id' not in csv_colnames and 'media_path' not in csv_colnames:
+        raise ValueError('media_id or media_path columns missing from CSV')
+    
+    if 'id' not in csv_colnames or 'timestamp' not in csv_colnames or 'end_timestamp' not in csv_colnames:
+        raise ValueError('id / timestamp / end_timestamp columns missing from CSV - make sure the correct script was used to geenrate the shots csv')
+    
+    metadata = load_metadata_from_csv(args.from_csv, args)
+    if 'media_path' in csv_colnames:
+        resolve_media_path(db_engine, metadata)
+
+
+    add_shots(metadata)
+
 
 ##
 ## B. Import metadata
@@ -132,13 +184,8 @@ def load_metadata_from_csv(csv_filename, args):
         dialect = csv.Sniffer().sniff(sample=data_sample, delimiters=',')
 
         reader = csv.DictReader(csv_file, dialect=dialect)
-        colnames = reader.fieldnames
 
-        for row in reader:
-            metadata = {}
-            for colname in colnames:
-                metadata[colname] = row[colname]
-            all_metadata.append(metadata)
+        all_metadata = [row for row in reader]
     return all_metadata
 
 def resolve_media_path(db_engine, metadata):

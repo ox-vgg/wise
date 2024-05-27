@@ -14,6 +14,7 @@ from ..data_models import (
     VectorMetadata,
     ExtraMediaMetadata,
     ThumbnailMetadata,
+    VideoShot
 )
 from .. import db
 
@@ -34,6 +35,8 @@ MediaMetadataRepo = SQLAlchemyRepository[
 ThumbnailRepo = SQLAlchemyRepository[
     ThumbnailMetadata, ThumbnailMetadata, ThumbnailMetadata
 ](db.thumbnails_table, ThumbnailMetadata)
+
+VideoShotsRepo = SQLAlchemyRepository[VideoShot, VideoShot, VideoShot](db.shots_table, VideoShot)
 
 
 _vtable = db.vectors_table
