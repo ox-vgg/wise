@@ -201,11 +201,12 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   }
 
   const numMediaFilesString: string = projectInfo.num_media_files?.toLocaleString('en', { useGrouping: true }) || '?';
+  const numMinutesString: string = Math.round(projectInfo.num_vectors / 120).toLocaleString('en-us') || '?';
   let loadingMessage = <></>;
   if (isSearching) {
-    loadingMessage = <p className="wise-loading-message">Searching in {numMediaFilesString} videos <LoadingOutlined /></p>;
+    loadingMessage = <p className="wise-loading-message">Searching in {numMediaFilesString} videos (total {numMinutesString} minutes) <LoadingOutlined /></p>;
   } else if (!isHomePage && !isSearching) {
-    loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds of {numMediaFilesString} videos</p>;
+    loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds of {numMediaFilesString} videos (total {numMinutesString} minutes)</p>;
   }
 
   const isLoadingFeaturedImages = (isHomePage && searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0);
