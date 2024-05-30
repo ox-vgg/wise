@@ -72,11 +72,11 @@ class SearchIndex:
             index.train(train_features)
             assert index.is_trained
 
+        print('Adding feature vectors to index')
         with tqdm(total=feature_count) as pbar:
-            for feature_id, feature_vector in feature_store:
-                feature_id_ndarray = np.ndarray((1), buffer=np.array([feature_id]), dtype=int)
-                index.add_with_ids(feature_vector, feature_id_ndarray)
-                pbar.update(1)
+            for feature_ids_batch, feature_vectors_batch in feature_store.iter_batch():
+                index.add_with_ids(feature_vectors_batch, feature_ids_batch)
+                pbar.update(len(feature_ids_batch))
 
         faiss.write_index(index, index_fn.as_posix())
         print(f'  saved index to {index_fn}')

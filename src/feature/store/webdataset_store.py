@@ -112,6 +112,33 @@ class WebdatasetStore(FeatureStore):
             feature_id = int(payload['__key__'])
             feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
             yield feature_id, feature_vector
+    
+    def iter_batch(self, batch_size=512):
+        if self.shuffle_values:
+            shard_reader = wds.WebDataset(self.wds_src_url,
+                                          shardshuffle=self.shard_shuffle,
+                                          repeat=False).shuffle(self.shuffle_bufsize)
+        else:
+            shard_reader = wds.WebDataset(self.wds_src_url,
+                                          shardshuffle=self.shard_shuffle,
+                                          repeat=False)
+        
+        def numpy_decoder(key, value):
+            assert key.endswith('features.pyd'), f"Unexpected key: {key}"
+            assert isinstance(value, bytes), f"Unexpected type: {type(value)}"
+            return np.load(io.BytesIO(value), allow_pickle=True)
+
+        shard_reader = (
+            shard_reader
+            .decode(numpy_decoder)
+            .to_tuple("__key__", "features.pyd")
+            .map_tuple(
+                int, # convert key to int
+                lambda x: x.squeeze(axis=0), # change shape of numpy array from (1, d) to (d,)
+            )
+            .batched(batch_size)
+        )
+        yield from shard_reader
 
     def close(self):
         self.shardWriter.close()
