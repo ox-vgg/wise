@@ -3,6 +3,7 @@ from tqdm import tqdm
 from pathlib import Path
 import numpy as np
 import math
+import itertools
 
 from .feature.feature_extractor_factory import FeatureExtractorFactory
 from .feature.store.feature_store_factory import FeatureStoreFactory
@@ -60,12 +61,11 @@ class SearchIndex:
             shuffled_features.enable_read(shard_shuffle=True)
 
             train_features = np.ndarray((train_count, feature_dim), dtype=np.float32)
-            feature_index = 0
-            for feature_id, feature_vector in shuffled_features:
-                train_features[feature_index,:] = feature_vector
-                feature_index += 1
-                if feature_index == train_count:
-                    break
+            for i, (feature_id, feature_vector) in tqdm(
+                enumerate(itertools.islice(shuffled_features, train_count)),
+                total=train_count
+            ):
+                train_features[i,:] = feature_vector
 
             assert not index.is_trained
             print(f'  training {index_type} faiss index with {train_count} features with {cell_count} clusters ...')
