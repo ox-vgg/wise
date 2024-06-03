@@ -12,41 +12,43 @@
 
 <details open>
   <summary><b>Natural language search</b></summary>
-  Use natural language to describe what you want to search for.
-  <br>
+  <p>Use natural language to describe what you want to search for.</p>
   <img src="docs/assets/natural_language_search.png" width="700px">
-  <br>
+  <p>
   WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image (i.e. it searches by image content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions.
+  </p>
 </details>
 
 <details>
   <summary><b>Visual similarity search</b></summary>
-  Upload an image or paste an image link to find similar images:
-  <br>
+  <p>Upload an image or paste an image link to find similar images:</p>
   <img src="docs/assets/visual_similarity_search.png" width="700px">
 </details>
 
 <details>
   <summary><b>Multi-modal search</b></summary>
+  <p>
   Combine images and text in your query. For example, if you upload a picture of a golden retriever and enter the text "in snow", WISE will find images of golden retrievers in snow.
-  <br>
+  </p>
   <img src="docs/assets/multimodal_search.png" width="700px">
 </details>
 
 <details>
   <summary><b>Various multimodal / vision-language models supported</b></summary>
+  <p>
   Various models are supported including vision-language models from <a target="_blank" href="https://github.com/mlfoundations/open_clip">OpenCLIP</a> (including OpenAI CLIP) and the <a target="_blank" href="https://github.com/microsoft/CLAP">Microsoft CLAP</a> audio-language model.
+  </p>
 </details>
 
 <details>
   <summary><b>Different ways to perform searches</b></summary>
-  Searches can be performed via:
+  <p>Searches can be performed via:</p>
   <ul>
     <li>CLI</li>
     <li>REST API</li>
     <li>Web frontend</li>
   </ul>
-  (Note: currently the search functionality in the CLI may be missing some features.)
+  <p>(Note: currently the search functionality in the CLI may be missing some features.)</p>
 </details>
 
 <details>
@@ -65,9 +67,9 @@ We are planning on implementing the following features soon. Stay tuned!
   <li>
     Searching on image and audio files
     <br>
-    Currently, WISE 2 only supports searching on _video files_ (on both the audio and visual stream of video files).
+    Currently, WISE 2 only supports searching on <i>video files</i> (on both the audio and visual stream of video files).
     Searching on images and pure audio files is not supported yet.
-    Please use [WISE 1.x.x](https://gitlab.com/vgg/wise/wise/-/tree/wise-1.2.0?ref_type%253Dtags) for now if you need to search on images.
+    Please use <a href="https://gitlab.com/vgg/wise/wise/-/tree/wise-1.2.0?ref_type%253Dtags">WISE 1.x.x</a> for now if you need to search on images.
   </li>
   <li>
   Cross platform easy installation
@@ -88,8 +90,10 @@ Here are some documents for users and developers of WISE.
 - Developer Resources
   - [Data Loading](docs/data-loading.md): describes interface for loading media files
   - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
-  - [Tests](docs/Tests.md) : describes the software testing process for WISE
   - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
+  - [Frontend](frontend/README.md) : describes the frontend web-based interface
+  - [Database](src/db/README.md) : describes the structure of the internal metadata database, which stores information about the source collections (i.e. input folders), media files (e.g. images, videos, or audio files), vectors, and extra metadata
+  - [Tests](docs/Tests.md) : describes the software testing process for WISE
 
 ## Contact
 

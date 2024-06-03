@@ -79,7 +79,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
   const aboutWiseTabContent: Record<string, React.ReactNode> = {
     'Overview': (
       <div className="wise-overview">
-        <p>WISE is an AI-powered search engine for images. You can find images using natural language, an uploaded image, or a combination of both, leveraging the power of multi-modal AI.</p>
+        <p>WISE is an AI-powered search engine for images and videos. You can search using natural language, an uploaded image, or a combination of both, leveraging the power of multi-modal AI.</p>
         {projectInfo.num_vectors ? 
           <p>Here, you can search within a set of {projectInfo.num_media_files?.toLocaleString('en-us')} media files ({projectInfo.num_vectors?.toLocaleString('en-us')} vectors).</p>
           :
