@@ -135,6 +135,12 @@ def get_featured_images(conn: sa.Connection) -> List[int]:
     )
     return conn.execute(stmt).scalars().all()
 
+def get_project_total_duration(conn: sa.Connection) -> Optional[float]:
+    """
+    Get the total duration (in seconds) of all the video/audio files in the project
+    """
+    return conn.execute(sa.select(sa.sql.func.sum(_mtable.c.duration))).scalar()
+
 # def query_by_timestamp(conn, *, location: str, timestamp: Tuple[int, int]):
 #     # Join the table and query by dataset_path, and return the id
 
