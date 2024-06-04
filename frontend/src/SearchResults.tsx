@@ -201,7 +201,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   }
 
   const numMediaFilesString: string = projectInfo.num_media_files?.toLocaleString('en', { useGrouping: true }) || '?';
-  const numMinutesString: string = Math.round(projectInfo.num_vectors / 120).toLocaleString('en-us') || '?';
+  const numMinutesString: string = Math.round(projectInfo.total_duration / 60).toLocaleString('en-us') || '?';
   let loadingMessage = <></>;
   if (isSearching) {
     loadingMessage = <p className="wise-loading-message">Searching in {numMediaFilesString} videos (total {numMinutesString} minutes) <LoadingOutlined /></p>;
