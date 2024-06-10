@@ -30,6 +30,7 @@ class FeatureSearchIndex(SearchIndex):
         return self.index_dir / (self.media_type + '-' + index_type + '.faiss')
 
     def create_index(self, index_type, overwrite=False):
+        self.index_dir.mkdir(parents=True, exist_ok=True)
         index_fn = self.get_index_filename(index_type)
         if index_fn.exists() and overwrite is False:
             print(f'{index_type} for {self.media_type} already exists')
