@@ -24,7 +24,7 @@ from rich.table import Table
 
 from src.dataloader import AVDataset
 from src.wise_project import WiseProject
-from src.search_index import SearchIndex
+from src.index.search_index_factory import SearchIndexFactory
 
 from src import db
 from src.data_models import (
@@ -74,44 +74,122 @@ def process_query(search_index_list, query_specs, args):
     topk = args.topk
     if 'topk' in query_specs:
         topk = int(query_specs['topk'])
-    for query_index in range(0, len(query_specs['query'])):
+    for query_index in range(0, len(query_specs['media_type'])):
         start_time = time.time()
         query_text = query_specs['query'][query_index]
         media_type = query_specs['media_type'][query_index]
 
-        # 2. Find nearest neighbours to the search query
-        dist, ids = search_index_list[media_type].search(media_type,
-                                                         query_text,
-                                                         topk,
-                                                         query_type='text')
-        match_filename_list = []
-        match_pts_list = []
-        match_score_list = []
-        with db_engine.connect() as conn:
-            for rank in range(0, len(ids)):
-                vector_id = int(ids[rank])
-                # if faiss cannot return topk number of results, it marks
-                # the end of result by setting ids to -1
-                if vector_id == -1:
-                    break
-                vector_metadata = VectorRepo.get(conn, vector_id)
-                media_metadata = MediaRepo.get(conn, vector_metadata.media_id)
-                filename = media_metadata.path
-                if vector_metadata.end_timestamp == None:
-                    pts = vector_metadata.timestamp
-                else:
-                    pts = [vector_metadata.timestamp, vector_metadata.end_timestamp]
-                match_filename_list.append(filename)
-                match_pts_list.append(pts)
-                match_score_list.append(float(dist[rank]))
+        if media_type == 'metadata':
+            search_result_i = search_index_list[media_type].search(media_type,
+                                                                   query_text,
+                                                                   topk,
+                                                                   query_type='text')
+        else:
+            # 2. Find nearest neighbours to the search query
+            dist, ids = search_index_list[media_type].search(media_type,
+                                                             query_text,
+                                                             topk,
+                                                             query_type='text')
+
+            match_filename_list = []
+            match_pts_list = []
+            match_score_list = []
+            with db_engine.connect() as conn:
+                for rank in range(0, len(ids)):
+                    vector_id = int(ids[rank])
+                    # if faiss cannot return topk number of results, it marks
+                    # the end of result by setting ids to -1
+                    if vector_id == -1:
+                        break
+                    vector_metadata = VectorRepo.get(conn, vector_id)
+                    media_metadata = MediaRepo.get(conn, vector_metadata.media_id)
+                    filename = media_metadata.path
+                    if vector_metadata.end_timestamp == None:
+                        pts = vector_metadata.timestamp
+                    else:
+                        pts = [vector_metadata.timestamp, vector_metadata.end_timestamp]
+                    match_filename_list.append(filename)
+                    match_pts_list.append(pts)
+                    match_score_list.append(float(dist[rank]))
+            search_result_i = {
+                'match_filename_list': match_filename_list,
+                'match_pts_list': match_pts_list,
+                'match_score_list': match_score_list,
+            }
         end_time = time.time()
-        search_result.append({
-            'match_filename_list': match_filename_list,
-            'match_pts_list': match_pts_list,
-            'match_score_list': match_score_list,
-            'search_time_sec': (end_time - start_time)
-        })
+        search_result_i['search_time_sec'] = end_time - start_time
+        search_result.append(search_result_i)
     return search_result
+
+""" Remove results as requested by the user using --not-in flag
+"""
+def apply_subtract(search_result, not_search_result):
+    new_search_result = []
+    for query_index in range(0, len(search_result)):
+        result_i = {
+            'match_filename_list':[],
+            'match_pts_list':[],
+            'match_score_list':[],
+            'search_time_sec':0
+        }
+        for result_index in range(0, len(search_result[query_index]['match_filename_list'])):
+            match_filename = search_result[query_index]['match_filename_list'][result_index]
+            match_pts = search_result[query_index]['match_pts_list'][result_index]
+            match_score = search_result[query_index]['match_score_list'][result_index]
+            if not result_exists(match_filename, match_pts, not_search_result):
+                result_i['match_filename_list'].append(match_filename)
+                result_i['match_pts_list'].append(match_pts)
+                result_i['match_score_list'].append(match_score)
+        result_i['search_time_sec'] = search_result[query_index]['search_time_sec']
+        new_search_result.append(result_i)
+    return new_search_result
+
+def result_exists(filename, pts, results):
+    for query_index in range(0, len(results)):
+        for result_index in range(0, len(results[query_index]['match_filename_list'])):
+            if filename == results[query_index]['match_filename_list'][result_index]:
+                pts2 = results[query_index]['match_pts_list'][result_index]
+                if does_pts1_lie_in_pts2(pts, pts2):
+                    return True
+    return False
+
+def does_pts1_lie_in_pts2(pts1, pts2):
+    if isinstance(pts2, list) and len(pts2) > 1:
+        low = pts2[0]
+        high = pts2[1]
+        if isinstance(pts1, list) and len(pts1) > 1:
+            # both pts1 and pts2 are time intervals
+            x = pts1[0]
+            y = pts1[1]
+            if (x>low and x<high) or (y>low and y<high):
+                return True
+            else:
+                return False
+        else:
+            # pts1 is a time value while pts2 is a time interval
+            pts1_value = pts1
+            if isinstance(pts1, list) and len(pts1) == 1:
+                pts1_value = pts1[0]
+            if pts1_value>low and pts1_value<high:
+                return True
+            else:
+                return False
+    else:
+        pts2_value = pts2
+        if isinstance(pts2, list) and len(pts2) == 1:
+            pts2_value = pts2[0]
+        if isinstance(pts1, list):
+            x = pts1[0]
+            y = pts1[1]
+            if pts2_value>x and pts2_value<y:
+                return True
+            else:
+                return False
+        else:
+            if fabs(pts1 - pts2_value) < 0.5:
+                return True
+            else:
+                return False
 
 ##
 ##  B. Merge search results based on audiovisual time segment, rank, etc.
@@ -141,7 +219,7 @@ def process_query(search_index_list, query_specs, args):
     merged search result in the same format as the "result" argument
 """
 def merge0(query_specs, result, args):
-    for query_index in range(0, len(query_specs['query'])):
+    for query_index in range(0, len(query_specs['media_type'])):
         media_type = query_specs['media_type'][query_index]
         merge_tolerance_id = 'merge_tolerance_' + media_type
         time_tolerance = getattr(args, merge_tolerance_id)
@@ -302,12 +380,13 @@ def merge1(query_specs, result, args):
         filename1 = result[1]['match_filename_list'][index1]
         score0 = result[0]['match_score_list'][index0]
         score1 = result[1]['match_score_list'][index1]
-        if filename0 == filename1:
+        pts0 = result[0]['match_pts_list'][index0]
+        pts1 = result[1]['match_pts_list'][index1]
+
+        if filename0 == filename1 and does_pts1_lie_in_pts2(pts0, pts1):
             merged_filename_list.append(filename0)
             merged_score = score0 + score1
             merged_score_list.append(merged_score)
-            pts0 = result[0]['match_pts_list'][index0]
-            pts1 = result[1]['match_pts_list'][index1]
             if isinstance(pts0, list) and isinstance(pts1, list):
                 merged_pts = pts0 + pts1
             else:
@@ -395,7 +474,7 @@ def show_result_as_table(query_specs, result, args):
 
     console = Console(file=out, no_color=True)
     total_search_time = 0
-    for query_index in range(0, len(query_specs['query'])):
+    for query_index in range(0, len(query_specs['media_type'])):
         query_text = query_specs['query'][query_index]
         media_type = query_specs['media_type'][query_index]
         table = Table(title='Search results for "' + query_text + '" in ' + media_type,
@@ -446,7 +525,7 @@ def show_result_as_csv(query_specs, result, args):
         out = io.open(query_specs['save-to-file'], 'a')
         writing_to_file = True
 
-    for query_index in range(0, len(query_specs['query'])):
+    for query_index in range(0, len(query_specs['media_type'])):
         query_text = query_specs['query'][query_index]
         media_type = query_specs['media_type'][query_index]
         query_id   = query_specs['query_id'][query_index]
@@ -584,9 +663,16 @@ if __name__ == '__main__':
     parser.add_argument('--in',
                         required=False,
                         action='append',
-                        dest='media_type', # since "in" is a reserved keyword
-                        choices=['audio', 'video'],
+                        dest='media_type_list', # since "in" is a reserved keyword
+                        choices=['audio', 'video', 'metadata'],
                         help='apply the search query term to these features; query applied to all features if --in argument is missing')
+
+    parser.add_argument('--not-in',
+                        required=False,
+                        action='append',
+                        dest='media_type_not_list',
+                        choices=['audio', 'video', 'metadata'],
+                        help='remove the results from the preceeding query obtained in this media_type; Note: all --not-in flags must come after --in flags')
 
     parser.add_argument('--index-type',
                         required=False,
@@ -628,6 +714,12 @@ if __name__ == '__main__':
                         type=int,
                         default=8,
                         help='tolerance (in seconds) for merging audio based search results')
+
+    parser.add_argument('--merge-tolerance-metadata',
+                        required=False,
+                        type=int,
+                        default=0,
+                        help='tolerance (in seconds) for merging metadata based search results')
 
     parser.add_argument('--result-format',
                         required=False,
@@ -677,17 +769,31 @@ if __name__ == '__main__':
 
     ## load search assets
     search_index_list = {}
-    for media_type in project_assets:
-        feature_extractor_id_list = list(project_assets[media_type].keys())
-        feature_extractor_id = feature_extractor_id_list[0] # TODO: allow users to select the feature
 
-        # load search index
-        index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
-        search_index_list[media_type] = SearchIndex(media_type,
-                                                    feature_extractor_id,
-                                                    index_dir)
+    required_media_type = list(args.media_type_list)
+    if args.media_type_not_list:
+        required_media_type += args.media_type_not_list
+    unique_required_media_type = list(set(required_media_type))
+
+    for media_type in unique_required_media_type:
+        asset_id_list = list(project_assets[media_type].keys())
+        asset_index = 0
+        N = len(asset_id_list)
+        if N == 1:
+            asset_index = 0
+        else:
+            print(f'{media_type} can be searched using the following search index:')
+            for asset_index in range(0, N):
+                print(f'  [{asset_index}] {asset_id_list[asset_index]}')
+            selected_asset_index = -1
+            while selected_asset_index < 0 and selected_asset_index >= N:
+                selected_asset_index = input(f'Enter the index of desired search index [0-{N}]')
+            asset_index = selected_asset_index
+        asset_id = asset_id_list[asset_index]
+        asset = project_assets[media_type][asset_id]
+        search_index_list[media_type] = SearchIndexFactory(media_type, asset_id, asset)
         if not search_index_list[media_type].load_index(args.index_type):
-            print(f'failed to load {args.index_type} for {media_type}')
+            print(f'failed to load {media_type} index: {asset_id}')
             del search_index_list[media_type]
             continue
 
@@ -704,29 +810,49 @@ if __name__ == '__main__':
     ## Case-1: Search query provided in the command line
     if hasattr(args, 'query') and args.query is not None:
         ## Sanity check
-        if len(args.query) > 1 and len(args.query) != len(args.media_type):
+        media_type_count = len(args.media_type_list)
+        if args.media_type_not_list:
+            media_type_count += len(args.media_type_not_list)
+        if len(args.query) > 1 and len(args.query) != media_type_count:
             print('Each --query argument must be followed by a --in argument. For example:')
             print('  $ python search.py --query people --in video --query shouting --in audio ...')
             sys.exit(0)
 
         ## if "--in" argments are missing, assume that the search query is
         ## to be applied on all possible media types
-        if len(args.query) == 1 and args.media_type is None:
-            setattr(args, 'media_type', ['audio', 'video'])
+        if len(args.query) == 1 and args.media_type_list is None:
+            setattr(args, 'media_type_list', ['audio', 'video', 'metadata'])
             only_query = args.query[0]
             setattr(args, 'query', [only_query, only_query])
 
         if args.result_format != 'csv' and not args.save_to_file:
             print(f'Searching {args.project_dir} for')
-            for i in range(0, len(args.query)):
-                print(f'  [{i}] "{args.query[i]}" in {args.media_type[i]}')
+            for i in range(0, len(args.media_type_list)):
+                print(f'  [{i}] "{args.query[i]}" in {args.media_type_list[i]}')
+            if args.media_type_not_list:
+                k = len(args.media_type_list)
+                for i in range(k, len(args.query)):
+                    print(f'  [{i}] "{args.query[i]}" not in {args.media_type_not_list[i-k]}')
             print('\n')
         query_specs = {
             'query': args.query,
             'query_id': [ str(x) for x in range(0, len(args.query)) ],
-            'media_type': args.media_type
+            'media_type': args.media_type_list
         }
         search_result = process_query(search_index_list, query_specs, args)
+        if args.media_type_not_list is not None:
+            # remove all results as specified using the --not-in flag
+            not_query_specs = {
+                'query':[],
+                'media_type':[],
+                'topk': args.topk
+            }
+            for i in range(len(args.media_type_list), len(args.query)):
+                not_query_specs['query'].append( args.query[i] )
+                not_in_media_type = args.media_type_not_list[len(args.media_type_list) - i]
+                not_query_specs['media_type'].append(not_in_media_type)
+            not_search_result = process_query(search_index_list, not_query_specs, args)
+            search_result = apply_subtract(search_result, not_search_result)
         if args.no_merge:
             show_result(query_specs, search_result, args)
         else:
@@ -752,9 +878,9 @@ if __name__ == '__main__':
                 query_id = row[0]
                 query_text = row[1]
                 query_specs = {
-                    'query': [query_text for _ in args.media_type], # repeat query for each media_type
-                    'query_id': [ query_id for _ in args.media_type ],
-                    'media_type': args.media_type
+                    'query': [query_text for _ in args.media_type_list], # repeat query for each media_type
+                    'query_id': [ query_id for _ in args.media_type_list ],
+                    'media_type': args.media_type_list
                 }
                 search_result = process_query(search_index_list, query_specs, args)
                 if args.no_merge:

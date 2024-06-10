@@ -62,10 +62,10 @@ def main():
                         type=str,
                         help='a CSV filename, must have a following column header as the first line')
 
-    parser.add_argument('--metadata-name',
+    parser.add_argument('--metadata-id',
                         required=False,
                         type=str,
-                        help='a unique id associated with all the metadata; append if already exists')
+                        help='a unique id of the form FOLDER_NAME/DB_NAME/TABLE_NAME (e.g. "EpicKitchens-100/retrieval_annotations/train"')
 
     parser.add_argument('--col-metadata-id',
                         required=False,
@@ -117,6 +117,11 @@ def import_metadata(args):
         sys.exit(1)
     db_engine = db.init_project(project.dburi, echo=False)
 
+    metadata_db, metadata_table = project.metadata_db_table(args.metadata_id)
+    if metadata_exist(metadata_db, metadata_table):
+        print(f'metadata "{args.metadata_id}" already exists in file {metadata_db}')
+        return
+
     if args.from_csv:
         csv_filename = Path(args.from_csv)
         if not csv_filename.exists():
@@ -130,11 +135,7 @@ def import_metadata(args):
 
     valid_metadata = get_valid_metadata(metadata, db_engine)
 
-    # 2. Count the timestamps that lie within the valid range of existing media's duration
-    metadata_db = project.metadata_filename()
-    metadata_table = args.metadata_name
     metadata_type = MetadataType.SEGMENT
-
     add_metadata(metadata_db,
                  metadata_table,
                  valid_metadata,
@@ -253,20 +254,7 @@ def add_metadata(metadata_db, metadata_table, metadata, metadata_type, wise_coln
         cursor.executemany(sql, sql_data)
         print(f'added {len(sql_data)} rows of metadata to table {metadata_table}')
 
-        ## 3. Create full text search table
-        metadata_table_fts = f'{metadata_table}_fts'
-        cursor.execute(f'DROP TABLE IF EXISTS {metadata_table_fts}')
-        sql = f'CREATE VIRTUAL TABLE {metadata_table_fts} USING fts5({metadata_colnames})'
-        cursor.execute(sql)
-        fts_data = []
-        value_placeholders = ','.join( ['?'] * len(metadata_colnames) )
-        for metadata_index in range(0, len(metadata)):
-            fts_data.append( tuple(metadata[metadata_index][colname] for colname in metadata_colnames) )
-        sql = f'INSERT INTO {metadata_table_fts}({metadata_colnames}) VALUES ({value_placeholders})'
-        cursor.executemany(sql, fts_data)
-        cursor.execute(f'END TRANSACTION')
-
-        print(f'created full text search index (FTS) on {len(fts_data)} rows in table {metadata_table_fts}')
+        ## Note: Index for full text search is created using create-index.py script
 
 ##
 ## Helper functions
@@ -301,6 +289,15 @@ def hhmmss_to_sec(hhmmss):
     ms = int(ssms_tok[1])
     sec = hh*60*60 + mm*60 + ss + ms/100.0
     return float(sec)
+
+def metadata_exist(metadata_db, metadata_table):
+    if metadata_db.exists():
+        with sqlite3.connect( str(metadata_db) ) as sqlite_connection:
+            cursor = sqlite_connection.cursor()
+            res = cursor.execute(f'SELECT COUNT(*) FROM sqlite_master WHERE type="table" AND name="{metadata_table}"')
+            if res == (1,):
+                return True
+    return False
 
 if __name__ == '__main__':
     main()
