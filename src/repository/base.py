@@ -56,6 +56,18 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         for row in result.mappings():
             yield self.model.model_validate(row)
 
+    def get_row_by_column_match(self, conn: sa.Connection, column_name_to_match, column_value):
+        """
+        Performs query equivalent to:
+        ```
+        SELECT * FROM table WHERE {col_name} = {col_value}
+        ```
+        """
+        result = conn.execute(sa.select(self._table).where(self._table.c[column_name_to_match] == column_value))
+        for row in result.mappings():
+            return self.model.model_validate(row)
+        return None
+
     def list_by_column_match(
             self,
             conn,
@@ -76,9 +88,9 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
 
         If select_columns is None, all columns in the table are selected (`SELECT * ...`)
         """
-        select_columns = self._table if select_columns is None else self._table.c[select_columns]
+        select_column_specs = self._table if select_columns is None else self._table.c[select_columns]
         result = conn.execution_options(stream_results=True).execute(
-            sa.select(select_columns)
+            sa.select(select_column_specs)
             .where(self._table.c[column_to_match] == value_to_match)
             .order_by(
                 self._table.c[order_by_column].desc() if desc else self._table.c[order_by_column].asc()

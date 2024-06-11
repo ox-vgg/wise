@@ -16,10 +16,15 @@ cd wise
 ```
 
 The WISE software depends on several python libraries and there are the
-following two ways to install these software dependencies.
+following three ways to install these software dependencies.
 
 - Using the [Conda](https://docs.conda.io/en/latest/) or [Mamba](https://mamba.readthedocs.io/en/latest/index.html) dependency management tool
 - Using Python's virtual environment [venv](https://docs.python.org/3/library/venv.html)
+- Install WISE to use only CPU (e.g. on machines without a GPU or GPU with insufficient memory)
+
+See the [User Guide](UserGuide.md) to test the visual search capability of the WISE
+software tool.
+
 
 ## Option 1: Installation using conda / mamba
 
@@ -53,5 +58,26 @@ pip install --no-deps msclap==1.3.3
 pip install -r torch-faiss-requirements.txt
 ```
 
-See the [User Guide](UserGuide.md) to test the visual search capability of the WISE
-software tool.
+## Option 3: Install WISE to use only CPU (i.e. no GPU)
+
+WISE can be installed on a machine without a GPU. While the processing speed is slow,
+all the functionality of the WISE software remains available.
+
+```
+git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
+cd wise
+
+python3 --version                  # must be >= 3.10
+sudo apt install ffmpeg            # ffmpeg is required to load videos
+python3 -m venv wise-dep/          # create virtual environment
+source wise-dep/bin/activate
+python -m pip install --upgrade pip
+
+# Note: the following command is the key to installing CPU only version of WISE
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+pip install -r requirements.txt
+pip install --no-deps msclap==1.3.3
+
+pip install faiss-cpu
+```

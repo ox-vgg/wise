@@ -27,6 +27,9 @@ class WiseProject:
     def dburi(self):
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
+    def metadata_filename(self):
+        return self.metadata_dir / 'external.db'
+
     def store_dir(self):
         return self.store_dir
 
@@ -89,4 +92,3 @@ class WiseProject:
                     self.assets[media_type][feature_extractor_id]['index_files'].append(index_data.name)
 
         return self.assets
-            
