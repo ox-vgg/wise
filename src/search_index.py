@@ -3,6 +3,7 @@ from tqdm import tqdm
 from pathlib import Path
 import numpy as np
 import math
+import itertools
 
 from .feature.feature_extractor_factory import FeatureExtractorFactory
 from .feature.store.feature_store_factory import FeatureStoreFactory
@@ -60,23 +61,22 @@ class SearchIndex:
             shuffled_features.enable_read(shard_shuffle=True)
 
             train_features = np.ndarray((train_count, feature_dim), dtype=np.float32)
-            feature_index = 0
-            for feature_id, feature_vector in shuffled_features:
-                train_features[feature_index,:] = feature_vector
-                feature_index += 1
-                if feature_index == train_count:
-                    break
+            for i, (feature_id, feature_vector) in tqdm(
+                enumerate(itertools.islice(shuffled_features, train_count)),
+                total=train_count
+            ):
+                train_features[i,:] = feature_vector
 
             assert not index.is_trained
             print(f'  training {index_type} faiss index with {train_count} features with {cell_count} clusters ...')
             index.train(train_features)
             assert index.is_trained
 
+        print('Adding feature vectors to index')
         with tqdm(total=feature_count) as pbar:
-            for feature_id, feature_vector in feature_store:
-                feature_id_ndarray = np.ndarray((1), buffer=np.array([feature_id]), dtype=int)
-                index.add_with_ids(feature_vector, feature_id_ndarray)
-                pbar.update(1)
+            for feature_ids_batch, feature_vectors_batch in feature_store.iter_batch():
+                index.add_with_ids(feature_vectors_batch, feature_ids_batch)
+                pbar.update(len(feature_ids_batch))
 
         faiss.write_index(index, index_fn.as_posix())
         print(f'  saved index to {index_fn}')

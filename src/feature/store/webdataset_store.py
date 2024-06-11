@@ -4,6 +4,7 @@ import webdataset as wds
 import glob
 import io
 import sys
+import tarfile
 
 from .feature_store import FeatureStore
 
@@ -48,7 +49,7 @@ class WebdatasetStore(FeatureStore):
         self.shuffle_values = shuffle_values
         self.shuffle_bufsize = shuffle_bufsize
 
-        # load the number of feature count and feature dimension
+        # Load the feature dimension
         wds_tar_prefix = os.path.join(self.store_data_dir, self.store_name + '-')
         wds_tar_pattern = wds_tar_prefix + '*.tar'
         self.tar_index = [sys.maxsize, -1]
@@ -64,18 +65,30 @@ class WebdatasetStore(FeatureStore):
                 self.tar_index_str[1] = tar_index
         tar_index_range = '{%s..%s}' % (self.tar_index_str[0], self.tar_index_str[1])
         self.wds_src_url = wds_tar_prefix + tar_index_range + '.tar'
-        self.feature_count = 0
         temp_shard_reader = wds.WebDataset(self.wds_src_url,
                                            shardshuffle=False,
                                            repeat=False)
-        self.feature_count = 0
-        for _ in temp_shard_reader:
-            self.feature_count += 1
         for payload in temp_shard_reader:
             feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
             self.feature_dim = feature_vector.shape[1]
             break
         temp_shard_reader.close()
+
+        # Fast method for counting the total number of features
+        # We assume that tar files with the same filesize have the same number of features.
+        # The process of counting the number of files (features) within a tar is slow,
+        # whereas filesizes can be computed much faster.
+        # Therefore, after we have counted the number of features of a given tar file,
+        # we skip the counting process for all the other tar files with the same filesize
+        self.feature_count = 0
+        filesize_to_count_mapping = {} # key: filesize of tar file; value: number of features in tar file
+        for tar_filename in glob.iglob(pathname=wds_tar_pattern, recursive=False):
+            filesize = os.stat(tar_filename).st_size
+            if filesize not in filesize_to_count_mapping:
+                with tarfile.open(tar_filename) as f:
+                    # Count the number of files in the tar (assuming each file is a feature vector)
+                    filesize_to_count_mapping[filesize] = sum(1 for member in f if member.isreg())
+            self.feature_count += filesize_to_count_mapping[filesize]        
 
     def add(self, id, features):
         if not self.shardWriter:
@@ -99,6 +112,33 @@ class WebdatasetStore(FeatureStore):
             feature_id = int(payload['__key__'])
             feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
             yield feature_id, feature_vector
+    
+    def iter_batch(self, batch_size=512):
+        if self.shuffle_values:
+            shard_reader = wds.WebDataset(self.wds_src_url,
+                                          shardshuffle=self.shard_shuffle,
+                                          repeat=False).shuffle(self.shuffle_bufsize)
+        else:
+            shard_reader = wds.WebDataset(self.wds_src_url,
+                                          shardshuffle=self.shard_shuffle,
+                                          repeat=False)
+        
+        def numpy_decoder(key, value):
+            assert key.endswith('features.pyd'), f"Unexpected key: {key}"
+            assert isinstance(value, bytes), f"Unexpected type: {type(value)}"
+            return np.load(io.BytesIO(value), allow_pickle=True)
+
+        shard_reader = (
+            shard_reader
+            .decode(numpy_decoder)
+            .to_tuple("__key__", "features.pyd")
+            .map_tuple(
+                int, # convert key to int
+                lambda x: x.squeeze(axis=0), # change shape of numpy array from (1, d) to (d,)
+            )
+            .batched(batch_size)
+        )
+        yield from shard_reader
 
     def close(self):
         self.shardWriter.close()
