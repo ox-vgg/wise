@@ -15,7 +15,7 @@ curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/Kinetics-6.t
 tar -zxvf Kinetics-6.tar.gz -C wise-data/Kinetics-6
 ```
 
-Next, we extract visual and audio features and create a search index that will allows
+Next, we extract visual and audio features and create a search index that will allow
 us to perform audio and visual search on the video collection.
 
 ```
