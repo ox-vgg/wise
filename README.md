@@ -87,6 +87,7 @@ Here are some documents for users and developers of WISE.
 
 - [Install](docs/Install.md) : describes the process for installing WISE
 - [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
+- [Metadata](docs/Metadata.md) : describes support for text metadata search in WISE
 - Developer Resources
   - [Data Loading](docs/data-loading.md): describes interface for loading media files
   - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
