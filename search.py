@@ -69,7 +69,9 @@ def process_query(search_index_list, args):
     assert hasattr(args, 'media_type_list'), 'args must contain "media_type_list" parameter'
     assert hasattr(args, 'topk'), 'args must contain "topk" parameter'
 
-    topk = int(args.topk)
+    topk = [int(k) for k in args.topk]
+    if len(args.topk) == 1:
+        topk = [ int(args.topk[0]) ] * len(args.query)
 
     # collect all results related to --not-in queries
     all_not_result = []
@@ -83,7 +85,7 @@ def process_query(search_index_list, args):
             not_result = process_text_query(search_index_list,
                                             not_query,
                                             not_media_type,
-                                            topk)
+                                            topk[not_index])
             all_not_result.append(not_result)
         not_end_time = time.time()
         not_elapsed_time = not_end_time - not_start_time
@@ -97,7 +99,7 @@ def process_query(search_index_list, args):
         search_result = process_text_query(search_index_list,
                                            query_text,
                                            media_type,
-                                           topk)
+                                           topk[query_index])
         search_result['query'] = [ query_text ]
         search_result['in'] = [ media_type ]
         search_result['not_in'] = []
@@ -230,20 +232,14 @@ def does_segment_overlap(seg1, seg2):
 
     Parameters
     ----------
-    query_specs : a dictionary structured as shown in the example below
-      {
-        'query':[ "query-text-1", "query-text-2"],
-        'media_type': [ "video", "audio"],
-        'topk': 10
-      }
-
     result : a list of length 2 and structured as follows
       [
         { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] },
         { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] }
       ]
 
-    args : command line arguments
+    args : command line arguments containing "query", "media_type_list", "topk"
+           and optionally "media_type_not_list".
 
     Returns
     -------
@@ -368,7 +364,8 @@ def merge_a_ranked_result_list(filename_list, pts_list, score_list, pts_toleranc
         { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] }
       ]
 
-    args : command line arguments
+    args : command line arguments containing "query", "media_type_list", "topk"
+           and optionally "media_type_not_list".
 
     Returns
     -------
@@ -630,7 +627,7 @@ def format_merged_ranks(merged_rank_list):
 """
 def parse_user_input(cmd, args):
     args_copy = copy.deepcopy(args)
-    list_args = ['query', 'in', 'not_in']
+    list_args = ['query', 'in', 'not_in', 'topk']
     list_arg_map = {
         'in': 'media_type_list',
         'not_in': 'media_type_not_list'
@@ -723,9 +720,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--topk',
                         required=False,
-                        type=int,
-                        default=5,
-                        help='show only the topk search results')
+                        action='append',
+                        default=[10],
+                        help='show only the top K search results, query specific --topk value can also be provided')
 
     parser.add_argument('--max-filename-length',
                         required=False,
@@ -796,8 +793,14 @@ if __name__ == '__main__':
         sys.exit(1)
     db_engine = db.init_project(project.dburi, echo=False)
 
+    # sanity check of some CLI arguments
     if args.media_type_list is None and args.media_type_not_list is not None:
         print(f'--not-in flag required previous definitions of --in flag')
+        sys.exit(0)
+    if len(args.topk) != 1:
+        args.topk = args.topk[1:] # remove the default value
+    if args.query is not None and (len(args.topk) != len(args.query)):
+        print(f'All --query flags should be accompanied by a --topk value')
         sys.exit(0)
 
     # Print the CSV header only once.
