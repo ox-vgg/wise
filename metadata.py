@@ -144,6 +144,7 @@ def import_metadata(args):
                  metadata_colnames)
 
 def load_metadata_from_csv(csv_filename, args):
+    print(f'Loading metadata from CSV file ...')
     metadata_store = []
     metadata_colnames = [ colname for colname in args.col_metadata ]
     with open(csv_filename, 'r') as csv_file:
@@ -210,6 +211,7 @@ def get_valid_metadata(metadata, db_engine):
     return valid_metadata
 
 def add_metadata(metadata_db, metadata_table, metadata, metadata_type, wise_colnames, metadata_colnames):
+    print(f'Adding {len(metadata)} rows of metadata to following sqlite table: {metadata_table} ...')
     # check that all the required WISE columns are contained in the metadata
     sqlite_data = []
     for metadata_index in range(0, len(metadata)):
@@ -252,7 +254,6 @@ def add_metadata(metadata_db, metadata_table, metadata, metadata_type, wise_coln
             sql_data.append( tuple(metadata[metadata_index][colname] for colname in metadata_table_colname) )
         sql = f'INSERT INTO {metadata_table}({metadata_table_colname_csv}) VALUES ({value_placeholders})'
         cursor.executemany(sql, sql_data)
-        print(f'added {len(sql_data)} rows of metadata to table {metadata_table}')
 
         ## Note: Index for full text search is created using create-index.py script
 
