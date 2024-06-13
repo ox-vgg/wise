@@ -31,7 +31,7 @@ if [ ! -d "${CODE_DIR}" ]; then
 else
     echo "Updating WISE2 code in ${CODE_DIR} ..."
     cd "${CODE_DIR}"
-    #git pull origin
+    git pull origin
 fi
 
 if ! command -v ffmpeg &> /dev/null; then
