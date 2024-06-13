@@ -836,10 +836,16 @@ if __name__ == '__main__':
         else:
             print(f'{media_type} can be searched using the following search index:')
             for asset_index in range(0, N):
-                print(f'  [{asset_index}] {asset_id_list[asset_index]}')
+                print(f'  {asset_index}. {asset_id_list[asset_index]}')
             selected_asset_index = -1
-            while selected_asset_index < 0 and selected_asset_index >= N:
-                selected_asset_index = input(f'Enter the index of desired search index [0-{N}]')
+            while True:
+                try:
+                    input_index = input(f'Enter the index of desired search index [0-{N-1}] : ')
+                    selected_asset_index = int(input_index)
+                    if selected_asset_index >= 0 and selected_asset_index < N:
+                        break
+                except:
+                    print(f'invalid input {input_index}')
             asset_index = selected_asset_index
         asset_id = asset_id_list[asset_index]
         asset = project_assets[media_type][asset_id]
