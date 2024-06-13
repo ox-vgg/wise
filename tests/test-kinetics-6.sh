@@ -31,7 +31,7 @@ if [ ! -d "${CODE_DIR}" ]; then
 else
     echo "Updating WISE2 code in ${CODE_DIR} ..."
     cd "${CODE_DIR}"
-    git pull origin
+    #git pull origin
 fi
 
 if ! command -v ffmpeg &> /dev/null; then
@@ -138,7 +138,7 @@ EOF
 
 TEST1_RESULT_FN="${TEST_DIR}/cooking-music.csv"
 if [ ! -d "${TEST1_RESULT_FN}" ]; then
-    echo "Test 1 (takes about 1 min.) ..."
+    echo "Test 1 (takes about 3 min.) ..."
     cd "${CODE_DIR}"
     python search.py \
            --query "cooking" --in video \
@@ -171,7 +171,7 @@ EOF
 
 TEST2_RESULT_FN="${TEST_DIR}/music-singing.csv"
 if [ ! -d "${TEST2_RESULT_FN}" ]; then
-    echo "Test 2 (takes about 1 min.) ..."
+    echo "Test 2 (takes about 3 min.) ..."
     cd "${CODE_DIR}"
     python search.py \
            --query "music" --in audio \
@@ -188,5 +188,38 @@ if [ ! -d "${TEST2_RESULT_FN}" ]; then
         diff "${TEST2_RESULT_FN}" "${TEST2_GND_FN}"
     else
         echo "Test 2 PASSED (completed in ${elapsed_time} sec.)"
+    fi
+fi
+
+
+##
+## Test 3 : test --queries-from flag (Note: ground truth is same as Test2)
+##
+TEST3_GND_FN="${TEST_DIR}/queries-from-GND-TRUTH.csv"
+cat << EOF > ${TEST3_GND_FN}
+query,rank,filename,start_time,end_time,score
+"""music"" in audio and ""singing"" not in metadata",0,"frying-vegetables/hxK9mej0_zw_000086_000096.mp4",0.0,4.0,0.256
+"""music"" in audio and ""singing"" not in metadata",1,"jogging/OmWoDAQM1kk_000000_000010.mp4",0.0,8.0,0.237
+"""music"" in audio and ""singing"" not in metadata",2,"shouting/9NdaqLe2gIs_000022_000032.mp4",0.0,4.0,0.181
+EOF
+
+TEST3_RESULT_FN="${TEST_DIR}/music-singing.csv"
+if [ ! -d "${TEST3_RESULT_FN}" ]; then
+    echo "Test 3 (takes about 3 min.) ..."
+    cd "${CODE_DIR}"
+    python search.py \
+           --queries-from "${KINETICS_DATA_DIR}/sample_queries.csv" \
+           --topk 10 \
+           --index-type IndexFlatIP \
+           --result-format csv \
+           --save-to-file $TEST3_RESULT_FN \
+           --project-dir $KINETICS_PROJECT_DIR
+    end=`date +%s`
+    elapsed_time=$((end-start))
+    if ! cmp -s ${TEST3_GND_FN} ${TEST3_RESULT_FN}; then
+        echo "Test 3 FAILED because search results are unexpected"
+        diff "${TEST3_RESULT_FN}" "${TEST3_GND_FN}"
+    else
+        echo "Test 3 PASSED (completed in ${elapsed_time} sec.)"
     fi
 fi
