@@ -45,6 +45,7 @@ class SqliteSearchIndex(SearchIndex):
         if self.sqlite_table_exists(self.metadata_db, self.metadata_table_fts) and not overwrite:
             print(f'{index_type} index for {self.media_type} already exists')
             return
+        print(f'Creating metadata index for {self.metadata_id}')
 
         with sqlite3.connect(self.metadata_db) as sqlite_connection:
             cursor = sqlite_connection.cursor()
@@ -53,7 +54,7 @@ class SqliteSearchIndex(SearchIndex):
             exiting_fts_table_list = []
             for row in cursor.execute(f'SELECT name FROM sqlite_master WHERE type="table"'):
                 table_name = row[0]
-                if '_fts' in table_name:
+                if f'{self.metadata_table}_fts' in table_name:
                     exiting_fts_table_list.append(table_name)
 
             cursor.execute(f'BEGIN TRANSACTION')
@@ -83,8 +84,6 @@ class SqliteSearchIndex(SearchIndex):
             sql = f'INSERT INTO {self.metadata_table_fts}({metadata_colnames_csv}) VALUES ({value_placeholders})'
             cursor.executemany(sql, fts_data)
             cursor.execute(f'END TRANSACTION')
-
-            print(f'Created metadata index for "{self.metadata_id}" with {len(fts_data)} entries')
 
     def is_index_loaded(self):
         return hasattr(self, 'index')
