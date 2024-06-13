@@ -113,6 +113,10 @@ def process_query(search_index_list, args):
                 search_result['not_in'].append(not_media_type)
         end_time = time.time()
         search_result['search_time_sec'] = (end_time - start_time) + not_elapsed_time
+        if args.query_id:
+            search_result['query_id'] = args.query_id
+        else:
+            search_result['query_id'] = query_index
         all_search_result.append(search_result)
     return all_search_result
 
@@ -162,6 +166,7 @@ def apply_subtract(search_result, not_search_result):
         'match_pts_list':[],
         'match_score_list':[],
         'query': search_result['query'],
+        'query_id': search_result['query_id'],
         'in': search_result['in'],
         'not_in': search_result['not_in']
     }
@@ -542,7 +547,10 @@ def show_result_as_csv(result, args):
         writing_to_file = True
 
     for query_index in range(0, len(result)):
-        query_id = search_result_title(result[query_index]).replace('"', '""')
+        if 'query_id' in result[query_index]:
+            query_id = result[query_index]['query_id'][0]
+        else:
+            query_id = search_result_title(result[query_index]).replace('"', '""')
         for rank in range(0, len(result[query_index]['match_filename_list'])):
             pts = result[query_index]['match_pts_list'][rank]
             if isinstance(pts, list):
@@ -908,31 +916,43 @@ if __name__ == '__main__':
             print(f'--queries-from flag does not support --not-in flag')
             sys.exit(0)
         start_time = time.time()
+        print(f'Processing queries from {args.queries_from} ...')
         with open(args.queries_from, 'r') as f:
             query_reader = csv.reader(f, delimiter=',', quotechar='"')
             header = next(query_reader)
             query_count = 0
             for row in query_reader:
+                print(f'[{query_count}] {row}')
                 if len(row) != 2 and len(row) != 4:
                     print(f'Skipping query: "{row}".')
-                    print(f'Each line must be formatted as "query,in" or "query1,in,query2,not_in"')
+                    print(f'Each input line must be formatted as one of the follows:')
+                    print(f'  - "query_id,query" (with --in flag to specify the search target')
+                    print(f'  - "query1,in,query2,not_in"')
                     continue
 
                 args_copy = copy.deepcopy(args)
                 setattr(args_copy, 'query', [ row[0] ])
 
-                MEDIA_TYPE_LIST = ['audio', 'video', 'metadata']
-                if row[1] not in MEDIA_TYPE_LIST:
-                    print(f'Skipping row with invalid "in" column: {row[1]}')
-                    continue
-                setattr(args_copy, 'query', [ row[0] ])
-                setattr(args_copy, 'media_type_list', [ row[1] ])
-                setattr(args_copy, 'media_type_not_list', None)
+                if len(row) == 2:
+                    if args.media_type_list is None:
+                        print(f'The CSV file {args.queries_from} contains a row with two columns: {row}')
+                        print(f'For such entries, the --queries-from must be followed by --in argument.')
+                        sys.exit(0)
+                    else:
+                        setattr(args_copy, 'query_id', [ row[0] ])
+                        setattr(args_copy, 'query', [ row[1] ])
+                        setattr(args_copy, 'media_type_not_list', None)
                 if len(row) == 4:
+                    MEDIA_TYPE_LIST = ['audio', 'video', 'metadata']
+                    if row[1] not in MEDIA_TYPE_LIST:
+                        print(f'Skipping row with invalid "in" column: {row[1]}')
+                        continue
                     if row[3] not in MEDIA_TYPE_LIST:
                         print(f'Skipping row with invalid "not_in" column: {row[3]}')
                         continue
+                    setattr(args_copy, 'query_id', [ query_count ])
                     setattr(args_copy, 'query', [ row[0], row[2] ])
+                    setattr(args_copy, 'media_type_list', [ row[1] ])
                     setattr(args_copy, 'media_type_not_list', [ row[3] ])
                 search_result = process_query(search_index_list, args_copy)
 
