@@ -27,6 +27,7 @@ Created metadata index for "Kinetics/6b/video_categories" with 30 entries
 ...
 Test 1 PASSED (completed in 164 sec.)
 Test 2 PASSED (completed in 190 sec.)
+Test 3 PASSED (completed in 118 sec.)
 ```
 
 # Unit Tests
