@@ -2,8 +2,8 @@
 
 set -euxo pipefail
 
-if [ "$#" -ne 1 ]; then
-    echo "Usage: ${0} OUTDIR"
+if [ "$#" -ne 1 ] && [ "$#" -ne 2 ]; then
+    echo "Usage: ${0} OUTDIR [NO-GIT-PULL]"
     echo "where, OUTDIR is the path for temporary storeage"
     exit
 fi
@@ -31,7 +31,11 @@ if [ ! -d "${CODE_DIR}" ]; then
 else
     echo "Updating WISE2 code in ${CODE_DIR} ..."
     cd "${CODE_DIR}"
-    git pull origin
+    if [ "$#" -eq 2 ] && [ "${2}" = "NO-GIT-PULL" ]; then
+        echo "Skipping git pull on user request"
+    else
+        git pull origin
+    fi
 fi
 
 if ! command -v ffmpeg &> /dev/null; then
