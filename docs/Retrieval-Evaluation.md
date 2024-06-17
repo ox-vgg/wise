@@ -14,7 +14,7 @@ plate, wash hands, etc.).
 |-----------------+------------------+--------+----------+-----------+---------------------------+-------|
 | Method          | Dataset          | Subset | # Videos | # Queries | FeatureExtractor          |   mAP |
 |-----------------+------------------+--------+----------+-----------+---------------------------+-------|
-| WISE2           | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-H-14-quickgelu:dfn5b   |  0.413 |
+| WISE2           | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-H-14-quickgelu:dfn5b  |  0.413 |
 | WISE2           | EpicKitchens-100 | Test   |     9668 |      3842 | xlm-..ViT-H-14:..laion5b..|  0.413 |
 | WISE2           | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-L-16-SigLIP-384:webli | 0.412 |
 | Baseline: JPoSE | EpicKitchens-100 | Test   |     9668 |      3842 |                           | 0.381 |
