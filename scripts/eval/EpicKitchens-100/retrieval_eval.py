@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # Note: The relevancy matrix can be generated using
     # https://github.com/mwray/Semantic-Video-Retrieval/blob/main/src/scripts/create_relevancy_matrix.py
-    print(f'Loading {N_video}x{N_text} similarity matrix')
+    print(f'Loading {N_video}x{N_text} relevancy matrix')
     rel_mat = pd.read_pickle(args.relevancy_mat_file)
     map = calculate_mAP(sim_mat, rel_mat)
     print(f'mAP = {map}')
