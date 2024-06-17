@@ -211,4 +211,4 @@ if __name__ == '__main__':
     print(f'Loading {N_video}x{N_text} relevancy matrix')
     rel_mat = pd.read_pickle(args.relevancy_mat_file)
     map = calculate_mAP(sim_mat, rel_mat)
-    print(f'mAP = {map}')
+    print(f'mAP = {map:.3f}')
