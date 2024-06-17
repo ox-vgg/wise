@@ -11,15 +11,24 @@ videos. The evaluation is based on `3842` text queries (e.g. take
 plate, wash hands, etc.).
 
 ```
-|------------------+--------+----------+-----------+---------------------------+-------|
-| Dataset          | Subset | # Videos | # Queries | FeatureExtractor          |   mAP |
-|------------------+--------+----------+-----------+---------------------------+-------|
-| EpicKitchens-100 | Test   |     9668 |      3842 | ViT-L-16-SigLIP-384:webli | 0.412 |
-| ...              |        |          |           |                           |       |
-|------------------+--------+----------+-----------+---------------------------+-------|
+|-----------------+------------------+--------+----------+-----------+---------------------------+-------|
+| Method          | Dataset          | Subset | # Videos | # Queries | FeatureExtractor          |   mAP |
+|-----------------+------------------+--------+----------+-----------+---------------------------+-------|
+| WISE2           | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-H-14-quickgelu:dfn5b  | 0.413 |
+| WISE2           | EpicKitchens-100 | Test   |     9668 |      3842 | xlm-..ViT-H-14:..laion5b..| 0.413 |
+| WISE2           | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-L-16-SigLIP-384:webli | 0.412 |
+| Baseline: JPoSE | EpicKitchens-100 | Test   |     9668 |      3842 |                           | 0.381 |
+| Baseline: MLP   | EpicKitchens-100 | Test   |     9668 |      3842 | 2 layer MLP, triplet loss |  0.34 |
+|-----------------+------------------+--------+----------+-----------+---------------------------+-------|
 ```
 
-The `FeatureExtractor` column corresponds to the model used by WISE to extract features from video frames. More details about various feature extractors are available at the [mlfoundation's openclip page](https://github.com/mlfoundations/open_clip/blob/main/docs/openclip_retrieval_results.csv).
+The `FeatureExtractor` column corresponds to the model used by WISE to
+extract features from video frames. More details about various feature
+extractors are available at the [mlfoundation's openclip
+page](https://github.com/mlfoundations/open_clip/blob/main/docs/openclip_retrieval_results.csv). The
+baseline performance (i.e. MLP and JPoSE) are taken from the [research
+paper](https://arxiv.org/pdf/2006.13256.pdf) introducing the
+multi-instance action retrieval challenge.
 
 The performance evaluation was carried out as follows.
 
