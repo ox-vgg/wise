@@ -839,6 +839,8 @@ if __name__ == '__main__':
         asset_id_list = list(project_assets[media_type].keys())
         asset_index = 0
         N = len(asset_id_list)
+        if N == 0:
+            continue
         if N == 1:
             asset_index = 0
         else:
