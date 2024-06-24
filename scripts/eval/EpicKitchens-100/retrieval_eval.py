@@ -67,7 +67,7 @@ def calculate_mAP(sim_mat, relevancy_matrix):
     mAP = np.mean(avg_precision)
     return mAP
 
-def does_segment_overlap(seg1, seg2):
+def does_segment_overlap(seg1, seg2, iou_threshold):
     seg1_is_point = False
     seg2_is_point = False
     if isinstance(seg1, float):
@@ -102,7 +102,7 @@ def does_segment_overlap(seg1, seg2):
     else:
         # check if a segment has any overlap with another segment
         iou = (min(seg1[1], seg2[1]) - max(seg1[0], seg2[0])) / seg1_union_seg2
-        if iou > 0.01:
+        if iou > iou_threshold:
             return True
         else:
             return False
@@ -137,6 +137,13 @@ if __name__ == '__main__':
         "--wise-search-results",
         required=True,
         type=str,
+        help="a CSV file containing search results returned by WISE for query sentences",
+    )
+
+    parser.add_argument(
+        "--iou-threshold",
+        required=True,
+        type=float,
         help="a CSV file containing search results returned by WISE for query sentences",
     )
 
@@ -200,7 +207,8 @@ if __name__ == '__main__':
             for i in range(0, len(video_segments[video_id])):
                 gnd_segment = [video_segments[video_id][i]['starttime'],
                                video_segments[video_id][i]['stoptime']]
-                if does_segment_overlap(result_segment, gnd_segment):
+
+                if does_segment_overlap(result_segment, gnd_segment, args.iou_threshold):
                     video_index = video_segments[video_id][i]['video_index']
                     sim_mat[video_index][query_index] = float(score)
 
