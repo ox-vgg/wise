@@ -113,7 +113,7 @@ def process_query(search_index_list, args):
                 search_result['not_in'].append(not_media_type)
         end_time = time.time()
         search_result['search_time_sec'] = (end_time - start_time) + not_elapsed_time
-        if args.query_id:
+        if hasattr(args, 'query_id'):
             search_result['query_id'] = args.query_id
         else:
             search_result['query_id'] = query_index
