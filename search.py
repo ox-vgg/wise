@@ -440,38 +440,6 @@ def merge1(result, args):
 
     return [ sorted_merged_result ]
 
-def sort_result_by_score(result, score_label):
-    sort_index = sorted( range(len(result[score_label])), key=result[score_label].__getitem__ )
-    sorted_result = {}
-    for key in merged_query_specs:
-        sorted_result[key] = [ merged_query_specs[key][i] for i in sort_index ]
-    return sorted_result
-
-""" Manages display of search results in console
-
-    Parameters
-    ----------
-    query_specs : a dictionary structured as shown in the example below
-      {
-        'query':[ "query-text-1", "query-text-2"],
-        'media_type': [ "video", "audio"],
-        'topk': 10
-      }
-
-    result : a list of length 2 and structured as follows
-      [
-        { 'match_filename_list': [...], 'match_pts_list': [...] },
-        { 'match_filename_list': [...], 'match_pts_list': [...] }
-      ]
-
-
-    args : command line arguments
-
-    Returns
-    -------
-    no returns
-"""
-
 ##
 ## C. Methods to display and export search results
 ##
