@@ -15,7 +15,7 @@ curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/Kinetics-6.t
 tar -zxvf Kinetics-6.tar.gz -C wise-data/Kinetics-6
 ```
 
-Next, we extract visual and audio features and create a search index that will allows
+Next, we extract visual and audio features and create a search index that will allow
 us to perform audio and visual search on the video collection.
 
 ```
@@ -218,3 +218,5 @@ query_id,query_text,media_type,rank,filename,start_time,end_time,score
 2,"walking",video,0,"jogging/UQsA-W-q3oA_000002_000012.mp4",2.5,9.0,0.168
 2,"walking",video,1,"jogging/RpjJ3VoLFmQ_000084_000094.mp4",1.0,6.5,0.165
 ```
+
+The process of importing text metadata and using text metadata in search queries is described in [Metadata](Metadata.md).

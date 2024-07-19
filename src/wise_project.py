@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 
 DB_SCHEME = "sqlite+pysqlite://"
 
@@ -27,8 +28,14 @@ class WiseProject:
     def dburi(self):
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
-    def metadata_filename(self):
-        return self.metadata_dir / 'external.db'
+    def metadata_db_table(self, metadata_id, extension='.sqlite'):
+        metadata_id_tok = metadata_id.split('/')
+        assert len(metadata_id_tok) == 3, 'metadata_id must be in "FOLDER_NAME/DB_NAME/TABLE_NAME" format'
+        metadata_db_dir = self.metadata_dir / metadata_id_tok[0]
+        metadata_db_dir.mkdir(parents=True, exist_ok=True)
+        metadata_db = metadata_db_dir / (metadata_id_tok[1] + extension)
+        metadata_table = metadata_id_tok[2]
+        return metadata_db, metadata_table
 
     def store_dir(self):
         return self.store_dir
@@ -58,6 +65,48 @@ class WiseProject:
         return index_store
 
     def discover_assets(self):
+        """
+        Find the location of all assets based on known structure of WISE project folder tree
+
+        Returns:
+        Here is an example of the returned data structure
+        {
+          "video": {
+            "mlfoundations/open_clip/xlm/laion5b": {
+              "features_root": "/data/wise/...",
+              "features_dir": "/data/wise/.../features",
+              "features_files": [
+                "video-000000.tar",
+                ...
+              ],
+              "index_dir": "/data/wise/.../index",
+              "index_files": [
+                "video-IndexFlatIP.faiss",
+                ...
+              ]
+            }
+          },
+          "audio": {
+            "microsoft/clap/2023/four-datasets": {
+              "features_root": "/data/wise/...",
+              "features_dir": "/data/wise/.../features",
+              "features_files": [
+                "audio-000000.tar",
+                ...
+              ],
+              "index_dir": "/data/wise/.../index",
+              "index_files": [
+                "audio-IndexFlatIP.faiss",
+                ...
+              ]
+            }
+          },
+          "metadata": {
+            "EpicKitchens-100/retrieval_annotations/test": "/data/wise/.../metadata/EpicKitchens-100/retrieval_annotations.db",
+            "EpicKitchens-100/retrieval_annotations/train": "/data/wise/.../metadata/EpicKitchens-100/retrieval_annotations.db"
+          }
+        }
+        """
         self.assets = {}
         # 1. find all feature-extractor-id
         for feature_dir in self.store_dir.glob('*/*/*/*/features/'):
@@ -77,18 +126,37 @@ class WiseProject:
             for feature_extractor_id in self.assets[media_type]:
                 features_root = self.store_dir / feature_extractor_id
                 features_dir = features_root / 'features'
-                self.assets[media_type][feature_extractor_id]['features_root'] = features_root
-                self.assets[media_type][feature_extractor_id]['features_dir'] = features_dir
+                self.assets[media_type][feature_extractor_id]['features_root'] = str(features_root)
+                self.assets[media_type][feature_extractor_id]['features_dir'] = str(features_dir)
                 self.assets[media_type][feature_extractor_id]['features_files'] = []
                 for feature_data in features_dir.glob(media_type + '-*.*'):
-                        self.assets[media_type][feature_extractor_id]['features_files'].append(feature_data.name)
+                    self.assets[media_type][feature_extractor_id]['features_files'].append(feature_data.name)
+                self.assets[media_type][feature_extractor_id]['features_files'].sort()
 
                 index_dir = features_root / 'index'
-                self.assets[media_type][feature_extractor_id]['index_dir'] = index_dir
+                self.assets[media_type][feature_extractor_id]['index_dir'] = str(index_dir)
                 self.assets[media_type][feature_extractor_id]['index_files'] = []
                 if not index_dir.exists():
                     continue
                 for index_data in index_dir.glob(media_type + '-*.faiss'):
                     self.assets[media_type][feature_extractor_id]['index_files'].append(index_data.name)
+                self.assets[media_type][feature_extractor_id]['index_files'].sort()
 
+        # 3. locate all assets related to metadata
+        self.assets['metadata'] = {}
+        for metadata_db in self.metadata_dir.glob('*/*.sqlite'):
+            metadata_db_rel_path = metadata_db.relative_to(self.metadata_dir)
+            assert len(metadata_db_rel_path.parts) == 2, f"unexpected {metadata_db_rel_path}, should be of form FOLDER_NAME/DB_NAME"
+            metadata_id_prefix = str(metadata_db_rel_path.parent / metadata_db_rel_path.stem)
+            with sqlite3.connect( str(metadata_db) ) as sqlite_connection:
+                cursor = sqlite_connection.cursor()
+                for row in cursor.execute(f'SELECT name FROM sqlite_master WHERE type="table"'):
+                    table_name = row[0]
+                    if '_fts' not in table_name:
+                        metadata_id = metadata_id_prefix + '/' + table_name
+                        self.assets['metadata'][metadata_id] = {
+                            'metadata_db': str(metadata_db),
+                            'metadata_db_type': 'sqlite',
+                            'metadata_table': table_name
+                        }
         return self.assets

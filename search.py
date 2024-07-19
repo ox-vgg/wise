@@ -17,6 +17,7 @@ import itertools
 import readline
 import csv
 import io
+import copy
 
 from rich import print as rprint
 from rich.console import Console
@@ -24,7 +25,7 @@ from rich.table import Table
 
 from src.dataloader import AVDataset
 from src.wise_project import WiseProject
-from src.search_index import SearchIndex
+from src.index.search_index_factory import SearchIndexFactory
 
 from src import db
 from src.data_models import (
@@ -52,46 +53,94 @@ from src.repository import (
     ----------
     search_index_list : a list containing instances of SearchIndex
 
-    query_specs : a dictionary structured as shown in the example below
-      {
-        'query':[ "query-text-1", "query-text-2"],
-        'media_type': [ "video", "audio"],
-        'topk': 10
-      }
-
-    args : command line arguments
+    args : command line arguments containing "query", "media_type_list", "topk"
+           and optionally "media_type_not_list".
 
     Returns
     -------
     result : a list of length 2 and structured as follows
       [
         { 'match_filename_list': [...], 'match_pts_list': [...], 'search_time_sec': ... },
-        { 'match_filename_list': [...], 'match_pts_list': [...], 'search_time_sec': ...  }
+        { 'match_filename_list': [...], 'match_pts_list': [...], 'search_time_sec': ... }
       ]
 """
-def process_query(search_index_list, query_specs, args):
-    search_result = []
-    topk = args.topk
-    if 'topk' in query_specs:
-        topk = int(query_specs['topk'])
-    for query_index in range(0, len(query_specs['query'])):
-        start_time = time.time()
-        query_text = query_specs['query'][query_index]
-        media_type = query_specs['media_type'][query_index]
+def process_query(search_index_list, args):
+    assert hasattr(args, 'query'), 'args must contain "query" parameter'
+    assert hasattr(args, 'media_type_list'), 'args must contain "media_type_list" parameter'
+    assert hasattr(args, 'topk'), 'args must contain "topk" parameter'
 
+    topk = [int(k) for k in args.topk]
+    if len(args.topk) == 1:
+        topk = [ int(args.topk[0]) ] * len(args.query)
+
+    # collect all results related to --not-in queries
+    all_not_result = []
+    not_elapsed_time = 0
+    if args.media_type_not_list is not None:
+        not_start_time = time.time()
+
+        for not_index in range(len(args.media_type_list), len(args.query)):
+            not_query = args.query[not_index]
+            not_media_type = args.media_type_not_list[len(args.media_type_list) - not_index]
+            not_result = process_text_query(search_index_list,
+                                            not_query,
+                                            not_media_type,
+                                            topk[not_index])
+            all_not_result.append(not_result)
+        not_end_time = time.time()
+        not_elapsed_time = not_end_time - not_start_time
+
+    # collect all results related to --in queries
+    all_search_result = []
+    for query_index in range(0, len(args.media_type_list)):
+        start_time = time.time()
+        query_text = args.query[query_index]
+        media_type = args.media_type_list[query_index]
+        search_result = process_text_query(search_index_list,
+                                           query_text,
+                                           media_type,
+                                           topk[query_index])
+        search_result['query'] = [ query_text ]
+        search_result['in'] = [ media_type ]
+        search_result['not_in'] = []
+
+        # remove all results appearing in --not-in query
+        if args.media_type_not_list is not None:
+            for not_index in range(len(args.media_type_list), len(args.query)):
+                not_search_result = all_not_result[not_index - len(args.media_type_list)]
+                search_result = apply_subtract(search_result, not_search_result)
+                search_result['query'].append(not_query)
+                search_result['not_in'].append(not_media_type)
+        end_time = time.time()
+        search_result['search_time_sec'] = (end_time - start_time) + not_elapsed_time
+        if hasattr(args, 'query_id'):
+            search_result['query_id'] = args.query_id
+        else:
+            search_result['query_id'] = query_index
+        all_search_result.append(search_result)
+    return all_search_result
+
+def process_text_query(search_index_list, query_text, media_type, topk):
+    if media_type == 'metadata':
+        result = search_index_list[media_type].search(media_type,
+                                                      query_text,
+                                                      topk,
+                                                      query_type='text')
+    else:
         # 2. Find nearest neighbours to the search query
         dist, ids = search_index_list[media_type].search(media_type,
                                                          query_text,
                                                          topk,
                                                          query_type='text')
+
         match_filename_list = []
         match_pts_list = []
         match_score_list = []
         with db_engine.connect() as conn:
             for rank in range(0, len(ids)):
                 vector_id = int(ids[rank])
-                # if faiss cannot return topk number of results, it marks
-                # the end of result by setting ids to -1
+                    # if faiss cannot return topk number of results, it marks
+                    # the end of result by setting ids to -1
                 if vector_id == -1:
                     break
                 vector_metadata = VectorRepo.get(conn, vector_id)
@@ -104,14 +153,81 @@ def process_query(search_index_list, query_specs, args):
                 match_filename_list.append(filename)
                 match_pts_list.append(pts)
                 match_score_list.append(float(dist[rank]))
-        end_time = time.time()
-        search_result.append({
+        result = {
             'match_filename_list': match_filename_list,
             'match_pts_list': match_pts_list,
             'match_score_list': match_score_list,
-            'search_time_sec': (end_time - start_time)
-        })
-    return search_result
+        }
+    return result
+
+def apply_subtract(search_result, not_search_result):
+    new_search_result = {
+        'match_filename_list':[],
+        'match_pts_list':[],
+        'match_score_list':[],
+        'query': search_result['query'],
+        'query_id': search_result['query_id'],
+        'in': search_result['in'],
+        'not_in': search_result['not_in']
+    }
+    for result_index in range(0, len(search_result['match_filename_list'])):
+        match_filename = search_result['match_filename_list'][result_index]
+        match_pts = search_result['match_pts_list'][result_index]
+        match_score = search_result['match_score_list'][result_index]
+        if not result_exists(match_filename, match_pts, not_search_result):
+            new_search_result['match_filename_list'].append(match_filename)
+            new_search_result['match_pts_list'].append(match_pts)
+            new_search_result['match_score_list'].append(match_score)
+    return new_search_result
+
+def result_exists(filename, pts, results):
+    for result_index in range(0, len(results['match_filename_list'])):
+        if filename == results['match_filename_list'][result_index]:
+            pts2 = results['match_pts_list'][result_index]
+            does_overlap = does_segment_overlap(pts, pts2)
+            if does_segment_overlap(pts, pts2):
+                return True
+    return False
+
+def does_segment_overlap(seg1, seg2):
+    seg1_is_point = False
+    seg2_is_point = False
+    if isinstance(seg1, float):
+        seg1 = [seg1, seg1]
+        seg1_is_point = True
+    if isinstance(seg2, float):
+        seg2 = [seg2, seg2]
+        seg2_is_point = True
+    if len(seg1) == 1:
+        seg1.append(seg1[0])
+        seg1_is_point = True
+    if len(seg2) == 1:
+        seg2.append(seg2[0])
+        seg2_is_point = True
+    assert len(seg1) == 2, f'segment1 must be defined using a list of length 2; received {seg1}'
+    assert len(seg2) == 2, f'segment2 must be defined using a list of length 2; received {seg2}'
+
+    all_pts = seg1 + seg2
+    seg1_union_seg2 = max(all_pts) - min(all_pts)
+    if seg1_is_point or seg2_is_point:
+        # check if a point lies within a temporal segment
+        if seg1_is_point:
+            if seg1[0] >= seg2[0] and seg1[0] <= seg2[1]:
+                return True
+            else:
+                return False
+        else:
+            if seg2[0] >= seg1[0] and seg2[0] <= seg1[1]:
+                return True
+            else:
+                return False
+    else:
+        # check if a segment has any overlap with another segment
+        iou = (min(seg1[1], seg2[1]) - max(seg1[0], seg2[0])) / seg1_union_seg2
+        if iou > 0.01:
+            return True
+        else:
+            return False
 
 ##
 ##  B. Merge search results based on audiovisual time segment, rank, etc.
@@ -121,35 +237,27 @@ def process_query(search_index_list, query_specs, args):
 
     Parameters
     ----------
-    query_specs : a dictionary structured as shown in the example below
-      {
-        'query':[ "query-text-1", "query-text-2"],
-        'media_type': [ "video", "audio"],
-        'topk': 10
-      }
-
     result : a list of length 2 and structured as follows
       [
         { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] },
         { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] }
       ]
 
-    args : command line arguments
+    args : command line arguments containing "query", "media_type_list", "topk"
+           and optionally "media_type_not_list".
 
     Returns
     -------
     merged search result in the same format as the "result" argument
 """
-def merge0(query_specs, result, args):
-    for query_index in range(0, len(query_specs['query'])):
-        media_type = query_specs['media_type'][query_index]
+def merge0(result, args):
+    for query_index in range(0, len(result)):
+        assert len(result[query_index]['in']) == 1, f'unexpected {result[query_index]["in"]}'
+
+        media_type = result[query_index]['in'][0]
         merge_tolerance_id = 'merge_tolerance_' + media_type
         time_tolerance = getattr(args, merge_tolerance_id)
-        if merge_tolerance_id in query_specs:
-            time_tolerance = float(query_specs[merge_tolerance_id])
         rank_tolerance = getattr(args, 'merge_rank_tolerance')
-        if 'merge_rank_tolerance' in query_specs:
-            rank_tolerance = int(query_specs['merge_rank_tolerance'])
 
         filename_list = result[query_index]['match_filename_list']
         pts_list = result[query_index]['match_pts_list']
@@ -255,21 +363,14 @@ def merge_a_ranked_result_list(filename_list, pts_list, score_list, pts_toleranc
 
     Parameters
     ----------
-    query_specs : a dictionary structured as shown in the example below
-      {
-        'query':[ "query-text-1", "query-text-2"],
-        'media_type': [ "video", "audio"],
-        'topk': 10
-      }
-
     result : a list of length 2 and structured as follows
       [
         { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] },
         { 'match_filename_list': [...], 'match_pts_list': [...], 'match_score_list': [...] }
       ]
 
-
-    args : command line arguments
+    args : command line arguments containing "query", "media_type_list", "topk"
+           and optionally "media_type_not_list".
 
     Returns
     -------
@@ -285,7 +386,7 @@ def merge_a_ranked_result_list(filename_list, pts_list, score_list, pts_toleranc
         'search_time_sec': ...
       }]
 """
-def merge1(query_specs, result, args):
+def merge1(result, args):
     if len(result) != 2:
         print('merge1() can be only applied if result contains two entries')
         return
@@ -302,12 +403,13 @@ def merge1(query_specs, result, args):
         filename1 = result[1]['match_filename_list'][index1]
         score0 = result[0]['match_score_list'][index0]
         score1 = result[1]['match_score_list'][index1]
-        if filename0 == filename1:
+        pts0 = result[0]['match_pts_list'][index0]
+        pts1 = result[1]['match_pts_list'][index1]
+
+        if filename0 == filename1 and does_segment_overlap(pts0, pts1):
             merged_filename_list.append(filename0)
             merged_score = score0 + score1
             merged_score_list.append(merged_score)
-            pts0 = result[0]['match_pts_list'][index0]
-            pts1 = result[1]['match_pts_list'][index1]
             if isinstance(pts0, list) and isinstance(pts1, list):
                 merged_pts = pts0 + pts1
             else:
@@ -321,84 +423,53 @@ def merge1(query_specs, result, args):
 
     # sort results based on merged scores
     sort_index = sorted( range(len(merged_score_list)), key=merged_score_list.__getitem__, reverse=True )
-    sorted_merged_result = [{
+    sorted_merged_result = {
         'match_filename_list': [ merged_filename_list[i] for i in sort_index ],
         'match_pts_list': [ merged_pts_list[i] for i in sort_index ],
         'match_score_list': [ merged_score_list[i] for i in sort_index ],
         'merged_rank_list': [ merged_rank_list[i] for i in sort_index ],
-        'search_time_sec': result[0]['search_time_sec'] + result[1]['search_time_sec']
-    }]
-    merged_query_specs = query_specs # to retain user provided arguments like --save-to-file
-    merged_query_specs['query'] = [ ' and '.join(query_specs['query']) ]
-    merged_query_specs['query_id'] = [ '-'.join(query_specs['query_id']) ]
-    merged_query_specs['media_type'] = [ ' and '.join(query_specs['media_type']) ]
-    return merged_query_specs, sorted_merged_result
+        'search_time_sec': result[0]['search_time_sec'] + result[1]['search_time_sec'],
+        'query': result[0]['query'] + result[1]['query'],
+        'in': result[0]['in'] + result[1]['in'],
+        'not_in':[]
+    }
+    if 'not_in' in result[0]:
+        sorted_merged_result['not_in'] += result[0]['not_in']
+    if 'not_in' in result[1]:
+        sorted_merged_result['not_in'] += result[1]['not_in']
 
-def sort_result_by_score(result, score_label):
-    sort_index = sorted( range(len(result[score_label])), key=result[score_label].__getitem__ )
-    sorted_result = {}
-    for key in merged_query_specs:
-        sorted_result[key] = [ merged_query_specs[key][i] for i in sort_index ]
-    return sorted_result
-
-""" Manages display of search results in console
-
-    Parameters
-    ----------
-    query_specs : a dictionary structured as shown in the example below
-      {
-        'query':[ "query-text-1", "query-text-2"],
-        'media_type': [ "video", "audio"],
-        'topk': 10
-      }
-
-    result : a list of length 2 and structured as follows
-      [
-        { 'match_filename_list': [...], 'match_pts_list': [...] },
-        { 'match_filename_list': [...], 'match_pts_list': [...] }
-      ]
-
-
-    args : command line arguments
-
-    Returns
-    -------
-    no returns
-"""
+    return [ sorted_merged_result ]
 
 ##
 ## C. Methods to display and export search results
 ##
 
-EXPORT_CSV_HEADER = 'query_id,query_text,media_type,rank,filename,start_time,end_time,score'
+EXPORT_CSV_HEADER = 'query,rank,filename,start_time,end_time,score'
 
-def show_result(query_specs, result, args):
+def show_result(result, args):
     result_format = 'table'
     if hasattr(args, 'result_format') and args.result_format is not None:
         result_format = args.result_format
-    if 'result-format' in query_specs:
-        result_format = query_specs['result-format']
     if result_format == 'csv':
-        show_result_as_csv(query_specs, result, args)
+        show_result_as_csv(result, args)
     else:
-        show_result_as_table(query_specs, result, args)
+        show_result_as_table(result, args)
 
-def show_result_as_table(query_specs, result, args):
+def show_result_as_table(result, args):
     out = sys.stdout
     writing_to_file = False
     if hasattr(args, 'save_to_file') and args.save_to_file is not None:
         out = io.open(args.save_to_file, 'a')
         writing_to_file = True
-    elif 'save-to-file' in query_specs:
-        out = io.open(query_specs['save-to-file'], 'a')
-        writing_to_file = True
 
     console = Console(file=out, no_color=True)
     total_search_time = 0
-    for query_index in range(0, len(query_specs['query'])):
-        query_text = query_specs['query'][query_index]
-        media_type = query_specs['media_type'][query_index]
-        table = Table(title='Search results for "' + query_text + '" in ' + media_type,
+    for query_index in range(0, len(result)):
+        title = search_result_title(result[query_index])
+        if len(result[query_index]['match_filename_list']) == 0:
+            print(f'No results found for {title}')
+            continue
+        table = Table(title='Search results for ' + title,
                       show_lines=False,
                       show_edge=False,
                       box=None,
@@ -430,10 +501,10 @@ def show_result_as_table(query_specs, result, args):
         console.print(table)
         console.print('')
         total_search_time += result[query_index]['search_time_sec']
-    if len(result) == 1:
+    if len(result) == 1 and len(result[0]['match_filename_list']) != 0:
         console.print('(search completed in %.3f sec.)' % (total_search_time))
 
-def show_result_as_csv(query_specs, result, args):
+def show_result_as_csv(result, args):
     # Note: The CSV header is written by caller because the csv header needs
     # to be written only once irrespective of the number of times
     # show_result_as_csv() is executed
@@ -442,14 +513,12 @@ def show_result_as_csv(query_specs, result, args):
     if hasattr(args, 'save_to_file') and args.save_to_file is not None:
         out = io.open(args.save_to_file, 'a')
         writing_to_file = True
-    elif 'save-to-file' in query_specs:
-        out = io.open(query_specs['save-to-file'], 'a')
-        writing_to_file = True
 
-    for query_index in range(0, len(query_specs['query'])):
-        query_text = query_specs['query'][query_index]
-        media_type = query_specs['media_type'][query_index]
-        query_id   = query_specs['query_id'][query_index]
+    for query_index in range(0, len(result)):
+        if 'query_id' in result[query_index]:
+            query_id = result[query_index]['query_id'][0]
+        else:
+            query_id = search_result_title(result[query_index]).replace('"', '""')
         for rank in range(0, len(result[query_index]['match_filename_list'])):
             pts = result[query_index]['match_pts_list'][rank]
             if isinstance(pts, list):
@@ -461,9 +530,19 @@ def show_result_as_csv(query_specs, result, args):
                 pts_str = '%.1f' % (result[query_index]['match_pts_list'][rank])
             filename = result[query_index]['match_filename_list'][rank]
             score_str = '%.3f' % (result[query_index]['match_score_list'][rank])
-            out.write(f'{query_id},"{query_text}",{media_type},{rank},"{filename}",{pts_str},{score_str}\n')
+            out.write(f'"{query_id}",{rank},"{filename}",{pts_str},{score_str}\n')
     if writing_to_file:
         out.close()
+
+def search_result_title(result):
+    title = []
+    query_count = len(result['query'])
+    in_count = len(result['in'])
+    for i in range(0, in_count):
+        title.append(f'"{result["query"][i]}" in {result["in"][i]}')
+    for i in range(in_count, query_count):
+        title.append(f'"{result["query"][i]}" not in {result["not_in"][i-in_count]}')
+    return ' and '.join(title)
 
 def to_hhmmss(sec):
     hh = int(sec / (60*60))
@@ -522,9 +601,13 @@ def format_merged_ranks(merged_rank_list):
 
 """A parser for user input obtained from the WISE search console
 """
-def parse_user_input(cmd):
-    repl_args = { 'query':[], 'in':[] }
-    # a basic parser
+def parse_user_input(cmd, args):
+    args_copy = copy.deepcopy(args)
+    list_args = ['query', 'in', 'not_in', 'topk']
+    list_arg_map = {
+        'in': 'media_type_list',
+        'not_in': 'media_type_not_list'
+    }
     tok_index = 0
     N = len(cmd)
     last_token_name = ''
@@ -543,7 +626,7 @@ def parse_user_input(cmd):
             else:
                 token_name = cmd[tok_index:next_space]
                 tok_index = next_space
-            last_token_name = token_name.strip()
+            last_token_name = token_name.strip().replace('-', '_')
             parse_token_name = False
             parse_token_value = True
         elif not parse_token_name and parse_token_value:
@@ -554,22 +637,31 @@ def parse_user_input(cmd):
             else:
                 token_value = cmd[tok_index:double_dash]
                 tok_index = double_dash
-            if last_token_name in repl_args:
-                repl_args[last_token_name].append(token_value.strip(' "')) # remove space and quotation
+            if last_token_name in list_args:
+                if hasattr(args_copy, last_token_name):
+                    if getattr(args_copy, last_token_name) is None:
+                        setattr(args_copy, last_token_name, list())
+                else:
+                    setattr(args_copy, last_token_name, list())
+                last_token_values = getattr(args_copy, last_token_name)
+                last_token_values.append(token_value.strip(' "')) # remove space and quotation
+                setattr(args_copy, last_token_name, last_token_values)
             else:
-                repl_args[last_token_name] = token_value.strip()
+                setattr(args_copy, last_token_name, token_value.strip())
             parse_token_name = False
             parse_token_value = False
         else:
             tok_index += 1
     if not parse_token_name and parse_token_value:
-        repl_args[last_token_name] = ''
-
-    if 'in' in repl_args:
-        # we avoid using 'in' as it is a reserved word in python
-        repl_args['media_type'] = repl_args['in']
-        del repl_args['in']
-    return repl_args
+        setattr(args_copy, last_token_name, '')
+    # map arguments under new name keeping the old values
+    for argname in list_arg_map:
+        if not hasattr(args_copy, argname):
+            continue
+        arg_newname = list_arg_map[argname]
+        argname_value = getattr(args_copy, argname)
+        setattr(args_copy, arg_newname, argname_value)
+    return args_copy
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='search',
@@ -584,9 +676,16 @@ if __name__ == '__main__':
     parser.add_argument('--in',
                         required=False,
                         action='append',
-                        dest='media_type', # since "in" is a reserved keyword
-                        choices=['audio', 'video'],
+                        dest='media_type_list', # since "in" is a reserved keyword
+                        choices=['audio', 'video', 'metadata'],
                         help='apply the search query term to these features; query applied to all features if --in argument is missing')
+
+    parser.add_argument('--not-in',
+                        required=False,
+                        action='append',
+                        dest='media_type_not_list',
+                        choices=['audio', 'video', 'metadata'],
+                        help='remove the results from the preceeding query obtained in this media_type; Note: all --not-in flags must come after --in flags')
 
     parser.add_argument('--index-type',
                         required=False,
@@ -597,9 +696,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--topk',
                         required=False,
-                        type=int,
-                        default=5,
-                        help='show only the topk search results')
+                        action='append',
+                        default=[10],
+                        help='show only the top K search results, query specific --topk value can also be provided')
 
     parser.add_argument('--max-filename-length',
                         required=False,
@@ -628,6 +727,12 @@ if __name__ == '__main__':
                         type=int,
                         default=8,
                         help='tolerance (in seconds) for merging audio based search results')
+
+    parser.add_argument('--merge-tolerance-metadata',
+                        required=False,
+                        type=int,
+                        default=0,
+                        help='tolerance (in seconds) for merging metadata based search results')
 
     parser.add_argument('--result-format',
                         required=False,
@@ -664,6 +769,16 @@ if __name__ == '__main__':
         sys.exit(1)
     db_engine = db.init_project(project.dburi, echo=False)
 
+    # sanity check of some CLI arguments
+    if args.media_type_list is None and args.media_type_not_list is not None:
+        print(f'--not-in flag required previous definitions of --in flag')
+        sys.exit(0)
+    if len(args.topk) != 1:
+        args.topk = args.topk[1:] # remove the default value
+    if args.query is not None and (len(args.topk) != len(args.query)):
+        print(f'All --query flags should be accompanied by a --topk value')
+        sys.exit(0)
+
     # Print the CSV header only once.
     # If this task is delegated to the show_result_as_csv() method,
     # the CSV header may get printed multiple times.
@@ -677,17 +792,44 @@ if __name__ == '__main__':
 
     ## load search assets
     search_index_list = {}
-    for media_type in project_assets:
-        feature_extractor_id_list = list(project_assets[media_type].keys())
-        feature_extractor_id = feature_extractor_id_list[0] # TODO: allow users to select the feature
 
-        # load search index
-        index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
-        search_index_list[media_type] = SearchIndex(media_type,
-                                                    feature_extractor_id,
-                                                    index_dir)
+    if args.query is None and args.media_type_list is None:
+        # load all search index as query is not decided yet (e.g. search console mode)
+        unique_required_media_type = list(project_assets.keys())
+    else:
+        # load only the required search index
+        required_media_type = list(args.media_type_list)
+        if args.media_type_not_list:
+            required_media_type += args.media_type_not_list
+        unique_required_media_type = list(set(required_media_type))
+
+    for media_type in unique_required_media_type:
+        asset_id_list = list(project_assets[media_type].keys())
+        asset_index = 0
+        N = len(asset_id_list)
+        if N == 0:
+            continue
+        if N == 1:
+            asset_index = 0
+        else:
+            print(f'{media_type} can be searched using the following search index:')
+            for asset_index in range(0, N):
+                print(f'  {asset_index}. {asset_id_list[asset_index]}')
+            selected_asset_index = -1
+            while True:
+                try:
+                    input_index = input(f'Enter the index of desired search index [0-{N-1}] : ')
+                    selected_asset_index = int(input_index)
+                    if selected_asset_index >= 0 and selected_asset_index < N:
+                        break
+                except:
+                    print(f'invalid input {input_index}')
+            asset_index = selected_asset_index
+        asset_id = asset_id_list[asset_index]
+        asset = project_assets[media_type][asset_id]
+        search_index_list[media_type] = SearchIndexFactory(media_type, asset_id, asset)
         if not search_index_list[media_type].load_index(args.index_type):
-            print(f'failed to load {args.index_type} for {media_type}')
+            print(f'failed to load {media_type} index: {asset_id}')
             del search_index_list[media_type]
             continue
 
@@ -704,69 +846,95 @@ if __name__ == '__main__':
     ## Case-1: Search query provided in the command line
     if hasattr(args, 'query') and args.query is not None:
         ## Sanity check
-        if len(args.query) > 1 and len(args.query) != len(args.media_type):
+        media_type_count = len(args.media_type_list)
+        if args.media_type_not_list:
+            media_type_count += len(args.media_type_not_list)
+        if len(args.query) > 1 and len(args.query) != media_type_count:
             print('Each --query argument must be followed by a --in argument. For example:')
             print('  $ python search.py --query people --in video --query shouting --in audio ...')
             sys.exit(0)
 
         ## if "--in" argments are missing, assume that the search query is
         ## to be applied on all possible media types
-        if len(args.query) == 1 and args.media_type is None:
-            setattr(args, 'media_type', ['audio', 'video'])
+        if len(args.query) == 1 and args.media_type_list is None:
+            setattr(args, 'media_type_list', ['audio', 'video', 'metadata'])
             only_query = args.query[0]
             setattr(args, 'query', [only_query, only_query])
 
         if args.result_format != 'csv' and not args.save_to_file:
             print(f'Searching {args.project_dir} for')
-            for i in range(0, len(args.query)):
-                print(f'  [{i}] "{args.query[i]}" in {args.media_type[i]}')
+            for i in range(0, len(args.media_type_list)):
+                print(f'  [{i}] "{args.query[i]}" in {args.media_type_list[i]}')
+            if args.media_type_not_list:
+                k = len(args.media_type_list)
+                for i in range(k, len(args.query)):
+                    print(f'  [{i}] "{args.query[i]}" not in {args.media_type_not_list[i-k]}')
             print('\n')
-        query_specs = {
-            'query': args.query,
-            'query_id': [ str(x) for x in range(0, len(args.query)) ],
-            'media_type': args.media_type
-        }
-        search_result = process_query(search_index_list, query_specs, args)
+        search_result = process_query(search_index_list, args)
         if args.no_merge:
-            show_result(query_specs, search_result, args)
+            show_result(search_result, args)
         else:
-            merge0_search_result = merge0(query_specs, search_result, args)
-            show_result(query_specs, merge0_search_result, args)
+            merge0_search_result = merge0(search_result, args)
+            show_result(merge0_search_result, args)
             if len(merge0_search_result) == 2 and args.queries_from is None:
-                merge1_query_specs, merge1_search_result = merge1(query_specs,
-                                                                  merge0_search_result,
-                                                                  args)
-                show_result(merge1_query_specs, merge1_search_result, args)
+                merge1_search_result = merge1(merge0_search_result, args)
+                show_result(merge1_search_result, args)
 
     ## Case-2: Search queries contained in a CSV file
     elif hasattr(args, 'queries_from') and args.queries_from is not None:
+        if hasattr(args, 'media_type_not_list') and args.media_type_not_list is not None:
+            print(f'--queries-from flag does not support --not-in flag')
+            sys.exit(0)
         start_time = time.time()
+        print(f'Processing queries from {args.queries_from} ...')
         with open(args.queries_from, 'r') as f:
             query_reader = csv.reader(f, delimiter=',', quotechar='"')
             header = next(query_reader)
             query_count = 0
             for row in query_reader:
-                if len(row) != 2:
-                    print(f'Skipping query: "{row}". Format each line as: query-id, query-text')
+                print(f'[{query_count}] {row}')
+                if len(row) != 2 and len(row) != 4:
+                    print(f'Skipping query: "{row}".')
+                    print(f'Each input line must be formatted as one of the follows:')
+                    print(f'  - "query_id,query" (with --in flag to specify the search target')
+                    print(f'  - "query1,in,query2,not_in"')
                     continue
-                query_id = row[0]
-                query_text = row[1]
-                query_specs = {
-                    'query': [query_text for _ in args.media_type], # repeat query for each media_type
-                    'query_id': [ query_id for _ in args.media_type ],
-                    'media_type': args.media_type
-                }
-                search_result = process_query(search_index_list, query_specs, args)
+
+                args_copy = copy.deepcopy(args)
+                setattr(args_copy, 'query', [ row[0] ])
+
+                if len(row) == 2:
+                    if args.media_type_list is None:
+                        print(f'The CSV file {args.queries_from} contains a row with two columns: {row}')
+                        print(f'For such entries, the --queries-from must be followed by --in argument.')
+                        sys.exit(0)
+                    else:
+                        setattr(args_copy, 'query_id', [ row[0] ])
+                        setattr(args_copy, 'query', [ row[1] ])
+                        setattr(args_copy, 'media_type_not_list', None)
+                if len(row) == 4:
+                    MEDIA_TYPE_LIST = ['audio', 'video', 'metadata']
+                    if row[1] not in MEDIA_TYPE_LIST:
+                        print(f'Skipping row with invalid "in" column: {row[1]}')
+                        continue
+                    if row[3] not in MEDIA_TYPE_LIST:
+                        print(f'Skipping row with invalid "not_in" column: {row[3]}')
+                        continue
+                    setattr(args_copy, 'query_id', [ query_count ])
+                    setattr(args_copy, 'query', [ row[0], row[2] ])
+                    setattr(args_copy, 'media_type_list', [ row[1] ])
+                    setattr(args_copy, 'media_type_not_list', [ row[3] ])
+                search_result = process_query(search_index_list, args_copy)
+
                 if args.no_merge:
-                    show_result(query_specs, search_result, args)
+                    show_result(search_result, args_copy)
                 else:
-                    merge0_search_result = merge0(query_specs, search_result, args)
-                    show_result(query_specs, merge0_search_result, args)
+                    merge0_search_result = merge0(search_result, args_copy)
+                    show_result(merge0_search_result, args_copy)
                     if len(merge0_search_result) == 2 and args.queries_from is None:
-                        merge1_query_specs, merge1_search_result = merge1(query_specs,
-                                                                          merge0_search_result,
-                                                                          args)
-                        show_result(merge1_query_specs, merge1_search_result, args)
+                        merge1_search_result = merge1(merge0_search_result,
+                                                      args_copy)
+                        show_result(merge1_search_result, args_copy)
                 query_count += 1
         end_time = time.time()
         elapsed = end_time - start_time
@@ -786,29 +954,27 @@ if __name__ == '__main__':
         while True:
             try:
                 cmd = input('[%d] > ' % (cmd_id))
-                query_specs = parse_user_input(cmd)
-                query_specs['query_id'] = [ str(x) for x in range(0, len(query_specs['query'])) ]
-                search_result = process_query(search_index_list, query_specs, args)
-                if 'save-to-file' in query_specs:
-                    with open(query_specs['save-to-file'], 'w') as f:
-                        if 'result-format' in query_specs and query_specs['result-format'] == 'csv':
+                args2 = parse_user_input(cmd, args)
+                search_result = process_query(search_index_list, args2)
+                if hasattr(args2, 'save_to_file') and getattr(args2, 'save_to_file') is not None:
+                    with open(getattr(args2, 'save_to_file'), 'w') as f:
+                        if hasattr(args2, 'result_format') and getattr(args2, 'result_format') == 'csv':
                             f.write(EXPORT_CSV_HEADER + '\n')
-                            print(f'saving results to file {query_specs["save-to-file"]}')
+                            print(f'writing results to file {getattr(args2, "save_to_file")} ...')
                 else:
-                    if 'result-format' in query_specs and query_specs['result-format'] == 'csv':
+                    if hasattr(args2, 'result_format') and getattr(args2, 'result_format') == 'csv':
                         print(f'{EXPORT_CSV_HEADER}')
 
-                if args.no_merge or ('no-merge' in query_specs):
-                    show_result(query_specs, search_result, args)
+                if args2.no_merge:
+                    show_result(search_result, args2)
                 else:
-                    merge0_search_result = merge0(query_specs, search_result, args)
-                    show_result(query_specs, merge0_search_result, args)
-                    if len(merge0_search_result) == 2 and args.queries_from is None:
-                        merge1_query_specs, merge1_search_result = merge1(query_specs,
-                                                                          merge0_search_result,
-                                                                          args)
-                        show_result(merge1_query_specs, merge1_search_result, args)
-                        cmd_id += 1
+                    merge0_search_result = merge0(search_result, args2)
+                    show_result(merge0_search_result, args2)
+                    if len(merge0_search_result) == 2 and args2.queries_from is None:
+                        merge1_search_result = merge1(merge0_search_result,
+                                                      args2)
+                        show_result(merge1_search_result, args2)
+                cmd_id += 1
             except EOFError:
                 print('\nBye')
                 break

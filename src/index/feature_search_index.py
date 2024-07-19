@@ -5,16 +5,21 @@ import numpy as np
 import math
 import itertools
 
-from .feature.feature_extractor_factory import FeatureExtractorFactory
-from .feature.store.feature_store_factory import FeatureStoreFactory
-from .feature.store.webdataset_store import WebdatasetStore
+from .search_index import SearchIndex
+from ..feature.feature_extractor_factory import FeatureExtractorFactory
+from ..feature.store.feature_store_factory import FeatureStoreFactory
+from ..feature.store.webdataset_store import WebdatasetStore
 
-class SearchIndex:
-    def __init__(self, media_type, feature_extractor_id, index_dir, feature_dir=None):
+class FeatureSearchIndex(SearchIndex):
+    def __init__(self, media_type, asset_id, asset):
         self.media_type = media_type
-        self.feature_extractor_id = feature_extractor_id
-        self.index_dir = index_dir
-        self.feature_dir = feature_dir
+        self.feature_extractor_id = asset_id
+
+        assert 'features_dir' in asset, "features_dir missing in assets"
+        self.features_dir = Path(asset['features_dir'])
+
+        assert 'index_dir' in asset, "index_dir missing in assets"
+        self.index_dir = Path(asset['index_dir'])
 
         self.prompt = {
             'image':'This is a photo of a ',
@@ -26,16 +31,14 @@ class SearchIndex:
         return self.index_dir / (self.media_type + '-' + index_type + '.faiss')
 
     def create_index(self, index_type, overwrite=False):
+        self.index_dir.mkdir(parents=True, exist_ok=True)
         index_fn = self.get_index_filename(index_type)
         if index_fn.exists() and overwrite is False:
-            print(f'  index {index_fn} already exists')
-            return
-        if self.feature_dir is None:
-            print(f'  feature_dir is missing')
+            print(f'{index_type} for {self.media_type} already exists')
             return
         self.index_type = index_type
 
-        feature_store = FeatureStoreFactory.load_store(self.media_type, self.feature_dir)
+        feature_store = FeatureStoreFactory.load_store(self.media_type, self.features_dir)
         feature_store.enable_read(shard_shuffle = False)
 
         feature_count = feature_store.feature_count
@@ -57,7 +60,7 @@ class SearchIndex:
             index = faiss.IndexIVFFlat(quantizer, feature_dim, cell_count, faiss.METRIC_INNER_PRODUCT)
 
             print(f'  loading a random sample of {train_count} features from {feature_count} features ...')
-            shuffled_features = WebdatasetStore(self.media_type, self.feature_dir)
+            shuffled_features = WebdatasetStore(self.media_type, self.features_dir)
             shuffled_features.enable_read(shard_shuffle=True)
 
             train_features = np.ndarray((train_count, feature_dim), dtype=np.float32)
@@ -105,7 +108,7 @@ class SearchIndex:
                 media_query_text = [ (self.prompt[media_type] + x) for x in query]
         else:
             media_query_text = [ (self.prompt[media_type] + query) ]
-        #print(f'Querying {media_type} with "{media_query_text}"')
+
         query_features = self.feature_extractor.extract_text_features(media_query_text)
         dist, ids  = self.index.search(query_features, topk)
         return dist[0], ids[0]

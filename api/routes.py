@@ -35,7 +35,8 @@ import os
 import sqlalchemy as sa
 
 from config import APIConfig
-from src.search_index import SearchIndex
+from src.index.search_index_factory import SearchIndexFactory
+from src.index.search_index import SearchIndex
 from src import db
 from src.repository import (
     SourceCollectionRepo,
@@ -754,7 +755,7 @@ def _get_search_router(config: APIConfig):
                 )
             else:
                 raise ValueError(f"Unsupported modality: {query_dict['modality']}")
-                
+
             if query_dict["sign"] == "negative":
                 feature_vector = -feature_vector
             feature_vectors.append(feature_vector)
@@ -781,28 +782,39 @@ def _get_search_router(config: APIConfig):
     """
     search_indices = defaultdict(dict)
     for media_type in project_assets:
-        for feature_extractor_id in project_assets[media_type]:
-            index_dir = project_assets[media_type][feature_extractor_id]['index_dir']
-            search_index = SearchIndex(media_type,
-                                        feature_extractor_id,
-                                        index_dir)
-            search_indices[media_type][feature_extractor_id] = search_index
-            logger.info(f"Loading faiss index from {search_index.get_index_filename(config.index_type)}")
-            if not search_index.load_index(config.index_type):
-                raise RuntimeError("Unable to load faiss index")
-            if hasattr(search_index.index, "nprobe"):
+        asset_id_list = list(project_assets[media_type].keys())
+        asset_index = 0
+        N = len(asset_id_list)
+        if N == 0:
+            continue
+        if N == 1:
+            asset_index = 0
+        else:
+            print(f'{media_type} can be searched using the following search index:')
+            for asset_index in range(0, N):
+                print(f'  {asset_index}. {asset_id_list[asset_index]}')
+            selected_asset_index = -1
+            while True:
+                try:
+                    input_index = input(f'Enter the index of desired search index [0-{N-1}] : ')
+                    selected_asset_index = int(input_index)
+                    if selected_asset_index >= 0 and selected_asset_index < N:
+                        break
+                except:
+                    print(f'invalid input {input_index}')
+            asset_index = selected_asset_index
+        asset_id = asset_id_list[asset_index]
+        asset = project_assets[media_type][asset_id]
+        search_indices[media_type] = SearchIndexFactory(media_type, asset_id, asset)
+        if not search_indices[media_type].load_index(config.index_type):
+            print(f'failed to load {media_type} index: {asset_id}')
+            del search_index_list[media_type]
+            continue
+
+            if hasattr(search_indices[media_type].index, "nprobe"):
                 # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
                 search_index.index.parallel_mode = 1
                 search_index.index.nprobe = getattr(config, "nprobe", 32)
-
-            if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
-                try:
-                    logger.info(f"Enabling direct map on search index for faster internal search.")
-                    search_index.index.make_direct_map(True)
-                except Exception as e:
-                    logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
-            else:
-                logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
 
     # Get counts
     with project_engine.connect() as conn:
@@ -1117,7 +1129,7 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-    
+
         for query in q:
             if query.strip() in config.query_blocklist:
                 message = (
@@ -1131,8 +1143,7 @@ def _get_search_router(config: APIConfig):
 
         # Pick the first feature extractor for videos
         search_in = MediaType.VIDEO
-        feature_extractor_id = list(search_indices[search_in].keys())[0]
-        search_index = search_indices[search_in][feature_extractor_id]
+        search_index = search_indices[search_in]
 
         extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
         extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
@@ -1184,13 +1195,7 @@ def _get_search_router(config: APIConfig):
         input images/text, and then using this as the query vector.
         """
         media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-        if feature_extractor_id is None:
-            # Pick the first feature extractor for the given media type
-            feature_extractor_id = list(search_indices[media_type].keys())[0]
-        elif feature_extractor_id not in search_indices[media_type]:
-            raise HTTPException(400, {"message": f"Invalid combination of feature_extractor_id: {feature_extractor_id} and media type: {media_type}"})
-        
-        search_index = search_indices[media_type][feature_extractor_id]
+        search_index = search_indices[media_type]
 
         extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
         extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
@@ -1202,7 +1207,7 @@ def _get_search_router(config: APIConfig):
                 raise ValueError("No audio file was specified")
             elif len(x) > 1:
                 raise NotImplementedError("Please specify 1 audio file only")
-            
+
             target_sample_rate = 48_000 # TODO set this based on model?
             audio_file = x[0]
             waveform, original_sample_rate = torchaudio.load(audio_file)
