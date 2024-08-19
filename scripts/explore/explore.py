@@ -11,18 +11,14 @@ from pydantic import BaseModel
 import uvicorn
 import json
 
-import sys
 import os
 from typing import BinaryIO
 
-# Add root to sys.path to import from src
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-from src.wise_project import WiseProject
-from src.data_models import MediaType, SourceCollectionType
+from wise.wise_project import WiseProject
+from wise.data_models import MediaType, SourceCollectionType
 from scripts.explore.db import init_explore_db
 from scripts.explore.models import Facet, Cluster, Assignment, ClusterStatus, FacetMetadataSchema
-import src.db.tables.facets as wise_tables
+import wise.db.tables.facets as wise_tables
 import sqlalchemy as sa
 
 logging.basicConfig(level=logging.INFO)
@@ -590,7 +586,7 @@ def update_cluster(project_name: str, cluster_id: int, update: ClusterUpdate, db
             from scripts.explore.models import KnownFaceCluster
             import faiss
             import numpy as np
-            from src.data_models import ModalityType
+            from wise.data_models import ModalityType
 
             # Get all vectors for this cluster
             assignments = db.query(Assignment).filter_by(cluster_id=cluster_id).all()
@@ -751,7 +747,7 @@ def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):
     internal_engine = app_state.project.db_engine
 
     # Ensure facet tables are created in internal.db before publishing
-    from src.db.base import facets_metadata_obj
+    from wise.db.base import facets_metadata_obj
     facets_metadata_obj.create_all(internal_engine)
 
     with internal_engine.begin() as conn:

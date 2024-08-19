@@ -20,15 +20,15 @@ import logging
 
 from pathlib import Path
 
-from config import APIConfig
+from wise.api.config import APIConfig
 
-# from src.dataloader import AVDataset
-# from src.search_index import SearchIndex
-from src.wise_project import WiseProject
-from src.feature import FeatureExtractorFactory
-from src.index.search_index_factory import SearchIndexFactory
-from src.search.fts import FTSSearch
-from src import db
+# from wise.dataloader import AVDataset
+# from wise.search_index import SearchIndex
+from wise.wise_project import WiseProject
+from wise.feature import FeatureExtractorFactory
+from wise.index.search_index_factory import SearchIndexFactory
+from wise.search.fts import FTSSearch
+from wise import db
 
 logging.basicConfig(
     level=logging.INFO,

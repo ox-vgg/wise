@@ -2,13 +2,13 @@
 
 The FeatureStore provides storage for features extracted from video
 frames and audio samples.  The
-[FaissStore][src.feature.store.faiss_store.FaissStore] uses the
+[FaissStore][wise.feature.store.faiss_store.FaissStore] uses the
 [faiss](https://ai.meta.com/tools/faiss/) index.
 
 Here is an example of how the features stores in these stores can be accessed.
 
 ```python
-# source: src/search_index.py
+# source: src/wise/search_index.py
 from pathlib import Path
 from .feature.store.feature_store_factory import FeatureStoreFactory
 from ...data_models import ModalityType

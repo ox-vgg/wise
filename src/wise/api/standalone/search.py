@@ -21,7 +21,7 @@ import functools
 from collections.abc import Callable, Iterable
 from typing import Annotated, cast
 
-from config import APIConfig
+from wise.api.config import APIConfig
 from .. import common
 from ..common import (
     MediaQueryTerm,
@@ -53,11 +53,11 @@ from ..services.search.segments import (
     get_shots_from_segments as _get_shots_from_segments,
 )
 
-from src.data_models import MediaType, ModalityType, VectorAndMediaMetadata
-from src.search.fts import WISEFTSQuery
+from wise.data_models import MediaType, ModalityType, VectorAndMediaMetadata
+from wise.search.fts import WISEFTSQuery
 
-from src.feature.feature_extractor import FeatureExtMetadata
-from src.wise_project import WiseProject
+from wise.feature.feature_extractor import FeatureExtMetadata
+from wise.wise_project import WiseProject
 
 import numpy as np
 import fastapi

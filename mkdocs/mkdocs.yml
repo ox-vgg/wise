@@ -35,7 +35,7 @@ plugins:
             unwrap_annotated: true
             show_docstring_type_parameters: true
             members_order: source
-  
+
 nav:
   - WISE: README.md
   - Install: docs/Install.md

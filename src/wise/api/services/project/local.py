@@ -20,14 +20,14 @@ import math
 import logging
 from typing import Any
 
-from config import APIConfig
+from wise.api.config import APIConfig
 from .exceptions import MediaNotFoundException, ThumbnailNotFoundException
 from .base import WiseProjectService, ProjectInfo
-from src.wise_project import WiseProject
-from src.data_models import VectorAndMediaMetadata, MediaType
-from src.repository import get_featured_images
+from wise.wise_project import WiseProject
+from wise.data_models import VectorAndMediaMetadata, MediaType
+from wise.repository import get_featured_images
 
-from src.utils import convert_uint8array_to_base64
+from wise.utils import convert_uint8array_to_base64
 
 from PIL import Image
 from webvtt import WebVTT, Caption

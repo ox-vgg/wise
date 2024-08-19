@@ -58,6 +58,17 @@ TMP_DIR=$(realpath ${1})
 OUTDIR="${TMP_DIR}/wise-test/"
 mkdir -p "${OUTDIR}"
 
+## Ensure we are running the version in the repo instead of some other
+## version of wise installed.
+export PYTHONPATH="$WISE_CODE_DIR/src:$PYTHONPATH"
+
+WISE_PKG_PATH=$(python -c 'import wise; print(wise.__path__[0])')
+if [ "$WISE_CODE_DIR/src/wise" !=  $WISE_PKG_PATH ];
+then
+    echo "ERROR: WISE in path '$WISE_PKG_PATH' is not the current repo" >&2
+    exit 1
+fi
+
 DATA_DIR="${OUTDIR}/test-data"
 TEST_DATA_DIR="${DATA_DIR}/${TEST_ID}/"
 TEST_DATA_DOWNLOAD_URL="https://thor.robots.ox.ac.uk/wise/assets/test/${TEST_ID}.zip"

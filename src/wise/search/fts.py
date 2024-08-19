@@ -33,7 +33,7 @@ from sqlalchemy.ext import compiler
 from sqlalchemy.schema import DDLElement
 
 if TYPE_CHECKING:
-    from src.wise_project import WiseProject
+    from wise.wise_project import WiseProject
 
 logger = logging.getLogger(__name__)
 

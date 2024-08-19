@@ -23,11 +23,12 @@ from fastapi import UploadFile
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 
-import api.common
-from api import create_app
-from api.common import MediaQueryTerm, TextQueryTerm
-from config import APIConfig
-from src.wise_project import WiseProject
+import wise.api.common
+from wise.api import create_app
+from wise.api.common import MediaQueryTerm, TextQueryTerm
+from wise.wise_project import WiseProject
+
+from wise.api.config import APIConfig
 
 
 class TestWithEmptyProject(unittest.TestCase):
@@ -125,7 +126,9 @@ class TestHandlingMultipartForm(unittest.TestCase):
         ]
 
         self.assertEqual(
-            api.common.merge_multipart_query_form(query_form, query_form_files),
+            wise.api.common.merge_multipart_query_form(
+                query_form, query_form_files
+            ),
             expected_query,
         )
 
@@ -135,15 +138,16 @@ class TestHandlingMultipartForm(unittest.TestCase):
             '{"term_id": "bar", "is_negative": false, "vector_id": "0/0/0"}',
         ]
         expected_q = [
-            api.common.TextQueryTerm(
+            wise.api.common.TextQueryTerm(
                 term_id="foo", is_negative=True, txt="crane"
             ),
-            api.common.VectorIdQueryTerm(
+            wise.api.common.VectorIdQueryTerm(
                 term_id="bar", is_negative=False, vector_id="0/0/0"
             )
         ]
         self.assertEqual(
-            api.common.merge_multipart_query_form(query_form, []), expected_q
+            wise.api.common.merge_multipart_query_form(query_form, []),
+            expected_q
         )
 
     def test_parsing_url(self):
@@ -152,7 +156,7 @@ class TestHandlingMultipartForm(unittest.TestCase):
             '{"term_id": "gnu", "is_negative": false, "src": "%s", "qtype": "visual"}' % url,
         ]
         expected_q = [
-            api.common.MediaQueryTerm(
+            wise.api.common.MediaQueryTerm(
                 term_id="gnu",
                 is_negative=False,
                 src=HttpUrl(url),
@@ -160,5 +164,6 @@ class TestHandlingMultipartForm(unittest.TestCase):
             )
         ]
         self.assertEqual(
-            api.common.merge_multipart_query_form(query_form, []), expected_q
+            wise.api.common.merge_multipart_query_form(query_form, []),
+            expected_q
         )

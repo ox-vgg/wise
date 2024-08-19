@@ -60,6 +60,9 @@ RUN mkdir -p ${HF_HOME} ${PYTHONPYCACHEPREFIX} && chmod 3777 -R /tmp && \
     mkdir -p /tmp/wise_root/wise && chmod -R 3775 /tmp/wise_root
 
 USER ${MAMBA_USER}
+COPY --chown=${MAMBA_USER}:${MAMBA_USER} . wise
+RUN micromamba run -n wise-env pip install wise/
+
 
 FROM ${NODE_IMAGE} AS wise-frontend
 
@@ -94,7 +97,13 @@ COPY --from=wise-env --chmod=3775 --chown=nonroot:nonroot \
     /tmp/wise_root/ /
 
 WORKDIR /wise
-COPY --chown=nonroot:nonroot . .
+COPY --from=wise-env \
+    --chown=nonroot:nonroot \
+    /tmp/wise/create-index.py \
+    /tmp/wise/extract-features.py \
+    /tmp/wise/media-metadata.py \
+    /tmp/wise/serve.py \
+    .
 
 # Ensure this command goes after copying the current folder
 # if the current folder already has a dist folder

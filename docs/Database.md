@@ -11,4 +11,4 @@ The diagram below shows the database schema. The table structures are defined [h
 
 In addition to the tables defined above, WISE stores the thumbnails as well in a separate database (`thumbs.db`) within the project folder. Thumbnails are explained in more detail [here](Thumbnails.md)
 
-WISE uses the [repository pattern](https://www.cosmicpython.com/book/chapter_02_repository.html) to abstract the DB access. The CRUD methods are defined [here](reference/repository.md) and repository for each metadata table is instantiated in `src/repository/__init__.py`
+WISE uses the [repository pattern](https://www.cosmicpython.com/book/chapter_02_repository.html) to abstract the DB access. The CRUD methods are defined [here](reference/repository.md) and repository for each metadata table is instantiated in `src/wise/repository/__init__.py`

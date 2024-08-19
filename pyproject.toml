@@ -1,0 +1,42 @@
+[build-system]
+## We require 'setuptools >= 62.6' because that's when setuptools
+## added support to list dependencies with `file:`
+requires = ["setuptools >= 62.6"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "wise"  # this name is already taken on PyPI so should be changed
+version = "2.1.0+dev"
+description = "Multimodal search engine for images, videos, and audio"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+
+requires-python = ">=3.10"
+dynamic = ["dependencies", "optional-dependencies"]
+
+
+## We keep the dependencies in separate requirements file instead of
+## manually listed to support users installing requirements with
+## mamba.  See also https://github.com/mamba-org/mamba/issues/2292
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.dynamic.optional-dependencies]
+dev = {file = ["requirements-dev.txt"]}
+docs = {file = ["requirements-docs.txt"]}
+
+
+[project.urls]
+homepage = "https://www.robots.ox.ac.uk/~vgg/software/wise/"
+documentation = "https://gitlab.com/vgg/wise/wise/-/tree/main/docs"
+releasenotes = "https://gitlab.com/vgg/wise/wise/-/blob/main/NEWS.md"
+repository = "https://gitlab.com/vgg/wise/wise/"
+tracker = "https://gitlab.com/vgg/wise/wise/-/work_items"

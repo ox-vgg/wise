@@ -30,6 +30,7 @@ build*.json
 /env/
 /venv/
 __pycache__/
+/src/wise.egg-info/
 
 # Jupyter
 .ipynb_checkpoints/

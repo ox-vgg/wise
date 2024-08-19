@@ -1,80 +1,127 @@
 # WISE Installation
 
-The hardware and software requirements for installing WISE are as follows.
+The requirements for installing WISE are as follows:
 
-- A modern computer with Ubuntu, Debian, or other similar OS
-  - There may be installation issues on macOS and Windows. We recommend using a Linux environment (or WSL) for now
-- Python version 3.10 (or higher)
+- A computer with a GNU/Linux distribution:
+  - We develop WISE in Ubuntu and Debian but other distributions
+    should work equally well;
+  - There may be installation issues on macOS and Windows (we have
+    simply not tested it yet but are interested in knowing about
+    failures and successes).
 
-To install WISE, we first download the WISE source code.
+- Python version 3.10 or higher;
 
-The latest stable release of WISE is available at https://gitlab.com/vgg/wise/wise/-/releases .
+- A Nvidia GPU is not required but WISE will be slower without one;
 
-```
-## 1. Download the latest release and extract the WISE code
-curl -sLO https://gitlab.com/vgg/wise/wise/-/archive/wise-2.1.0/wise-wise-2.1.0.zip
-unzip wise-wise-2.1.0.zip
-mv wise-wise-2.1.0 wise-2.1.0
-cd wise-2.1.0
-```
+- [FFmpeg](https://ffmpeg.org/) installation compatible with Python's
+  [torchaudio](https://docs.pytorch.org/audio/2.8.0/installation.html)
 
-The WISE software depends on several python libraries and there are the
-following three ways to install these software dependencies.
+## Quick start installation
 
-- Using the [Conda](https://docs.conda.io/en/latest/) or [Mamba](https://mamba.readthedocs.io/en/latest/index.html) dependency management tool
-- Using Python's virtual environment [venv](https://docs.python.org/3/library/venv.html)
-- Install WISE to use only CPU (e.g. on machines without a GPU or GPU with insufficient memory)
-
-See the [User Guide](UserGuide.md) to test the visual search capability of the WISE
-software tool.
-
-
-## Option 1: Installation using conda / mamba
-
-Using the conda tool, the WISE software dependencies can be installed as follows. Please note:
-
-- We recommend you to use a recent version of conda (22 or greater) / mamba (1.4+). WISE might not work on lower versions of conda / mamba.
-
-- If you are using WISE on an Intel platforms, you may install the MKL
-  distribution of BLAS for better performance on FAISS by appending
-  the `blas=*=mkl` argument to the `conda env create` command.
+For the least amount of grief and the fastest install, we recommend
+using [Miniconda](https://docs.anaconda.com/miniconda/) and provide a
+Conda environment file.  Using Conda, the current development version
+of WISE can be installed like so:
 
 ```
-conda env create --name wise -f environment.yml
+git clone https://gitlab.com/vgg/wise/wise.git
+cd wise
+conda env create --name wise --file environment.yml
 conda activate wise
+pip install .
 ```
 
-(For mamba, replace conda in the above command accordingly)
+[Mamba and Micromamba](https://mamba.readthedocs.io/) are also
+supported, just replace `conda` with `mamba` or `micromamba` on the
+commands above.
 
-## Option 2: Installation using venv
+## Full install instructions
 
-If the conda tool based dependency management option is not suitable, the alternative
-is to use Python's virtual environment [venv](https://docs.python.org/3/library/venv.html)
-module for installing the dependencies as shown below.
-
-```
-python3 --version                  # must be >= 3.10
-sudo apt install ffmpeg            # ffmpeg>=4.4.2,<7.0 is required to load videos
-python3 -m venv wise-dep/          # create virtual environment
-source wise-dep/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-## Option 3: Install WISE to use only CPU (i.e. no GPU)
-
-WISE can be installed on a machine without a GPU. While the processing speed is slow,
-all the functionality of the WISE software remains available.
+WISE is a Python package and can be installed with `pip` as any other
+Python package.  However, WISE is not yet distributed on any Python
+package repository so needs to be installed from development sources,
+the short version of it is:
 
 ```
-python3 --version                  # must be >= 3.10
-sudo apt install ffmpeg            # ffmpeg>=4.4.2,<7.0 is required to load videos
-python3 -m venv wise-dep/          # create virtual environment
-source wise-dep/bin/activate
-python -m pip install --upgrade pip
-
-# Note: the following command is the key to installing CPU only version of WISE
-pip install --index-url https://download.pytorch.org/whl/cpu \
-    -r requirements.txt
-
+git clone https://gitlab.com/vgg/wise/wise.git
+cd wise
+pip install .
 ```
+
+### Dependencies
+
+#### FAISS Python package
+
+[FAISS](https://faiss.ai/) does not currently provide Python packages
+other than those in Conda.  There are currently three options:
+
+- Install one of the unofficial FAISS distributions, namely
+  [`faiss-cpu` on PyPI](https://pypi.org/project/faiss-cpu/)
+
+- Install FAISS with Conda (the `faiss-cpu` Conda package is enough
+  since WISE does not use the GPU with FAISS);
+
+- Build [FAISS from
+  source](https://github.com/facebookresearch/faiss/blob/main/INSTALL.md);
+
+Currently, `requirements.txt` lists a requirement on `faiss-cpu`.
+This is the name of the PyPI distribution that installs a `faiss`
+package.  If you build FAISS from source or if you install it with
+Conda, rename `faiss-cpu` on `requirements.txt` to `faiss` to avoid
+getting the package overwritten by the PyPI distribution.
+
+Note that there is also a `faiss` Python distribution on PyPI.  That
+is an "unofficial" distribution of FAISS, unmaintained since 2019 and
+still in version 1.5.3.
+
+#### PyTorch (torch, torchvision, and torchaudio)
+
+[PyTorch](https://pytorch.org/) is another dependency of WISE.  There
+are PyPI distributions for its torch, torchvision, and torchaudio
+packages so typically they require no particular attention.  PyTorch
+also provides built distributions for different versions of CUDA,
+ROCm, operating systems for both Conda and pip.  Refer to PyTorch
+[install page](https://pytorch.org/get-started/locally/) if needed.
+
+#### FFmpeg
+
+FFmpeg is a transitive dependency from Torchaudio.  It is worth of
+note simply because it is not a Python package and is only checked at
+runtime.  Please refer to the documentation for the Torchaudio version
+you have installed for its [FFmpeg version
+compatibility](https://docs.pytorch.org/audio/2.8.0/installation.html).
+
+### Running WISE with an AMD GPU
+
+We have not tested running WISE with an AMD GPU.  However, PyTorch
+provides distributions built for ROCm.  Please refer to [PyTorch
+install page](https://pytorch.org/get-started/locally/).  We are
+interested in knowing about any successes or failures with AMD GPUs.
+
+### Running WISE without a GPU
+
+WISE can run without using a GPU.  While the processing speed is
+slower, all the functionality of WISE remains available.  The main
+performance impact will be during the "extract features" step which
+can be done offline and in a different computer.
+
+### Development install
+
+If you plan to make changes to WISE, install the `dev` dependencies
+and consider installing in editable mode, i.e., setuptools "develop
+mode".  For that, use:
+
+    cd wise
+    pip install --editable .[dev]
+
+### Virtual Environments
+
+It is possible to have Python environments without Conda.  [Python's
+venv](https://docs.python.org/3/library/venv.html) is a common choice
+and comes builtin with Python.  To use it, create and activate the
+environment before installing WISE and its dependencies:
+
+    cd wise
+    python3 -m venv venv/       # create virtual environment (optional)
+    source venv/bin/activate    # activate virtual environment (optional)
+    pip install .

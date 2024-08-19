@@ -4,8 +4,8 @@ To help serve wise projects quickly, thumbnails (height: 192px) are obtained fro
 
 Each frame is then encoded as jpeg (with quality set as 80) and stored in the `thumbnails` table in the `thumbs.db` database, under the `content` column, along with the timestamp and media_id
 
-See [WiseProject][src.wise_project.WiseProject.thumbnail] code for an example of querying by `id` and `timestamp` interval
+See [WiseProject][wise.wise_project.WiseProject.thumbnail] code for an example of querying by `id` and `timestamp` interval
 
-See `src/dataloader/dataset.py#L247` for the configuration of the thumbnail stream
+See `src/wise/dataloader/dataset.py#L247` for the configuration of the thumbnail stream
 
 See [Internal Metadata Database documentation](Database.md) for more details on how the thumbnails database (and internal metadata database) can be accessed.
