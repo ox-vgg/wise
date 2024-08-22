@@ -160,8 +160,13 @@ def run(
     # Construct the dataloader
     loader = torch_data.DataLoader(stream, batch_size=None, num_workers=0)
     logger.info(f"Iterating over {len(input_files)} file(s)")
-    for mid, *chunks in tqdm(loader):
-        logger.debug(f"{mid}, {[x and (x.tensor.shape, x.pts) for x in chunks]}")
+    for mid, chunks in tqdm(loader):
+        logger.debug([{
+            media_chunk_type: (
+                f"List length: {len(chunk.tensor)} | Shapes: {[t.shape for t in chunk.tensor]}" if isinstance(chunk.tensor, list) else chunk.tensor.shape,
+                chunk.pts
+            ) if chunk else None
+        } for media_chunk_type, chunk in chunks.items()])
         pass
 
 

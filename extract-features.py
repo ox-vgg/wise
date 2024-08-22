@@ -10,8 +10,10 @@ import numpy as np
 from collections import defaultdict
 import logging
 
-from src.dataloader import AVDataset, get_media_metadata
+from src.dataloader.dataset import MediaChunk
+from src.dataloader import AVDataset, VideoDataset, AudioDataset, get_media_metadata
 from src.dataloader.utils import VIDEO_EXTENSIONS, is_valid_image, is_valid_video
+from src.dataloader.streamreader import MediaChunkType
 from src.wise_project import WiseProject
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
 from src.feature.store.feature_store_factory import FeatureStoreFactory
@@ -220,9 +222,7 @@ if __name__ == "__main__":
     feature_store_dir_list = {}
     feature_store_list = {}
 
-    for media_type in feature_extractor_id_list:
-        feature_extractor_id = feature_extractor_id_list[media_type]
-
+    for media_type, feature_extractor_id in feature_extractor_id_list.items():
         ## 3.1 Initialise feature extractor
         feature_extractor_list[media_type] = FeatureExtractorFactory(
             feature_extractor_id
@@ -269,13 +269,14 @@ if __name__ == "__main__":
     )
     MAX_BULK_INSERT = 8192
     with db_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn, tqdm(desc="Feature extraction") as pbar:
-        for idx, (mid, video, audio, *rest) in enumerate(av_data_loader):
-            media_segment = {"video": video, "audio": audio}
+        mid: str | int # type annotation
+        chunks: Dict[MediaChunkType, MediaChunk | None] # type annotation
+        for idx, (mid, chunks) in enumerate(av_data_loader):
             for media_type in feature_extractor_id_list:
-                if media_segment[media_type] is None:
+                if chunks[media_type] is None:
                     continue
-                segment_tensor = media_segment[media_type].tensor
-                segment_pts = media_segment[media_type].pts
+                segment_tensor = chunks[media_type].tensor
+                segment_pts = chunks[media_type].pts
 
                 if media_type == "image" or media_type == "video":
                     segment_feature = feature_extractor_list[
@@ -323,14 +324,10 @@ if __name__ == "__main__":
                         feature_metadata.id, segment_feature
                     )
 
-            if len(rest) > 0:
+            if 'thumbnails' in chunks:
                 # Handle thumbnails
-                _thumbnails = rest[0]
-                if _thumbnails == None:
-                    continue
-
-                _thumb_jpegs = _thumbnails.tensor
-                _thumb_pts = _thumbnails.pts
+                _thumb_jpegs = chunks['thumbnails'].tensor
+                _thumb_pts = chunks['thumbnails'].pts
 
                 # Store in thumbnail store
                 # (thumbnail will be N x 3 x 192 x W)
@@ -346,7 +343,7 @@ if __name__ == "__main__":
                     )
 
             # Update progress bar
-            _media = video or audio
+            _media = chunks.get('video') or chunks.get('audio')
             if _media is not None:
                 pbar.update(_media.tensor.shape[0])
 

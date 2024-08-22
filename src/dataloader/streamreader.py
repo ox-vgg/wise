@@ -18,6 +18,12 @@ class SourceMediaType(str, enum.Enum):
     AV = "av"
 
 
+class MediaChunkType(str, enum.Enum):
+    AUDIO = "audio"
+    VIDEO = "video"
+    THUMBNAILS = "thumbnails"
+
+
 @dataclasses.dataclass
 class BaseStreamOutputOptions(object):
     frames_per_chunk: int
@@ -35,6 +41,11 @@ class BasicVideoStreamOutputOptions(BaseStreamOutputOptions):
     # TODO
     # Add decoder and decoder_option, hw_accel
     # https://pytorch.org/audio/stable/generated/torio.io.StreamingMediaDecoder.html#add-basic-video-stream
+
+
+@dataclasses.dataclass
+class BasicThumbnailStreamOutputOptions(BasicVideoStreamOutputOptions):
+    pass
 
 
 @dataclasses.dataclass

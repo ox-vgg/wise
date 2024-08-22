@@ -2,12 +2,14 @@ import itertools
 import logging
 from pathlib import Path
 from uuid import uuid4, UUID
-from typing import List, Dict, Callable, Optional, Union
+from typing import List, Dict, Callable, Optional, Union, Generator, Tuple, Any
 from .streamreader import (
     SourceMediaType,
+    MediaChunkType,
     StreamOutputOptions,
     BasicAudioStreamOutputOptions,
     BasicVideoStreamOutputOptions,
+    BasicThumbnailStreamOutputOptions,
     get_media_type,
     get_media_info,
     get_stream_duration,
@@ -244,7 +246,7 @@ class MediaDataset(torch_data.IterableDataset):
 
         # Handle thumbnail for video and image
         self._thumbnails = thumbnails
-        self._thumbnail_opts = BasicVideoStreamOutputOptions(
+        self._thumbnail_opts = BasicThumbnailStreamOutputOptions(
             frames_per_chunk=self._segment_length * 2 if self._segment_length else 1,
             frame_rate=2 if self._segment_length else None,
             width=-2,
@@ -256,7 +258,7 @@ class MediaDataset(torch_data.IterableDataset):
         # verify if length of output_stream_opts and transform matches up
         assert len(self._transforms) == len(self._output_stream_opts)
 
-    def _get_media_iterator(self, id_list: List[Union[str, int]]):
+    def _get_media_iterator(self, id_list: List[Union[str, int]]) -> Generator[Tuple[str | int, Dict[MediaChunkType, MediaChunk | None]], Any, None]:
         for _id in id_list:
             path = self._filelist[_id]
             try:
@@ -273,9 +275,6 @@ class MediaDataset(torch_data.IterableDataset):
                     )
                     thumbnails = False
 
-                should_pad_output_with_none = (
-                    self._thumbnails == True and thumbnails == False
-                )
                 stream_transforms = list(self._transforms)
                 output_stream_opts = list(self._output_stream_opts)
                 if thumbnails:
@@ -287,10 +286,22 @@ class MediaDataset(torch_data.IterableDataset):
                 reader = get_stream_reader(str(path), output_stream_opts)
                 reader.seek(self._offset)
 
+                def get_media_chunk_type(opts: StreamOutputOptions) -> MediaChunkType:
+                    if isinstance(opts, BasicThumbnailStreamOutputOptions):
+                        return MediaChunkType.THUMBNAILS
+                    elif isinstance(opts, BasicVideoStreamOutputOptions):
+                        return MediaChunkType.VIDEO
+                    elif isinstance(opts, BasicAudioStreamOutputOptions):
+                        return MediaChunkType.AUDIO
+                    else:
+                        raise ValueError(f"Unknown output stream type: {type(opts)}")
+
+                media_chunk_types = [get_media_chunk_type(opts) for opts in output_stream_opts]
+
                 for c in reader.stream():
                     # Might contain 1 or many output streams. Apply the corresponding transform
-                    stream_outputs = tuple(
-                        (
+                    media_chunks = {
+                        media_chunk_type: (
                             MediaChunk(
                                 tensor=stream_transform(torch.Tensor(stream_chunk)),
                                 pts=stream_chunk.pts,
@@ -298,21 +309,15 @@ class MediaDataset(torch_data.IterableDataset):
                             if stream_chunk is not None
                             else None
                         )
-                        for (stream_chunk, stream_transform) in zip(
-                            c, stream_transforms
+                        for (stream_chunk, stream_transform, media_chunk_type) in zip(
+                            c, stream_transforms, media_chunk_types
                         )
-                    )
-                    yield _id, (
-                        stream_outputs
-                        if should_pad_output_with_none == False
-                        else stream_outputs + (None,)
-                    )
+                    }
+                    yield _id, media_chunks
             except Exception:
                 logger.exception(f'Exception when processing "{_id}: {path}"')
 
-    def __iter__(
-        self,
-    ):
+    def __iter__(self) -> Generator[Tuple[str | int, Dict[MediaChunkType, MediaChunk | None]], Any, None]:
         """
         Creates the iterator used by the dataloader
 
@@ -366,11 +371,6 @@ class AudioDataset(MediaDataset):
             thumbnails=False,
         )
 
-    def __iter__(self):
-        _iter = super(AudioDataset, self).__iter__()
-        for _id, (chunk,) in _iter:
-            yield _id, chunk
-
 
 class VideoDataset(MediaDataset):
 
@@ -399,11 +399,6 @@ class VideoDataset(MediaDataset):
             thumbnails=thumbnails,
         )
 
-    def __iter__(self):
-        _iter = super(VideoDataset, self).__iter__()
-        for _id, chunk in _iter:
-            yield _id, *chunk
-
 
 class ImageDataset(MediaDataset):
 
@@ -426,11 +421,6 @@ class ImageDataset(MediaDataset):
             offset=None,
             thumbnails=thumbnails,
         )
-
-    def __iter__(self):
-        _iter = super(ImageDataset, self).__iter__()
-        for _id, chunk in _iter:
-            yield _id, *chunk
 
 
 class AVDataset(MediaDataset):
@@ -483,8 +473,3 @@ class AVDataset(MediaDataset):
             offset=offset,
             thumbnails=thumbnails,
         )
-
-    def __iter__(self):
-        _iter = super(AVDataset, self).__iter__()
-        for _id, chunks in _iter:
-            yield _id, *chunks
