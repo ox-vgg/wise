@@ -54,3 +54,12 @@ lines_after_imports = 2
 
 [tool.pytest]
 testpaths = ["src"]
+
+
+[tool.vulture]
+ignore_decorators = [
+    "@router.api_route",
+    "@router.get",
+    "@router.post",
+]
+paths = ["src/wise"]
