@@ -29,5 +29,4 @@ tqdm
 transformers[sentencepiece]>=4.44.0
 qwen-vl-utils  # required by Qwen3-VL-Embedding feature extractor
 tritonclient[all]
-typer
 webvtt-py
