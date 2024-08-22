@@ -8,6 +8,7 @@ import torch.utils.data as torch_data
 from tqdm import tqdm
 import numpy as np
 from collections import defaultdict
+import logging
 
 from src.dataloader import AVDataset, get_media_metadata
 from src.dataloader.utils import VIDEO_EXTENSIONS, is_valid_image, is_valid_video
@@ -116,6 +117,12 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
+    )
+    logger = logging.getLogger()
 
     # sanity check: remove duplicate entries in command line args
     if len(args.media_include_list) > 1:
