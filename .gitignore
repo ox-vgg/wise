@@ -1,6 +1,9 @@
 .vscode/
 
 # data folder
+data/
+wise-data/
+wise-projects/
 images/
 public/images
 public/thumbs
