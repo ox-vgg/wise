@@ -11,7 +11,7 @@ from collections import defaultdict
 import logging
 
 from src.dataloader.dataset import MediaChunk
-from src.dataloader import AVDataset, VideoDataset, AudioDataset, get_media_metadata
+from src.dataloader import MediaDataset, AVDataset, VideoDataset, AudioDataset, get_media_metadata
 from src.dataloader.utils import VIDEO_EXTENSIONS, is_valid_image, is_valid_video
 from src.dataloader.streamreader import MediaChunkType
 from src.wise_project import WiseProject
@@ -108,6 +108,13 @@ if __name__ == "__main__":
         type=str,
         default="microsoft/clap/2023/four-datasets",
         help="use this feature extractor for audio samples",
+    )
+
+    parser.add_argument(
+        "--skip-audio-feature-extraction",
+        required=False,
+        action="store_true",
+        help="skip the extraction of audio features (for videos)"
     )
 
     parser.add_argument(
@@ -212,7 +219,8 @@ if __name__ == "__main__":
     print(f"Extracting features from {len(media_filelist)} files")
     feature_extractor_id_list = {}
     feature_extractor_id_list['video'] = args.video_feature_id
-    feature_extractor_id_list['audio'] = args.audio_feature_id
+    if not args.skip_audio_feature_extraction:
+        feature_extractor_id_list['audio'] = args.audio_feature_id
 
     feature_extractor_list = {}
     feature_store_dir_list = {}
@@ -246,17 +254,29 @@ if __name__ == "__main__":
     audio_segment_length = segment_length  # seconds
     audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
 
-    stream = AVDataset(
-        media_filelist,
-        video_frames_per_chunk=video_frames_per_chunk,
-        video_frame_rate=video_frame_rate,
-        video_preprocessing_function=feature_extractor_list["video"].preprocess_image,
-        audio_samples_per_chunk=audio_frames_per_chunk,
-        audio_sample_rate=audio_sampling_rate,
-        audio_preprocessing_function=feature_extractor_list["audio"].preprocess_audio,
-        offset=None,
-        thumbnails=args.thumbnails,
-    )
+    stream: MediaDataset
+    if not args.skip_audio_feature_extraction:
+        stream = AVDataset(
+            media_filelist,
+            video_frames_per_chunk=video_frames_per_chunk,
+            video_frame_rate=video_frame_rate,
+            video_preprocessing_function=feature_extractor_list["video"].preprocess_image,
+            audio_samples_per_chunk=audio_frames_per_chunk,
+            audio_sample_rate=audio_sampling_rate,
+            audio_preprocessing_function=feature_extractor_list["audio"].preprocess_audio,
+            offset=None,
+            thumbnails=args.thumbnails,
+        )
+    else:
+        stream = VideoDataset(
+            media_filelist,
+            frames_per_chunk=video_frames_per_chunk,
+            frame_rate=video_frame_rate,
+            preprocessing_function=feature_extractor_list["video"].preprocess_image,
+            offset=None,
+            thumbnails=args.thumbnails,
+        )
+
 
     ## 5. extract video and audio features
     print(f"Initializing data loader with {args.num_workers} workers ...")
