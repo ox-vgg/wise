@@ -98,6 +98,7 @@ if __name__ == "__main__":
         "--video-feature-id",
         required=False,
         type=str,
+        default="mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k",
         help="use this feature extractor for video frames",
     )
 
@@ -105,6 +106,7 @@ if __name__ == "__main__":
         "--audio-feature-id",
         required=False,
         type=str,
+        default="microsoft/clap/2023/four-datasets",
         help="use this feature extractor for audio samples",
     )
 
@@ -209,14 +211,8 @@ if __name__ == "__main__":
     ## 3. Prepare for feature extraction and storage
     print(f"Extracting features from {len(media_filelist)} files")
     feature_extractor_id_list = {}
-    if hasattr(args, 'video_feature_id') and args.video_feature_id is not None:
-        feature_extractor_id_list['video'] = args.video_feature_id
-    else:
-        feature_extractor_id_list['video'] = 'mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k'
-    if hasattr(args, 'audio_feature_id') and args.audio_feature_id is not None:
-        feature_extractor_id_list['audio'] = args.audio_feature_id
-    else:
-        feature_extractor_id_list['audio'] = 'microsoft/clap/2023/four-datasets'
+    feature_extractor_id_list['video'] = args.video_feature_id
+    feature_extractor_id_list['audio'] = args.audio_feature_id
 
     feature_extractor_list = {}
     feature_store_dir_list = {}
