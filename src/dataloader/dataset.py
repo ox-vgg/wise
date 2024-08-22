@@ -226,7 +226,7 @@ class MediaDataset(torch_data.IterableDataset):
     ):
         super(MediaDataset).__init__()
 
-        self._filelist = (
+        self._filelist: Dict[str | int, Path] = (
             input_files
             if isinstance(input_files, dict)
             else dict(enumerate(input_files))

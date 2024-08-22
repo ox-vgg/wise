@@ -116,13 +116,13 @@ def run(
     preprocess = get_input_transform_for_model(model)
 
     # Dummy filtering, will be replaced in the main code
-    video_extensions = ("mkv", "mp4", "webm")
+    video_extensions = (".mkv", ".mp4", ".webm")
     if input_file.is_file() and input_file.suffix in video_extensions:
         logger.debug(f'"{input_file}"is a file, adding to sources')
         sources = [input_file]
     elif input_file.is_dir():
         logger.debug(f'"{input_file}"is a dir, globbing for videos')
-        sources = list(x for y in video_extensions for x in input_file.rglob(f"*.{y}"))
+        sources = list(x for y in video_extensions for x in input_file.rglob(f"*{y}"))
     else:
         raise ValueError(f'Unrecognized file "{input_file}"')
 

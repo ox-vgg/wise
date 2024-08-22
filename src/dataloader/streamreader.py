@@ -189,7 +189,7 @@ def get_media_info(url: str, guess_missing_video_info: bool = False):
     return video_stream_info, audio_stream_info
 
 
-def get_stream_reader(url: str, output_stream_opts: List[BaseStreamOutputOptions] = []):
+def get_stream_reader(url: str, output_stream_opts: List[BaseStreamOutputOptions] = []) -> StreamReader:
     streamer = StreamReader(url)
 
     logger.debug(f"StreamReader: (metadata) {streamer.get_metadata()}")
@@ -218,7 +218,7 @@ def get_stream_reader(url: str, output_stream_opts: List[BaseStreamOutputOptions
     return streamer
 
 
-def get_media_type(video_stream_info, audio_stream_info):
+def get_media_type(video_stream_info, audio_stream_info) -> SourceMediaType:
     """
     Based on the default video / audio stream info, infer whether the source file is either
         - IMAGE
