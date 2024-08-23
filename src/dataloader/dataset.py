@@ -239,10 +239,11 @@ class MediaDataset(torch_data.IterableDataset):
             else [IdentityTransform for _ in range(len(self._output_stream_opts))]
         )
 
-        self._segment_length = validate_segment_lengths_from_options(output_stream_opts)
-        if self._segment_length is None:
-            # No output stream configured, default to 4s for the sake of thumbnails
-            self._segment_length = 4
+        # self._segment_length = validate_segment_lengths_from_options(output_stream_opts)
+        # if self._segment_length is None:
+        #     # No output stream configured, default to 4s for the sake of thumbnails
+        #     self._segment_length = 4
+        self._segment_length = None
 
         # Handle thumbnail for video and image
         self._thumbnails = thumbnails
@@ -284,7 +285,7 @@ class MediaDataset(torch_data.IterableDataset):
 
                 # Read the frames from starting offset
                 reader = get_stream_reader(str(path), output_stream_opts)
-                reader.seek(self._offset)
+                # reader.seek(self._offset)
 
                 def get_media_chunk_type(opts: StreamOutputOptions) -> MediaChunkType:
                     if isinstance(opts, BasicThumbnailStreamOutputOptions):

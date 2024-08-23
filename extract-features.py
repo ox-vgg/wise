@@ -11,7 +11,7 @@ from collections import defaultdict
 import logging
 
 from src.dataloader.dataset import MediaChunk
-from src.dataloader import MediaDataset, AVDataset, VideoDataset, AudioDataset, get_media_metadata
+from src.dataloader import MediaDataset, AVDataset, VideoDataset, AudioDataset, ImageDataset, get_media_metadata
 from src.dataloader.utils import VIDEO_EXTENSIONS, is_valid_image, is_valid_video
 from src.dataloader.streamreader import MediaChunkType
 from src.wise_project import WiseProject
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         required=False,
         action="append",
         dest="media_include_list",
-        default=[f"*.{ext}" for ext in VIDEO_EXTENSIONS],
+        default=["*.jpg"],
         type=str,
         help="regular expression to include certain media files",
     )
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             media_search_dir = os.path.join(media_dir, "**/" + media_include)
             media_paths = list(glob.iglob(pathname=media_search_dir, recursive=True))
             media_paths = [Path(x) for x in media_paths]
-            media_paths = [str(x) for x in tqdm(media_paths) if x.is_file() and is_valid_video(x)]
+            media_paths = [str(x) for x in tqdm(media_paths) if x.is_file() and is_valid_image(x)]
             if len(media_paths) > 0:
                 valid_media_files[media_dir] += media_paths
 
@@ -268,12 +268,17 @@ if __name__ == "__main__":
             thumbnails=args.thumbnails,
         )
     else:
-        stream = VideoDataset(
+        # stream = VideoDataset(
+        #     media_filelist,
+        #     frames_per_chunk=video_frames_per_chunk,
+        #     frame_rate=video_frame_rate,
+        #     preprocessing_function=feature_extractor_list["video"].preprocess_image,
+        #     offset=None,
+        #     thumbnails=args.thumbnails,
+        # )
+        stream = ImageDataset(
             media_filelist,
-            frames_per_chunk=video_frames_per_chunk,
-            frame_rate=video_frame_rate,
             preprocessing_function=feature_extractor_list["video"].preprocess_image,
-            offset=None,
             thumbnails=args.thumbnails,
         )
 
