@@ -22,6 +22,7 @@ class MediaChunkType(str, enum.Enum):
     AUDIO = "audio"
     VIDEO = "video"
     THUMBNAILS = "thumbnails"
+    IMAGE = 'image'
 
 
 @dataclasses.dataclass
@@ -42,6 +43,10 @@ class BasicVideoStreamOutputOptions(BaseStreamOutputOptions):
     # Add decoder and decoder_option, hw_accel
     # https://pytorch.org/audio/stable/generated/torio.io.StreamingMediaDecoder.html#add-basic-video-stream
 
+@dataclasses.dataclass
+class BasicImageStreamOutputOptions(BasicVideoStreamOutputOptions):
+    frames_per_chunk = 1
+    frame_rate = None
 
 @dataclasses.dataclass
 class BasicThumbnailStreamOutputOptions(BasicVideoStreamOutputOptions):
@@ -59,6 +64,18 @@ class BasicAudioStreamOutputOptions(BaseStreamOutputOptions):
 
 
 StreamOutputOptions = TypeVar("StreamOutputOptions", bound=BaseStreamOutputOptions)
+
+def get_media_chunk_type(opts: StreamOutputOptions) -> MediaChunkType:
+    if isinstance(opts, BasicThumbnailStreamOutputOptions):
+        return MediaChunkType.THUMBNAILS
+    elif isinstance(opts, BasicImageStreamOutputOptions):
+        return MediaChunkType.IMAGE
+    elif isinstance(opts, BasicVideoStreamOutputOptions):
+        return MediaChunkType.VIDEO
+    elif isinstance(opts, BasicAudioStreamOutputOptions):
+        return MediaChunkType.AUDIO
+    else:
+        raise ValueError(f"Unknown output stream type: {type(opts)}")
 
 # Subset of `ffmpeg -decoders` output
 IMAGE_CODECS = (

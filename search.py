@@ -255,9 +255,13 @@ def merge0(result, args):
         assert len(result[query_index]['in']) == 1, f'unexpected {result[query_index]["in"]}'
 
         media_type = result[query_index]['in'][0]
-        merge_tolerance_id = 'merge_tolerance_' + media_type
-        time_tolerance = getattr(args, merge_tolerance_id)
-        rank_tolerance = getattr(args, 'merge_rank_tolerance')
+        if media_type == 'image':
+            time_tolerance = 0
+            rank_tolerance = 0
+        else:
+            merge_tolerance_id = 'merge_tolerance_' + media_type
+            time_tolerance = getattr(args, merge_tolerance_id)
+            rank_tolerance = getattr(args, 'merge_rank_tolerance')
 
         filename_list = result[query_index]['match_filename_list']
         pts_list = result[query_index]['match_pts_list']
@@ -334,7 +338,7 @@ def merge_a_ranked_result_list(filename_list, pts_list, score_list, pts_toleranc
                 mid2 = sum(pts_list[pts_index2]) / len(pts_list[pts_index2])
                 del_pts = math.fabs(mid1 - mid2)
             else:
-                # if pts is a timestamp, compute their separation using their difference 
+                # if pts is a timestamp, compute their separation using their difference
                 del_pts = math.fabs(pts_list[pts_index1] - pts_list[pts_index2])
 
             if del_pts <= pts_tolerance:
@@ -677,14 +681,14 @@ if __name__ == '__main__':
                         required=False,
                         action='append',
                         dest='media_type_list', # since "in" is a reserved keyword
-                        choices=['audio', 'video', 'metadata'],
+                        choices=['audio', 'video', 'metadata', "image"],
                         help='apply the search query term to these features; query applied to all features if --in argument is missing')
 
     parser.add_argument('--not-in',
                         required=False,
                         action='append',
                         dest='media_type_not_list',
-                        choices=['audio', 'video', 'metadata'],
+                        choices=['audio', 'video', 'metadata', "image"],
                         help='remove the results from the preceeding query obtained in this media_type; Note: all --not-in flags must come after --in flags')
 
     parser.add_argument('--index-type',
@@ -727,6 +731,7 @@ if __name__ == '__main__':
                         type=int,
                         default=8,
                         help='tolerance (in seconds) for merging audio based search results')
+
 
     parser.add_argument('--merge-tolerance-metadata',
                         required=False,
