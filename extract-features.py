@@ -186,6 +186,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--image-feature-id",
+        required=False,
+        type=str,
+        default="mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k",
+        help="use this feature extractor for images",
+    )
+
+    parser.add_argument(
         "--video-feature-id",
         required=False,
         type=str,
@@ -268,7 +276,7 @@ if __name__ == "__main__":
     if SourceMediaType.VIDEO in media_types_present or SourceMediaType.AV in media_types_present:
         feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id
     if SourceMediaType.IMAGE in media_types_present:
-        feature_extractor_ids[ModalityType.IMAGE] = args.video_feature_id
+        feature_extractor_ids[ModalityType.IMAGE] = args.image_feature_id
     if SourceMediaType.AUDIO in media_types_present or SourceMediaType.AV in media_types_present:
         # TODO: temporary disable - if not args.skip_audio_feature_extraction:
         feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id
