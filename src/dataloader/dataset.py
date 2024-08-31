@@ -284,7 +284,8 @@ class MediaDataset(torch_data.IterableDataset):
 
                 # Read the frames from starting offset
                 reader = get_stream_reader(path, output_stream_opts)
-                # reader.seek(self._offset)
+                if not isinstance(self, ImageDataset):
+                    reader.seek(self._offset)
 
 
                 media_chunk_types = [get_media_chunk_type(opts) for opts in output_stream_opts]
