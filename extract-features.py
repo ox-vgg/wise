@@ -11,6 +11,7 @@ import logging
 from src.dataloader.dataset import MediaChunk
 from src.dataloader import  get_dataset, get_metadata_for_valid_files, DatasetPayload
 from src.dataloader.streamreader import SourceMediaType, MediaChunkType
+from src.dataloader.utils import get_files_from_directory_with_extensions
 from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtractor
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
@@ -35,9 +36,6 @@ from src.repository import (
     ThumbnailRepo,
 )
 
-
-def get_files_from_directory_with_extensions(dir: Path, extensions: list[str]):
-    return (x for ext in extensions for x in dir.rglob(ext) if x.is_file())
 
 def initialise_feature_extractors(
     project: WiseProject,

@@ -1,6 +1,9 @@
 import enum
 import logging
 from pathlib import Path
+import itertools
+
+from .utils import get_files_from_directory_with_extensions
 from .dataset import get_metadata_for_valid_files, get_dataset
 import numpy as np
 import torch
@@ -85,13 +88,16 @@ def base(verbose: bool = False):
 
 @app.command()
 def run(
-    input_files: List[Path] = typer.Argument(
+    media_dir_list: List[Path] = typer.Argument(
         ...,
-        file_okay=True,
+        file_okay=False,
         dir_okay=True,
         exists=True,
         readable=True,
-        help="Path to input file / folder of videos",
+        help="Path to input folder of media files",
+    ),
+    media_include: List[str] = typer.Option(
+        default=["*"], help="regular expression to include certain media files"
     ),
     model: CLIPModel = typer.Option(
        "ViT-B-32:openai", help="Pass in a open_clip model string (or) internvideo"
@@ -148,6 +154,9 @@ def run(
 
 
     # Get metadata to write into the media table
+    input_files = list(itertools.chain.from_iterable(
+        get_files_from_directory_with_extensions(media_dir, media_include) for media_dir in media_dir_list
+    ))
     metadata, _ = get_metadata_for_valid_files(input_files)
     stream = torch_data.ChainDataset(get_dataset(metadata, params))
     # Construct the dataloader

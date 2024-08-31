@@ -18,7 +18,7 @@ from .streamreader import (
     get_stream_reader,
     get_media_chunk_type,
 )
-from .utils import md5, get_valid_media_files_and_media_types, MediaMimetype, get_media_type_from_mimetype, get_mime_type
+from .utils import get_mimetype_and_media_type_for_file, md5, MediaMimetype, get_media_type_from_mimetype, get_mime_type
 from pydantic import dataclasses, ConfigDict
 import torch
 import torchvision as tv
@@ -471,14 +471,11 @@ def get_metadata_for_valid_files(paths: list[Path]):
 
     TODO: Accept URLs, filebuffers in the future
     """
-    # get a chain of valid media files
-    valid_media_files = list(itertools.chain.from_iterable(
-        get_valid_media_files_and_media_types(x)
-        for x in paths
-    ))
+    # get the mimetypes and media types for each file
+    media_files = [get_mimetype_and_media_type_for_file(x) for x in paths]
     # separate the files with an unknown MIME type
-    unknown_files = [p for (_, media_type, p) in valid_media_files if media_type == MediaMimetype.unknown]
-    known_files = [p for (_, media_type, p) in valid_media_files if media_type != MediaMimetype.unknown]
+    unknown_files = [p for (_, media_type, p) in media_files if media_type == MediaMimetype.unknown]
+    known_files = [p for (_, media_type, p) in media_files if media_type != MediaMimetype.unknown]
 
     media_metadata: list[MediaMetadata] = []
     # for each file, try to open the file and get its metadata

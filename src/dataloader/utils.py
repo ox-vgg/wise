@@ -36,22 +36,15 @@ def get_media_type_from_mimetype(mimetype: str) -> MediaMimetype:
 
     return MediaMimetype.unknown
 
-def _get_media_type_for_file(p: Path):
+def get_mimetype_and_media_type_for_file(p: Path):
     # p must be a file. TODO implement a contract check
 
     mimetype = get_mime_type(p)
     media_type = get_media_type_from_mimetype(mimetype)
     return (mimetype, media_type, p)
 
-def get_valid_media_files_and_media_types(p: Path):
-    if p.is_file():
-        yield _get_media_type_for_file(p)
-
-    elif p.is_dir():
-        yield from (_get_media_type_for_file(x) for x in p.rglob('*') if x.is_file())
-
-    else:
-        raise ValueError(f'Unsupported path type - "{p}" must be a directory / file')
+def get_files_from_directory_with_extensions(dir: Path, extensions: list[str]):
+    return (x for ext in extensions for x in dir.rglob(ext) if x.is_file())
 
 Identity = lambda *args, **kwargs: (args, kwargs)
 NoOp = lambda *args, **kwargs: None
