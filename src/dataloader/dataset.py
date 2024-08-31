@@ -271,22 +271,9 @@ class MediaDataset(torch_data.IterableDataset):
         for _id in id_list:
             path = self._filelist[_id]
             try:
-                # Get stream metadata
-                video_stream_info, audio_stream_info = get_media_info(path)
-
-                # Get media type
-                media_type = get_media_type(video_stream_info, audio_stream_info)
-
-                thumbnails = self._thumbnails
-                if media_type == SourceMediaType.AUDIO and thumbnails:
-                    logger.warning(
-                        "Cannot extract thumbnails for audio-only files, Ignoring parameter"
-                    )
-                    thumbnails = False
-
                 stream_transforms = list(self._transforms)
                 output_stream_opts = list(self._output_stream_opts)
-                if thumbnails:
+                if self._thumbnails:
                     logger.debug("Adding thumbnails stream")
                     output_stream_opts.append(self._thumbnail_opts)
                     stream_transforms.append(JpegTransform)
