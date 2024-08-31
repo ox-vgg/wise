@@ -262,13 +262,18 @@ if __name__ == "__main__":
         metadata = process_media_dir(Path(media_dir), db_engine, args.media_include_list)
         all_metadata.extend(metadata)
 
+    # Get the set of media types present in the input media files
+    media_types_present: set[SourceMediaType] = set(x.media_type for x in all_metadata)
 
     ## 5. extract video and audio features
     feature_extractor_ids: dict[ModalityType, str] = {}
-    feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id
-    feature_extractor_ids[ModalityType.IMAGE] = args.video_feature_id
-    # TODO: temporary disable - if not args.skip_audio_feature_extraction:
-    feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id
+    if SourceMediaType.VIDEO in media_types_present or SourceMediaType.AV in media_types_present:
+        feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id
+    if SourceMediaType.IMAGE in media_types_present:
+        feature_extractor_ids[ModalityType.IMAGE] = args.video_feature_id
+    if SourceMediaType.AUDIO in media_types_present or SourceMediaType.AV in media_types_present:
+        # TODO: temporary disable - if not args.skip_audio_feature_extraction:
+        feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id
 
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
@@ -288,13 +293,13 @@ if __name__ == "__main__":
     params = {
         "video_frames_per_chunk": video_frames_per_chunk,
         "video_frame_rate": video_frame_rate,
-        "video_preprocessing_function": feature_extractors['video'].preprocess_image,
+        "video_preprocessing_function": feature_extractors[ModalityType.VIDEO].preprocess_image if ModalityType.VIDEO in feature_extractors else None,
 
         "audio_samples_per_chunk": audio_frames_per_chunk,
         "audio_sampling_rate": audio_sampling_rate,
-        "audio_preprocessing_function": feature_extractors['audio'].preprocess_audio,
+        "audio_preprocessing_function": feature_extractors[ModalityType.AUDIO].preprocess_audio if ModalityType.AUDIO in feature_extractors else None,
 
-        "image_preprocessing_function": feature_extractors['video'].preprocess_image,
+        "image_preprocessing_function": feature_extractors[ModalityType.IMAGE].preprocess_image if ModalityType.IMAGE in feature_extractors else None,
 
         "offset": None,
         "thumbnails": args.thumbnails
