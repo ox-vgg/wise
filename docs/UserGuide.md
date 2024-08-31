@@ -21,7 +21,7 @@ us to perform audio and visual search on the video collection.
 ```
 mkdir -p wise-projects/
 python3 extract-features.py \
-  --media-dir wise-data/Kinetics-6/ \
+  wise-data/Kinetics-6/ \
   --project-dir wise-projects/Kinetics-6/
 
 python3 create-index.py \
