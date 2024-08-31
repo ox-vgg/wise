@@ -18,7 +18,7 @@ from .streamreader import (
     get_stream_reader,
     get_media_chunk_type,
 )
-from .utils import md5, get_valid_sources_and_media_types, MediaMimetype, get_media_type_from_mimetype, get_mime_type
+from .utils import md5, get_valid_media_files_and_media_types, MediaMimetype, get_media_type_from_mimetype, get_mime_type
 from pydantic import dataclasses, ConfigDict
 import torch
 import torchvision as tv
@@ -480,29 +480,22 @@ def get_metadata_for_valid_files(paths: list[Path]):
     Given a list of file paths
     - filter files with media mimetypes (image/*, video/*, audio/*)
     - get metadata for each file if possible
-    - return a map from file path to metadata and list of unknown_files
+    - return a list of metadata and list of unknown_files
 
     TODO: Accept URLs, filebuffers in the future
     """
-    # chain, sort and group (by media_type - image/video/audio/unknown)
-    valid_sources =  itertools.chain.from_iterable(
-        get_valid_sources_and_media_types(x)
+    # get a chain of valid media files
+    valid_media_files = list(itertools.chain.from_iterable(
+        get_valid_media_files_and_media_types(x)
         for x in paths
-    )
-    keyfunc = lambda x: x[1] != MediaMimetype.unknown
-    valid_sources = sorted(valid_sources, key=keyfunc)
-    valid_sources = {
-        k: [x[2] for x in g] for k, g in itertools.groupby(valid_sources, key=keyfunc)
-    }
+    ))
+    # separate the files with an unknown MIME type
+    unknown_files = [p for (_, media_type, p) in valid_media_files if media_type == MediaMimetype.unknown]
+    known_files = [p for (_, media_type, p) in valid_media_files if media_type != MediaMimetype.unknown]
 
-    # for each file, try to open the file and get metadata
-    # skip the ones that fail
-    # return the metadata and group by source media_type
-    unknown_files = valid_sources.get(False, [])
-    known_files = valid_sources.get(True, [])
-
-    # dicts are ordered by default in python 3.7+
     media_metadata: list[MediaMetadata] = []
+    # for each file, try to open the file and get its metadata
+    # skip the ones that fail
     for p in known_files:
         try:
             metadata = get_media_metadata(str(p))
@@ -630,6 +623,7 @@ def _get_dataset(
     return stream
 
 def get_dataset(media_metadata: list[DatasetPayload], params: Dict[str, Any]):
+    # sort and group (by media_type - image/video/audio/av)
     sort_func = lambda x: x.media_type
     sorted_metadata = sorted(media_metadata, key=sort_func)
     datasets = [

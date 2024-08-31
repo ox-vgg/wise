@@ -43,7 +43,7 @@ def _get_media_type_for_file(p: Path):
     media_type = get_media_type_from_mimetype(mimetype)
     return (mimetype, media_type, p)
 
-def get_valid_sources_and_media_types(p: Path):
+def get_valid_media_files_and_media_types(p: Path):
     if p.is_file():
         yield _get_media_type_for_file(p)
 
