@@ -8,6 +8,8 @@ from pydantic import dataclasses
 from dataclasses import asdict
 from torchaudio.io import StreamReader
 
+from .utils import MediaMimetype
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,21 +78,6 @@ def get_media_chunk_type(opts: StreamOutputOptions) -> MediaChunkType:
         return MediaChunkType.AUDIO
     else:
         raise ValueError(f"Unknown output stream type: {type(opts)}")
-
-# Subset of `ffmpeg -decoders` output
-IMAGE_CODECS = (
-    "bmp",
-    "exr",
-    "hdr",
-    "jpeg2000",
-    "jpegls",
-    "pbm",
-    "pgm",
-    "png",
-    "ppm",
-    "tiff",
-    "webp",
-)
 
 
 def convert_duration_string_to_seconds(duration_str: Optional[str]):
@@ -246,7 +233,7 @@ def get_stream_reader(url: str, output_stream_opts: List[BaseStreamOutputOptions
     return streamer
 
 
-def get_media_type(video_stream_info, audio_stream_info) -> SourceMediaType:
+def get_media_type(video_stream_info, audio_stream_info, media_type_from_mimetype: MediaMimetype) -> SourceMediaType:
     """
     Based on the default video / audio stream info, infer whether the source file is either
         - IMAGE
@@ -261,7 +248,7 @@ def get_media_type(video_stream_info, audio_stream_info) -> SourceMediaType:
     # Must be one of image, audio-only, video-only or av
     elif audio_stream_info is None:
         # Either video-only or image
-        if video_stream_info.codec in IMAGE_CODECS:
+        if media_type_from_mimetype == MediaMimetype.image:
             # image
             # TODO check for iptc, exif and other metadata
             return SourceMediaType.IMAGE

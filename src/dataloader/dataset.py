@@ -47,11 +47,14 @@ class DatasetPayload(object):
     path: str
     media_type: SourceMediaType
 
-def get_media_metadata(url: str):
+def get_media_metadata(url: str, media_type_from_mimetype: MediaMimetype = None, mimetype: str = None):
     # TODO: Update the code to handle remote path
     # Only md5sum will be a problem.
 
     # TODO: How to handle subtitle
+
+    if not media_type_from_mimetype or not mimetype:
+        media_type_from_mimetype, mimetype, _ = get_mimetype_and_media_type_for_file(url)
 
     # Get stream metadata
     video_stream_info, audio_stream_info = get_media_info(
@@ -59,7 +62,7 @@ def get_media_metadata(url: str):
     )
 
     # Get media type
-    media_type = get_media_type(video_stream_info, audio_stream_info)
+    media_type = get_media_type(video_stream_info, audio_stream_info, media_type_from_mimetype)
 
     # Get md5sum for file.
     # TODO Update code to ignore for remote file
@@ -475,14 +478,14 @@ def get_metadata_for_valid_files(paths: list[Path]):
     media_files = [get_mimetype_and_media_type_for_file(x) for x in paths]
     # separate the files with an unknown MIME type
     unknown_files = [p for (_, media_type, p) in media_files if media_type == MediaMimetype.unknown]
-    known_files = [p for (_, media_type, p) in media_files if media_type != MediaMimetype.unknown]
+    known_files = [(mimetype, media_type, p) for (mimetype, media_type, p) in media_files if media_type != MediaMimetype.unknown]
 
     media_metadata: list[MediaMetadata] = []
     # for each file, try to open the file and get its metadata
     # skip the ones that fail
-    for p in known_files:
+    for mimetype, media_type, p in known_files:
         try:
-            metadata = get_media_metadata(str(p))
+            metadata = get_media_metadata(str(p), media_type, mimetype)
             media_metadata.append(metadata)
         except Exception:
             logger.exception(f'Exception while reading file - {p}, skipping')
