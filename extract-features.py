@@ -10,9 +10,11 @@ import logging
 
 from src.dataloader.dataset import MediaChunk
 from src.dataloader import  get_dataset, get_metadata_for_valid_files, DatasetPayload
-from src.dataloader.streamreader import MediaChunkType
+from src.dataloader.streamreader import SourceMediaType, MediaChunkType
 from src.wise_project import WiseProject
+from src.feature.feature_extractor import FeatureExtractor
 from src.feature.feature_extractor_factory import FeatureExtractorFactory
+from src.feature.store.feature_store import FeatureStore
 from src.feature.store.feature_store_factory import FeatureStoreFactory
 from src import db
 from src.data_models import (
@@ -22,6 +24,7 @@ from src.data_models import (
     VectorMetadata,
     ThumbnailMetadata,
     MediaType,
+    ModalityType,
     SourceCollectionType,
 )
 from src.repository import (
@@ -37,34 +40,35 @@ def get_files_from_directory_with_extensions(dir: Path, extensions: list[str]):
     return (x for ext in extensions for x in dir.rglob(ext) if x.is_file())
 
 def initialise_feature_extractors(
-        project: WiseProject,
-        feature_extractor_ids: dict[Literal['video', 'audio', 'image'], str],
-        feature_store_type: Literal['webdataset', 'numpy'],
-        shard_max_count: int,
-        shard_max_size: int):
+    project: WiseProject,
+    feature_extractor_ids: dict[ModalityType, str],
+    feature_store_type: Literal['webdataset', 'numpy'],
+    shard_max_count: int,
+    shard_max_size: int
+) -> tuple[dict[ModalityType, FeatureExtractor], dict[ModalityType, FeatureStore]]:
     ## 3. Prepare for feature extraction and storage
     logger.info(f"Initialising feature extractor")
 
     feature_extractors = {}
     feature_stores = {}
 
-    for media_type, feature_extractor_id in feature_extractor_ids.items():
+    for modality_type, feature_extractor_id in feature_extractor_ids.items():
         ## 3.1 Initialise feature extractor
-        feature_extractors[media_type] = FeatureExtractorFactory(
+        feature_extractors[modality_type] = FeatureExtractorFactory(
             feature_extractor_id
         )
-        print(f"Using {feature_extractor_id} for {media_type}")
+        print(f"Using {feature_extractor_id} for {modality_type}")
 
         ## 3.2 Create folders to store features, metadata and search index
         project.create_features_dir(feature_extractor_id)
 
         ## 3.3 Initialise feature store to store features
-        feature_stores[media_type] = FeatureStoreFactory.create_store(
+        feature_stores[modality_type] = FeatureStoreFactory.create_store(
             feature_store_type,
-            media_type,
+            modality_type,
             project.features_dir(feature_extractor_id),
         )
-        feature_stores[media_type].enable_write(
+        feature_stores[modality_type].enable_write(
             shard_max_count, shard_max_size
         )
 
@@ -253,18 +257,18 @@ if __name__ == "__main__":
 
     ## 1. Initialise internal metadata database with valid files
     print('Initialising internal metadata database')
-    all_metadata = []
+    all_metadata: list[DatasetPayload] = []
     for media_dir in args.media_dir_list:
         metadata = process_media_dir(Path(media_dir), db_engine, args.media_include_list)
         all_metadata.extend(metadata)
 
 
     ## 5. extract video and audio features
-    feature_extractor_ids = {}
-    feature_extractor_ids['video'] = args.video_feature_id
-    feature_extractor_ids['image'] = args.video_feature_id
+    feature_extractor_ids: dict[ModalityType, str] = {}
+    feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id
+    feature_extractor_ids[ModalityType.IMAGE] = args.video_feature_id
     # TODO: temporary disable - if not args.skip_audio_feature_extraction:
-    feature_extractor_ids['audio'] = args.audio_feature_id
+    feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id
 
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
