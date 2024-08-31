@@ -26,7 +26,7 @@ collection.
 ## 2. Extract audiovisual features
 mkdir -p wise-projects/
 python3 extract-features.py \
-  --media-dir wise-data/Kinetics-6/ \
+  wise-data/Kinetics-6/ \
   --project-dir wise-projects/Kinetics-6/
 ```
 
