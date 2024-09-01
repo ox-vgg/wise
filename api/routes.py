@@ -780,7 +780,7 @@ def _get_search_router(config: APIConfig):
     `search_indices` is a dictionary of dictionaries, e.g. `search_indices[media_type][feature_extractor_id]`
     contains a `SearchIndex` object for a given media type and feature extractor id
     """
-    search_indices = defaultdict(dict)
+    search_indices: dict[str, SearchIndex] = {}
     for media_type in project_assets:
         asset_id_list = list(project_assets[media_type].keys())
         asset_index = 0
@@ -808,13 +808,13 @@ def _get_search_router(config: APIConfig):
         search_indices[media_type] = SearchIndexFactory(media_type, asset_id, asset)
         if not search_indices[media_type].load_index(config.index_type):
             print(f'failed to load {media_type} index: {asset_id}')
-            del search_index_list[media_type]
+            del search_indices[media_type]
             continue
 
-            if hasattr(search_indices[media_type].index, "nprobe"):
-                # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
-                search_index.index.parallel_mode = 1
-                search_index.index.nprobe = getattr(config, "nprobe", 32)
+        if hasattr(search_indices[media_type].index, "nprobe"):
+            # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
+            search_indices[media_type].index.parallel_mode = 1
+            search_indices[media_type].index.nprobe = getattr(config, "nprobe", 32)
 
     # Get counts
     with project_engine.connect() as conn:
