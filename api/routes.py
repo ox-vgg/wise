@@ -1176,8 +1176,6 @@ def _get_search_router(config: APIConfig):
         # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
         # "audio" refers to pure audio files, and "image" refers to images
         search_in: MediaType = Query(default=MediaType.VIDEO),
-        # Name of feature extractor to use
-        feature_extractor_id: str = Query(default=None),
 
         # Positive queries
         text_queries: List[str] = Query(default=[]),
