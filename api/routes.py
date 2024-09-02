@@ -218,7 +218,7 @@ def _get_project_data_router(config: APIConfig):
                     file_path = location / metadata.path
                     if file_path.is_file():
                         return FileResponse(
-                            file_path, media_type=f"media/{metadata.format.lower()}"
+                            file_path, media_type=f"image/{metadata.format.lower()}"
                         )
                     return PlainTextResponse(
                         status_code=404, content=f"{media_id} not found!"
@@ -232,7 +232,7 @@ def _get_project_data_router(config: APIConfig):
                 try:
                     file_iter = get_file_from_tar(location, metadata.path.lstrip("#"))
                     return StreamingResponse(
-                        file_iter, media_type=f"media/{metadata.format.lower()}"
+                        file_iter, media_type=f"image/{metadata.format.lower()}"
                     )
                 except Exception as e:
                     logger.exception(f"Exception when reading image {media_id}")
@@ -777,8 +777,8 @@ def _get_search_router(config: APIConfig):
 
     """
     Load search indices for all feature extractors.
-    `search_indices` is a dictionary of dictionaries, e.g. `search_indices[media_type][feature_extractor_id]`
-    contains a `SearchIndex` object for a given media type and feature extractor id
+    `search_indices` is a dictionary of SearchIndex objects, where the key is a media_type
+    and value is a SearchIndex object
     """
     search_indices: dict[str, SearchIndex] = {}
     for media_type in project_assets:
@@ -806,6 +806,7 @@ def _get_search_router(config: APIConfig):
         asset_id = asset_id_list[asset_index]
         asset = project_assets[media_type][asset_id]
         search_indices[media_type] = SearchIndexFactory(media_type, asset_id, asset)
+        logger.info(f"Loading faiss index from {search_indices[media_type].get_index_filename(config.index_type)}")
         if not search_indices[media_type].load_index(config.index_type):
             print(f'failed to load {media_type} index: {asset_id}')
             del search_indices[media_type]
@@ -815,6 +816,16 @@ def _get_search_router(config: APIConfig):
             # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
             search_indices[media_type].index.parallel_mode = 1
             search_indices[media_type].index.nprobe = getattr(config, "nprobe", 32)
+
+        if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
+            try:
+                logger.info(f"Enabling direct map on search index for faster internal search.")
+                search_indices[media_type].index.make_direct_map(True)
+            except Exception as e:
+                logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
+        else:
+            logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
+
 
     # Get counts
     with project_engine.connect() as conn:
@@ -1195,6 +1206,10 @@ def _get_search_router(config: APIConfig):
         input images/text, and then using this as the query vector.
         """
         media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
+        if media_type not in search_indices:
+            raise HTTPException(400, {
+                "message": f"No search index exists for this modality: {search_in}"
+            })
         search_index = search_indices[media_type]
 
         extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
