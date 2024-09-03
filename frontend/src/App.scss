@@ -1,6 +1,10 @@
-.wise-content, .wise-header {
-  padding: 0 6vw;
-}
-.wise-content {
-  padding-bottom: 50px;
+.ant-layout {
+  background: transparent;
+
+  .wise-content, .wise-header {
+    padding: 0 6vw;
+  }
+  .wise-content {
+    padding-bottom: 50px;
+  }
 }

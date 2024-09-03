@@ -101,9 +101,9 @@ export const App: React.FunctionComponent = () => {
       type: "TEXT",
       value: exampleQuery
     }]);
-  }  
+  }
 
-  return <Layout style={(dataService.searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0) ? {background: 'transparent'} : {}}>
+  return <Layout>
     <WiseHeader multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                 searchText={searchText} setSearchText={setSearchText}
                 viewModality={viewModality} setViewModality={setViewModality}
