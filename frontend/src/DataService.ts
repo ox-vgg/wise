@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse } from './misc/types.ts';
+import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse, ProcessedImageInfo, ProcessedImageVector } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
 
@@ -52,7 +52,8 @@ const processUnmergedSegments = (unmergedSegments: VideoSegment[], processedVide
     }
     return {
       ...segment,
-      videoInfo: processedVideos.get(segment.media_id)!
+      mediaType: 'VIDEO',
+      mediaInfo: processedVideos.get(segment.media_id)!
     }
   });
 }
@@ -69,37 +70,80 @@ const processShots = (shots: VideoSegment[], processedVideos: Map<string, Proces
 
     return {
       ...shot,
-      videoInfo: processedVideos.get(shot.media_id)!
+      mediaType: 'VIDEO',
+      mediaInfo: processedVideos.get(shot.media_id)!
     }
   });
 }
 
 const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean = false): ProcessedSearchResponse => {
   console.log('Search response', results);
-  if (!(results.video_results || results.video_audio_results)) throw new Error("Cannot process search results");
+  if (!(results.image_results || results.video_results || results.video_audio_results)) throw new Error("Cannot process search results");
   
   let processedSearchResults = {
+    Image: {
+      vectors: [],
+      mediaInfo: new Map(),
+    },
     Video: {
       unmerged_windows: [],
       merged_windows: [],
-      videos: new Map(),
+      mediaInfo: new Map(),
     },
     VideoAudio: {
       unmerged_windows: [],
       merged_windows: [],
-      videos: new Map(),
+      mediaInfo: new Map(),
     },
     Audio: {
       unmerged_windows: [],
       merged_windows: [],
-      videos: new Map(),
+      mediaInfo: new Map(),
     },
   } as ProcessedSearchResults;
+  if (results.image_results) {
+    processedSearchResults.Image.mediaInfo = new Map(
+      Object.entries(results.image_results.images)
+        .map(([mediaId, imageInfo]) => {
+          if (!imageInfo.thumbnail.startsWith('http') && !imageInfo.thumbnail.startsWith('data:')) {
+            imageInfo.thumbnail = config.API_BASE_URL + imageInfo.thumbnail; // Fixes URLs for dev mode
+          }
+          // Populate title field with filename if it doesn't exist
+          if (!imageInfo.title) imageInfo.title = imageInfo.filename;
+          return [
+            mediaId,
+            {
+              ...imageInfo,
+              vectors: processedSearchResults.Image.vectors.filter(vector => vector.media_id === mediaId), // populate vectors array
+            }
+          ] as [string, ProcessedImageInfo]
+        })
+        // Sort images
+        .sort(([, imageInfoA], [, imageInfoB]) => {
+          const distanceA = Math.max(...imageInfoA.vectors.map(vector => vector.distance));
+          const distanceB = Math.max(...imageInfoB.vectors.map(vector => vector.distance));
+          return distanceB - distanceA;
+        })
+    );
+    processedSearchResults.Image.vectors = results.image_results.vectors.map(vector => {
+      if (vector.link && !vector.link.startsWith('http')) {
+        vector.link = config.API_BASE_URL + vector.link; // Fixes image URLs for dev mode
+      }
+      if (!vector.thumbnail.startsWith('http') && !vector.thumbnail.startsWith('data:')) {
+        vector.thumbnail = config.API_BASE_URL + vector.thumbnail; // Fixes URLs for dev mode
+      }
+      return {
+        ...vector,
+        mediaType: 'IMAGE',
+        mediaInfo: processedSearchResults.Image.mediaInfo.get(vector.media_id)!
+      } as ProcessedImageVector;
+    });
+  }
   if (results.video_results) {
-    processedSearchResults.Video.videos = processVideos(results.video_results.videos, results.video_results.merged_windows);
-    processedSearchResults.Video.unmerged_windows = processUnmergedSegments(results.video_results.unmerged_windows, processedSearchResults.Video.videos);
-    processedSearchResults.Video.merged_windows = processShots(results.video_results.merged_windows, processedSearchResults.Video.videos);
-    for (let [mediaId, processedVideo] of processedSearchResults.Video.videos) {
+    processedSearchResults.Video.mediaInfo = processVideos(results.video_results.videos, results.video_results.merged_windows);
+    processedSearchResults.Video.unmerged_windows = processUnmergedSegments(results.video_results.unmerged_windows, processedSearchResults.Video.mediaInfo);
+    processedSearchResults.Video.merged_windows = processShots(results.video_results.merged_windows, processedSearchResults.Video.mediaInfo);
+    for (let [mediaId, processedVideo] of processedSearchResults.Video.mediaInfo) {
       processedVideo.shots = processedSearchResults.Video.merged_windows.filter(shot => shot.media_id === mediaId)
     }
 
@@ -109,10 +153,10 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
     }
   }
   if (results.video_audio_results) {
-    processedSearchResults.VideoAudio.videos = processVideos(results.video_audio_results.videos, results.video_audio_results.merged_windows);
-    processedSearchResults.VideoAudio.unmerged_windows = processUnmergedSegments(results.video_audio_results.unmerged_windows, processedSearchResults.VideoAudio.videos);
-    processedSearchResults.VideoAudio.merged_windows = processShots(results.video_audio_results.merged_windows, processedSearchResults.VideoAudio.videos);
-    for (let [mediaId, processedVideo] of processedSearchResults.VideoAudio.videos) {
+    processedSearchResults.VideoAudio.mediaInfo = processVideos(results.video_audio_results.videos, results.video_audio_results.merged_windows);
+    processedSearchResults.VideoAudio.unmerged_windows = processUnmergedSegments(results.video_audio_results.unmerged_windows, processedSearchResults.VideoAudio.mediaInfo);
+    processedSearchResults.VideoAudio.merged_windows = processShots(results.video_audio_results.merged_windows, processedSearchResults.VideoAudio.mediaInfo);
+    for (let [mediaId, processedVideo] of processedSearchResults.VideoAudio.mediaInfo) {
       processedVideo.shots = processedSearchResults.VideoAudio.merged_windows.filter(shot => shot.media_id === mediaId)
     }
   }
@@ -201,8 +245,9 @@ const fetchSearchResults = (queries: Query[], viewModality: string, pageStart: n
   }
 
   let searchIn = 'undefined';
-  if (viewModality == 'Video') searchIn = 'video';
-  if (viewModality == 'VideoAudio') searchIn = 'av';
+  if (viewModality == 'Image') searchIn = 'image';
+  else if (viewModality == 'Video') searchIn = 'video';
+  else if (viewModality == 'VideoAudio') searchIn = 'av';
 
   const urlParams = new URLSearchParams([
     ['start', start.toString()],
@@ -264,9 +309,10 @@ export const useDataService = (): DataServiceOutput => {
   // const [ pagedResults, setPagedResults ] = useState<any[][]>(getArrayOfEmptyArrays(NUM_PAGES));
   // const [ pageNum, setPageNum ] = useState(0);
   const [ searchResponse, setSearchResponse ] = useState<ProcessedSearchResults>({
-    Video: { unmerged_windows: [], merged_windows: [], videos: new Map() },
-    VideoAudio: { unmerged_windows: [], merged_windows: [], videos: new Map() },
-    Audio: { unmerged_windows: [], merged_windows: [], videos: new Map() },
+    Image: { vectors: [], mediaInfo: new Map() },
+    Video: { unmerged_windows: [], merged_windows: [], mediaInfo: new Map() },
+    VideoAudio: { unmerged_windows: [], merged_windows: [], mediaInfo: new Map() },
+    Audio: { unmerged_windows: [], merged_windows: [], mediaInfo: new Map() },
   });
 
   // Get featured images to display on home page

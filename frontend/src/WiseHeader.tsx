@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
 import { Alert, Button, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
-import { CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
+import { CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
@@ -313,7 +313,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   }, [multimodalQueries, searchText]);
 
   let _modalities = modalities;
-  if (viewModality == 'Video') {
+  if (viewModality == 'Image' || viewModality == 'Video') {
     _modalities = _modalities.filter(modality => modality.id != 'audio');
   } else if (viewModality == 'VideoAudio') {
     _modalities = _modalities.filter(modality => modality.id != 'image');
@@ -403,10 +403,32 @@ const QUERY_COLORS = {
   'AUDIO_URL': 'orange'
 }
 
+const VIEW_MODALITY_OPTIONS = {
+  image: {
+    icon: <PictureTwoTone />,
+    label: 'Image',
+    longLabel: 'Image',
+    value: 'Image',
+  },
+  video: {
+    icon: <VideoCameraTwoTone />,
+    label: 'Video',
+    longLabel: 'Video (visual track)',
+    value: 'Video',
+  },
+  audio: {
+    icon: <SoundTwoTone />,
+    label: 'Audio',
+    longLabel: 'Audio track of video',
+    value: 'VideoAudio',
+  },
+}
+
 const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   multimodalQueries, setMultimodalQueries, searchText, setSearchText,
   viewModality, setViewModality,
-  submitSearch, refsForTour, isHomePage = false, isLoadingNewSearch = false
+  submitSearch, refsForTour, projectInfo,
+  isHomePage = false, isLoadingNewSearch = false
 }: WiseHeaderProps) => {
   // This state is set to true when the dropdown is triggered (by hovering over the search bar), and false when the mouse moves outside the search bar
   const [isSearchDropdownTriggered, setIsSearchDropdownTriggered] = useState(false);
@@ -498,18 +520,30 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
         <a href="./" id="wise-logo">
           <WiseLogo />
         </a>
-        <Tooltip title="Choose the media track / media type to search on">
-          <Select
-            size="large"
-            variant="borderless"
-            value={viewModality}
-            onChange={setViewModality}
-            options={[
-              { label: <Space><VideoCameraTwoTone />Visual</Space>, value: 'Video' },
-              { label: <Space><SoundTwoTone />Audio</Space>, value: 'VideoAudio' },
-            ]}
-          />
-        </Tooltip>
+        {
+          
+          projectInfo.search_modalities &&
+          <Tooltip title="Choose the media track / media type to search on">
+            <Select
+              size="large"
+              variant="borderless"
+              value={viewModality}
+              onChange={setViewModality}
+              options={
+                projectInfo.search_modalities
+                  .map((k) => VIEW_MODALITY_OPTIONS[k])
+                  .map(option => ({
+                    ...option,
+                    label: <Space>{option.icon}{option.label}</Space>,
+                  }))
+              }
+              optionRender={(option) => (
+                <Space>{option.data.icon}{option.data.longLabel}</Space>
+              )}
+              popupMatchSelectWidth={false}
+            />
+          </Tooltip>
+        }
         <Dropdown
           overlayClassName="wise-search-dropdown"
           dropdownRender={_ => 
