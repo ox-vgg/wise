@@ -49,7 +49,7 @@ from src.repository import (
     get_project_total_duration,
     get_thumbnail_by_timestamp,
 )
-from src.data_models import MediaMetadata, MediaType, SourceCollectionType, VectorAndMediaMetadata
+from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollectionType, VectorAndMediaMetadata
 from src.enums import IndexType
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
@@ -446,12 +446,9 @@ def _get_search_router(config: APIConfig):
     class VideoInfo(MediaInfo):
         timeline_hover_thumbnails: str
 
-    # An audio or video segment
-    class MediaSegment(BaseModel):
+    class VectorResult(BaseModel):
         vector_id: str
         media_id: str
-        ts: float
-        te: float
         link: str
         distance: float
 
@@ -459,6 +456,20 @@ def _get_search_router(config: APIConfig):
         @classmethod
         def round_distance(cls, v):
             return round(v, config.precision)
+
+    class ImageVector(VectorResult):
+        thumbnail: str
+        thumbnail_score: float
+
+        @field_validator("thumbnail_score")
+        @classmethod
+        def round_distance(cls, v):
+            return round(v, config.precision)
+
+    # An audio or video segment
+    class MediaSegment(VectorResult):
+        ts: float
+        te: float
 
     # A subclass of MediaSegment for pure audio files
     class AudioSegment(MediaSegment):
@@ -493,7 +504,8 @@ def _get_search_router(config: APIConfig):
 
     class ImageResults(BaseModel):
         total: int # maximum number of images that can be returned e.g. min(1000, num_images_in_project)
-        results: List[ImageInfo]
+        vectors: List[ImageVector]
+        images: Dict[str, ImageInfo]
 
     class SearchResponse(BaseModel):
         time: float # backend search time in seconds
@@ -587,14 +599,12 @@ def _get_search_router(config: APIConfig):
     def construct_video_search_response(
         search_in: MediaType,
         top_dist: List[float],
-        top_ids: List[int],
-        get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
+        all_metadata: List[VectorAndMediaMetadata],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
     ):
         videos = {}
         shots = []
         segments = []
-        all_metadata = get_metadata_fn(top_ids)
         for _dist, _metadata, (_thumb, _thumb_score) in zip(
             top_dist,
             all_metadata,
@@ -642,35 +652,104 @@ def _get_search_router(config: APIConfig):
             videos[v].thumbnail = best_thumbnails[v].thumbnail
 
         if search_in == MediaType.VIDEO:
-            video_results = VideoResults(
+            return VideoResults(
                 total=300, # TODO change this
                 unmerged_windows=segments,
                 merged_windows=shots,
                 videos=videos,
-            )
-            return SearchResponse(
-                time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
-                audio_results=None,
-                video_audio_results=None,
-                video_results=video_results,
-                image_results=None,
             )
         elif search_in == MediaType.AV:
-            video_audio_results = VideoAudioResults(
+            return VideoAudioResults(
                 total=300, # TODO change this
                 unmerged_windows=segments,
                 merged_windows=shots,
                 videos=videos,
             )
-            return SearchResponse(
-                time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
-                audio_results=None,
-                video_audio_results=video_audio_results,
-                video_results=None,
-                image_results=None,
-            )
         else:
-            raise NotImplementedError()
+            raise ValueError("`search_in` must be either `MediaType.VIDEO` or `MediaType.AV`")
+
+    def construct_image_search_response(
+        top_dist: List[float],
+        all_metadata: List[VectorAndMediaMetadata],
+        get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
+    ):
+        images = {}
+        image_vectors = []
+        for _dist, _metadata, (_thumb, _thumb_score) in zip(
+            top_dist,
+            all_metadata,
+            get_thumbs_fn(all_metadata),
+        ):
+            image_id = str(_metadata.media_id)
+            images[image_id] = ImageInfo(
+                id=image_id,
+                link=f"media/{image_id}",
+                filename=_metadata.path,
+                width=_metadata.width,
+                height=_metadata.height,
+                media_type=_metadata.media_type,
+                format=_metadata.format,
+                duration=_metadata.duration,
+                thumbnail=_thumb,
+                distance=_dist,
+            )
+            
+            image_vector = ImageVector(
+                vector_id=str(_metadata.id),
+                media_id=image_id,
+                link=f"media/{image_id}",
+                distance=_dist,
+                thumbnail=_thumb,
+                thumbnail_score=_thumb_score,
+            )
+            image_vectors.append(image_vector)
+
+        return ImageResults(
+            total=300, # TODO change this
+            vectors=image_vectors,
+            images=images,
+        )
+
+    def construct_search_response(
+        top_dist: List[float],
+        top_ids: List[int],
+        get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
+        get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
+        search_in: MediaType = None,
+    ):
+        all_metadata = get_metadata_fn(top_ids)
+        audio_results = None
+        video_audio_results = None
+        video_results = None
+        image_results = None
+        if search_in is None or search_in == MediaType.IMAGE:
+            image_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.IMAGE]
+            if len(image_indices) > 0:
+                image_top_dist = [top_dist[i] for i in image_indices]
+                image_all_metadata = [all_metadata[i] for i in image_indices]
+                image_results = construct_image_search_response(image_top_dist, image_all_metadata, get_thumbs_fn)
+        if search_in is None or search_in == MediaType.VIDEO:
+            video_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.VIDEO]
+            if len(video_indices) > 0:
+                video_top_dist = [top_dist[i] for i in video_indices]
+                video_all_metadata = [all_metadata[i] for i in video_indices]
+                video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, get_thumbs_fn)
+        if search_in is None or search_in == MediaType.AV:
+            av_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.AUDIO and x.media_type == MediaType.AV]
+            if len(av_indices) > 0:
+                av_top_dist = [top_dist[i] for i in av_indices]
+                av_all_metadata = [all_metadata[i] for i in av_indices]
+                video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, get_thumbs_fn)
+        if search_in is not None and search_in not in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AV]:
+            raise NotImplementedError("`search_in` must be either `MediaType.IMAGE`, `MediaType.VIDEO`, or `MediaType.AV`. Support for `MediaType.AUDIO` is not available yet")
+
+        return SearchResponse(
+            time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
+            audio_results=audio_results,
+            video_audio_results=video_audio_results,
+            video_results=video_results,
+            image_results=image_results,
+        )
 
     def _get_query_features(
         query_prefix: str,
@@ -1114,8 +1193,7 @@ def _get_search_router(config: APIConfig):
             #     return m
 
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
-            response = construct_video_search_response(
-                search_in=MediaType.VIDEO,
+            response = construct_search_response(
                 top_dist=dist[start:end],
                 top_ids=selected_ids[start:end],
                 get_metadata_fn=_get_metadata,
@@ -1175,7 +1253,7 @@ def _get_search_router(config: APIConfig):
         # Which media type to search on
         # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
         # "audio" refers to pure audio files, and "image" refers to images
-        search_in: MediaType = Query(default=MediaType.VIDEO),
+        search_in: MediaType = Query(),
 
         # Positive queries
         text_queries: List[str] = Query(default=[]),
@@ -1275,7 +1353,12 @@ def _get_search_router(config: APIConfig):
         elif len(q) > 5:
             raise HTTPException(400, {"message": "Too many query items"})
 
-        if search_in == MediaType.VIDEO:
+        if search_in == MediaType.IMAGE:
+            if len([query for query in q if query['modality'] == 'audio']) > 0:
+                raise HTTPException(400, {
+                    "message": "Cannot search on images using an audio query"
+                })
+        elif search_in == MediaType.VIDEO:
             if len([query for query in q if query['modality'] == 'audio']) > 0:
                 raise HTTPException(400, {
                     "message": "Cannot search on visual stream of video files using an audio query"
@@ -1343,12 +1426,12 @@ def _get_search_router(config: APIConfig):
 
             get_thumbs = thumbs_reader(thumbs_conn, valid_dist, thumbnails_to_send)
 
-            response = construct_video_search_response(
-                search_in=search_in,
+            response = construct_search_response(
                 top_dist=valid_dist,
                 top_ids=valid_ids,
                 get_metadata_fn=_get_metadata,
                 get_thumbs_fn=get_thumbs,
+                search_in=search_in,
             )
 
         return response
