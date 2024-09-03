@@ -323,7 +323,7 @@ if __name__ == "__main__":
         chunks: Dict[MediaChunkType, MediaChunk | None] # type annotation
         for idx, (mid, chunks) in enumerate(av_data_loader):
             for media_type in feature_extractor_ids:
-                if media_type not in chunks:
+                if media_type not in chunks or chunks[media_type] is None:
                     continue
                 segment_tensor = chunks[media_type].tensor
                 segment_pts = chunks[media_type].pts
@@ -374,7 +374,7 @@ if __name__ == "__main__":
                         feature_metadata.id, segment_feature
                     )
 
-            if 'thumbnails' in chunks:
+            if 'thumbnails' in chunks and chunks['thumbnails'] is not None:
                 # Handle thumbnails
                 _thumb_jpegs = chunks['thumbnails'].tensor
                 _thumb_pts = chunks['thumbnails'].pts
