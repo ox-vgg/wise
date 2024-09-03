@@ -5,6 +5,7 @@ from .base import SQLAlchemyRepository
 
 # from .extra_metadata import ExtraMediaMetadataSQLAlchemyRepository
 from ..data_models import (
+    ModalityType,
     Project,
     SourceCollection,
     MediaMetadata,
@@ -115,7 +116,7 @@ def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp:
 def get_featured_images(conn: sa.Connection) -> List[int]:
     """
     Get a set of featured images to be shown on the frontend.
-    Returns a list of vector ids of the 12th second from each video.
+    Returns a list of vector ids of the 4th second from each video.
 
     Parameters
     ----------
@@ -125,13 +126,21 @@ def get_featured_images(conn: sa.Connection) -> List[int]:
     Returns
     -------
     list of int
-        List of vector ids from the 12th second from each video
+        List of vector ids from the 4th second from each video
     """
     stmt = (
         sa.select(_vtable.c.id)
         .select_from(_vtable.join(_mtable))
-        # .where(_vtable.c.timestamp >= 4)
-        # .where(_vtable.c.timestamp < 4.5)
+        .where(
+            (
+                # Get the vector id from the 4th second of each video (non-image)
+                (_vtable.c.modality != ModalityType.IMAGE) &
+                (_vtable.c.timestamp >= 4) &
+                (_vtable.c.timestamp < 4.5)
+            ) | 
+            # Ignore timestamp if modality type is image
+            (_vtable.c.modality == ModalityType.IMAGE)
+        )
     )
     return conn.execute(stmt).scalars().all()
 
