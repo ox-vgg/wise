@@ -340,12 +340,17 @@ def _get_project_data_router(config: APIConfig):
             feature_extractor_id for feature_extractor_id in project_assets[media_type]
         ] for media_type in project_assets
     }
+    # search modalities available in the frontend
+    # the order of this list determines the order of the options shown in the frontend
+    search_modalities = ['image', 'video', 'audio']
+    search_modalities = [x for x in search_modalities if x in project_assets]
 
     @router.get("/info")
     def get_info():
         return {
             "project_name": config.project_dir.stem,
             "models": models,
+            "search_modalities": search_modalities,
             "num_vectors": num_vectors,
             "num_media_files": num_media_files,
             "total_duration": total_duration,
