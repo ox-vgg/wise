@@ -1,5 +1,6 @@
 from .mlfoundation_openclip import MlfoundationOpenClip
 from .microsoft_clap import MicrosoftClap
+from .transformers_owlv2 import TransformersOWLv2
 from .insightface import InsightFaceFeatureExtractor
 
 def FeatureExtractorFactory(id):
@@ -44,6 +45,8 @@ def FeatureExtractorFactory(id):
         return MlfoundationOpenClip(id)
     elif id.startswith('microsoft/clap/'):
         return MicrosoftClap(id)
+    elif id.startswith('transformers/owlv2/'):
+        return TransformersOWLv2(id)
     elif id.startswith('deepinsight/insightface/'):
         return InsightFaceFeatureExtractor(id)
     else:
