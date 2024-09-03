@@ -17,7 +17,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   dataService, isHomePage, projectInfo, setSearchText,
   multimodalQueries, setMultimodalQueries, viewModality, submitSearch
 }: SearchResultsProps) => {
-  const { searchResults, isSearching, searchLatency /*, totalResults */ } = dataService;
+  const { searchResults, isLoadingNewSearch, searchLatency /*, totalResults */ } = dataService;
   const [viewMode, setViewMode] = useState<string | number>('Segments');
   const [pageNum, changePageNum] = useState(0);
   useEffect(() => {
@@ -203,9 +203,9 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   const numMediaFilesString: string = projectInfo.num_media_files?.toLocaleString('en', { useGrouping: true }) || '?';
   const numMinutesString: string = Math.round(projectInfo.total_duration / 60).toLocaleString('en-us') || '?';
   let loadingMessage = <></>;
-  if (isSearching) {
+  if (isLoadingNewSearch) {
     loadingMessage = <p className="wise-loading-message">Searching in {numMediaFilesString} videos (total {numMinutesString} minutes) <LoadingOutlined /></p>;
-  } else if (!isHomePage && !isSearching) {
+  } else if (!isHomePage && !isLoadingNewSearch) {
     loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds of {numMediaFilesString} videos (total {numMinutesString} minutes)</p>;
   }
 

@@ -109,7 +109,7 @@ export const App: React.FunctionComponent = () => {
                 viewModality={viewModality} setViewModality={setViewModality}
                 submitSearch={submitSearch}
                 refsForTour={refsForTour}
-                isHomePage={isHomePage} isSearching={dataService.isSearching}></WiseHeader>
+                isHomePage={isHomePage} isLoadingNewSearch={dataService.isLoadingNewSearch}></WiseHeader>
     <Content className="wise-content">
       {isHomePage && // Only show if isHomePage is true
         <WiseOverviewCard handleExampleQueryClick={handleExampleQueryClick} projectInfo={projectInfo} refsForTour={refsForTour} />
