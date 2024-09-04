@@ -72,8 +72,10 @@ section#search-results {
       }
 
       // Additional rules to deal with very wide / panorama images causing issues
-      max-width: calc(50% - 4px);
-      max-height: 230px;
+      & {
+        max-width: calc(50% - 4px);
+        max-height: 230px;
+      }
       > a > video.wise-video-preview {
         height: 100%;
         object-fit: contain;

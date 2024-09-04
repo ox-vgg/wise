@@ -8,7 +8,7 @@ import './App.scss';
 import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
-import { ProcessedSearchResults, Query } from './misc/types.ts';
+import { Query } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
