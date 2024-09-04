@@ -689,18 +689,19 @@ def _get_search_router(config: APIConfig):
             get_thumbs_fn(all_metadata),
         ):
             image_id = str(_metadata.media_id)
-            images[image_id] = ImageInfo(
-                id=image_id,
-                link=f"media/{image_id}",
-                filename=_metadata.path,
-                width=_metadata.width,
-                height=_metadata.height,
-                media_type=_metadata.media_type,
-                format=_metadata.format,
-                duration=_metadata.duration,
-                thumbnail=_thumb,
-                distance=_dist,
-            )
+            if image_id not in images:
+                images[image_id] = ImageInfo(
+                    id=image_id,
+                    link=f"media/{image_id}",
+                    filename=_metadata.path,
+                    width=_metadata.width,
+                    height=_metadata.height,
+                    media_type=_metadata.media_type,
+                    format=_metadata.format,
+                    duration=_metadata.duration,
+                    thumbnail=_thumb,
+                    distance=_dist,
+                )
             
             image_vector = ImageVector(
                 vector_id=str(_metadata.id),
