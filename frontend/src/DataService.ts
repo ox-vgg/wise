@@ -114,7 +114,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
             mediaId,
             {
               ...imageInfo,
-              vectors: processedSearchResults.Image.vectors.filter(vector => vector.media_id === mediaId), // populate vectors array
+              vectors: results.image_results!.vectors.filter(vector => vector.media_id === mediaId), // populate vectors array
             }
           ] as [string, ProcessedImageInfo]
         })
@@ -138,6 +138,9 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
         mediaInfo: processedSearchResults.Image.mediaInfo.get(vector.media_id)!
       } as ProcessedImageVector;
     });
+    for (let [mediaId, processedImageInfo] of processedSearchResults.Image.mediaInfo) {
+      processedImageInfo.vectors = processedSearchResults.Image.vectors.filter(vector => vector.media_id === mediaId)
+    }
   }
   if (results.video_results) {
     processedSearchResults.Video.mediaInfo = processVideos(results.video_results.videos, results.video_results.merged_windows);
