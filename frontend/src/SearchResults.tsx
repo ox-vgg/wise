@@ -210,13 +210,20 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
                 `${rangeStart}-${rangeEnd} of top ${total.toLocaleString('en', { useGrouping: true })} retrieved results`;
   }
 
-  const numMediaFilesString: string = projectInfo.num_media_files?.toLocaleString('en', { useGrouping: true }) || '?';
-  const numMinutesString: string = projectInfo.total_duration ? Math.round(projectInfo.total_duration / 60).toLocaleString('en-us') : '?';
+  let numMediaFilesString;
+  if (viewModality == 'Image') {
+    const numImagesString = projectInfo.media_file_counts?.image?.toLocaleString('en', { useGrouping: true }) || '?';
+    numMediaFilesString = `${numImagesString} images`;
+  } else if (viewModality == 'Video' || viewModality == 'VideoAudio') {
+    const numVideosString = projectInfo.media_file_counts?.video?.toLocaleString('en', { useGrouping: true }) || '?';
+    const numMinutesString: string = projectInfo.total_duration ? Math.round(projectInfo.total_duration / 60).toLocaleString('en-us') : '?';
+    numMediaFilesString = `${numVideosString} videos (total ${numMinutesString} minutes)`;
+  }
   let loadingMessage = <></>;
   if (isLoadingNewSearch) {
-    loadingMessage = <p className="wise-loading-message">Searching in {numMediaFilesString} videos (total {numMinutesString} minutes) <LoadingOutlined /></p>;
+    loadingMessage = <p className="wise-loading-message">Searching on {numMediaFilesString} <LoadingOutlined /></p>;
   } else if (!isHomePage && !isLoadingNewSearch) {
-    loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds of {numMediaFilesString} videos (total {numMinutesString} minutes)</p>;
+    loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds on {numMediaFilesString}</p>;
   }
 
   const isLoadingFeaturedImages = (isHomePage && searchResultsHTML.length === 0);

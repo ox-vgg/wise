@@ -172,6 +172,11 @@ export interface ProjectInfo {
   search_modalities?: ('image' | 'video' | 'audio')[],
   num_vectors?: number;
   num_media_files?: number;
+  media_file_counts?: {
+    image?: number;
+    video?: number;
+    audio?: number;
+  };
   total_duration?: number;
 }
 

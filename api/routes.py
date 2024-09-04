@@ -46,6 +46,7 @@ from src.repository import (
     # query_by_timestamp,
     get_featured_images,
     get_full_metadata_batch,
+    get_media_counts_by_media_type,
     get_project_total_duration,
     get_thumbnail_by_timestamp,
 )
@@ -334,6 +335,7 @@ def _get_project_data_router(config: APIConfig):
     with project_engine.connect() as conn:
         num_vectors = VectorRepo.get_count(conn)
         num_media_files = MediaRepo.get_count(conn)
+        media_file_counts = get_media_counts_by_media_type(conn)
         total_duration = get_project_total_duration(conn)
     models = {
         media_type: [
@@ -352,7 +354,8 @@ def _get_project_data_router(config: APIConfig):
             "models": models,
             "search_modalities": search_modalities,
             "num_vectors": num_vectors,
-            "num_media_files": num_media_files,
+            "num_media_files": num_media_files, # Total number of media files
+            "media_file_counts": media_file_counts, # Number of media files by media type
             "total_duration": total_duration,
         }
 
