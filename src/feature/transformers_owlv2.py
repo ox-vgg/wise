@@ -174,7 +174,7 @@ class TransformersOWLv2(FeatureExtractor):
         Run a random image through the model to find the output_dim
         """
         if not hasattr(self, 'output_dim'):
-            random_image = torch.rand( (1, 3,) + (self.input_image_size) )
+            random_image = torch.randint(0, 255, (1, 3,) + (self.input_image_size) )
             model_image_input = self.preprocess_image(random_image)
             model_image_features_list = self.extract_image_features(model_image_input)
             model_text_input = ['some random text']
