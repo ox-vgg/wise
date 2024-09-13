@@ -218,5 +218,8 @@ if __name__ == '__main__':
     # https://github.com/mwray/Semantic-Video-Retrieval/blob/main/src/scripts/create_relevancy_matrix.py
     print(f'Loading {N_video}x{N_text} relevancy matrix')
     rel_mat = pd.read_pickle(args.relevancy_mat_file)
-    map = calculate_mAP(sim_mat, rel_mat)
+
+    # The calculate_mAP function expects each row to correspond to a query
+    # see "... query item (i.e row in the matrix)" in calculate_mAP()
+    map = calculate_mAP(np.transpose(sim_mat), np.transpose(rel_mat))
     print(f'mAP = {map:.3f}')

@@ -14,9 +14,9 @@ plate, wash hands, etc.).
 |-----------------+------------------+--------+----------+-----------+---------------------------+-------|
 | Method          | Dataset          | Subset | # Videos | # Queries | FeatureExtractor          |   mAP |
 |-----------------+------------------+--------+----------+-----------+---------------------------+-------|
-| WISE2 IoU=0.1   | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-H-14-quickgelu:dfn5b  | 0.411 |
-| WISE2 IoU=0.1   | EpicKitchens-100 | Test   |     9668 |      3842 | xlm-..ViT-H-14:..laion5b..| 0.411 |
-| WISE2 IoU=0.1   | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-L-16-SigLIP-384:webli | 0.410 |
+| WISE2 IoU=0.1   | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-H-14-quickgelu:dfn5b  | 0.419 |
+| WISE2 IoU=0.1   | EpicKitchens-100 | Test   |     9668 |      3842 | xlm-..ViT-H-14:..laion5b..| 0.418 |
+| WISE2 IoU=0.1   | EpicKitchens-100 | Test   |     9668 |      3842 | ViT-L-16-SigLIP-384:webli | 0.417 |
 | Baseline: JPoSE | EpicKitchens-100 | Test   |     9668 |      3842 |                           | 0.381 |
 | Baseline: MLP   | EpicKitchens-100 | Test   |     9668 |      3842 | 2 layer MLP, triplet loss |  0.34 |
 |-----------------+------------------+--------+----------+-----------+---------------------------+-------|
