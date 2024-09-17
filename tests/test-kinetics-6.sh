@@ -60,6 +60,7 @@ pip install --no-deps msclap==1.3.3
 if [ ! -d "${KINETICS_DATA_DIR}" ]; then
     echo "Downloading Kinetics-6 dataset to ${DATA_DIR} ..."
     mkdir -p "${KINETICS_DATA_DIR}"
+    cd "${DATA_DIR}"
     curl -sLO $KINETICS6_DOWNLOAD_URL
     tar -zxvf Kinetics-6b.tar.gz -C "${KINETICS_DATA_DIR}"
 else
