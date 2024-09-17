@@ -27,7 +27,7 @@ if [ ! -d "${CODE_DIR}" ]; then
     echo "Downloading WISE2 code to ${CODE_DIR} ..."
     mkdir -p "${CODE_BASEDIR}"
     cd "${CODE_BASEDIR}"
-    git clone -b wise2-integration https://gitlab.com/vgg/wise/wise.git
+    git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
 else
     echo "Updating WISE2 code in ${CODE_DIR} ..."
     cd "${CODE_DIR}"
