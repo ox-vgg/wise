@@ -776,8 +776,13 @@ if __name__ == '__main__':
     if len(args.topk) != 1:
         args.topk = args.topk[1:] # remove the default value
     if args.query is not None and (len(args.topk) != len(args.query)):
-        print(f'All --query flags should be accompanied by a --topk value')
-        sys.exit(0)
+        if len(args.topk) == 1:
+            # reuse the same topk value for all queries
+            common_topk_value = args.topk[0];
+            setattr(args, 'topk', [ common_topk_value ] * len(args.query))
+        else:
+            print(f'All --query flags should be accompanied by a --topk value')
+            sys.exit(0)
 
     # Print the CSV header only once.
     # If this task is delegated to the show_result_as_csv() method,
