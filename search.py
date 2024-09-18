@@ -115,8 +115,6 @@ def process_query(search_index_list, args):
         search_result['search_time_sec'] = (end_time - start_time) + not_elapsed_time
         if hasattr(args, 'query_id'):
             search_result['query_id'] = args.query_id
-        else:
-            search_result['query_id'] = query_index
         all_search_result.append(search_result)
     return all_search_result
 
@@ -166,10 +164,12 @@ def apply_subtract(search_result, not_search_result):
         'match_pts_list':[],
         'match_score_list':[],
         'query': search_result['query'],
-        'query_id': search_result['query_id'],
         'in': search_result['in'],
         'not_in': search_result['not_in']
     }
+    if 'query_id' in search_result:
+        new_search_result['query_id'] = search_result['query_id']
+
     for result_index in range(0, len(search_result['match_filename_list'])):
         match_filename = search_result['match_filename_list'][result_index]
         match_pts = search_result['match_pts_list'][result_index]
@@ -925,7 +925,6 @@ if __name__ == '__main__':
                     if row[3] not in MEDIA_TYPE_LIST:
                         print(f'Skipping row with invalid "not_in" column: {row[3]}')
                         continue
-                    setattr(args_copy, 'query_id', [ query_count ])
                     setattr(args_copy, 'query', [ row[0], row[2] ])
                     setattr(args_copy, 'media_type_list', [ row[1] ])
                     setattr(args_copy, 'media_type_not_list', [ row[3] ])
