@@ -133,7 +133,7 @@ export type ProcessedSearchResponse = {
 
 export interface DataServiceOutput {
   searchResults: ProcessedSearchResults;
-  isSearching: boolean;
+  isLoadingNewSearch: boolean;
   searchLatency: number;
   totalResults: number;
   // pageNum: number;
@@ -193,7 +193,7 @@ export interface WiseHeaderProps {
   submitSearch: () => void;
   refsForTour: RefsForTour;
   isHomePage?: boolean;
-  isSearching?: boolean;
+  isLoadingNewSearch?: boolean;
 };
 export interface WiseOverviewCardProps {
   handleExampleQueryClick: (exampleQuery: string) => void;

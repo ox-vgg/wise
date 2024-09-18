@@ -1,12 +1,17 @@
+import enum
 import hashlib
 from pathlib import Path
-from PIL import Image
-import mimetypes
 import logging
-from .streamreader import get_media_info
+
+import magic
 
 logger = logging.getLogger(__name__)
 
+class MediaMimetype(str, enum.Enum):
+    image = 'image'
+    video = 'video'
+    audio = 'audio'
+    unknown = 'unknown'
 
 def md5(path: str):
     file_hash = hashlib.md5()
@@ -16,29 +21,30 @@ def md5(path: str):
 
     return file_hash.hexdigest()
 
+def get_mime_type(p: Path):
+    return magic.from_file(p, mime=True)
 
-VIDEO_EXTENSIONS = ("mp4", "webm", "mkv")
+def get_media_type_from_mimetype(mimetype: str) -> MediaMimetype:
+    if mimetype.startswith('image/'):
+        return MediaMimetype.image
 
+    if mimetype.startswith('audio/'):
+        return MediaMimetype.audio
 
-def is_valid_image(p: Path):
-    try:
-        with Image.open(p) as im:
-            im.verify()
-            return True
-    except Exception:
-        return False
+    if mimetype.startswith('video/'):
+        return MediaMimetype.video
 
+    return MediaMimetype.unknown
 
-def is_valid_video(p: Path):
-    if not mimetypes.guess_type(p)[0].startswith('video'):
-        return False
-    try:
-        get_media_info(str(p))
-        return True
-    except Exception:
-        logger.warning(f'Skipping invalid video file: {p}')
-        return False
+def get_mimetype_and_media_type_for_file(p: Path):
+    # p must be a file. TODO implement a contract check
 
+    mimetype = get_mime_type(p)
+    media_type = get_media_type_from_mimetype(mimetype)
+    return (mimetype, media_type, p)
+
+def get_files_from_directory_with_extensions(dir: Path, extensions: list[str]):
+    return (x for ext in extensions for x in dir.rglob(ext) if x.is_file())
 
 Identity = lambda *args, **kwargs: (args, kwargs)
 NoOp = lambda *args, **kwargs: None

@@ -13,7 +13,7 @@ def SearchIndexFactory(media_type, asset_id, asset):
          see src/wise_project.py::discover_assets()
 
     """
-    if media_type in ['audio', 'video']:
+    if media_type in ['audio', 'video', 'image']:
         return FeatureSearchIndex(media_type, asset_id, asset)
     elif media_type == 'metadata':
         return SqliteSearchIndex(media_type, asset_id, asset)

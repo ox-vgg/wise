@@ -1,7 +1,10 @@
 import enum
 import logging
 from pathlib import Path
-from .dataset import get_media_metadata, AVDataset
+import itertools
+
+from .utils import get_files_from_directory_with_extensions
+from .dataset import get_metadata_for_valid_files, get_dataset
 import numpy as np
 import torch
 import torch.utils.data as torch_data
@@ -9,6 +12,7 @@ import torchvision.transforms.v2 as transforms_v2
 import open_clip
 import typer
 from tqdm import tqdm
+from typing import List
 
 app = typer.Typer()
 app_state = {"verbose": True}
@@ -84,16 +88,19 @@ def base(verbose: bool = False):
 
 @app.command()
 def run(
-    input_file: Path = typer.Argument(
+    media_dir_list: List[Path] = typer.Argument(
         ...,
-        file_okay=True,
+        file_okay=False,
         dir_okay=True,
         exists=True,
         readable=True,
-        help="Path to input file / folder of videos",
+        help="Path to input folder of media files",
+    ),
+    media_include: List[str] = typer.Option(
+        default=["*"], help="regular expression to include certain media files"
     ),
     model: CLIPModel = typer.Option(
-        ..., help="Pass in a open_clip model string (or) internvideo"
+       "ViT-B-32:openai", help="Pass in a open_clip model string (or) internvideo"
     ),
     thumbnails: bool = typer.Option(True, help="Flag to control thumbnail extraction"),
 ):
@@ -111,29 +118,10 @@ def run(
     python3 -m src run data/ --model "internvideo"
     """
 
-    logger.debug("Getting preprocessing function")
-    # get preprocessing function from feature extractor
-    preprocess = get_input_transform_for_model(model)
-
-    # Dummy filtering, will be replaced in the main code
-    video_extensions = ("mkv", "mp4", "webm")
-    if input_file.is_file() and input_file.suffix in video_extensions:
-        logger.debug(f'"{input_file}"is a file, adding to sources')
-        sources = [input_file]
-    elif input_file.is_dir():
-        logger.debug(f'"{input_file}"is a dir, globbing for videos')
-        sources = list(x for y in video_extensions for x in input_file.rglob(f"*.{y}"))
-    else:
-        raise ValueError(f'Unrecognized file "{input_file}"')
-
-    # Get metadata to write into the media table
-    metadata = (get_media_metadata(str(x)) for x in sources)
-    input_files = {x.id: y for x, y in zip(metadata, sources)}
 
     # Define output stream options based on model.
     # Every 0.5 seconds, we read 8 frames chunk for internvideo, and 1 for clip
 
-    # Construct the dataset
     audio_sampling_rate = 48_000  # (48 kHz)
 
     video_frame_rate = 2  # fps
@@ -145,23 +133,42 @@ def run(
         round(audio_sampling_rate * segment_length)
     )  # audio frames spanning the same segment length as video
 
-    stream = AVDataset(
-        input_files,
-        video_frames_per_chunk=video_frames_per_chunk,
-        video_frame_rate=video_frame_rate,
-        video_preprocessing_function=preprocess,
-        audio_samples_per_chunk=audio_frames_per_chunk,
-        audio_sample_rate=audio_sampling_rate,
-        audio_preprocessing_function=None,
-        offset=None,
-        thumbnails=thumbnails,
-    )
+    # get preprocessing function from feature extractor
+    logger.debug("Getting preprocessing function")
+    preprocess = get_input_transform_for_model(model)
 
+    params = {
+        "video_frames_per_chunk": video_frames_per_chunk,
+        "video_frame_rate": video_frame_rate,
+        "video_preprocessing_function": preprocess,
+
+        "audio_samples_per_chunk": audio_frames_per_chunk,
+        "audio_sampling_rate": audio_sampling_rate,
+        "audio_preprocessing_function": None,
+
+        "image_preprocessing_function": preprocess,
+
+        "offset": None,
+        "thumbnails": thumbnails
+    }
+
+
+    # Get metadata to write into the media table
+    input_files = list(itertools.chain.from_iterable(
+        get_files_from_directory_with_extensions(media_dir, media_include) for media_dir in media_dir_list
+    ))
+    metadata, _ = get_metadata_for_valid_files(input_files)
+    stream = torch_data.ChainDataset(get_dataset(metadata, params))
     # Construct the dataloader
     loader = torch_data.DataLoader(stream, batch_size=None, num_workers=0)
-    logger.info(f"Iterating over {len(input_files)} file(s)")
-    for mid, *chunks in tqdm(loader):
-        logger.debug(f"{mid}, {[x and (x.tensor.shape, x.pts) for x in chunks]}")
+    logger.info(f"Iterating over {len(metadata)} file(s)")
+    for mid, chunks in tqdm(loader):
+        logger.debug([{
+            media_chunk_type: (
+                f"List length: {len(chunk.tensor)} | Shapes: {[t.shape for t in chunk.tensor]}" if isinstance(chunk.tensor, list) else chunk.tensor.shape,
+                chunk.pts
+            ) if chunk else None
+        } for media_chunk_type, chunk in chunks.items()])
         pass
 
 

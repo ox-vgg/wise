@@ -256,7 +256,7 @@ export const useDataService = (): DataServiceOutput => {
   const [ searchingState, setSearchingState ] = useState({
     queries: [] as Query[],
     isFeaturedImages: false,
-    isSearching: false,
+    isLoadingNewSearch: false,
     searchLatency: NaN,
     totalResults: NaN
   });
@@ -275,7 +275,7 @@ export const useDataService = (): DataServiceOutput => {
       setSearchingState({
         queries: [],
         isFeaturedImages: true,
-        isSearching: false,
+        isLoadingNewSearch: false,
         searchLatency: _searchResponse.time,
         totalResults: MAX_FEATURED_IMAGES
       });
@@ -323,7 +323,7 @@ export const useDataService = (): DataServiceOutput => {
   const performNewSearch = async (queries: Query[], viewModality: string) => {
     setSearchingState((_searchingState) => ({
       ..._searchingState,
-      isSearching: true
+      isLoadingNewSearch: true
     }));
     let searchResponseJSON: ProcessedSearchResponse;
     try {
@@ -331,14 +331,14 @@ export const useDataService = (): DataServiceOutput => {
     } catch (e) {
       setSearchingState((_searchingState) => ({
         ..._searchingState,
-        isSearching: false
+        isLoadingNewSearch: false
       }));
       throw e;
     }
     setSearchingState({
       queries: queries,
       isFeaturedImages: false,
-      isSearching: false,
+      isLoadingNewSearch: false,
       searchLatency: searchResponseJSON.time,
       totalResults: config.MAX_SEARCH_RESULTS
     });
@@ -375,7 +375,7 @@ export const useDataService = (): DataServiceOutput => {
 
   return {
     searchResults: searchResponse,
-    isSearching: searchingState.isSearching,
+    isLoadingNewSearch: searchingState.isLoadingNewSearch,
     searchLatency: searchingState.searchLatency,
     totalResults: searchingState.totalResults,
     // pageNum,

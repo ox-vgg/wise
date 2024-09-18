@@ -49,7 +49,7 @@ from src.repository import (
     get_project_total_duration,
     get_thumbnail_by_timestamp,
 )
-from src.data_models import MediaMetadata, MediaType, SourceCollectionType, VectorAndMediaMetadata
+from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollectionType, VectorAndMediaMetadata
 from src.enums import IndexType
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
@@ -218,7 +218,7 @@ def _get_project_data_router(config: APIConfig):
                     file_path = location / metadata.path
                     if file_path.is_file():
                         return FileResponse(
-                            file_path, media_type=f"media/{metadata.format.lower()}"
+                            file_path, media_type=f"image/{metadata.format.lower()}"
                         )
                     return PlainTextResponse(
                         status_code=404, content=f"{media_id} not found!"
@@ -232,7 +232,7 @@ def _get_project_data_router(config: APIConfig):
                 try:
                     file_iter = get_file_from_tar(location, metadata.path.lstrip("#"))
                     return StreamingResponse(
-                        file_iter, media_type=f"media/{metadata.format.lower()}"
+                        file_iter, media_type=f"image/{metadata.format.lower()}"
                     )
                 except Exception as e:
                     logger.exception(f"Exception when reading image {media_id}")
@@ -340,12 +340,17 @@ def _get_project_data_router(config: APIConfig):
             feature_extractor_id for feature_extractor_id in project_assets[media_type]
         ] for media_type in project_assets
     }
+    # search modalities available in the frontend
+    # the order of this list determines the order of the options shown in the frontend
+    search_modalities = ['image', 'video', 'audio']
+    search_modalities = [x for x in search_modalities if x in project_assets]
 
     @router.get("/info")
     def get_info():
         return {
             "project_name": config.project_dir.stem,
             "models": models,
+            "search_modalities": search_modalities,
             "num_vectors": num_vectors,
             "num_media_files": num_media_files,
             "total_duration": total_duration,
@@ -446,12 +451,9 @@ def _get_search_router(config: APIConfig):
     class VideoInfo(MediaInfo):
         timeline_hover_thumbnails: str
 
-    # An audio or video segment
-    class MediaSegment(BaseModel):
+    class VectorResult(BaseModel):
         vector_id: str
         media_id: str
-        ts: float
-        te: float
         link: str
         distance: float
 
@@ -459,6 +461,20 @@ def _get_search_router(config: APIConfig):
         @classmethod
         def round_distance(cls, v):
             return round(v, config.precision)
+
+    class ImageVector(VectorResult):
+        thumbnail: str
+        thumbnail_score: float
+
+        @field_validator("thumbnail_score")
+        @classmethod
+        def round_distance(cls, v):
+            return round(v, config.precision)
+
+    # An audio or video segment
+    class MediaSegment(VectorResult):
+        ts: float
+        te: float
 
     # A subclass of MediaSegment for pure audio files
     class AudioSegment(MediaSegment):
@@ -493,7 +509,8 @@ def _get_search_router(config: APIConfig):
 
     class ImageResults(BaseModel):
         total: int # maximum number of images that can be returned e.g. min(1000, num_images_in_project)
-        results: List[ImageInfo]
+        vectors: List[ImageVector]
+        images: Dict[str, ImageInfo]
 
     class SearchResponse(BaseModel):
         time: float # backend search time in seconds
@@ -587,14 +604,12 @@ def _get_search_router(config: APIConfig):
     def construct_video_search_response(
         search_in: MediaType,
         top_dist: List[float],
-        top_ids: List[int],
-        get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
+        all_metadata: List[VectorAndMediaMetadata],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
     ):
         videos = {}
         shots = []
         segments = []
-        all_metadata = get_metadata_fn(top_ids)
         for _dist, _metadata, (_thumb, _thumb_score) in zip(
             top_dist,
             all_metadata,
@@ -642,35 +657,104 @@ def _get_search_router(config: APIConfig):
             videos[v].thumbnail = best_thumbnails[v].thumbnail
 
         if search_in == MediaType.VIDEO:
-            video_results = VideoResults(
+            return VideoResults(
                 total=300, # TODO change this
                 unmerged_windows=segments,
                 merged_windows=shots,
                 videos=videos,
-            )
-            return SearchResponse(
-                time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
-                audio_results=None,
-                video_audio_results=None,
-                video_results=video_results,
-                image_results=None,
             )
         elif search_in == MediaType.AV:
-            video_audio_results = VideoAudioResults(
+            return VideoAudioResults(
                 total=300, # TODO change this
                 unmerged_windows=segments,
                 merged_windows=shots,
                 videos=videos,
             )
-            return SearchResponse(
-                time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
-                audio_results=None,
-                video_audio_results=video_audio_results,
-                video_results=None,
-                image_results=None,
-            )
         else:
-            raise NotImplementedError()
+            raise ValueError("`search_in` must be either `MediaType.VIDEO` or `MediaType.AV`")
+
+    def construct_image_search_response(
+        top_dist: List[float],
+        all_metadata: List[VectorAndMediaMetadata],
+        get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
+    ):
+        images = {}
+        image_vectors = []
+        for _dist, _metadata, (_thumb, _thumb_score) in zip(
+            top_dist,
+            all_metadata,
+            get_thumbs_fn(all_metadata),
+        ):
+            image_id = str(_metadata.media_id)
+            images[image_id] = ImageInfo(
+                id=image_id,
+                link=f"media/{image_id}",
+                filename=_metadata.path,
+                width=_metadata.width,
+                height=_metadata.height,
+                media_type=_metadata.media_type,
+                format=_metadata.format,
+                duration=_metadata.duration,
+                thumbnail=_thumb,
+                distance=_dist,
+            )
+            
+            image_vector = ImageVector(
+                vector_id=str(_metadata.id),
+                media_id=image_id,
+                link=f"media/{image_id}",
+                distance=_dist,
+                thumbnail=_thumb,
+                thumbnail_score=_thumb_score,
+            )
+            image_vectors.append(image_vector)
+
+        return ImageResults(
+            total=300, # TODO change this
+            vectors=image_vectors,
+            images=images,
+        )
+
+    def construct_search_response(
+        top_dist: List[float],
+        top_ids: List[int],
+        get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
+        get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
+        search_in: MediaType = None,
+    ):
+        all_metadata = get_metadata_fn(top_ids)
+        audio_results = None
+        video_audio_results = None
+        video_results = None
+        image_results = None
+        if search_in is None or search_in == MediaType.IMAGE:
+            image_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.IMAGE]
+            if len(image_indices) > 0:
+                image_top_dist = [top_dist[i] for i in image_indices]
+                image_all_metadata = [all_metadata[i] for i in image_indices]
+                image_results = construct_image_search_response(image_top_dist, image_all_metadata, get_thumbs_fn)
+        if search_in is None or search_in == MediaType.VIDEO:
+            video_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.VIDEO]
+            if len(video_indices) > 0:
+                video_top_dist = [top_dist[i] for i in video_indices]
+                video_all_metadata = [all_metadata[i] for i in video_indices]
+                video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, get_thumbs_fn)
+        if search_in is None or search_in == MediaType.AV:
+            av_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.AUDIO and x.media_type == MediaType.AV]
+            if len(av_indices) > 0:
+                av_top_dist = [top_dist[i] for i in av_indices]
+                av_all_metadata = [all_metadata[i] for i in av_indices]
+                video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, get_thumbs_fn)
+        if search_in is not None and search_in not in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AV]:
+            raise NotImplementedError("`search_in` must be either `MediaType.IMAGE`, `MediaType.VIDEO`, or `MediaType.AV`. Support for `MediaType.AUDIO` is not available yet")
+
+        return SearchResponse(
+            time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
+            audio_results=audio_results,
+            video_audio_results=video_audio_results,
+            video_results=video_results,
+            image_results=image_results,
+        )
 
     def _get_query_features(
         query_prefix: str,
@@ -777,10 +861,10 @@ def _get_search_router(config: APIConfig):
 
     """
     Load search indices for all feature extractors.
-    `search_indices` is a dictionary of dictionaries, e.g. `search_indices[media_type][feature_extractor_id]`
-    contains a `SearchIndex` object for a given media type and feature extractor id
+    `search_indices` is a dictionary of SearchIndex objects, where the key is a media_type
+    and value is a SearchIndex object
     """
-    search_indices = defaultdict(dict)
+    search_indices: dict[str, SearchIndex] = {}
     for media_type in project_assets:
         asset_id_list = list(project_assets[media_type].keys())
         asset_index = 0
@@ -806,15 +890,26 @@ def _get_search_router(config: APIConfig):
         asset_id = asset_id_list[asset_index]
         asset = project_assets[media_type][asset_id]
         search_indices[media_type] = SearchIndexFactory(media_type, asset_id, asset)
+        logger.info(f"Loading faiss index from {search_indices[media_type].get_index_filename(config.index_type)}")
         if not search_indices[media_type].load_index(config.index_type):
             print(f'failed to load {media_type} index: {asset_id}')
-            del search_index_list[media_type]
+            del search_indices[media_type]
             continue
 
-            if hasattr(search_indices[media_type].index, "nprobe"):
-                # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
-                search_index.index.parallel_mode = 1
-                search_index.index.nprobe = getattr(config, "nprobe", 32)
+        if hasattr(search_indices[media_type].index, "nprobe"):
+            # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
+            search_indices[media_type].index.parallel_mode = 1
+            search_indices[media_type].index.nprobe = getattr(config, "nprobe", 32)
+
+        if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
+            try:
+                logger.info(f"Enabling direct map on search index for faster internal search.")
+                search_indices[media_type].index.make_direct_map(True)
+            except Exception as e:
+                logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
+        else:
+            logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
+
 
     # Get counts
     with project_engine.connect() as conn:
@@ -1103,8 +1198,7 @@ def _get_search_router(config: APIConfig):
             #     return m
 
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
-            response = construct_video_search_response(
-                search_in=MediaType.VIDEO,
+            response = construct_search_response(
                 top_dist=dist[start:end],
                 top_ids=selected_ids[start:end],
                 get_metadata_fn=_get_metadata,
@@ -1164,9 +1258,7 @@ def _get_search_router(config: APIConfig):
         # Which media type to search on
         # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
         # "audio" refers to pure audio files, and "image" refers to images
-        search_in: MediaType = Query(default=MediaType.VIDEO),
-        # Name of feature extractor to use
-        feature_extractor_id: str = Query(default=None),
+        search_in: MediaType = Query(),
 
         # Positive queries
         text_queries: List[str] = Query(default=[]),
@@ -1195,6 +1287,10 @@ def _get_search_router(config: APIConfig):
         input images/text, and then using this as the query vector.
         """
         media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
+        if media_type not in search_indices:
+            raise HTTPException(400, {
+                "message": f"No search index exists for this modality: {search_in}"
+            })
         search_index = search_indices[media_type]
 
         extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
@@ -1262,7 +1358,12 @@ def _get_search_router(config: APIConfig):
         elif len(q) > 5:
             raise HTTPException(400, {"message": "Too many query items"})
 
-        if search_in == MediaType.VIDEO:
+        if search_in == MediaType.IMAGE:
+            if len([query for query in q if query['modality'] == 'audio']) > 0:
+                raise HTTPException(400, {
+                    "message": "Cannot search on images using an audio query"
+                })
+        elif search_in == MediaType.VIDEO:
             if len([query for query in q if query['modality'] == 'audio']) > 0:
                 raise HTTPException(400, {
                     "message": "Cannot search on visual stream of video files using an audio query"
@@ -1330,12 +1431,12 @@ def _get_search_router(config: APIConfig):
 
             get_thumbs = thumbs_reader(thumbs_conn, valid_dist, thumbnails_to_send)
 
-            response = construct_video_search_response(
-                search_in=search_in,
+            response = construct_search_response(
                 top_dist=valid_dist,
                 top_ids=valid_ids,
                 get_metadata_fn=_get_metadata,
                 get_thumbs_fn=get_thumbs,
+                search_in=search_in,
             )
 
         return response

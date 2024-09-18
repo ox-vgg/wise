@@ -68,9 +68,12 @@ stream = AVDataset(
 # Keep batch_size None, as we havent implemented collation
 # TODO: Implement collation
 # loader = torch_data.DataLoader(stream, batch_size=None, num_workers=num_workers)
-for id, *chunks in stream:
-    video, audio, thumbnail = chunks
-    print(f"{id}, {(x.tensor.shape, x.pts) for x in chunks if x else None}")
+for id, chunks in stream:
+    video, audio, thumbnails = chunks.get(MediaChunkType.VIDEO), chunks.get(MediaChunkType.AUDIO), chunks.get(MediaChunkType.THUMBNAILS)
+    print(f"{id}:")
+    print(f"\tvideo: {(video.tensor.shape, video.pts) if video else None}")
+    print(f"\taudio: {(audio.tensor.shape, audio.pts) if audio else None}")
+    print(f"\tthumbnails: {(f'list length: {len(thumbnails.tensor)}', thumbnails.pts) if thumbnails else None}")    
 ```
 
 # Outputs

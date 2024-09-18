@@ -406,7 +406,7 @@ const QUERY_COLORS = {
 const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   multimodalQueries, setMultimodalQueries, searchText, setSearchText,
   viewModality, setViewModality,
-  submitSearch, refsForTour, isHomePage = false, isSearching = false
+  submitSearch, refsForTour, isHomePage = false, isLoadingNewSearch = false
 }: WiseHeaderProps) => {
   // This state is set to true when the dropdown is triggered (by hovering over the search bar), and false when the mouse moves outside the search bar
   const [isSearchDropdownTriggered, setIsSearchDropdownTriggered] = useState(false);
@@ -541,7 +541,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                       <Button type="text" shape="circle" size="large" icon={<CloseOutlined />} onClick={clearSearchBar} />
                     </Tooltip>
                   }
-                  <Button type="text" shape="circle" size="large" loading={isSearching} htmlType="submit" icon={<SearchOutlined />} />
+                  <Button type="text" shape="circle" size="large" loading={isLoadingNewSearch} htmlType="submit" icon={<SearchOutlined />} />
                 </>
               }
               ref={refsForTour.searchBar}

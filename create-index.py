@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--media-type',
                         required=False,
                         action='append',
-                        choices=['audio', 'video', 'metadata'],
+                        choices=['audio', 'video', 'metadata', 'image'],
                         help='create search index only for these media types; applies to all by default ')
 
     parser.add_argument('--index-type',

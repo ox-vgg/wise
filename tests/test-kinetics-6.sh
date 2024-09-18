@@ -82,7 +82,7 @@ if [ ! -d "${KINETICS_PROJECT_DIR}" ]; then
     echo "Extracting features from videos (takes about 3 min.) ..."
     cd "${CODE_DIR}"
     python extract-features.py \
-           --media-dir "${KINETICS_DATA_DIR}" \
+           "${KINETICS_DATA_DIR}" \
            --media-include "*.mp4" \
            --shard-maxcount 4096 \
            --shard-maxsize 20971520 \

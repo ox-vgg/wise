@@ -117,7 +117,7 @@ curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/CondensedMov
 tar -zxvf CondensedMovies-10.tar.gz -C wise-data/
 
 python extract-features.py \
-  --media-dir wise-data/CondensedMovies-10/ \
+  wise-data/CondensedMovies-10/ \
   --video-feature-id "vgg/random/2024/04" \
   --project-dir wise-projects/CondensedMovies-10/
 

@@ -101,15 +101,15 @@ export const App: React.FunctionComponent = () => {
       type: "TEXT",
       value: exampleQuery
     }]);
-  }  
+  }
 
-  return <Layout style={(dataService.searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0) ? {background: 'transparent'} : {}}>
+  return <Layout>
     <WiseHeader multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                 searchText={searchText} setSearchText={setSearchText}
                 viewModality={viewModality} setViewModality={setViewModality}
                 submitSearch={submitSearch}
                 refsForTour={refsForTour}
-                isHomePage={isHomePage} isSearching={dataService.isSearching}></WiseHeader>
+                isHomePage={isHomePage} isLoadingNewSearch={dataService.isLoadingNewSearch}></WiseHeader>
     <Content className="wise-content">
       {isHomePage && // Only show if isHomePage is true
         <WiseOverviewCard handleExampleQueryClick={handleExampleQueryClick} projectInfo={projectInfo} refsForTour={refsForTour} />
