@@ -35,7 +35,7 @@ class TestFeatureExtractor(unittest.TestCase):
 
     def test_audio_feature(self):
         featureExtractor = FeatureExtractorFactory('microsoft/clap/2023/Not-Applicable')
-        audio_time_series = [ torch.rand((1,408700)) ] # 2 sec. random audio
+        audio_time_series = torch.rand((1,408700)) # 2 sec. random audio
         preprocessed_audio = featureExtractor.preprocess_audio(audio_time_series)
         audio_embeddings = featureExtractor.extract_audio_features(preprocessed_audio)
         self.assertEqual(audio_embeddings.shape[1], 1024)
