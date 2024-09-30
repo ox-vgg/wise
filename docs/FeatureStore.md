@@ -13,19 +13,17 @@ Here is an example of how the features stores in these stores can be accessed.
 
 ```
 # source: src/search_index.py
-import numpy as np
-
-from .feature.feature_extractor_factory import FeatureExtractorFactory
+from pathlib import Path
 from .feature.store.feature_store_factory import FeatureStoreFactory
 
 ...
 media_type = 'video' # or 'audio'
-feature_dir = '/data/projects/Kinetics-7/store/mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k/features/'
+feature_dir = Path('/data/projects/Kinetics-7/store/mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k/features/')
 feature_store = FeatureStoreFactory.load_store(media_type, feature_dir)
 feature_store.enable_read(shard_shuffle = False)
 
 for feature_id, feature_vector in feature_store:
-    print(f'feature_id={feature_id}, feature = {feature_vector.shape}'
+    print(f'feature_id={feature_id}, feature = {feature_vector.shape}')
 
 ...
 ```
