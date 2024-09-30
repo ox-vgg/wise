@@ -21,14 +21,14 @@ class WiseProject:
                 raise ValueError(f"project folder {self.project_dir} does not exist")
 
     @property
-    def thumbs_uri(self):
+    def thumbs_uri(self) -> str:
         return f"{DB_SCHEME}/{self.project_dir.absolute()}/thumbs.db"
 
     @property
-    def dburi(self):
+    def dburi(self) -> str:
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
-    def metadata_db_table(self, metadata_id, extension='.sqlite'):
+    def metadata_db_table(self, metadata_id: str, extension='.sqlite') -> tuple[Path, str]:
         metadata_id_tok = metadata_id.split('/')
         assert len(metadata_id_tok) == 3, 'metadata_id must be in "FOLDER_NAME/DB_NAME/TABLE_NAME" format'
         metadata_db_dir = self.metadata_dir / metadata_id_tok[0]
@@ -37,28 +37,28 @@ class WiseProject:
         metadata_table = metadata_id_tok[2]
         return metadata_db, metadata_table
 
-    def store_dir(self):
+    def store_dir(self) -> Path:
         return self.store_dir
 
-    def media_dir(self):
+    def media_dir(self) -> Path:
         return self.media_dir
 
-    def features_root(self, feature_extractor_id):
+    def features_root(self, feature_extractor_id: str) -> Path:
         return self.store_dir / feature_extractor_id
 
-    def features_dir(self, feature_extractor_id):
+    def features_dir(self, feature_extractor_id: str) -> Path:
         return self.features_root(feature_extractor_id) / 'features'
 
-    def create_features_dir(self, feature_extractor_id):
+    def create_features_dir(self, feature_extractor_id: str) -> Path:
         features_store = self.features_dir(feature_extractor_id)
         if not features_store.exists():
             features_store.mkdir(parents=True, exist_ok=True)
         return features_store
 
-    def index_dir(self, feature_extractor_id):
+    def index_dir(self, feature_extractor_id: str) -> Path:
         return self.features_root(feature_extractor_id) / 'index'
 
-    def create_index_dir(self, feature_extractor_id):
+    def create_index_dir(self, feature_extractor_id: str) -> Path:
         index_store = self.features_root(feature_extractor_id) / 'index'
         if not index_store.exists():
             index_store.mkdir(parents=True, exist_ok=True)

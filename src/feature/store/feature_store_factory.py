@@ -21,6 +21,8 @@ class FeatureStoreFactory:
 
     @classmethod
     def load_store(cls, media_type, features_dir):
+        features_dir = Path(features_dir) # convert type in case features_dir is a string
+
         # infer the store type
         shard_ext_list = []
         shard_file_pattern = features_dir / (media_type + '-*.*')
