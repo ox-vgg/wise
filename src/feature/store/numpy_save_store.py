@@ -89,16 +89,15 @@ class NumpySaveStore(FeatureStore):
     def __iter__(self):
         for npz_filename in self.npz_filename_list:
             payload = np.load(npz_filename)
-            feature_id_list = payload['feature_id']
-            features_list = payload['features']
-            N = feature_id_list.shape[0]
+            feature_ids_array = payload['feature_id']
+            features_array = payload['features']
+            N = feature_ids_array.shape[0]
+            index_list = range(0, N)
             if self.shuffle_values:
-                index_list = random.sample(range(0, N),N)
-            else:
-                index_list = range(0, N)
+                random.shuffle(index_list)
             for i in index_list:
-                feature_id = feature_id_list[i]
-                feature_vector = np.take(features_list, [i], 0) # to return (1,N) instead of (N,)
+                feature_id = feature_ids_array[i]
+                feature_vector = features_array[[i],:] # shape: (1,N)
                 yield feature_id, feature_vector
 
     def close(self):
