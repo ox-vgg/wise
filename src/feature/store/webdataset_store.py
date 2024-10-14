@@ -162,8 +162,8 @@ class WebdatasetStore(FeatureStore):
         vector = store[123]
         ```
 
-        Internally, these two steps are performed:
-        1. A list of 'shards' is created, in the same format as the 'shardlist' array in this
+        Internally, these two things are created:
+        1. A list of 'shards', in the same format as the 'shardlist' array in this
             example: https://storage.googleapis.com/webdataset/fake-imagenet/imagenet-train.json
 
             This is used to initialize a wids.ShardListDataset instance which is saved to
@@ -212,7 +212,7 @@ class WebdatasetStore(FeatureStore):
         # has been modified (to determine whether the shardlist and id mapping need to be
         # re-computed)
 
-    def __getitem__(self, vector_id):
+    def __getitem__(self, vector_id: int) -> np.ndarray:
         """
         Access a feature vector with its vector id. The `enable_random_access()`
         method needs to be called first in order to enable this.
@@ -230,7 +230,9 @@ class WebdatasetStore(FeatureStore):
         if not self.shard_list_dataset or not self.vector_id_to_webdataset_idx_mapping:
             raise Exception("Please run `store.enable_random_access()` on this feature store first")
         webdataset_idx = self.vector_id_to_webdataset_idx_mapping[vector_id]
-        return self.shard_list_dataset[webdataset_idx]
+        payload = self.shard_list_dataset[webdataset_idx]
+        feature_vector = np.load(payload['.features.pyd'], allow_pickle=True)
+        return feature_vector
 
     def close(self):
         self.shardWriter.close()
