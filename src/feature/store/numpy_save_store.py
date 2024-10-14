@@ -14,6 +14,7 @@ class NumpySaveStore(FeatureStore):
         """
         self.store_name = store_name
         self.store_data_dir = Path(store_data_dir)
+        self.vector_id_to_shard_location = None
 
     def enable_write(self, shard_maxcount, shard_maxsize, verbose=0):
         self.shard_maxcount = shard_maxcount
@@ -105,6 +106,53 @@ class NumpySaveStore(FeatureStore):
                 feature_ids = feature_ids_array[batch_indices]
                 feature_vectors = features_array[batch_indices,:] # shape: (batch_size, feature_dim)
                 yield feature_ids, feature_vectors
+
+    def enable_random_access(self):
+        """
+        Enables random access to the NumpySaveStore for the internal search feature.
+        Once enabled, feature vectors can be accessed directly using their vector id.
+
+        Usage example:
+        ```
+        store = NumpySaveStore(...)
+        store.enable_read()
+        store.enable_random_access()
+        
+        # Access a feature vector with an id of 123
+        vector = store[123]
+        ```
+        """
+        # a dictionary with key: vector id and value: tuple(shard filename, array index within the shard)
+        vector_id_to_shard_location: dict[int, tuple[str, int]] = {}
+
+        for npz_filename in self.npz_filename_list:
+            payload = np.load(npz_filename)
+            feature_ids_array = payload['feature_id'] # shape: (2048,)
+            for array_index, feature_id in enumerate(feature_ids_array):
+                vector_id_to_shard_location[feature_id] = (npz_filename, array_index)
+        self.vector_id_to_shard_location = vector_id_to_shard_location
+
+    def __getitem__(self, vector_id: int) -> np.ndarray:
+        """
+        Access a feature vector with its vector id. The `enable_random_access()`
+        method needs to be called first in order to enable this.
+
+        Usage example:
+        ```
+        store = NumpySaveStore(...)
+        store.enable_read()
+        store.enable_random_access()
+        
+        # Access a feature vector with an id of 123
+        vector = store[123]
+        ```
+        """
+        if not self.vector_id_to_shard_location:
+            raise Exception("Please run `store.enable_random_access()` on this feature store first")
+        npz_filename, array_index = self.vector_id_to_shard_location[vector_id]
+        payload = np.load(npz_filename)
+        feature_vector = payload['features'][[array_index]] # shape: (1, feature_dim)
+        return feature_vector
 
     def close(self):
         if self.shard_feature_index != 0:
