@@ -4,6 +4,7 @@ from pathlib import Path
 import glob
 import random
 
+from src.utils import batched
 from .feature_store import FeatureStore
 
 class NumpySaveStore(FeatureStore):
@@ -87,6 +88,11 @@ class NumpySaveStore(FeatureStore):
         self.shard_feature_index = 0
 
     def __iter__(self):
+        for feature_ids, feature_vectors in self.iter_batch(batch_size=1):
+            # feature_ids[0] is of type np.int32 and feature_vectors is a numpy array of shape (1, feature_dim)
+            yield feature_ids[0], feature_vectors
+
+    def iter_batch(self, batch_size=512):
         for npz_filename in self.npz_filename_list:
             payload = np.load(npz_filename)
             feature_ids_array = payload['feature_id']
@@ -95,10 +101,10 @@ class NumpySaveStore(FeatureStore):
             index_list = range(0, N)
             if self.shuffle_values:
                 random.shuffle(index_list)
-            for i in index_list:
-                feature_id = feature_ids_array[i]
-                feature_vector = features_array[[i],:] # shape: (1,N)
-                yield feature_id, feature_vector
+            for batch_indices in batched(index_list, batch_size):
+                feature_ids = feature_ids_array[batch_indices]
+                feature_vectors = features_array[batch_indices,:] # shape: (batch_size, feature_dim)
+                yield feature_ids, feature_vectors
 
     def close(self):
         if self.shard_feature_index != 0:
