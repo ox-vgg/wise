@@ -1,13 +1,18 @@
 import os
 import numpy as np
 import webdataset as wds
+import wids
 import glob
 import io
 import sys
 import tarfile
+import logging
+from tqdm import tqdm
 
+from src.dataloader.utils import md5
 from .feature_store import FeatureStore
 
+logger = logging.getLogger()
 class WebdatasetStore(FeatureStore):
     def __init__(self, store_name, store_data_dir):
         """
@@ -35,6 +40,8 @@ class WebdatasetStore(FeatureStore):
                                                 self.store_name + '-%06d.' + self.EXTENSION)
         self.feature_count = -1
         self.feature_dim = -1
+        self.shard_list_dataset = None
+        self.vector_id_to_webdataset_idx_mapping = None
 
     def enable_write(self, shard_maxcount, shard_maxsize, verbose=0):
         self.shard_maxcount = shard_maxcount
@@ -139,6 +146,91 @@ class WebdatasetStore(FeatureStore):
             .batched(batch_size)
         )
         yield from shard_reader
+
+    def enable_random_access(self):
+        """
+        Enables random access to the WebDataset store for the internal search feature.
+        Once enabled, feature vectors can be accessed directly using their vector id.
+
+        Usage example:
+        ```
+        store = WebdatasetStore(...)
+        store.enable_read()
+        store.enable_random_access()
+        
+        # Access a feature vector with an id of 123
+        vector = store[123]
+        ```
+
+        Internally, these two steps are performed:
+        1. A list of 'shards' is created, in the same format as the 'shardlist' array in this
+            example: https://storage.googleapis.com/webdataset/fake-imagenet/imagenet-train.json
+
+            This is used to initialize a wids.ShardListDataset instance which is saved to
+            self.shard_list_dataset. The wids.ShardListDataset instance is what provides
+            random access to the feature vectors.
+
+        2. A mapping between the vector ids and indices used to access the ShardListDataset.
+
+            This is needed because the index of a vector within the ShardListDataset is different
+            from its vector id. For example, shard_list_dataset[0] might have a vector id of 1 
+            (instead of 0), and shard_list_dataset[8] might have a vector id of 11
+
+        """
+        wds_tar_prefix = os.path.join(self.store_data_dir, self.store_name + '-')
+        wds_tar_pattern = wds_tar_prefix + '*.tar'
+        tar_filenames = sorted(glob.iglob(pathname=wds_tar_pattern, recursive=False))
+
+        shardlist = []
+        # a dictionary with key: vector id and value: webdataset index
+        vector_id_to_webdataset_idx_mapping: dict[int, int] = {}
+        webdataset_idx = 0
+        logger.info("Enabling random access to feature store")
+        for tar_filename in tqdm(tar_filenames):
+            nsamples = None
+            with tarfile.open(tar_filename) as f:
+                feature_filenames = f.getnames()
+                nsamples = len(feature_filenames)
+                for feature_filename in feature_filenames:
+                    # Get the vector id from each filename, e.g. 123456 from '0000123456.features.pyd'
+                    vector_id = int(feature_filename.split('.')[0])
+                    vector_id_to_webdataset_idx_mapping[vector_id] = webdataset_idx
+                    webdataset_idx += 1
+
+            shardlist.append({
+                "url": tar_filename,
+                "md5sum": md5(tar_filename),
+                "nsamples": nsamples,
+                "filesize": os.stat(tar_filename).st_size,
+            })
+        self.shard_list_dataset = wids.ShardListDataset(shardlist)
+        self.vector_id_to_webdataset_idx_mapping = vector_id_to_webdataset_idx_mapping
+        # Note: in the future, we could save the shardlist and vector_id_to_webdataset_idx_mapping
+        # as JSON files to disk, so that they do not need to be re-computed each time
+        # we want to enable random access.
+        # The md5 checksums in the shardlist can be used to detect whether the feature store
+        # has been modified (to determine whether the shardlist and id mapping need to be
+        # re-computed)
+
+    def __getitem__(self, vector_id):
+        """
+        Access a feature vector with its vector id. The `enable_random_access()`
+        method needs to be called first in order to enable this.
+
+        Usage example:
+        ```
+        store = WebdatasetStore(...)
+        store.enable_read()
+        store.enable_random_access()
+        
+        # Access a feature vector with an id of 123
+        vector = store[123]
+        ```
+        """
+        if not self.shard_list_dataset or not self.vector_id_to_webdataset_idx_mapping:
+            raise Exception("Please run `store.enable_random_access()` on this feature store first")
+        webdataset_idx = self.vector_id_to_webdataset_idx_mapping[vector_id]
+        return self.shard_list_dataset[webdataset_idx]
 
     def close(self):
         self.shardWriter.close()
