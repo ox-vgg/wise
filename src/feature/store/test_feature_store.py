@@ -101,6 +101,32 @@ class TestFeatureExtractorFactory(unittest.TestCase):
                 read_feature_id.append( int(feature_id) )
             self.assertEqual(read_feature_id, [0, 3, 6, 7, 8])
 
+    def test_webdataset_store_random_access(self):
+        with tempfile.TemporaryDirectory() as temp_store_dir:
+            shard_maxcount = 3
+            shard_maxsize = 256 # bytes
+            write_store = WebdatasetStore(self.store_name, temp_store_dir)
+            featureA = np.array([[1,2,3,4]])
+            featureB = np.array([[5,6,7,8]])
+            featureC = np.array([[9,10,11,12]])
+
+            write_store.enable_write(shard_maxcount, shard_maxsize, verbose=1)
+            # Add vectors with non-consecutive vector ids
+            write_store.add(1, featureA)
+            write_store.add(2, featureB)
+            write_store.add(5, featureC)
+            write_store.close()
+            del write_store
+
+            read_store = WebdatasetStore(self.store_name, temp_store_dir)
+            read_store.enable_read(shard_shuffle=False, shuffle_values=False)
+
+            read_store.enable_random_access()
+            # Read vectors in a different order
+            self.assertTrue(np.array_equal(read_store[5], featureC))
+            self.assertTrue(np.array_equal(read_store[1], featureA))
+            self.assertTrue(np.array_equal(read_store[2], featureB))
+
     def tearDown(self):
         pass
 
