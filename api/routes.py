@@ -901,15 +901,12 @@ def _get_search_router(config: APIConfig):
             search_indices[media_type].index.parallel_mode = 1
             search_indices[media_type].index.nprobe = getattr(config, "nprobe", 32)
 
-        if hasattr(config, 'index_use_direct_map') and config.index_use_direct_map == 1:
-            try:
-                logger.info(f"Enabling direct map on search index for faster internal search.")
-                search_indices[media_type].index.make_direct_map(True)
-            except Exception as e:
-                logger.info(f"Search index does not support direct map, falling back to using saved features for internal search (slower)")
-        else:
-            logger.info(f"Direct map on search index can be enabled by setting index_use_direct_map=1 in config.py. This speeds up internal search.")
-
+        if not search_indices[media_type].is_internal_search_supported:
+            logger.info(
+                "This faiss index does not support internal search. To enable "
+                "internal search, please re-create the index by running "
+                f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {search_indices[media_type].index_type} --overwrite`",
+            )
 
     # Get counts
     with project_engine.connect() as conn:
@@ -1313,20 +1310,26 @@ def _get_search_router(config: APIConfig):
             search_index.feature_extractor.preprocess_audio(load_audio(x))
         )
 
-        try:
-            if not hasattr(search_index.index, 'direct_map') or search_index.index.direct_map.type == search_index.index.direct_map.NoMap:
-                # load saved features from HDF file (slower)
-                internal_image_queries = load_internal_images(internal_image_queries)
-                negative_internal_image_queries = load_internal_images(negative_internal_image_queries)
+        if internal_image_queries or negative_internal_image_queries:
+            if search_index.is_internal_search_supported:
+                try:
+                    # reconstruct features from faiss index
+                    internal_image_queries = reconstruct_internal_img_feature(search_index, internal_image_queries)
+                    negative_internal_image_queries = reconstruct_internal_img_feature(search_index, negative_internal_image_queries)
+                except Exception as e:
+                    logger.exception(e)
+                    return PlainTextResponse(
+                        status_code=500, content=f"Error processing internal search query"
+                    )
             else:
-                # reconstruct features from faiss index (faster)
-                internal_image_queries = reconstruct_internal_img_feature(search_index, internal_image_queries)
-                negative_internal_image_queries = reconstruct_internal_img_feature(search_index, negative_internal_image_queries)
-        except Exception as e:
-            logger.exception(e)
-            return PlainTextResponse(
-                status_code=500, content=f"Error processing internal image queries"
-            )
+                logger.exception(
+                    "This faiss index does not support internal search. To enable "
+                    "internal search, please re-create the index by running "
+                    f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {search_index.index_type} --overwrite`",
+                )
+                return PlainTextResponse(
+                    status_code=500, content=f"Internal search not supported in this project"
+                )
 
         for tq in text_queries:
             if tq.strip() in config.query_blocklist:

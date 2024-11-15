@@ -46,10 +46,11 @@ class FeatureSearchIndex(SearchIndex):
 
         index = faiss.IndexFlatIP(feature_dim)
         if index_type == 'IndexFlatIP':
-            # IndexFlatIP does not support index.add_with_ids() therefore we use IndexIdMap
+            # IndexFlatIP does not support index.add_with_ids() therefore we use IndexIdMap2
             # see https://github.com/facebookresearch/faiss/wiki/Pre--and-post-processing
-            index_for_id_map = index
-            index = faiss.IndexIDMap(index_for_id_map)
+            # We use IndexIdMap2 instead of IndexIdMap because it supports reconstructing
+            # the original vectors from their IDs (for internal search)
+            index = faiss.IndexIDMap2(index)
         if index_type == 'IndexIVFFlat':
             quantizer = index
             if feature_count < 200000:
@@ -58,6 +59,7 @@ class FeatureSearchIndex(SearchIndex):
                 cell_count = 10 * round(math.sqrt(feature_count))
             train_count = min(feature_count, 100 * cell_count)
             index = faiss.IndexIVFFlat(quantizer, feature_dim, cell_count, faiss.METRIC_INNER_PRODUCT)
+            index.set_direct_map_type(faiss.DirectMap.Hashtable) # Hashtable needed to support non-sequential ids
 
             print(f'  loading a random sample of {train_count} features from {feature_count} features ...')
             shuffled_features = WebdatasetStore(self.media_type, self.features_dir)
@@ -88,6 +90,7 @@ class FeatureSearchIndex(SearchIndex):
         return hasattr(self, 'index')
 
     def load_index(self, index_type):
+        self.index_type = index_type
         index_fn = self.get_index_filename(index_type)
         if not index_fn.exists():
             print(f'  index {index_fn} does not exist')
@@ -96,6 +99,23 @@ class FeatureSearchIndex(SearchIndex):
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
         self.feature_extractor = FeatureExtractorFactory(self.feature_extractor_id)
         return True
+    
+    @property
+    def is_internal_search_supported(self):
+        """
+        Checks if the faiss index supports internal search (i.e. reconstructing 
+        vectors from their ids). This should be enabled by default for new
+        projects created using our latest code, but older projects might not
+        support this, so we need to perform some checks.
+        """
+        if self.index_type == 'IndexFlatIP':
+            # In previous versions of our code, we were using faiss.IndexIDMap,
+            # which doesn't support internal search. Therefore we need to check 
+            # if faiss.IndexIDMap2 (rather than faiss.IndexIDMap) is being used
+            return isinstance(self.index, faiss.IndexIDMap2)
+        elif self.index_type == 'IndexIVFFlat':
+            # Check if the direct map was enabled
+            return hasattr(self.index, 'direct_map') and not self.index.direct_map.no()
 
     def search(self, media_type, query, topk=5, query_type='text'):
         if query_type != 'text':
