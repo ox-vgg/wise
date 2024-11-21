@@ -17,7 +17,7 @@ dependencies:
   - python-magic=0.4
   - mkl=2023
   - blas=*=mkl
-  - conda-forge::ffmpeg
+  - conda-forge::ffmpeg<7
   - pip:
     - -r requirements.txt
     # Install msclap separately till we pip freeze
