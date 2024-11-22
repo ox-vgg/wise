@@ -11,9 +11,8 @@
 }
 
 .wise-loading-message {
-  width: 100%;
   text-align: center;
-  margin: 8px 0 0 0;
+  margin: 10px 0 5px 0;
 
   > .anticon {
     margin-left: 5px;
@@ -22,11 +21,13 @@
 }
 
 .ant-segmented {
-  background: #f0f0f0;
+  background: #eee;
+  margin-top: 5px;
 }
 
 section#search-results {
   display: block;
+  margin-top: 20px;
 
   .ant-pagination {
     margin: 10px 0;
@@ -63,7 +64,7 @@ section#search-results {
       > a {
         color: unset;
 
-        > video.wise-video-preview {
+        > video.wise-video-preview, > img.wise-image {
           position: absolute;
           top: 0;
           width: 100%;
@@ -76,7 +77,7 @@ section#search-results {
         max-width: calc(50% - 4px);
         max-height: 230px;
       }
-      > a > video.wise-video-preview {
+      > a > video.wise-video-preview, > a > img.wise-image {
         height: 100%;
         object-fit: contain;
       }

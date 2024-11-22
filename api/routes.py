@@ -46,6 +46,7 @@ from src.repository import (
     # query_by_timestamp,
     get_featured_images,
     get_full_metadata_batch,
+    get_media_counts_by_media_type,
     get_project_total_duration,
     get_thumbnail_by_timestamp,
 )
@@ -334,6 +335,7 @@ def _get_project_data_router(config: APIConfig):
     with project_engine.connect() as conn:
         num_vectors = VectorRepo.get_count(conn)
         num_media_files = MediaRepo.get_count(conn)
+        media_file_counts = get_media_counts_by_media_type(conn)
         total_duration = get_project_total_duration(conn)
     models = {
         media_type: [
@@ -352,7 +354,8 @@ def _get_project_data_router(config: APIConfig):
             "models": models,
             "search_modalities": search_modalities,
             "num_vectors": num_vectors,
-            "num_media_files": num_media_files,
+            "num_media_files": num_media_files, # Total number of media files
+            "media_file_counts": media_file_counts, # Number of media files by media type
             "total_duration": total_duration,
         }
 
@@ -686,18 +689,19 @@ def _get_search_router(config: APIConfig):
             get_thumbs_fn(all_metadata),
         ):
             image_id = str(_metadata.media_id)
-            images[image_id] = ImageInfo(
-                id=image_id,
-                link=f"media/{image_id}",
-                filename=_metadata.path,
-                width=_metadata.width,
-                height=_metadata.height,
-                media_type=_metadata.media_type,
-                format=_metadata.format,
-                duration=_metadata.duration,
-                thumbnail=_thumb,
-                distance=_dist,
-            )
+            if image_id not in images:
+                images[image_id] = ImageInfo(
+                    id=image_id,
+                    link=f"media/{image_id}",
+                    filename=_metadata.path,
+                    width=_metadata.width,
+                    height=_metadata.height,
+                    media_type=_metadata.media_type,
+                    format=_metadata.format,
+                    duration=_metadata.duration,
+                    thumbnail=_thumb,
+                    distance=_dist,
+                )
             
             image_vector = ImageVector(
                 vector_id=str(_metadata.id),

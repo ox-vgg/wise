@@ -8,7 +8,7 @@ import './App.scss';
 import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
-import { Query } from './misc/types.ts';
+import { ProcessedSearchResults, ProjectInfo, Query } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
@@ -16,11 +16,11 @@ import { useDataService } from './DataService.ts';
 export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
-  const [viewModality, setViewModality] = useState<string>('Video');
+  const [viewModality, setViewModality] = useState<keyof ProcessedSearchResults>('Image');
 
   const dataService = useDataService();
   const [isHomePage, setIsHomePage] = useState(true);
-  const [projectInfo, setProjectInfo] = useState<any>({});
+  const [projectInfo, setProjectInfo] = useState<ProjectInfo>({});
 
   const refsForTour = {
     searchBar: useRef(null),
@@ -59,6 +59,18 @@ export const App: React.FunctionComponent = () => {
         console.error(err);
       });
   }, []);
+
+  useEffect(() => {
+    // Set viewModality based on the first search modality listed in projectInfo.search_modalities
+    if (projectInfo.search_modalities && projectInfo.search_modalities.length > 0) {
+      const _viewModality = {
+        'image': 'Image',
+        'video': 'Video',
+        'audio': 'VideoAudio'
+      }[projectInfo.search_modalities[0]]
+      setViewModality(_viewModality as keyof ProcessedSearchResults)
+    } 
+  }, [projectInfo]);
 
   const _submitSearch = (queries: Query[]) => {
     dataService.performNewSearch(queries, viewModality).then(_ => {
@@ -109,6 +121,7 @@ export const App: React.FunctionComponent = () => {
                 viewModality={viewModality} setViewModality={setViewModality}
                 submitSearch={submitSearch}
                 refsForTour={refsForTour}
+                projectInfo={projectInfo}
                 isHomePage={isHomePage} isLoadingNewSearch={dataService.isLoadingNewSearch}></WiseHeader>
     <Content className="wise-content">
       {isHomePage && // Only show if isHomePage is true

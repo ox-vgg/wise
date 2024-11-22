@@ -5,6 +5,7 @@ from .base import SQLAlchemyRepository
 
 # from .extra_metadata import ExtraMediaMetadataSQLAlchemyRepository
 from ..data_models import (
+    MediaType,
     ModalityType,
     Project,
     SourceCollection,
@@ -149,6 +150,20 @@ def get_project_total_duration(conn: sa.Connection) -> Optional[float]:
     Get the total duration (in seconds) of all the video/audio files in the project
     """
     return conn.execute(sa.select(sa.sql.func.sum(_mtable.c.duration))).scalar()
+
+def get_media_counts_by_media_type(conn: sa.Connection) -> dict[MediaType, int]:
+    """
+    Get the number of media files for each media type (image, video, audio).
+    Note that the "av" and "video" media types are both counted as "video".
+    """
+    results = conn.execute(sa.select(_mtable.c.media_type, sa.func.count(_mtable.c.id)).group_by(_mtable.c.media_type)).tuples().all()
+    media_counts = {
+        media_type: count for media_type, count in results
+    }
+    if MediaType.AV in media_counts:
+        media_counts[MediaType.VIDEO] = media_counts.get(MediaType.VIDEO, 0) + media_counts[MediaType.AV]
+        del media_counts[MediaType.AV]
+    return media_counts
 
 # def query_by_timestamp(conn, *, location: str, timestamp: Tuple[int, int]):
 #     # Join the table and query by dataset_path, and return the id

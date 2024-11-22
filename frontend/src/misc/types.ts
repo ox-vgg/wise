@@ -47,13 +47,19 @@ export type VideoInfo = MediaInfo & {
   timeline_hover_thumbnails: string;
 }
 
-type MediaSegment = {
+type VectorResult = {
   vector_id: string;
   media_id: string;
-  ts: number;
-  te: number;
   link: string;
   distance: number;
+}
+type ImageVector = VectorResult & {
+  thumbnail: string;
+  thumbnail_score: number;
+};
+type MediaSegment = VectorResult & {
+  ts: number;
+  te: number;
 }
 export type AudioSegment = MediaSegment & {}
 export type VideoSegment = MediaSegment & {
@@ -80,7 +86,8 @@ export type VideoResults = {
 }
 export type ImageResults = {
   total: number;
-  results: ImageInfo[];
+  vectors: ImageVector[];
+  images: Record<string, ImageInfo>;
 }
 export type SearchResponse = {
   time: number;
@@ -102,28 +109,40 @@ export type SearchResponse = {
 }
 
 // TODO update everything below
+export type ProcessedImageVector = ImageVector & {
+  mediaType: 'IMAGE';
+  mediaInfo: ProcessedImageInfo;
+}
+export type ProcessedImageInfo = ImageInfo & {
+  vectors: ImageVector[] | ProcessedImageVector[];
+}
 export type ProcessedVideoSegment = VideoSegment & {
-  videoInfo: ProcessedVideoInfo;
+  mediaType: 'VIDEO';
+  mediaInfo: ProcessedVideoInfo;
 }
 export type ProcessedVideoInfo = VideoInfo & {
   shots: VideoSegment[] | ProcessedVideoSegment[];
   title: string;
 }
 export type ProcessedSearchResults = {
+  Image: {
+    vectors: ProcessedImageVector[]
+    mediaInfo: Map<string, ProcessedImageInfo>;
+  };
   Video: {
     unmerged_windows: ProcessedVideoSegment[];
     merged_windows: ProcessedVideoSegment[];
-    videos: Map<string, ProcessedVideoInfo>;
+    mediaInfo: Map<string, ProcessedVideoInfo>;
   };
   VideoAudio: {
     unmerged_windows: ProcessedVideoSegment[];
     merged_windows: ProcessedVideoSegment[];
-    videos: Map<string, ProcessedVideoInfo>;
+    mediaInfo: Map<string, ProcessedVideoInfo>;
   };
   Audio: {
     unmerged_windows: ProcessedVideoSegment[];
     merged_windows: ProcessedVideoSegment[];
-    videos: Map<string, ProcessedVideoInfo>;
+    mediaInfo: Map<string, ProcessedVideoInfo>;
   };
 }
 export type ProcessedSearchResponse = {
@@ -138,9 +157,27 @@ export interface DataServiceOutput {
   totalResults: number;
   // pageNum: number;
   // changePageNum: (x: number) => void;
-  performNewSearch: (queries: Query[], viewModality: string) => Promise<void>;
+  performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults) => Promise<void>;
   fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
+}
+
+export interface ProjectInfo {
+  project_name?: string;
+  models?: {
+    image?: string[],
+    video?: string[],
+    audio?: string[],
+  },
+  search_modalities?: ('image' | 'video' | 'audio')[],
+  num_vectors?: number;
+  num_media_files?: number;
+  media_file_counts?: {
+    image?: number;
+    video?: number;
+    audio?: number;
+  };
+  total_duration?: number;
 }
 
 interface RefsForTour {
@@ -178,7 +215,7 @@ export interface SearchDropdownProps {
   searchText: string;
   setSearchText: (x: string) => void;
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
-  viewModality: string;
+  viewModality: keyof ProcessedSearchResults;
   submitSearch: () => void;
   clearSearchBar: () => void;
   isHomePage?: boolean;
@@ -188,33 +225,34 @@ export interface WiseHeaderProps {
   setMultimodalQueries: (x: Query[]) => void;
   searchText: string;
   setSearchText: (x: string) => void;
-  viewModality: string;
-  setViewModality: (x: string) => void;
+  viewModality: keyof ProcessedSearchResults;
+  setViewModality: (x: keyof ProcessedSearchResults) => void;
   submitSearch: () => void;
   refsForTour: RefsForTour;
+  projectInfo: ProjectInfo;
   isHomePage?: boolean;
   isLoadingNewSearch?: boolean;
 };
 export interface WiseOverviewCardProps {
   handleExampleQueryClick: (exampleQuery: string) => void;
-  projectInfo: any;
+  projectInfo: ProjectInfo;
   refsForTour: RefsForTour;
 };
 export interface SearchResultsProps {
   dataService: DataServiceOutput;
   isHomePage: boolean;
-  projectInfo: any;
+  projectInfo: ProjectInfo;
   setSearchText: (x: string) => void;
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
-  viewModality: string;
+  viewModality: keyof ProcessedSearchResults;
   submitSearch: () => void;
 };
 
 export interface ImageDetailsModalProps {
   isHomePage: boolean;
-  imageDetails?: ProcessedVideoSegment;
-  setImageDetails: (x?: ProcessedVideoSegment) => void;
+  imageDetails?: ProcessedImageVector | ProcessedVideoSegment;
+  setImageDetails: (x?: ProcessedImageVector | ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
 };
 

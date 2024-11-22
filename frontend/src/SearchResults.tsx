@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Dropdown, Pagination, Segmented, Tooltip } from 'antd';
+import { Dropdown, Pagination, Row, Segmented, Tooltip } from 'antd';
 import { AppstoreOutlined, BarsOutlined, FlagFilled, LoadingOutlined, MinusCircleFilled, PictureOutlined, PlusCircleFilled } from '@ant-design/icons';
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
-import { ProcessedSearchResults, ProcessedVideoSegment, SearchResultsProps } from './misc/types.ts';
+import { ProcessedImageVector, ProcessedVideoSegment, SearchResultsProps } from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
 // import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
@@ -63,24 +63,30 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     setIsSubmitSearch(true);
   }
 
-  const [imageDetails, setImageDetails] = useState<ProcessedVideoSegment | undefined>();
+  const [imageDetails, setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
   
   let searchResultsHTML;
   let totalResultsCount;
-  if (viewMode == 'UnmergedSegments' || viewMode == 'Segments') {
+  if (viewModality == 'Image' || viewMode == 'UnmergedSegments' || viewMode == 'Segments') {
     // Unmerged Segments / Segments view mode
-    let segments;
-    if (viewMode == 'UnmergedSegments') {
-      segments = searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows;
+    let _searchResults: ProcessedImageVector[] | ProcessedVideoSegment[] = [];
+    if (viewModality == 'Image') {
+      _searchResults = searchResults.Image.vectors;
+    } else if (viewModality == 'Video' || viewModality == 'VideoAudio' || viewModality == 'Audio') {
+      if (viewMode == 'UnmergedSegments') {
+        _searchResults = searchResults[viewModality].unmerged_windows;
+      } else {
+        _searchResults = searchResults[viewModality].merged_windows;
+      }
     } else {
-      segments = searchResults[viewModality as keyof ProcessedSearchResults].merged_windows;
+      console.error('Unexpected value for viewModality:', viewModality)
     }
-    totalResultsCount = segments.length;
+    totalResultsCount = _searchResults.length;
 
-    searchResultsHTML = segments
+    searchResultsHTML = _searchResults
       .slice(pageNum*FRONTEND_PAGE_SIZE,(pageNum+1)*FRONTEND_PAGE_SIZE)
-      .map((searchResult: ProcessedVideoSegment) => {
-        const { title, width, height } = searchResult.videoInfo;
+      .map((searchResult: ProcessedImageVector | ProcessedVideoSegment) => {
+        const { title, width, height } = searchResult.mediaInfo;
 
         const dropdownItems = [
           {
@@ -126,20 +132,24 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
             </div>
             <i style={{paddingBottom: `${height/width*100}%`}}></i>
             <a onClick={() => setImageDetails(searchResult)}>
-              {/* <img src={searchResult.thumbnail}
-                  title={title + (searchResult.distance ? ` | Distance = ${searchResult.distance.toFixed(2)}` : '')}
-                  className="wise-image"
-              ></img> */}
-              <video src={searchResult.link}
-                  poster={searchResult.thumbnail}
-                  // title={searchResult.distance ? `Distance = ${searchResult.distance.toFixed(2)}` : ''}
-                  playsInline
-                  muted
-                  preload="none"
-                  className="wise-video-preview"
-                  onMouseEnter={(e) => e.currentTarget.play()}
-                  onMouseLeave={(e) => e.currentTarget.load()}
-              />
+              {
+                (searchResult.mediaType == 'IMAGE') ? 
+                  <img src={searchResult.thumbnail}
+                      title={title + (searchResult.distance ? ` | Distance = ${searchResult.distance.toFixed(2)}` : '')}
+                      className="wise-image"
+                  ></img>
+                :
+                  <video src={searchResult.link}
+                      poster={searchResult.thumbnail}
+                      // title={searchResult.distance ? `Distance = ${searchResult.distance.toFixed(2)}` : ''}
+                      playsInline
+                      muted
+                      preload="none"
+                      className="wise-video-preview"
+                      onMouseEnter={(e) => e.currentTarget.play()}
+                      onMouseLeave={(e) => e.currentTarget.load()}
+                  />
+              }
             </a>
             <div className="wise-image-hover-display">{title}</div>
             {/* <SensitiveImageWarning isSensitive={searchResult.is_nsfw || false} /> */}
@@ -148,7 +158,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
       });
   } else {
     // Videos view mode
-    let videos = searchResults[viewModality as keyof ProcessedSearchResults].videos;
+    let videos = searchResults[viewModality].mediaInfo;
     totalResultsCount = videos.size;
     searchResultsHTML = Array.from(videos).slice(pageNum*FRONTEND_PAGE_SIZE,(pageNum+1)*FRONTEND_PAGE_SIZE).map(([videoId, video]) => {
       if (video.shots.length == 0) {
@@ -200,16 +210,23 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
                 `${rangeStart}-${rangeEnd} of top ${total.toLocaleString('en', { useGrouping: true })} retrieved results`;
   }
 
-  const numMediaFilesString: string = projectInfo.num_media_files?.toLocaleString('en', { useGrouping: true }) || '?';
-  const numMinutesString: string = Math.round(projectInfo.total_duration / 60).toLocaleString('en-us') || '?';
+  let numMediaFilesString;
+  if (viewModality == 'Image') {
+    const numImagesString = projectInfo.media_file_counts?.image?.toLocaleString('en', { useGrouping: true }) || '?';
+    numMediaFilesString = `${numImagesString} images`;
+  } else if (viewModality == 'Video' || viewModality == 'VideoAudio') {
+    const numVideosString = projectInfo.media_file_counts?.video?.toLocaleString('en', { useGrouping: true }) || '?';
+    const numMinutesString: string = projectInfo.total_duration ? Math.round(projectInfo.total_duration / 60).toLocaleString('en-us') : '?';
+    numMediaFilesString = `${numVideosString} videos (total ${numMinutesString} minutes)`;
+  }
   let loadingMessage = <></>;
   if (isLoadingNewSearch) {
-    loadingMessage = <p className="wise-loading-message">Searching in {numMediaFilesString} videos (total {numMinutesString} minutes) <LoadingOutlined /></p>;
+    loadingMessage = <p className="wise-loading-message">Searching on {numMediaFilesString} <LoadingOutlined /></p>;
   } else if (!isHomePage && !isLoadingNewSearch) {
-    loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds of {numMediaFilesString} videos (total {numMinutesString} minutes)</p>;
+    loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds on {numMediaFilesString}</p>;
   }
 
-  const isLoadingFeaturedImages = (isHomePage && searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0);
+  const isLoadingFeaturedImages = (isHomePage && searchResultsHTML.length === 0);
   
   let pagination = (<Pagination
     total={totalResultsCount}
@@ -223,26 +240,30 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   if (isLoadingFeaturedImages) pagination = <></>;
 
   return <>
-    {loadingMessage}
-    
-    <Segmented
-      options={[
-        { label: 'Frames', value: 'UnmergedSegments', icon: <PictureOutlined /> },
-        { label: 'Segments', value: 'Segments', icon: <AppstoreOutlined /> },
-        { label: 'Videos', value: 'Videos', icon: <BarsOutlined /> },
-      ]}
-      value={viewMode} onChange={setViewMode}
-      style={{marginBottom: '20px', marginTop: '20px', float: 'right'}}
-    />
+    <Row justify="center">{loadingMessage}</Row>
+
+    {
+      (viewModality != 'Image') &&
+      <Row justify="end">
+        <Segmented
+          options={[
+            { label: 'Frames', value: 'UnmergedSegments', icon: <PictureOutlined /> },
+            { label: 'Segments', value: 'Segments', icon: <AppstoreOutlined /> },
+            { label: 'Videos', value: 'Videos', icon: <BarsOutlined /> },
+          ]}
+          value={viewMode} onChange={setViewMode}
+        />
+      </Row>
+    }
 
     <section id="search-results">
-      {(searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0) ? 
+      {(searchResultsHTML.length === 0) ? 
         <div className="wise-large-loading-screen"><LoadingOutlined /></div> : <></>
       }
       <div id="wise-image-grid" className="wise-image-grid">
         {searchResultsHTML}
       </div>
-      {(searchResults[viewModality as keyof ProcessedSearchResults].unmerged_windows.length === 0) ? <></> : pagination}
+      {(searchResultsHTML.length === 0) ? <></> : pagination}
     </section>
     <ReportImageModal dataService={dataService} isHomePage={isHomePage}
                       selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId} />

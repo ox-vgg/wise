@@ -28,11 +28,11 @@ const ImageDetailsModal = ({
     title = (
       <Button
         type="text"
-        // href={imageDetails.videoInfo.externalLink}
+        // href={imageDetails.mediaInfo.externalLink}
         target='_blank'
         size="large"
       >
-        <b>{imageDetails.videoInfo.title}</b>
+        <b>{imageDetails.mediaInfo.title}</b>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           height="24"
@@ -54,14 +54,16 @@ const ImageDetailsModal = ({
   
   const setStartTimestamp = () => {
     // This is needed because the video player doesn't automatically play the video from the start time in the URL (e.g. #t=16.0)
-    if (imageDetails && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
+    if (imageDetails && imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
   }
 
   const handleClickOccurrence = (videoSegment: ProcessedVideoSegment) => {
-    if (imageDetails?.vector_id === videoSegment.vector_id) {
-      if (imageDetails && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
-    } else {
-      setImageDetails(videoSegment);
+    if (imageDetails && imageDetails.mediaType == 'VIDEO') {
+      if (imageDetails.vector_id === videoSegment.vector_id) {
+        if (playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
+      } else {
+        setImageDetails(videoSegment);
+      }
     }
   }
 
@@ -79,7 +81,7 @@ const ImageDetailsModal = ({
               items: [
                 {
                   label: "Report image",
-                  key: imageDetails?.videoInfo.filename || '',
+                  key: imageDetails?.mediaInfo.filename || '',
                 },
               ],
               onClick: ({ key }) => {
@@ -107,7 +109,7 @@ const ImageDetailsModal = ({
       className="wise-image-details-modal"
     >
       <div className="wise-image-wrapper">
-        {imageDetails && ['av', 'video'].includes(imageDetails.videoInfo.media_type) ? (
+        {imageDetails && imageDetails.mediaType == 'VIDEO' ? (
           <MediaPlayer
             src={videoSrc}
             viewType="video"
@@ -115,7 +117,7 @@ const ImageDetailsModal = ({
             autoPlay
             ref={playerRef}
             onLoadedMetadata={setStartTimestamp}
-            clipEndTime={imageDetails.videoInfo.duration} // This is needed due to a bug with the chapter markers https://github.com/vidstack/player/issues/1022
+            clipEndTime={imageDetails.mediaInfo.duration} // This is needed due to a bug with the chapter markers https://github.com/vidstack/player/issues/1022
           >
             {/* 
             TODO - chapter markers by default use thumbnails from storyboard - change this to use thumbnails from search results instead
@@ -125,7 +127,7 @@ const ImageDetailsModal = ({
                 !isHomePage && 
                 <Track content={{
                   // @ts-ignore
-                  cues: [...imageDetails.videoInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
+                  cues: [...imageDetails.mediaInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
                       startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
                                                                   add 0.1s to the timestamp due to CSS rule
                                                                   requiring the matching chapter elements to be 'even' rather than odd */
@@ -136,14 +138,14 @@ const ImageDetailsModal = ({
               }
             </MediaProvider>
             <DefaultVideoLayout
-              thumbnails={imageDetails.videoInfo.timeline_hover_thumbnails}
+              thumbnails={imageDetails.mediaInfo.timeline_hover_thumbnails}
               icons={defaultLayoutIcons} noScrubGesture={false} seekStep={5} />
           </MediaPlayer>
         ) : (
           <img
             src={imageDetails?.link}
             // title={
-            //   imageDetails?.videoInfo.filename +
+            //   imageDetails?.mediaInfo.filename +
             //   (imageDetails?.distance
             //     ? ` | Distance = ${imageDetails.distance.toFixed(2)}`
             //     : "")
@@ -152,18 +154,17 @@ const ImageDetailsModal = ({
         )}
       </div>
       {
-        imageDetails && !isHomePage ?
-        <VideoOccurrencesView videoInfo={imageDetails.videoInfo}
+        (imageDetails && !isHomePage && imageDetails.mediaType == 'VIDEO') &&
+        <VideoOccurrencesView videoInfo={imageDetails.mediaInfo}
           handleClickOccurrence={handleClickOccurrence}
           customHeaderSingular='search match in this video'
           customHeaderPlural='search matches in this video'
         />
-        : <></>
       }
       <p>
         <b>Filename</b>
         <br />
-        <span>{imageDetails?.videoInfo.filename}</span>
+        <span>{imageDetails?.mediaInfo.filename}</span>
       </p>
 
       {/* <div className="wise-image-details-metadata">
