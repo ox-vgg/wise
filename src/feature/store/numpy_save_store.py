@@ -80,7 +80,7 @@ class NumpySaveStore(FeatureStore):
             self.shard_feature_index += 1
 
     def save_current_shard(self):
-        current_shard_id = '%s-%06d' % (self.store_name, self.current_shard_index)
+        current_shard_id = f'{self.store_name}-{self.current_shard_index:06d}'
         current_shard_filename = self.store_data_dir / current_shard_id
         np.savez(current_shard_filename, feature_id=self.shard_feature_id, features=self.shard_features)
         if self.verbose:
