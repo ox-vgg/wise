@@ -4,7 +4,7 @@
   <p>
     <img src="docs/assets/wise_logo.svg" alt="wise-logo" width="160px" height="70px"/>
     <br>
-    WISE is a search engine for images, videos, and audio powered by multimodal AI, allowing you to quickly and easily search through large collections of audiovisual media. You can search using natural language, an uploaded image/audio file, or a combination of these modalities.
+    WISE is a search engine for images, videos, and audio powered by multimodal AI, allowing you to quickly and easily search through large collections of audiovisual media. You can search using natural language, an uploaded image/audio file, or a combination of these modalities. Use WISE locally on your own collections of images/videos.
   </p>
 </div>
 
@@ -15,7 +15,7 @@
   <p>Use natural language to describe what you want to search for.</p>
   <img src="docs/assets/natural_language_search.png" width="700px">
   <p>
-  WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image (i.e. it searches by image content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions.
+  WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. Moreover, WISE uses a vision model to understand what's being depicted in an image/video (i.e. it searches on visual content rather than metadata such as keywords, tags, or descriptions), so the images do not need to be manually tagged or labelled with text captions.
   </p>
 </details>
 
@@ -64,13 +64,6 @@
 We are planning on implementing the following features soon. Stay tuned!
 
 <ul>
-  <li>
-    Searching on image and audio files
-    <br>
-    Currently, WISE 2 only supports searching on <i>video files</i> (on both the audio and visual stream of video files).
-    Searching on images and pure audio files is not supported yet.
-    Please use <a href="https://gitlab.com/vgg/wise/wise/-/tree/wise-1.2.0?ref_type%253Dtags">WISE 1.x.x</a> for now if you need to search on images.
-  </li>
   <li>
   Cross platform easy installation
   <br>
