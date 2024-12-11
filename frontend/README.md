@@ -22,9 +22,9 @@ If you need to modify/customise the frontend, read the section below.
 ## Development setup
 1. Make sure you have [npm](https://docs.npmjs.com/about-npm) installed beforehand. If you do not have `npm` installed, we recommend installing [nvm (Node Version Manager)](https://github.com/nvm-sh/nvm#install--update-script) first and then running `nvm install node` to install `npm` and `node`.
 2. `cd` into this directory and then run `npm install` to install the project dependencies
-3. Start the development server using `npm run dev`
+3. Start the development server using `npm run dev`. Once the server is running, open `localhost:5173` in your browser to access the development version of the frontend.
 
-Note: You will need to separately run the API server using `MODE="development" python3 serve.py --project-dir {your_project_dir}` from the root directory of this repository (or run `python3 serve.py --project-dir {your_project_dir}` with `mode` set to `"development"` in `config.py`). You might also need to modify some of the configurations in `src/config.ts` such as `API_BASE_URL` depending on the URL of the the API server. The `<base href>` in `index.html` in this directory (not `dist/index.html`) needs to be set to `<base href="/">` in order for the development server to work.
+Note: You will need to separately run the API server using `MODE="development" python3 serve.py --project-dir {your_project_dir}` from the root directory of this repository (or run `python3 serve.py --project-dir {your_project_dir}` with `mode` set to `"development"` in `config.py`). You might also need to modify some of the configurations in `frontend/public/config.js` such as `API_BASE_URL` in line 45 depending on the URL of the the API server. The `<base href>` in `index.html` in this directory (not `dist/index.html`) needs to be set to `<base href="/">` in order for the development server to work.
 
 ### Production build
 To build the project, simply run `npm run build`. This creates a production build in the `dist` folder.
