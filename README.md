@@ -71,6 +71,15 @@ We are planning on implementing the following features soon. Stay tuned!
   </li>
 </ul>
 
+## Colab demo
+
+Try out WISE in Google Colab below (Google Colab is a free cloud service allowing you to run 
+machine learning models and code without installing anything locally):
+
+<a target="_blank" href="https://colab.research.google.com/github/ox-vgg/demo-notebooks/blob/main/notebooks/wise2-colab.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 ## Documentation
 
 The WISE open source software is developed and maintained by the
