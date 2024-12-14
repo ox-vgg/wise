@@ -23,7 +23,7 @@ from pydantic import dataclasses, ConfigDict
 import torch
 import torchvision as tv
 import torch.utils.data as torch_data
-
+from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
@@ -59,7 +59,7 @@ def get_media_metadata(url: str, media_type_from_mimetype: MediaMimetype = None,
 
     # Get stream metadata
     video_stream_info, audio_stream_info = get_media_info(
-        url, guess_missing_video_info=True
+        url, guess_missing_video_info=(media_type_from_mimetype == MediaMimetype.video)
     )
 
     # Get media type
@@ -477,15 +477,18 @@ def get_metadata_for_valid_files(paths: list[Path]):
     TODO: Accept URLs, filebuffers in the future
     """
     # get the mimetypes and media types for each file
-    media_files = [get_mimetype_and_media_type_for_file(x) for x in paths]
+    logger.info('Getting mimetypes of files ...')
+    media_files = [get_mimetype_and_media_type_for_file(x) for x in tqdm(paths, total=len(paths))]
+
     # separate the files with an unknown MIME type
     unknown_files = [p for (_, media_type, p) in media_files if media_type == MediaMimetype.unknown]
     known_files = [(mimetype, media_type, p) for (mimetype, media_type, p) in media_files if media_type != MediaMimetype.unknown]
 
     media_metadata: list[MediaMetadata] = []
+    logger.info('Extracting metadata from files ...')
     # for each file, try to open the file and get its metadata
     # skip the ones that fail
-    for mimetype, media_type, p in known_files:
+    for mimetype, media_type, p in tqdm(known_files, total=len(known_files)):
         try:
             metadata = get_media_metadata(str(p), media_type, mimetype)
             media_metadata.append(metadata)
