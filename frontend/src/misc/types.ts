@@ -19,8 +19,8 @@ export type Query = {
   displayText: string;
   value: string; // this value represents the internal image id
   isNegative?: boolean;
-}
-    
+};
+
 
 
 type MediaMetadata = {
@@ -34,25 +34,25 @@ type MediaMetadata = {
   title: string;
   caption: string;
   copyright: string;
-}
+};
 // A search result containing the metadata fields from MediaMetadata, as well as additional fields like `thumbnail` and `distance`
 type MediaInfo = MediaMetadata & {
   link: string;
   thumbnail: string;
   distance?: number;
-}
-export type ImageInfo = MediaInfo & {}
-export type AudioInfo = MediaInfo & {}
+};
+export type ImageInfo = MediaInfo & {};
+export type AudioInfo = MediaInfo & {};
 export type VideoInfo = MediaInfo & {
   timeline_hover_thumbnails: string;
-}
+};
 
 type VectorResult = {
   vector_id: string;
   media_id: string;
   link: string;
   distance: number;
-}
+};
 type ImageVector = VectorResult & {
   thumbnail: string;
   thumbnail_score: number;
@@ -60,35 +60,35 @@ type ImageVector = VectorResult & {
 type MediaSegment = VectorResult & {
   ts: number;
   te: number;
-}
-export type AudioSegment = MediaSegment & {}
+};
+export type AudioSegment = MediaSegment & {};
 export type VideoSegment = MediaSegment & {
   thumbnail: string;
   thumbnail_score: number;
-}
+};
 
 export type AudioResults = {
   total: number;
   unmerged_windows: AudioSegment[];
   audios: Record<string, AudioInfo>;
-}
+};
 export type VideoAudioResults = {
   total: number;
   unmerged_windows: VideoSegment[];
   merged_windows: VideoSegment[];
   videos: Record<string, VideoInfo>;
-}
+};
 export type VideoResults = {
   total: number;
   unmerged_windows: VideoSegment[];
   merged_windows: VideoSegment[];
   videos: Record<string, VideoInfo>;
-}
+};
 export type ImageResults = {
   total: number;
   vectors: ImageVector[];
   images: Record<string, ImageInfo>;
-}
+};
 export type SearchResponse = {
   time: number;
   audio_results?: AudioResults;
@@ -106,27 +106,27 @@ export type SearchResponse = {
   // visual_segments?: VideoSegment[];
   // visual_shots?: VideoSegment[];
   // visual_videos?: Record<string, VideoInfo>;
-}
+};
 
 // TODO update everything below
 export type ProcessedImageVector = ImageVector & {
   mediaType: 'IMAGE';
   mediaInfo: ProcessedImageInfo;
-}
+};
 export type ProcessedImageInfo = ImageInfo & {
   vectors: ImageVector[] | ProcessedImageVector[];
-}
+};
 export type ProcessedVideoSegment = VideoSegment & {
   mediaType: 'VIDEO';
   mediaInfo: ProcessedVideoInfo;
-}
+};
 export type ProcessedVideoInfo = VideoInfo & {
   shots: VideoSegment[] | ProcessedVideoSegment[];
   title: string;
-}
+};
 export type ProcessedSearchResults = {
   Image: {
-    vectors: ProcessedImageVector[]
+    vectors: ProcessedImageVector[];
     mediaInfo: Map<string, ProcessedImageInfo>;
   };
   Video: {
@@ -144,11 +144,11 @@ export type ProcessedSearchResults = {
     merged_windows: ProcessedVideoSegment[];
     mediaInfo: Map<string, ProcessedVideoInfo>;
   };
-}
+};
 export type ProcessedSearchResponse = {
   processedSearchResults: ProcessedSearchResults;
   time: number;
-}
+};
 
 export interface DataServiceOutput {
   searchResults: ProcessedSearchResults;
@@ -160,7 +160,7 @@ export interface DataServiceOutput {
   performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults) => Promise<void>;
   fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
-}
+};
 
 export interface ProjectInfo {
   project_name?: string;
@@ -178,7 +178,7 @@ export interface ProjectInfo {
     audio?: number;
   };
   total_duration?: number;
-}
+};
 
 interface RefsForTour {
   searchBar: MutableRefObject<any>;
@@ -186,7 +186,7 @@ interface RefsForTour {
   multimodalSearchButton: MutableRefObject<any>;
   paginationControls: MutableRefObject<any>;
   reportImageButton: MutableRefObject<any>;
-}
+};
 
 
 /* ------ Component props ------ */
@@ -197,18 +197,18 @@ export interface TextSearchFormProps {
   setSearchText: (x: string) => void;
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
   submitSearch: () => void;
-}
+};
 export interface MediaSearchFormProps {
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
   submitSearch: () => void;
   modality: string;
-}
+};
 export interface SearchExamplesProps {
   setMultimodalQueries: (x: Query[]) => void;
   setSearchText: (x: string) => void;
   submitSearch: () => void;
-}
+};
 export interface SearchDropdownProps {
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
@@ -219,7 +219,7 @@ export interface SearchDropdownProps {
   submitSearch: () => void;
   clearSearchBar: () => void;
   isHomePage?: boolean;
-}
+};
 export interface WiseHeaderProps {
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
@@ -261,11 +261,11 @@ export interface ReportImageModalProps {
   isHomePage: boolean;
   selectedImageId?: string;
   setSelectedImageId: (imageId?: string) => void;
-}
+};
 
 export interface VideoOccurrencesViewProps {
   videoInfo: ProcessedVideoInfo;
   handleClickOccurrence: (videoSegment: ProcessedVideoSegment) => void;
   customHeaderSingular?: string;
   customHeaderPlural?: string;
-}
+};
