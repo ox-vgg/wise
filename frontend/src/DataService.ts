@@ -222,7 +222,7 @@ const convertQueriesToFormData = (queries: Query[]) => {
     } else if (q.type === 'INTERNAL_IMAGE') {
       let query_type = 'internal_image_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, q.value);
+      formData.append(query_type, q.value.vector_id);
     } else if (q.type === 'TEXT') {
       let query_type = 'text_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
@@ -258,7 +258,7 @@ const fetchSearchResults = (queries: Query[], viewModality: string, pageStart: n
     ['thumbs', config.FETCH_THUMBS.toString()],
     ['search_in', searchIn],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
-    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value as string])
+    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
   ]);
   
   const endpoint = config.API_BASE_URL + `search?${urlParams.toString()}`;

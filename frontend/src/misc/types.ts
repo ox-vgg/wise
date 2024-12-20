@@ -17,7 +17,7 @@ export type Query = {
   id: string;
   type: 'INTERNAL_IMAGE';
   displayText: string;
-  value: string; // this value represents the internal image id
+  value: ProcessedImageVector | ProcessedVideoSegment;
   isNegative?: boolean;
 };
 

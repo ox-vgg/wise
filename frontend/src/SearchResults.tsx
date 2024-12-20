@@ -47,19 +47,34 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     } else if (key.startsWith('add_image_query_')) {
       key = key.replace(/^add_image_query_/, '');
       setDropdownImageId(undefined);
-      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: key }]);
+      const vector = searchResults.Image.vectors.find(v => v.vector_id === key);
+      if (!vector) {
+        console.error(`Could not find vector with id ${key}`)
+        return;
+      }
+      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector }]);
       setIsSubmitSearch(true);
     } else if (key.startsWith('add_negative_image_query_')) {
       key = key.replace(/^add_negative_image_query_/, '');
       setDropdownImageId(undefined);
-      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: key, isNegative: true }]);
+      const vector = searchResults.Image.vectors.find(v => v.vector_id === key);
+      if (!vector) {
+        console.error(`Could not find vector with id ${key}`)
+        return;
+      }
+      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector, isNegative: true }]);
       setIsSubmitSearch(true);
     }
   }
 
   const handleInternalSearchButtonClick = (imageId: string) => {
     setSearchText('');
-    setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: imageId }]);
+    const vector = searchResults.Image.vectors.find(v => v.vector_id === imageId);
+    if (!vector) {
+      console.error(`Could not find vector with id ${imageId}`)
+      return;
+    }
+    setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector }]);
     setIsSubmitSearch(true);
   }
 
@@ -111,25 +126,29 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
               style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
               className={'wise-image-wrapper ' + ((dropdownImageId === searchResult.vector_id) ? 'wise-image-dropdown-open' : '')}
           >
-            <div style={{display: 'none'}}>
-              <Tooltip title="Find visually similar images">
-                <img src="internal_search_icon.png" className="wise-internal-image-search-button"
-                      onClick={() => handleInternalSearchButtonClick(searchResult.vector_id)} />
-              </Tooltip>
-              <Tooltip title="More options">
-                <Dropdown menu={{
-                  items: dropdownItems,
-                  onClick: handleDropdownItemClick
-                }}
-                  onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.vector_id) }}
-                  placement="bottomRight" trigger={['click']} arrow>
-                  <img src="more_icon.png"
-                        className="wise-image-more-button"
-                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
-                        />
-                </Dropdown>
-              </Tooltip>
-            </div>
+            {
+              /* Enable internal search only for images for now */
+              (searchResult.mediaType === 'IMAGE') &&
+              <>
+                <Tooltip title="Find visually similar images">
+                  <img src="internal_search_icon.png" className="wise-internal-image-search-button"
+                        onClick={() => handleInternalSearchButtonClick(searchResult.vector_id)} />
+                </Tooltip>
+                <Tooltip title="More options">
+                  <Dropdown menu={{
+                    items: dropdownItems,
+                    onClick: handleDropdownItemClick
+                  }}
+                    onOpenChange={(open: boolean) => { handleOpenDropdownChange(open, searchResult.vector_id) }}
+                    placement="bottomRight" trigger={['click']} arrow>
+                    <img src="more_icon.png"
+                          className="wise-image-more-button"
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); return false;}}
+                          />
+                  </Dropdown>
+                </Tooltip>
+              </>
+            }
             <i style={{paddingBottom: `${height/width*100}%`}}></i>
             <a onClick={() => setImageDetails(searchResult)}>
               {

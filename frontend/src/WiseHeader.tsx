@@ -7,7 +7,6 @@ import { nanoid } from 'nanoid'
 import './WiseHeader.scss';
 import { WiseLogo } from './misc/logo.tsx';
 import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query } from './misc/types.ts';
-import config from './config.ts';
 
 // TODO
 // Update Tour feature, remove refsForTour.visualSearchButton and refsForTour.multimodalSearchButton
@@ -485,7 +484,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     else if (query.type === 'IMAGE_URL') icon = <img src={query.value} />;
     else if (query.type === 'AUDIO_FILE') icon = <SoundOutlined />;
     else if (query.type === 'AUDIO_URL') icon = <SoundOutlined />;
-    else if (query.type === 'INTERNAL_IMAGE') icon = <img src={config.API_BASE_URL + 'thumbs/' + query.value} />;
+    else if (query.type === 'INTERNAL_IMAGE') icon = <img src={query.value.thumbnail} />;
 
     const tag = <Tag closable
                   key={query.id}
@@ -507,8 +506,8 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     } else if (query.type === 'AUDIO_URL') {
       return <Popover content={<audio controls src={query.value} />} key={query.id} title="Online audio file">{tag}</Popover>
     } else if (query.type === 'INTERNAL_IMAGE') {
-      const full_image = <img src={config.API_BASE_URL + 'images/' + query.value} />;
-      return <Popover content={full_image} key={query.id} title="Internal image" overlayClassName="wise-search-image-preview">{tag}</Popover>
+      const thumbnail = <img src={query.value.thumbnail} />;
+      return <Popover content={thumbnail} key={query.id} title="Internal image" overlayClassName="wise-search-image-preview">{tag}</Popover>
     } else if (query.type === 'TEXT') {
       return <Tooltip title="Text query">{tag}</Tooltip>
     }
