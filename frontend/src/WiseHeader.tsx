@@ -452,6 +452,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
 
   const _submitSearch = () => {
     // remove focus from search bar input element, to close the search dropdown
+    setIsSearchDropdownTriggered(false);
     refsForTour.searchBar.current.blur();
     submitSearch()
   }
