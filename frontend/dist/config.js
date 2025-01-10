@@ -28,6 +28,7 @@ const productionConfig = {
       </ul>
     `
   },
+  // Example queries shown in Overview card
   EXAMPLE_QUERIES: [
     // 'Cute puppy', 'Bees feeding on flower', 'Hot air balloon above a mountain',
     // 'Penguin with wings raised', 'Dolphin playing with ball', 'People taking pictures of mona lisa',
@@ -36,7 +37,18 @@ const productionConfig = {
     // 'People on a roller coaster', 'Running on a hill', 'A peculiar airplane', 'Busy street in Paris',
     // 'Singer next to a piano', 'Black and white photo of a steam train', 'First lady and her husband',
     // 'Cubist painting of a violin'
-  ]
+  ],
+  // Multimodal example queries shown in search dropdown
+  MULTIMODAL_EXAMPLE_QUERIES: [
+    {
+      url: 'https://images.unsplash.com/photo-1559562328-bc48b8b32e2b?fm=jpg&w=640&fit=crop&q=80',
+      text: 'in snow'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?auto=format&fit=crop&w=640&q=80',
+      text: 'at night'
+    },
+  ],
 };
 
 // Config for development mode

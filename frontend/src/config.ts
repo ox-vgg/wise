@@ -13,6 +13,10 @@ type ConfigType = {
     DISCLAIMER: string;
   };
   EXAMPLE_QUERIES: string[];
+  MULTIMODAL_EXAMPLE_QUERIES: {
+    url: string;
+    text: string;
+  }[];
 };
 
 declare global {

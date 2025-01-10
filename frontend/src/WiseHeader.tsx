@@ -6,24 +6,11 @@ import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
 import { WiseLogo } from './misc/logo.tsx';
+import config from './config.ts';
 import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query } from './misc/types.ts';
 
 // TODO
 // Update Tour feature, remove refsForTour.visualSearchButton and refsForTour.multimodalSearchButton
-
-const examples = [
-  {
-    url: 'https://images.unsplash.com/photo-1559562328-bc48b8b32e2b?fm=jpg&w=640&fit=crop&q=80',
-    text: 'in snow'
-  },
-  {
-    url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?auto=format&fit=crop&w=640&q=80',
-    text: 'at night'
-  },
-  {
-    url: 'https://images.unsplash.com/photo-1642653856727-957f76dd014e?auto=format&fit=crop&w=640&q=80'
-  }
-];
 
 const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
   multimodalQueries, setMultimodalQueries,
@@ -208,7 +195,7 @@ const SearchExamples: React.FunctionComponent<SearchExamplesProps> = ({
     onFinish={onFormSubmit}
   >
     {
-      examples.slice(0,2).map(example => 
+      config.MULTIMODAL_EXAMPLE_QUERIES.map(example => 
         <div className="wise-multimodal-example-query"
             onClick={() => handleExampleMultimodalQueryClick(example)}
             key={example.url}
