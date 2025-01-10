@@ -508,12 +508,14 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
           <WiseLogo />
         </a>
         {
-          
           projectInfo.search_modalities &&
+          // only show the selection menu when there is more than 1 modality in the project
+          projectInfo.search_modalities.length > 1 &&
           <Tooltip title="Choose the media track / media type to search on">
             <Select
               size="large"
               variant="borderless"
+              className="wise-view-modality-select"
               value={viewModality}
               onChange={setViewModality}
               options={

@@ -54,7 +54,7 @@
     line-height: 1;
 
     #wise-logo {
-      margin-right: 25px;
+      margin-right: 45px;
 
       & > svg {
         height: 40px;
@@ -80,6 +80,10 @@
           transform: rotate(0deg) translateX(-7px);
         }
       }
+    }
+
+    .wise-view-modality-select {
+      margin-left: -20px;
     }
 
     & > form {
