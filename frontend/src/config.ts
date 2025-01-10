@@ -9,11 +9,11 @@ type ConfigType = {
   FETCH_TIMEOUT: number;
   REPO_URL: string;
   WISE_OVERVIEW_CARD: {
-    ABOUT: string,
-    DISCLAIMER: string
+    ABOUT: string;
+    DISCLAIMER: string;
   };
   EXAMPLE_QUERIES: string[];
-}
+};
 
 declare global {
   var wiseConfig: {

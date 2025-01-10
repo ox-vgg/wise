@@ -28,6 +28,7 @@ const productionConfig = {
       </ul>
     `
   },
+  // Example queries shown in Overview card
   EXAMPLE_QUERIES: [
     // 'Cute puppy', 'Bees feeding on flower', 'Hot air balloon above a mountain',
     // 'Penguin with wings raised', 'Dolphin playing with ball', 'People taking pictures of mona lisa',
@@ -36,7 +37,7 @@ const productionConfig = {
     // 'People on a roller coaster', 'Running on a hill', 'A peculiar airplane', 'Busy street in Paris',
     // 'Singer next to a piano', 'Black and white photo of a steam train', 'First lady and her husband',
     // 'Cubist painting of a violin'
-  ]
+  ],
 };
 
 // Config for development mode
