@@ -1,19 +1,17 @@
 # Metadata
 WISE2 aims to support the following four types of metadata.
 
-|------------------|-----------------------------------------|-------------|
 | Type of Metadata | Reserved Column Names in Metadata Table | Description |
 |------------------|-----------------------------------------|-------------|
 | Media Metadata   | media_id, NULL, NULL, NULL              | metadata associated with an image, video or audio file (e.g. file caption, author, description, etc) |
 | Frame Metadata   | media_id, timestamp, NULL, NULL         | metadata associated with a video frame or audio sample |
 | Segment Metadata | media_id, timestamp, end_timestamp, NULL| metadata associated with a video or audio temporal segment (e.g. automatic speech recognition data, etc) |
 | Region Metadata  | media_id, timestamp, end_timestamp, vector_id | metadata associated with an image or frame region (e.g. face, object, etc) |
-|------------------|-----------------------------------------|-------------|
 
 For each type of metadata, we write scripts that will populate the `metadata/internal.db` SQLite database with a new table that must have all the columns (i.e. reserved column names) described above. Illustrative examples of each type of metadata is shown below.
 
 ## Media Metadata
-The script [`media-metadata.py`](media-metadata.py) allows import of metadata associated with each image, video or audio file. Here is an example based on Kinetics-6c dataset which is a set of 30 videos taken from the [Kinetics](https://github.com/cvdfoundation/kinetics-dataset) dataset.
+The script [`media-metadata.py`](../../tree/media-metadata/media-metadata.py) allows import of metadata associated with each image, video or audio file. Here is an example based on Kinetics-6c dataset which is a set of 30 videos taken from the [Kinetics](https://github.com/cvdfoundation/kinetics-dataset) dataset.
 
 The [Install](docs/Install.md) guide describes the process of installing WISE. We assume that the WISE software has already been installed in the `wise` folder.
 
@@ -60,8 +58,8 @@ Loading metadata from CSV file wise-data/Kinetics-6c/metadata.csv ...
 inserted 30 rows into table metadata-Kinetics-6c
 ```
 
-TODO: show how this metadata appears in the web based search user interface of WISE
+**TODO**: show how this metadata appears in the web based search user interface of WISE
 
 ## Segment Metadata
 
-TODO: Show an example based on the Automatic Speech Recognition (ASR) model applied to audio channel of videos.
+**TODO**: Show an example based on the Automatic Speech Recognition (ASR) model applied to audio channel of videos.
