@@ -1,134 +1,67 @@
 # Metadata
+WISE2 aims to support the following four types of metadata.
 
-WISE supports metadata defined over temporal segments of videos. In
-the future, the WISE team will add support to various other types of
-metadata. Here is an example of metadata import and search based on
-the Kinetics-6 dataset which is a set of 30 videos taken from the
-[Kinetics dataset](https://github.com/cvdfoundation/kinetics-dataset).
+|------------------|-----------------------------------------|-------------|
+| Type of Metadata | Reserved Column Names in Metadata Table | Description |
+|------------------|-----------------------------------------|-------------|
+| Media Metadata   | media_id, NULL, NULL, NULL              | metadata associated with an image, video or audio file (e.g. file caption, author, description, etc) |
+| Frame Metadata   | media_id, timestamp, NULL, NULL         | metadata associated with a video frame or audio sample |
+| Segment Metadata | media_id, timestamp, end_timestamp, NULL| metadata associated with a video or audio temporal segment (e.g. automatic speech recognition data, etc) |
+| Region Metadata  | media_id, timestamp, end_timestamp, vector_id | metadata associated with an image or frame region (e.g. face, object, etc) |
+|------------------|-----------------------------------------|-------------|
 
-The [Install](Install.md) guide describes the process of installing
-WISE. We assume that the WISE software is installed in the `wise` folder.
+For each type of metadata, we write scripts that will populate the `metadata/internal.db` SQLite database with a new table that must have all the columns (i.e. reserved column names) described above. Illustrative examples of each type of metadata is shown below.
 
-First, we download the Kinetics-6 dataset as follows.
+## Media Metadata
+The script [`media-metadata.py`](media-metadata.py) allows import of metadata associated with each image, video or audio file. Here is an example based on Kinetics-6c dataset which is a set of 30 videos taken from the [Kinetics](https://github.com/cvdfoundation/kinetics-dataset) dataset.
+
+The [Install](docs/Install.md) guide describes the process of installing WISE. We assume that the WISE software has already been installed in the `wise` folder.
 
 ```
-## 1. Download the Kinetics-6 dataset
-mkdir -p wise-data/Kinetics-6
-curl -sLO "https://thor.robots.ox.ac.uk/wise/assets/test/Kinetics-6b.tar.gz"
-tar -zxvf Kinetics-6b.tar.gz -C wise-data/Kinetics-6
+## 1. Download the Kinetics-6c dataset
+mkdir -p wise-data/
+curl -sLO "https://thor.robots.ox.ac.uk/wise/assets/test/Kinetics-6c.tar.gz"
+tar -zxvf Kinetics-6c.tar.gz -C wise-data/
 ```
 
-Next, we extract visual and audio features and create a search index
-that will allow us to perform audio and visual search on the video
-collection.
+Next, we create a WISE project based on these videos.
 
 ```
 ## 2. Extract audiovisual features
 mkdir -p wise-projects/
 python3 extract-features.py \
-  wise-data/Kinetics-6/ \
-  --project-dir wise-projects/Kinetics-6/
+  wise-data/Kinetics-6c/ \
+  --project-dir wise-projects/Kinetics-6c/
 ```
 
 The Kinetics-6 dataset comes with a sample metadata as shown below.
-```
-cat wise-data/Kinetics-6/metadata.csv
 
-metadata_id,filename,starttime,stoptime,metadata
-0,6XvsLPDioVA_000000_000010.mp4,0,10,coughing
-1,7XXXwvatW1U_000051_000061.mp4,0,10,coughing
-2,ADHjOYdb450_000002_000012.mp4,0,10,coughing
-3,AFRoHj8B8DM_000116_000126.mp4,0,10,coughing
-4,alcbLCIrT-s_000208_000218.mp4,0,10,coughing
-5,5E20wCGF6Ig_000122_000132.mp4,0,10,frying-vegetables
-6,hxK9mej0_zw_000086_000096.mp4,0,10,frying-vegetables
+```
+cat wise-data/Kinetics-6c/metadata.csv
+
+media_path,media_category,media_description
+coughing/6XvsLPDioVA_000000_000010.mp4,"coughing","A person coughing while driving a car"
+coughing/7XXXwvatW1U_000051_000061.mp4,"coughing","A girl coughs while talking"
+coughing/ADHjOYdb450_000002_000012.mp4,"coughing","A baby coughts while opening a book" 
+coughing/AFRoHj8B8DM_000116_000126.mp4,"coughing","Hillary Clinton coughts while speaking on stage"
 ...
-28,Pp45zkGEEp4_000019_000029.mp4,0,10,whistling
-29,tzgEoLzwRDo_000005_000015.mp4,0,10,whistling
 ```
 
-We import this metadata into WISE as follows.
+This metadata can be imported into the existing WISE project using the [media-metadata.py](media-metadata.py) script as follows.
 
 ```
-python3 metadata.py import \
-  --from-csv wise-data/Kinetics-6/metadata.csv \
-  --metadata-id "Kinetics/6b/video_categories" \
-  --col-metadata-id metadata_id \
-  --col-filename "{metadata}/{filename}" \
-  --col-starttime starttime \
-  --col-stoptime stoptime \
-  --col-metadata metadata \
-  --project-dir wise-projects/Kinetics-6/
+python3 media-metadata.py import \
+  --metadata-id "Kinetics-6c" \
+  --from-csv wise-data/Kinetics-6c/metadata.csv \
+  --metadata-type "media" \
+  --project-dir wise-projects/Kinetics-6c/
+
+Loading metadata from CSV file wise-data/Kinetics-6c/metadata.csv ...
+inserted 30 rows into table metadata-Kinetics-6c
 ```
 
-This creates a `video_categories` table in a sqlite database named
-`wise-projects/Kinetics-6/metadata/Kinetics/6b.sqlite`. The database
-and table name for storing the metadata is extracted from
-`--metadata-id` flag. The video files in Kinetics-6 dataset are stored
-as `jogging/xyz.mp4`, `singing/abc.mp4`, etc. Each row in the
-`metadata.csv` file needs to be matched with existing video filenames
-in the WISE project. Therefore, we use `--col-filname
-"{metadata}/{filename}"` to generate a filename for each row in
-`metadata.csv` such that it matches with the filenames stored in the
-WISE project.
+TODO: show how this metadata appears in the web based search user interface of WISE
 
-Next, we create an index of audiovisual features as well as text
-metadata.
+## Segment Metadata
 
-```
-python3 create-index.py \
-  --project-dir wise-projects/Kinetics-6/
-```
-
-Now, we are ready to search. First, let us verify that the metadata
-has been imported successfuly by searching for videos tagged as `singing`.
-
-```
-python search.py \
-  --query "singing" --in metadata \
-  --project-dir wise-projects/Kinetics-6/
-
-Searching wise-projects/Kinetics-6/ for
-  [0] "singing" in metadata
-
-
-                    Search results for "singing" in metadata                     
- Rank  Filename                               Time        Score   Original Ranks 
-    0  singing/GO5DhmRmHco_000112_000122.mp4  0.0 - 10.0  -1.629  0              
-    1  singing/I6NDj1EcP6w_000073_000083.mp4  0.0 - 10.0  -1.629  1              
-    2  singing/WKSxT9T-P_U_000157_000167.mp4  0.0 - 10.0  -1.629  2              
-    3  singing/arBpk6QCVFs_000064_000074.mp4  0.0 - 10.0  -1.629  3              
-    4  singing/vdnskiY-DRc_000023_000033.mp4  0.0 - 10.0  -1.629  4              
-
-(search completed in 0.001 sec.)
-```
-
-This shows that all the 5 videos inside `singing` folder have been
-correctly tagged using the `singing` text metadata. We want to find
-all the videos that contains music but is not tagged with the
-`singing` metadata. We can search for `music` in the audio stream
-(because the video stream is not ideal for identifying music) and
-remove all the results that are tagged with `singing` metadata as follows.
-
-```
-python search.py \
-  --query "music" --in audio \
-  --query "singing" --not-in metadata \
-  --project-dir wise-projects/Kinetics-6/
-
-Searching wise-projects/Kinetics-6/ for
-  [0] "music" in audio
-  [1] "singing" not in metadata
-
-
-            Search results for "music" in audio and "singing" not in metadata            
- Rank  Filename                                         Time       Score  Original Ranks 
-    0  frying-vegetables/hxK9mej0_zw_000086_000096.mp4  0.0 - 4.0  0.256  0              
-    1  jogging/OmWoDAQM1kk_000000_000010.mp4            0.0 - 8.0  0.237  1,2            
-
-(search completed in 0.263 sec.)
-```
-
-You can download the [Kinetics-6 dataset](https://thor.robots.ox.ac.uk/wise/assets/test/Kinetics-6b.tar.gz)
-(50MB) and manually verify that these two videos files does indeed contain
-music.
+TODO: Show an example based on the Automatic Speech Recognition (ASR) model applied to audio channel of videos.
