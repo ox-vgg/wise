@@ -59,6 +59,7 @@ class VectorMetadata(BaseModel):
 
 
 class VectorAndMediaMetadata(VectorMetadata, MediaMetadata):
+    external_metadata: Dict = {}
     pass
 
 

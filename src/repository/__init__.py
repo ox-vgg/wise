@@ -40,7 +40,7 @@ _vtable = db.vectors_table
 _mtable = db.media_table
 _thumbs_table = db.thumbnails_table
 
-def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorAndMediaMetadata]:
+def get_full_metadata_batch(conn: sa.Connection, ids: List[int], external_metadata_tables = []) -> List[VectorAndMediaMetadata]:
     """
     Get the vector and media metadata for a batch of vector ids.
 
@@ -67,17 +67,43 @@ def get_full_metadata_batch(conn: sa.Connection, ids: List[int]) -> List[VectorA
         {id: index for index, id in enumerate(ids)},
         value=_vtable.c.id,
     )
-    stmt = (
+
+    stmt1 = (
         sa.select(_vtable.c, _mtable.c)
         .select_from(_vtable.join(_mtable))
         .where(_vtable.c.id.in_(ids))
         .order_by(ordering)
     )
-    res = conn.execute(stmt)
-    res = [VectorAndMediaMetadata.model_validate(row) for row in res.mappings()]
-    if len(res) != len(ids):
-        raise RuntimeError(f"Unable to retrieve metadata for all ids. Retrieved metadata for {len(res)}/{len(ids)} ids")
-    return res
+    res1 = conn.execute(stmt1)
+    res1 = [VectorAndMediaMetadata.model_validate(row) for row in res1.mappings()]
+    if len(external_metadata_tables) == 0:
+        if len(res1) != len(ids):
+            raise RuntimeError(f"Unable to retrieve metadata for all ids. Retrieved metadata for {len(res1)}/{len(ids)} ids")
+        return res1
+
+    ## collect external metadata
+    from_clause = _vtable.join(_mtable)
+    for external_metadata_table in external_metadata_tables:
+        from_clause = from_clause.join(external_metadata_table)
+    external_metadata_colnames = []
+    for external_metadata_table in external_metadata_tables:
+        for col in external_metadata_table.columns:
+            if col.name not in ['media_id', 'timestamp', 'end_timestamp', 'vector_id']:
+                external_metadata_colnames.append(col)
+    stmt2 = (
+        sa.select(*external_metadata_colnames)
+        .select_from(from_clause)
+        .where(_vtable.c.id.in_(ids))
+        .order_by(ordering)
+    )
+
+    res2 = conn.execute(stmt2)
+    for m, r in zip(res1, res2.mappings()):
+        m.external_metadata = r
+
+    if len(res1) != len(ids):
+        raise RuntimeError(f"Unable to retrieve metadata for all ids. Retrieved metadata for {len(res1)}/{len(ids)} ids")
+    return res1
 
 def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp: float, get_id_only: bool = False) -> Optional[Union[bytes, int]]:
     """

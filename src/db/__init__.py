@@ -21,3 +21,7 @@ def init_project(dburi: str, **kwargs) -> Engine:
 
 def init_thumbs(dburi: str, **kwargs) -> Engine:
     return _init(dburi, thumbs_metadata_obj, **kwargs)
+
+def reflect_external_metadata(db_engine):
+    project_metadata_obj.reflect(bind=db_engine)
+    return [ v for k, v in project_metadata_obj.tables.items() if k.startswith('metadata-') ]
