@@ -67,6 +67,21 @@ const ImageDetailsModal = ({
     }
   }
 
+  function ExternalMetadata({all_metadata}) {
+    return (
+      <table>
+        <tbody>
+          {Object.keys(all_metadata).map((key) => (
+            <tr key={key}>
+            <td>{key}</td>
+            <td>{all_metadata[key]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
   return (
     <Modal
       title={title}
@@ -167,6 +182,7 @@ const ImageDetailsModal = ({
         <span>{imageDetails?.mediaInfo.filename}</span>
       </p>
 
+      <ExternalMetadata all_metadata={imageDetails?.mediaInfo.external_metadata} />
       {/* <div className="wise-image-details-metadata">
         <p>
           <b>Description</b>
