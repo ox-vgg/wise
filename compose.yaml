@@ -1,0 +1,35 @@
+services:
+  wise:
+    image: ${REGISTRY:-$USER}/wise:${VERSION:-latest}
+    build:
+      dockerfile: Dockerfile
+      target: wise
+      context: .
+
+    init: true
+    # HOST_UID and HOST_GID are needed at runtime to make sure the volume mounts work alright
+    user: ${HOST_UID?'HOST_UID must be set before using this compose.yaml. Please see docs/Docker.md'}:${HOST_GID?'HOST_GID must be set before using this compose.yaml. Please see docs/Docker.md'}
+
+    environment:
+      - MODE=production
+      - WISE_PROJECT
+
+    ports:
+    - ${PORT:-9670}:9670
+
+    # Pass wise project dir to persist projects
+    volumes:
+    - ${WISE_PROJECT_DIR:-$PWD/projects}:/wise/projects
+    - wise-cache:/tmp
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: 'nvidia'
+              capabilities: [gpu]
+              count: 1
+    shm_size: 1G
+
+volumes:
+  wise-cache:

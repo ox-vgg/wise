@@ -1,4 +1,9 @@
 .vscode/
+# dotenv
+.env
+*.env
+
+!.env.template
 
 # data folder
 data/
@@ -12,10 +17,13 @@ public/thumbs
 *.tar
 *.db
 cmd
-
+projects/
 # generated output
 output/
 logs/
+build*.json
+build/
+dist/
 
 # Python
 env/
