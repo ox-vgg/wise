@@ -1,0 +1,90 @@
+variables:
+  HOST_UID: 1000
+  HOST_GID: 1000
+  MAMBA_IMAGE: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/mambaorg/micromamba:1.5.10
+  PYTHON_IMAGE: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/python:3.10-slim
+  NODE_IMAGE: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/node:22-slim
+  REGISTRY: ${CI_REGISTRY_IMAGE}
+  
+
+stages:
+  - build
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "wise2" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api")
+
+default:
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:26.1.4
+  services:
+    - name: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:26.1.4-dind
+      alias: docker
+
+  before_script:
+    - docker info
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker login -u "$CI_DEPENDENCY_PROXY_USER" -p "$CI_DEPENDENCY_PROXY_PASSWORD" "$CI_DEPENDENCY_PROXY_SERVER"
+    - docker context create buildx-builder
+    - apk update && apk add jq
+
+  tags: 
+    - saas-linux-small-amd64
+
+build-wise:
+  stage: build  
+  artifacts:
+    name: ${APP}-${PLATFORM}-image-digest
+    paths:
+      - bake-meta-${APP}-${PLATFORM}.json
+  script:
+    - export CACHE_TAG=${APP//wise-/}-${PLATFORM}
+    - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/${PLATFORM}
+    - docker compose -f compose.yaml -f compose.gitlab.yaml config
+    - docker buildx bake --metadata-file bake-meta-${APP}-${PLATFORM}.json --pull -f compose.yaml -f compose.gitlab.yaml wise
+  parallel:
+    matrix:
+      - PLATFORM: [amd64]
+        APP: [wise]
+      - PLATFORM: [amd64, arm64]
+        APP: [wise-cpu]
+  tags: 
+    - saas-linux-large-${PLATFORM}
+
+.push-manifest: &push-manifest
+  stage: build
+  script:
+    - set -x
+    - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/amd64
+    - IMAGE_TAG=$(docker buildx bake -f compose.yaml -f compose.gitlab.yaml wise --print | jq -cr '.target.wise.tags[0]')
+    - IMAGE_NAME=${IMAGE_TAG%%:*}
+    - printf "${IMAGE_TAG%%:*}"'@%s ' $(jq -rc 'map(.wise."containerimage.digest") | join(" ")' -s bake-meta*.json)
+    - |
+      docker buildx imagetools create \
+        -t ${IMAGE_TAG} \
+        $(printf "${IMAGE_TAG%%:*}"'@%s ' $(jq -rc 'map(.wise."containerimage.digest") | join(" ")' -s bake-meta*.json))
+
+push-manifest:
+  <<: *push-manifest
+  needs: 
+    - job: build-wise
+      parallel:
+        matrix:
+          - PLATFORM: [amd64]
+            APP: [wise]
+      artifacts: true
+  variables:
+    APP: wise
+    CACHE_TAG: "ignored"
+
+push-manifest-cpu:
+  <<: *push-manifest
+  needs: 
+    - job: build-wise
+      parallel:
+        matrix:
+          - PLATFORM: [amd64, arm64]
+            APP: [wise-cpu]
+      artifacts: true
+  variables:
+    APP: wise-cpu
+    CACHE_TAG: "ignored"

@@ -5,7 +5,7 @@ from pathlib import Path
 
 class APIConfig(BaseSettings):
     mode: Literal['production', 'development'] = 'production'
-    hostname: str = "0.0.0.0"
+    listen_address: str = "0.0.0.0"
     port: int = 9670
     top_k: int = 10
     precision: int = 3

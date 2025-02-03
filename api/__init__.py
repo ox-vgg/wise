@@ -47,7 +47,7 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
             StaticFiles(directory=theme_asset_dir, html=True),
             name="assets",
         )
-        log_custom_format(f'Open http://{config.hostname}:{config.port}/{config.project_dir.stem}/ in your browser')
+        log_custom_format(f'Open http://{config.listen_address}:{config.port}/{config.project_dir.stem}/ in your browser')
         if callback:
             callback()
 
@@ -92,4 +92,4 @@ def serve(
                 f2.write(line)
 
     app = create_app(config, theme_asset_dir, callback)
-    uvicorn.run(app, host=config.hostname, port=config.port, log_level="info")
+    uvicorn.run(app, host=config.listen_address, port=config.port, log_level="info")

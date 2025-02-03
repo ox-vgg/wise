@@ -1,0 +1,46 @@
+# VCS
+.git/
+.gitignore
+
+# IDE
+.vscode
+
+# Python
+__pycache__/
+**/*/__pycache__/
+
+**/*.py[cod]
+
+env/
+venv/
+
+# Docker
+.gitlab-ci.yml
+.dockerignore
+Dockerfile
+docker-compose.*.ya?ml
+compose.*.ya?ml
+build*.json
+
+# dotenv
+.env
+.env.template
+*.env
+
+# Other files
+.logfire/
+docs/
+hub/
+k5/
+logs/
+projects/
+data/
+frontend/node_modules/
+frontend/dist/
+*.tar.gz
+
+*.log
+
+*.swo
+*.swp
+
