@@ -26,12 +26,13 @@ RUN mkdir -p ${HF_HOME} ${PYTHONPYCACHEPREFIX} && chmod 3777 -R /tmp
 USER ${MAMBA_USER}
 WORKDIR /tmp
 
-COPY --chown=${MAMBA_USER}:${MAMBA_USER} "conda-lockfiles/${APP}.conda-lock.yml" ./
+COPY --chown=${MAMBA_USER}:${MAMBA_USER} "docker/wise.yml" ./
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/home/${MAMBA_USER}/.cache,uid=${MAMBA_USER_ID},gid=${MAMBA_USER_GID} \
-    micromamba create --always-copy --yes -n wise-env -f "${APP}.conda-lock.yml" && \
+    export PIP_EXTRA_INDEX_URL=$([[ ${APP} == 'wise-cpu' ]] && echo 'https://download.pytorch.org/whl/cpu' || echo 'https://download.pytorch.org/whl/cu124') && \
+    echo "Using Pip index url: $PIP_EXTRA_INDEX_URL" && \
+    micromamba create --always-copy --yes -n wise-env -f "wise.yml" && \
     ${MAMBA_ROOT_PREFIX}/envs/wise-env/bin/python3 -m pip install --no-deps --no-cache-dir "msclap==1.3.3"
-
 
 FROM ${NODE_IMAGE} AS wise-frontend
 
@@ -69,6 +70,10 @@ COPY --from=wise-frontend --chown=nonroot:nonroot --chmod=3775 \
 # The user who runs the container is possibly not nonroot, so we need a+rw equivalent
 COPY --from=wise-frontend --chown=nonroot:nonroot --chmod=0666 \
     /wise/frontend/dist/index.html /wise/frontend/dist/index.html
+
+# For libmagic to find the database in a non standard location
+ENV MAGIC='/env/share/misc/magic' \
+    LD_LIBRARY_PATH="/env/lib/:${LD_LIBRARY_PATH}"
 
 # You can modify the CMD statement as needed....
 ENTRYPOINT ["python3"]

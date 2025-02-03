@@ -1,2 +1,0 @@
-dependencies:
-  - conda-forge::pytorch-cpu

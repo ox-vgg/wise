@@ -4,7 +4,7 @@ services:
     image: ${REGISTRY:-$USER}/wise-cpu:${VERSION:-latest}
     build:
       args:
-        - USE_ENV=wise-cpu
+        - APP=wise-cpu
 
     # Set device ids to expose GPU to container
     deploy: !reset {}
