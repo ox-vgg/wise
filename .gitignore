@@ -6,27 +6,28 @@
 !.env.template
 
 # data folder
-data/
-wise-data/
-wise-projects/
-images/
-public/images
-public/thumbs
+/data/
+/wise-data/
+/wise-projects/
+/images/
+/projects
+/public/images
+/public/thumbs
 *.h5
 *.npy
 *.tar
 *.db
-cmd
-projects/
+/cmd
 # generated output
-output/
-logs/
+/output/
+/logs/
 build*.json
-build/
-dist/
+/build/
+/dist/
 
 # Python
-env/
+/env/
+/venv/
 __pycache__/
 
 # Temp files by editors
