@@ -11,7 +11,7 @@ To install WISE, we first download the WISE source code.
 
 ```
 ## 1. Get the code
-git clone -b wise-2.1.0 https://gitlab.com/vgg/wise/wise.git
+git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
 cd wise
 ```
 
@@ -64,7 +64,7 @@ WISE can be installed on a machine without a GPU. While the processing speed is 
 all the functionality of the WISE software remains available.
 
 ```
-git clone -b wise-2.1.0 https://gitlab.com/vgg/wise/wise.git
+git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
 cd wise
 
 python3 --version                  # must be >= 3.10
