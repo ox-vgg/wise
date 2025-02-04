@@ -356,12 +356,17 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
           </Space>
         </Flex> */}
       </div>
-      <div style={{borderTop: '1px solid #e3e3e3', marginTop: 20}} />
-      <Collapse items={collapseItems}
-        bordered={false} expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} />}
-        activeKey={activeKeys} onChange={_setActiveKeys}
-        style={{background: 'unset'}}
-      />
+      {
+        config.MULTIMODAL_EXAMPLE_QUERIES &&
+        <>
+          <div style={{borderTop: '1px solid #e3e3e3', marginTop: 20}} />
+          <Collapse items={collapseItems}
+            bordered={false} expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} />}
+            activeKey={activeKeys} onChange={_setActiveKeys}
+            style={{background: 'unset'}}
+          />
+        </>
+      }
       {
         // !(multimodalQueries.length > 0 || searchText) &&
         // <div>
