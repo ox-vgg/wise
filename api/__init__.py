@@ -1,12 +1,12 @@
 import logging
 
 from typing import Optional, Callable
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from config import APIConfig
-from .routes import get_project_router
+from .routes import get_project_router, WiseFrontendUserException
 
 from pathlib import Path
 
@@ -37,6 +37,10 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    @app.exception_handler(WiseFrontendUserException)
+    async def frontend_user_exception_handler(request: Request, exc: WiseFrontendUserException):
+        raise HTTPException(400, {"message": str(exc)})
 
     @app.on_event("startup")
     async def startup():

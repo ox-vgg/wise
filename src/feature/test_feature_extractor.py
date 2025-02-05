@@ -30,8 +30,8 @@ class TestFeatureExtractor(unittest.TestCase):
         # extract features
         extracted_features = featureExtractor.extract_image_features(preprocessed_data)
 
-        self.assertEqual(preprocessed_data.shape[0], extracted_features.shape[0])
-        self.assertEqual(extracted_features.shape[1], 768)
+        self.assertEqual(preprocessed_data.shape[0], len(extracted_features))
+        self.assertTrue(all([x.shape == (1, 768) for x in extracted_features]))
 
     def test_audio_feature(self):
         featureExtractor = FeatureExtractorFactory('microsoft/clap/2023/Not-Applicable')
