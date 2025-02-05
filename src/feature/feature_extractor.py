@@ -1,7 +1,35 @@
-from typing import List, Union
+from dataclasses import dataclass
+from typing import Any, List, Union
+
 from PIL import Image
 import torch
 import numpy as np
+import sqlalchemy as sa
+
+
+@dataclass
+class Features:
+    """Object for extracted features vectors as well as any metadata.
+
+    Attributes
+    ----------
+    vectors
+        A 2D numpy ndarray, the first dimension being the number of
+        features (in a single image).  The length of the second
+        dimension is the dimensionality of the embedding and dependent
+        on the model used by the `FeatureExtractor`.
+
+    metadata
+        A free for all place, specific to each feature extractor.
+        This is the metadata for all feature vectors so it might make
+        sense for this to be a list but each `FeatureExtractor` is
+        free to use in whatever manner.  This will be the argument to
+        :meth:`FeatureExtractor.add_to_vector_metadata_table`.
+
+    """
+    metadata: Any  # free for use by concrete FeatureExtractor
+    vectors: np.ndarray  # shaped (n-features, embedding-length)
+
 
 class FeatureExtractor:
     """ABC for extractor of feature vectors from audio, image, and text.
@@ -14,6 +42,30 @@ class FeatureExtractor:
 
     def __init__(self):
         raise NotImplementedError
+
+    def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
+        """Create if needed a table for these features metadata.
+        """
+        pass  # default to no-op
+
+    def add_to_vector_metadata_table(
+        self, conn:sa.Connection, vid: list[int], metadata: Any
+    ) -> None:
+        """Add vector metadata to the database.
+
+        Parameters
+        ----------
+        conn
+        ----
+            Connection for the insert (if any).
+        vid
+            List of the ids in the vectors table.
+        metadata
+            The `metadata` attributed of the `Features` returned by
+            :meth:`.extract_image_features`.
+
+        """
+        pass  # default to no-op
 
     def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
         """ Preprocess media to prepare it for feature extraction
@@ -29,7 +81,7 @@ class FeatureExtractor:
         """
         raise NotImplementedError
 
-    def extract_image_features(self, images: torch.Tensor) -> list[np.ndarray]:
+    def extract_image_features(self, images: torch.Tensor) -> list[Features]:
         """Extracts features from pre-processed images
 
         Parameters
@@ -38,11 +90,9 @@ class FeatureExtractor:
 
         Returns
         -------
-        list[np.ndarray]
-            a list of 2D numpy ndarray, one per image in the input
-            `images`, of extracted feature vectors.  The number of
-            extracted features per image is the length of the first
-            dimension.
+        list[Features]
+            One :class:`Feature` object per input image.
+
         """
         raise NotImplementedError
 

@@ -39,7 +39,7 @@ import onnxruntime  # import before insightface for cleaner error
 import insightface.app
 # isort: on
 
-from .feature_extractor import FeatureExtractor
+from .feature_extractor import FeatureExtractor, Features
 
 _logger = logging.getLogger(__name__)
 
@@ -175,9 +175,9 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             raise Exception("unexpected input images of type %s" % type(images))
 
     @torch.inference_mode
-    def extract_image_features(self, images: torch.Tensor) -> list[np.ndarray]:
+    def extract_image_features(self, images: torch.Tensor) -> list[Features]:
         _logger.debug("extracting image features from a %s", type(images))
-        features: list[np.ndarray] = []
+        features: list[Features] = []
         for image in images:
             ## NB: undocumented but `get()` expects a numpy ndarray,
             ##     of shape `(H, W, C)`, and mode BRG.  The mode seems
@@ -197,9 +197,12 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             feature_vectors = np.empty(
                 (len(faces), self._embedding_size), dtype=self._embedding_dtype
             )
+            feature_metadata = None
             for i, face in enumerate(faces):
                 feature_vectors[i] = face.normed_embedding
                 # TODO: save feature_metadata
-            features.append(feature_vectors)
+            features.append(
+                Features(vectors=feature_vectors, metadata=feature_metadata)
+            )
 
         return features

@@ -1312,14 +1312,14 @@ def _get_search_router(config: APIConfig):
             if search_index.feature_extractor.extract_image_features is None:
                 raise WiseFrontendUserException("image modality not supported")
             assert len(images) == 1
-            feature_vectors = search_index.feature_extractor.extract_image_features(
+            features = search_index.feature_extractor.extract_image_features(
                 search_index.feature_extractor.preprocess_image(images)
             )[0]
-            if not len(feature_vectors):
+            if not len(features.vectors):
                 raise WiseFrontendUserException("no features found on image")
-            if len(feature_vectors) > 1:
+            if len(features.vectors) > 1:
                 logger.debug("multiple features found, will return vector for the top feature only")
-            return feature_vectors[0:1]
+            return features.vectors[0:1]
 
         def load_audio(x: List[io.BytesIO]) -> torch.Tensor:
             # TODO add support for loading multiple audio files

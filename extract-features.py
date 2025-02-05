@@ -8,6 +8,8 @@ from tqdm import tqdm
 import numpy as np
 import logging
 
+import sqlalchemy as sa
+
 from src.dataloader.dataset import MediaChunk
 from src.dataloader import  get_dataset, get_metadata_for_valid_files, DatasetPayload
 from src.dataloader.streamreader import SourceMediaType, MediaChunkType
@@ -42,7 +44,8 @@ def initialise_feature_extractors(
     feature_extractor_ids: dict[ModalityType, str],
     feature_store_type: Literal['webdataset', 'numpy'],
     shard_max_count: int,
-    shard_max_size: int
+    shard_max_size: int,
+    db_engine: sa.Engine,
 ) -> tuple[dict[ModalityType, FeatureExtractor], dict[ModalityType, FeatureStore]]:
     ## 3. Prepare for feature extraction and storage
     logger.info(f"Initialising feature extractor")
@@ -55,6 +58,7 @@ def initialise_feature_extractors(
         feature_extractors[modality_type] = FeatureExtractorFactory(
             feature_extractor_id
         )
+        feature_extractors[modality_type].create_vector_metadata_table(db_engine)
         print(f"Using {feature_extractor_id} for {modality_type}")
 
         ## 3.2 Create folders to store features, metadata and search index
@@ -285,7 +289,9 @@ if __name__ == "__main__":
         project,
         feature_extractor_ids,
         args.feature_store_type,
-        args.shard_maxcount, args.shard_maxsize,
+        args.shard_maxcount,
+        args.shard_maxsize,
+        db_engine,
     )
 
     ## dataset
@@ -345,7 +351,8 @@ if __name__ == "__main__":
                 # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
                 if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
                     for frame_idx, frame_features in enumerate(segment_feature):
-                        for frame_single_feature in frame_features:
+                        vector_ids: list[int] = []
+                        for frame_single_vector in frame_features.vectors:
                             feature_metadata = VectorRepo.create(
                                 conn,
                                 data=VectorMetadata(
@@ -356,8 +363,12 @@ if __name__ == "__main__":
                             )
                             feature_stores[media_type].add(
                                 feature_metadata.id,
-                                np.expand_dims(frame_single_feature, axis=0),
+                                np.expand_dims(frame_single_vector, axis=0),
                             )
+                            vector_ids.append(feature_metadata.id)
+                        feature_extractors[media_type].add_to_vector_metadata_table(
+                            conn, vector_ids, frame_features.metadata
+                        )
                 else:
                     # Add whole segment
                     _start_time = segment_pts
