@@ -18,6 +18,7 @@ dependencies:
   - mkl=2023
   - blas=*=mkl
   - conda-forge::ffmpeg<7
+  - cudnn  # needed for onnxruntime-gpu (insightface)
   - pip:
     - -r requirements.txt
     # Install msclap separately till we pip freeze
