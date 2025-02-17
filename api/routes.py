@@ -1295,9 +1295,13 @@ def _get_search_router(config: APIConfig):
         search_index = search_indices[media_type]
 
         extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
-        extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
-            search_index.feature_extractor.preprocess_image(x)
-        )
+
+        def extract_image_features(images: List[Image.Image]) -> ndarray:
+            feature_vectors = search_index.feature_extractor.extract_image_features(
+                search_index.feature_extractor.preprocess_image(images)
+            )
+            return feature_vectors
+
         def load_audio(x: List[io.BytesIO]) -> torch.Tensor:
             # TODO add support for loading multiple audio files
             if len(x) == 0:
