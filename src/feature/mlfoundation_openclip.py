@@ -22,6 +22,10 @@ class MlfoundationOpenClip(FeatureExtractor):
     ID_PREFIX = 'mlfoundations/open_clip/'
     DESCRIPTION = 'See https://github.com/mlfoundations/open_clip'
 
+    ## CLIP supports text and image (no audio)
+    preprocess_audio = None
+    extract_audio_features = None
+
     def __init__(self, id):
         if not id.startswith(self.ID_PREFIX):
             raise ValueError(f'feature id cannot start with {id} and must start with {self.ID_PREFIX}')

@@ -1304,9 +1304,13 @@ def _get_search_router(config: APIConfig):
         search_index = search_indices[media_type]
 
         def extract_text_features(text: List[str]) -> ndarray:
+            if search_index.feature_extractor.extract_text_features is None:
+                raise WiseFrontendUserException("text modality not supported")
             return search_index.feature_extractor.extract_text_features(text)
 
         def extract_image_features(images: List[Image.Image]) -> ndarray:
+            if search_index.feature_extractor.extract_image_features is None:
+                raise WiseFrontendUserException("image modality not supported")
             assert len(images) == 1
             feature_vectors = search_index.feature_extractor.extract_image_features(
                 search_index.feature_extractor.preprocess_image(images)
@@ -1331,6 +1335,8 @@ def _get_search_router(config: APIConfig):
             return waveform
 
         def extract_audio_features(audio: List[io.BytesIO]) -> ndarray:
+            if search_index.feature_extractor.extract_audio_features is None:
+                raise WiseFrontendUserException("audio modality not supported")
             return search_index.feature_extractor.extract_audio_features(
                 search_index.feature_extractor.preprocess_audio(load_audio(audio))
             )
