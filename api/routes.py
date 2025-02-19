@@ -62,6 +62,16 @@ def raise_(ex):
     raise ex
 
 
+class WiseFrontendUserException(Exception):
+    """An exception whose message can be sent to the user.
+
+    Exceptions by default will only send an "Internal server error"
+    message to the user.  This separate class enables us to catch only
+    some with a message meant to the frontend user.
+    """
+    pass
+
+
 def send_bytes_range_requests(
     file_obj: BinaryIO, start: int, end: int, chunk_size: int = 10_000
 ):
@@ -850,7 +860,6 @@ def _get_search_router(config: APIConfig):
         weights = array(weights, dtype=float32)
         average_features = average(feature_vectors, axis=0, weights=weights)
         average_features /= norm(average_features, axis=-1, keepdims=True)
-
         return average_features
 
     _prefix = {
@@ -1295,9 +1304,18 @@ def _get_search_router(config: APIConfig):
         search_index = search_indices[media_type]
 
         extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
-        extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
-            search_index.feature_extractor.preprocess_image(x)
-        )
+
+        def extract_image_features(images: List[Image.Image]) -> ndarray:
+            assert len(images) == 1
+            feature_vectors = search_index.feature_extractor.extract_image_features(
+                search_index.feature_extractor.preprocess_image(images)
+            )[0]
+            if not len(feature_vectors):
+                raise WiseFrontendUserException("no features found on image")
+            if len(feature_vectors) > 1:
+                logger.debug("multiple features found, will return vector for the top feature only")
+            return feature_vectors[0:1]
+
         def load_audio(x: List[io.BytesIO]) -> torch.Tensor:
             # TODO add support for loading multiple audio files
             if len(x) == 0:

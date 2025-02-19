@@ -344,19 +344,20 @@ if __name__ == "__main__":
 
                 # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
                 if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
-                    for i in range(len(segment_feature)):
-                        feature_metadata = VectorRepo.create(
-                            conn,
-                            data=VectorMetadata(
-                                modality=media_type,
-                                media_id=mid,
-                                timestamp=segment_pts + i * (1 / video_frame_rate),
-                            ),
-                        )
-                        feature_stores[media_type].add(
-                            feature_metadata.id,
-                            np.expand_dims(segment_feature[i], axis=0),
-                        )
+                    for frame_idx, frame_features in enumerate(segment_feature):
+                        for frame_single_feature in frame_features:
+                            feature_metadata = VectorRepo.create(
+                                conn,
+                                data=VectorMetadata(
+                                    modality=media_type,
+                                    media_id=mid,
+                                    timestamp=segment_pts + frame_idx * (1 / video_frame_rate),
+                                ),
+                            )
+                            feature_stores[media_type].add(
+                                feature_metadata.id,
+                                np.expand_dims(frame_single_feature, axis=0),
+                            )
                 else:
                     # Add whole segment
                     _start_time = segment_pts

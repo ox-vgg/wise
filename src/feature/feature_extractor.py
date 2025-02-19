@@ -21,8 +21,8 @@ class FeatureExtractor:
         """
         raise NotImplementedError
 
-    def extract_image_features(self, images: torch.Tensor) -> np.ndarray:
-        """ Extracts features from pre-processed images
+    def extract_image_features(self, images: torch.Tensor) -> list[np.ndarray]:
+        """Extracts features from pre-processed images
 
         Parameters
         ----------
@@ -30,8 +30,11 @@ class FeatureExtractor:
 
         Returns
         -------
-        np.ndarray
-            a numpy ndarray containing extracted feature vectors
+        list[np.ndarray]
+            a list of 2D numpy ndarray, one per image in the input
+            `images`, of extracted feature vectors.  The number of
+            extracted features per image is the length of the first
+            dimension.
         """
         raise NotImplementedError
 
