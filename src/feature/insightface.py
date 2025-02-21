@@ -5,10 +5,12 @@
 import contextlib
 import logging
 import os
-from typing import Union
+from dataclasses import dataclass
+from typing import NamedTuple, Union
 
 import numpy as np
 import PIL.Image
+import sqlalchemy as sa
 import torch
 
 ## Importing InsightFace requires some care:
@@ -41,6 +43,7 @@ import insightface.app
 
 from .feature_extractor import FeatureExtractor, Features
 
+
 _logger = logging.getLogger(__name__)
 
 
@@ -66,6 +69,49 @@ def pil_img_list_to_nhwc_tensor(images: list[PIL.Image.Image]) -> torch.Tensor:
     assert len({x.size for x in images}) in [0, 1], \
         "multiple PIL images of different sizes"
     return torch.stack([rgb_pil_to_bgr_hwc_tensor(x) for x in images])
+
+
+class BBox(NamedTuple):
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass
+class FaceFeatureMetadata:
+    detection_score: float
+    bbox: BBox
+    age: int
+    is_male: bool
+
+    @classmethod
+    def from_app_face(cls, face: insightface.app.common.Face, img: np.ndarray):
+        assert img.ndim == 3
+        img_w = float(img.shape[1])
+        img_h = float(img.shape[0])
+        bbox = face.bbox.copy()
+        bbox[(0, 2),] /= img_w
+        bbox[(1, 3),] /= img_h
+        bbox[(2, 3),] -= bbox[(0, 1),]
+        return cls(
+            detection_score=face.det_score,
+            bbox=BBox(*bbox),
+            age=face.age,
+            is_male=(face.sex == "M"),
+        )
+
+    def to_sql_values(self, vector_id: int):
+        return {
+            "vector_id": vector_id,
+            "detection_score" : self.detection_score,
+            "bbox_x": self.bbox.x,
+            "bbox_y": self.bbox.y,
+            "bbox_w": self.bbox.w,
+            "bbox_h": self.bbox.h,
+            "age": self.age,
+            "is_male": self.is_male,
+        }
 
 
 class InsightFaceFeatureExtractor(FeatureExtractor):
@@ -118,7 +164,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             with contextlib.redirect_stdout(devnull):
                 self._app = insightface.app.FaceAnalysis(
                     model_name,
-                    allowed_modules=["detection", "recognition"],
+                    allowed_modules=["detection", "recognition", "genderage"],
                 )
                 self._app.prepare(
                     ctx_id=0,
@@ -156,6 +202,44 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
         ## models anyway.
         assert recognition_outputs.type == "tensor(float)"
         self._embedding_dtype = np.float32
+
+    def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
+        db_metadata_obj = sa.MetaData()
+        db_metadata_obj.reflect(db_engine)
+        self._vector_metadata_table = sa.Table(
+            "vector_metadata_insightface",
+            db_metadata_obj,
+            sa.Column(
+                "vector_id",
+                sa.ForeignKey("vectors.id", ondelete="cascade"),
+                nullable=False,
+            ),
+            sa.Column("detection_score", sa.Float, nullable=False),
+            ## InsightFace returns (x0, y0, x1, y1) in absolute
+            ## coordinates and we convert to (x, y, w, h) in relative
+            ## coordinates because that's what frontend uses.
+            sa.Column("bbox_x", sa.Float, nullable=False),  # [0.0-1.0]
+            sa.Column("bbox_y", sa.Float, nullable=False),  # [0.0-1.0]
+            sa.Column("bbox_w", sa.Float, nullable=False),  # [0.0-1.0]
+            sa.Column("bbox_h", sa.Float, nullable=False),  # [0.0-1.0]
+            sa.Column("age", sa.Integer, nullable=False),
+            ## InsightFace returns gender/sex with two options only,
+            ## so we use is_male so we can use boolean type.
+            sa.Column("is_male", sa.Boolean, nullable=False),
+        )
+        db_metadata_obj.create_all(db_engine)
+
+    def add_to_vector_metadata_table(
+        self, conn:sa.Connection, vid: list[int], metadata: list[FaceFeatureMetadata]
+    ) -> None:
+        ## This condition is needed because insert with an empty list
+        ## does an insert with NULLs instead of "nothing".  See
+        ## https://github.com/sqlalchemy/sqlalchemy/discussions/9645
+        if len(metadata) > 0:
+            conn.execute(
+                sa.insert(self._vector_metadata_table),
+                [x.to_sql_values(vid) for vid, x in zip(vid, metadata)],
+            )
 
     def preprocess_image(
         self, images: Union[torch.Tensor, list[PIL.Image.Image]]
@@ -197,10 +281,12 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             feature_vectors = np.empty(
                 (len(faces), self._embedding_size), dtype=self._embedding_dtype
             )
-            feature_metadata = None
+            feature_metadata: list[FaceFeatureMetadata] = []
             for i, face in enumerate(faces):
                 feature_vectors[i] = face.normed_embedding
-                # TODO: save feature_metadata
+                feature_metadata.append(
+                    FaceFeatureMetadata.from_app_face(face, image)
+                )
             features.append(
                 Features(vectors=feature_vectors, metadata=feature_metadata)
             )

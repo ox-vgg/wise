@@ -79,6 +79,9 @@ class TestInsigthFaceFeatureExtractor(unittest.TestCase):
         return Image.fromarray(np_img, mode="RGB")
 
     def _test_with_t1_images(self, images, n_images):
+        ## The t1 image distributed with InsightFace is a photo from
+        ## Friends (the TV show) showing the six characters.  The
+        ## model should find 6 faces, 3 male and 3 female.
         assert n_images > 0
         features = self._preprocess_and_extract_features(images)
         ## Check vectors
@@ -87,7 +90,11 @@ class TestInsigthFaceFeatureExtractor(unittest.TestCase):
         self.assertIsInstance(features[0].vectors, np.ndarray)
         self.assertTupleEqual(features[0].vectors.shape, (6, 512))
         self.assertTrue(all([x.vectors.shape == (6, 512) for x in features]))
-        self.assertTrue(all([x.metadata is None for x in features]))
+        ## Check metadata (just check presence of one of the attributes)
+        self.assertTrue(all([isinstance(x.metadata, list) for x in features]))
+        for f in features:
+            self.assertEqual(len(f.metadata), 6)
+            self.assertEqual([x.is_male for x in f.metadata].count(True), 3)
 
     def test_with_one_element_list(self):
         images = [self._get_t1_rgb_pil()]
