@@ -1,10 +1,18 @@
-import unittest
-import torch
 import tempfile
-from PIL import Image
+import unittest
+
 import numpy as np
+import torch
+from PIL import Image
 
 from .feature_extractor_factory import FeatureExtractorFactory
+
+## Typically, imports from external libraries come before local
+## imports.  But insightface needs some care to import, already done
+## in ..feature.insightface, so we are importing it at the end to
+## avoid duplicating that mess.
+import insightface.data  # isort: skip
+
 
 class TestFeatureExtractor(unittest.TestCase):
     def setUp(self):
@@ -42,6 +50,85 @@ class TestFeatureExtractor(unittest.TestCase):
 
     def tearDown(self):
         pass
+
+
+class TestInsigthFaceFeatureExtractor(unittest.TestCase):
+    def setUp(self):
+        self._extractor = FeatureExtractorFactory("insightface/_/buffalo_l/_")
+
+    def _preprocess_and_extract_features(self, images):
+        return self._extractor.extract_image_features(
+            self._extractor.preprocess_image(images)
+        )
+
+    def _get_tom_hanks_grayscale_tensor(self) -> torch.Tensor:
+        np_img = insightface.data.get_image("Tom_Hanks_54745", to_rgb=True)
+        assert (np.all(np_img[:,:,0] == np_img[:,:,1])
+                and np.all(np_img[:,:,0] == np_img[:,:,2]))
+        np_img = np_img.transpose([2, 0, 1])  # H,W,C -> C,H,W
+        return torch.tensor(np_img[0:1,:,:].copy())
+
+    def _get_t1_rgb_tensor(self) -> torch.Tensor:
+        np_img = insightface.data.get_image("t1", to_rgb=True)
+        np_img = np_img.transpose([2, 0, 1])  # H,W,C -> C,H,W
+        return torch.tensor(np_img.copy())
+
+    def _get_t1_rgb_pil(self) -> Image.Image:
+        np_img = insightface.data.get_image("t1", to_rgb=True)
+        return Image.fromarray(np_img, mode="RGB")
+
+    def _test_with_t1_images(self, images, n_images):
+        assert n_images > 0
+        vectors = self._preprocess_and_extract_features(images)
+        self.assertIsInstance(vectors, list)
+        self.assertEqual(len(vectors), n_images)
+        self.assertIsInstance(vectors[0], np.ndarray)
+        self.assertTupleEqual(vectors[0].shape, (6, 512))
+        self.assertListEqual([x.shape for x in vectors], [(6, 512)] * n_images)
+
+    def test_with_one_element_list(self):
+        images = [self._get_t1_rgb_pil()]
+        self._test_with_t1_images(images, 1)
+
+    def test_with_one_image_tensor(self):
+        images = torch.unsqueeze(self._get_t1_rgb_tensor(), dim=0)
+        self._test_with_t1_images(images, 1)
+
+    def test_with_n_elements_list(self):
+        images = [
+            self._get_t1_rgb_pil(),
+            self._get_t1_rgb_pil(),
+            self._get_t1_rgb_pil(),
+            self._get_t1_rgb_pil(),
+        ]
+        self._test_with_t1_images(images, 4)
+
+    def test_with_n_images_tensor(self):
+        images = torch.stack(
+            [
+                self._get_t1_rgb_tensor(),
+                self._get_t1_rgb_tensor(),
+                self._get_t1_rgb_tensor(),
+                self._get_t1_rgb_tensor(),
+            ]
+        )
+        self._test_with_t1_images(images, 4)
+
+    def test_grayscale_torch_image(self):
+        images = torch.unsqueeze(self._get_tom_hanks_grayscale_tensor(), dim=0)
+        with self.assertRaisesRegex(Exception, 'RGB in NCHW order'):
+            self._preprocess_and_extract_features(images)
+
+    def test_with_empty_list(self):
+        images = []
+        vectors = self._preprocess_and_extract_features(images)
+        self.assertListEqual(vectors, [])
+
+    def test_with_empty_tensor(self):
+        images = torch.empty([0, 3, 768, 1024])
+        vectors = self._preprocess_and_extract_features(images)
+        self.assertListEqual(vectors, [])
+
 
 if __name__ == '__main__':
     unittest.main()

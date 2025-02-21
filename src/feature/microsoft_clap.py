@@ -17,6 +17,10 @@ class MicrosoftClap(FeatureExtractor):
     ID_PREFIX = 'microsoft/clap/'
     DESCRIPTION = 'See https://github.com/microsoft/CLAP'
 
+    ## CLAP supports text and audio (no image)
+    preprocess_image = None
+    extract_image_features = None
+
     def __init__(self, id):
         if not id.startswith(self.ID_PREFIX):
             raise ValueError(f'feature id cannot start with {id} and must start with {self.ID_PREFIX}')

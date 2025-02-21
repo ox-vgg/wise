@@ -1,5 +1,6 @@
 from .mlfoundation_openclip import MlfoundationOpenClip
 from .microsoft_clap import MicrosoftClap
+from .insightface import InsightFaceFeatureExtractor
 
 def FeatureExtractorFactory(id):
     """
@@ -23,5 +24,7 @@ def FeatureExtractorFactory(id):
         return MlfoundationOpenClip(id)
     elif id.startswith('microsoft/clap/'):
         return MicrosoftClap(id)
+    elif id.startswith('insightface/_/'):
+        return InsightFaceFeatureExtractor(id)
     else:
         raise ValueError(f'Unknown feature extractor id {id}')

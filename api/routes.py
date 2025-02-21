@@ -1303,9 +1303,14 @@ def _get_search_router(config: APIConfig):
             })
         search_index = search_indices[media_type]
 
-        extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
+        def extract_text_features(text: List[str]) -> ndarray:
+            if search_index.feature_extractor.extract_text_features is None:
+                raise WiseFrontendUserException("text modality not supported")
+            return search_index.feature_extractor.extract_text_features(text)
 
         def extract_image_features(images: List[Image.Image]) -> ndarray:
+            if search_index.feature_extractor.extract_image_features is None:
+                raise WiseFrontendUserException("image modality not supported")
             assert len(images) == 1
             feature_vectors = search_index.feature_extractor.extract_image_features(
                 search_index.feature_extractor.preprocess_image(images)
@@ -1328,9 +1333,13 @@ def _get_search_router(config: APIConfig):
             waveform, original_sample_rate = torchaudio.load(audio_file)
             waveform = torchaudio.functional.resample(waveform, orig_freq=original_sample_rate, new_freq=target_sample_rate)
             return waveform
-        extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = lambda x: search_index.feature_extractor.extract_audio_features(
-            search_index.feature_extractor.preprocess_audio(load_audio(x))
-        )
+
+        def extract_audio_features(audio: List[io.BytesIO]) -> ndarray:
+            if search_index.feature_extractor.extract_audio_features is None:
+                raise WiseFrontendUserException("audio modality not supported")
+            return search_index.feature_extractor.extract_audio_features(
+                search_index.feature_extractor.preprocess_audio(load_audio(audio))
+            )
 
         if internal_image_queries or negative_internal_image_queries:
             if search_index.is_internal_search_supported:

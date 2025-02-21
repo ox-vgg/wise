@@ -4,6 +4,14 @@ import torch
 import numpy as np
 
 class FeatureExtractor:
+    """ABC for extractor of feature vectors from audio, image, and text.
+
+    If a subclass will not support specific modalities, e.g., the
+    model does not handle audio, set the methods for that modality to
+    `None` (see :py:exc:`NotImplementedError`).
+
+    """
+
     def __init__(self):
         raise NotImplementedError
 
