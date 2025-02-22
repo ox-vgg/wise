@@ -162,7 +162,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
     ) -> torch.Tensor:
         _logger.debug("preprocessing images of type %s", type(images))
         if isinstance(images, torch.Tensor):
-            if len(images.shape) != 4 or images.shape[1] != 3:
+            if images.ndim != 4 or images.shape[1] != 3:
                 raise Exception("expect tensor images to be RGB in NCHW order")
             return rgb_nchw_to_bgr_nhwc(images)
         elif isinstance(images, list):
@@ -177,30 +177,29 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
     @torch.inference_mode
     def extract_image_features(self, images: torch.Tensor) -> list[np.ndarray]:
         _logger.debug("extracting image features from a %s", type(images))
-        feature_vectors = [None] * len(images)
-        for i, image in enumerate(images):
+        features: list[np.ndarray] = []
+        for image in images:
             ## NB: undocumented but `get()` expects a numpy ndarray,
             ##     of shape `(H, W, C)`, and mode BRG.  The mode seems
             ##     less (not?) important for detection but has an
             ##     impact on recognition models, namely gender
             ##     recognition.
+            ## NB: undocumented but `get()` returns faces ordered by
+            ##     detection score.  We want to preserve that order.
+            ##     This is so that when someone makes a search with
+            ##     multiple faces, the face used for the search is the
+            ##     one we are most confident about (the big frontal
+            ##     and centre face instead of a small, barely
+            ##     noticeable, face in the background).
             faces = self._app.get(image.numpy())
             _logger.debug("found %d faces", len(faces))
-            if faces:
-                feature_vectors[i] = np.stack(
-                    [x.normed_embedding for x in faces]
-                )
-                # TODO: save feature_metadata
-            else:  # no faces found
-                feature_vectors[i] = np.empty(
-                    (0, self._embedding_size), dtype=self._embedding_dtype
-                )
 
-        ## NB: InsightFace.get() returns faces ordered by detection
-        ##     score.  We want to preserve that order.  This is so
-        ##     that when someone makes a search with multiple faces,
-        ##     the face used for the search is the one we are most
-        ##     confident about (the big frontal and centre face
-        ##     instead of a small, barely noticeable, face in the
-        ##     background).
-        return feature_vectors
+            feature_vectors = np.empty(
+                (len(faces), self._embedding_size), dtype=self._embedding_dtype
+            )
+            for i, face in enumerate(faces):
+                feature_vectors[i] = face.normed_embedding
+                # TODO: save feature_metadata
+            features.append(feature_vectors)
+
+        return features
