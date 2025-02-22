@@ -51,9 +51,11 @@ def rgb_nchw_to_bgr_nhwc(images: torch.Tensor) -> torch.Tensor:
     return images
 
 
-def rgb_pil_to_hwc_tensor(pil_img):
+def rgb_pil_to_bgr_hwc_tensor(pil_img: PIL.Image.Image) -> torch.Tensor:
+    assert pil_img.mode == "RGB"
     tensor_img = torch.as_tensor(np.array(pil_img, copy=True))
     tensor_img = tensor_img.view(pil_img.size[1], pil_img.size[0], 3)
+    tensor_img = tensor_img.flip(2)  # RGB -> BGR
     return tensor_img
 
 
@@ -63,7 +65,7 @@ def pil_img_list_to_nhwc_tensor(images: list[PIL.Image.Image]) -> torch.Tensor:
 
     assert len({x.size for x in images}) in [0, 1], \
         "multiple PIL images of different sizes"
-    return torch.stack([rgb_pil_to_hwc_tensor(x) for x in images])
+    return torch.stack([rgb_pil_to_bgr_hwc_tensor(x) for x in images])
 
 
 class InsightFaceFeatureExtractor(FeatureExtractor):
