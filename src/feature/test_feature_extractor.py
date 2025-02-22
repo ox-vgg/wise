@@ -39,7 +39,8 @@ class TestFeatureExtractor(unittest.TestCase):
         extracted_features = featureExtractor.extract_image_features(preprocessed_data)
 
         self.assertEqual(preprocessed_data.shape[0], len(extracted_features))
-        self.assertTrue(all([x.shape == (1, 768) for x in extracted_features]))
+        self.assertTrue(all([x.vectors.shape == (1, 768) for x in extracted_features]))
+        self.assertTrue(all([x.metadata == None for x in extracted_features]))
 
     def test_audio_feature(self):
         featureExtractor = FeatureExtractorFactory('microsoft/clap/2023/Not-Applicable')
@@ -78,13 +79,22 @@ class TestInsigthFaceFeatureExtractor(unittest.TestCase):
         return Image.fromarray(np_img, mode="RGB")
 
     def _test_with_t1_images(self, images, n_images):
+        ## The t1 image distributed with InsightFace is a photo from
+        ## Friends (the TV show) showing the six characters.  The
+        ## model should find 6 faces, 3 male and 3 female.
         assert n_images > 0
-        vectors = self._preprocess_and_extract_features(images)
-        self.assertIsInstance(vectors, list)
-        self.assertEqual(len(vectors), n_images)
-        self.assertIsInstance(vectors[0], np.ndarray)
-        self.assertTupleEqual(vectors[0].shape, (6, 512))
-        self.assertListEqual([x.shape for x in vectors], [(6, 512)] * n_images)
+        features = self._preprocess_and_extract_features(images)
+        ## Check vectors
+        self.assertIsInstance(features, list)
+        self.assertEqual(len(features), n_images)
+        self.assertIsInstance(features[0].vectors, np.ndarray)
+        self.assertTupleEqual(features[0].vectors.shape, (6, 512))
+        self.assertTrue(all([x.vectors.shape == (6, 512) for x in features]))
+        ## Check metadata (just check presence of one of the attributes)
+        self.assertTrue(all([isinstance(x.metadata, list) for x in features]))
+        for f in features:
+            self.assertEqual(len(f.metadata), 6)
+            self.assertEqual([x.is_male for x in f.metadata].count(True), 3)
 
     def test_with_one_element_list(self):
         images = [self._get_t1_rgb_pil()]
@@ -121,13 +131,13 @@ class TestInsigthFaceFeatureExtractor(unittest.TestCase):
 
     def test_with_empty_list(self):
         images = []
-        vectors = self._preprocess_and_extract_features(images)
-        self.assertListEqual(vectors, [])
+        features = self._preprocess_and_extract_features(images)
+        self.assertListEqual(features, [])
 
     def test_with_empty_tensor(self):
         images = torch.empty([0, 3, 768, 1024])
-        vectors = self._preprocess_and_extract_features(images)
-        self.assertListEqual(vectors, [])
+        features = self._preprocess_and_extract_features(images)
+        self.assertListEqual(features, [])
 
 
 if __name__ == '__main__':

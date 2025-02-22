@@ -6,7 +6,7 @@ from PIL import Image
 import torchvision.transforms.functional as F
 from collections.abc import Iterable
 
-from .feature_extractor import FeatureExtractor
+from .feature_extractor import FeatureExtractor, Features
 
 class MlfoundationOpenClip(FeatureExtractor):
     """
@@ -73,8 +73,8 @@ class MlfoundationOpenClip(FeatureExtractor):
             model_image_features = self.extract_image_features(model_image_input)
             model_text_input = ['some random text']
             model_text_features  = self.extract_text_features(model_text_input)
-            assert model_image_features[0].shape[1] == model_text_features.shape[1]
-            self.output_dim = model_image_features[0].shape[1]
+            assert model_image_features[0].vectors.shape[1] == model_text_features.shape[1]
+            self.output_dim = model_image_features[0].vectors.shape[1]
 
     def get_output_dim(self):
         return self.output_dim
@@ -93,7 +93,7 @@ class MlfoundationOpenClip(FeatureExtractor):
         else:
             raise ValueError('all input to preprocess_image() must be an instance of torch.Tensor or PIL.Image')
 
-    def extract_image_features(self, images: torch.Tensor) -> list[np.ndarray]:
+    def extract_image_features(self, images: torch.Tensor) -> list[Features]:
         if isinstance(images, torch.Tensor):
             model_input = images.to(device=self.DEVICE)
         else:
@@ -103,7 +103,8 @@ class MlfoundationOpenClip(FeatureExtractor):
             model_output = self.model.encode_image(model_input).float()
             model_output /= torch.linalg.norm(model_output, dim=-1, keepdims=True)
         model_output = model_output.cpu().numpy()
-        return list(np.expand_dims(model_output, axis=1))
+        feature_vectors = list(np.expand_dims(model_output, axis=1))
+        return [Features(vectors=x, metadata=None) for x in feature_vectors]
 
     def extract_text_features(self, text_query: List[str]) -> np.ndarray:
         with torch.no_grad():
