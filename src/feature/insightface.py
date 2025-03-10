@@ -6,7 +6,7 @@ import contextlib
 import logging
 import os
 from dataclasses import dataclass
-from typing import NamedTuple, Union
+from typing import Union
 
 import numpy as np
 import PIL.Image
@@ -41,7 +41,7 @@ import onnxruntime  # import before insightface for cleaner error
 import insightface.app
 # isort: on
 
-from .feature_extractor import FeatureExtractor, Features
+from .feature_extractor import BBoxXYWH, FeatureExtractor, Features
 
 
 _logger = logging.getLogger(__name__)
@@ -71,17 +71,10 @@ def pil_img_list_to_nhwc_tensor(images: list[PIL.Image.Image]) -> torch.Tensor:
     return torch.stack([rgb_pil_to_bgr_hwc_tensor(x) for x in images])
 
 
-class BBox(NamedTuple):
-    x: float
-    y: float
-    w: float
-    h: float
-
-
 @dataclass
 class FaceFeatureMetadata:
     detection_score: float
-    bbox: BBox
+    bbox: BBoxXYWH
     age: int
     is_male: bool
 
@@ -96,7 +89,7 @@ class FaceFeatureMetadata:
         bbox[(2, 3),] -= bbox[(0, 1),]
         return cls(
             detection_score=face.det_score,
-            bbox=BBox(*bbox),
+            bbox=BBoxXYWH(*bbox),
             age=face.age,
             is_male=(face.sex == "M"),
         )
