@@ -89,7 +89,7 @@ class FeatureSearchIndex(SearchIndex):
     def is_index_loaded(self):
         return hasattr(self, 'index')
 
-    def load_index(self, index_type):
+    def load_index(self, index_type, db_engine):
         self.index_type = index_type
         index_fn = self.get_index_filename(index_type)
         if not index_fn.exists():
@@ -98,6 +98,7 @@ class FeatureSearchIndex(SearchIndex):
             False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
         self.feature_extractor = FeatureExtractorFactory(self.feature_extractor_id)
+        self.feature_extractor.create_vector_metadata_table(db_engine)
         return True
     
     @property

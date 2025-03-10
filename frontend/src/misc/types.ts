@@ -48,11 +48,21 @@ export type VideoInfo = MediaInfo & {
   timeline_hover_thumbnails: string;
 };
 
+// Bounding Box in (x0, y0, w, h) format and in range [0, 1].  They
+// are relative to the size of the image.
+type BBoxXYWH = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 type VectorResult = {
   vector_id: string;
   media_id: string;
   link: string;
   distance: number;
+  bbox?: BBoxXYWH;
 };
 type ImageVector = VectorResult & {
   thumbnail: string;
