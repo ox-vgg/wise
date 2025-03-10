@@ -41,7 +41,12 @@ import onnxruntime  # import before insightface for cleaner error
 import insightface.app
 # isort: on
 
-from .feature_extractor import BBoxXYWH, FeatureExtractor, Features
+from .feature_extractor import (
+    BBoxXYWH,
+    FeatureExtractor,
+    FeatureXTMetadata,
+    Features,
+)
 
 
 _logger = logging.getLogger(__name__)
@@ -234,6 +239,21 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
                 sa.insert(self._vector_metadata_table),
                 [x.to_sql_values(vid) for vid, x in zip(vid, metadata)],
             )
+
+    def get_vector_metadata(
+        self, conn: sa.Connection, vid: list[int]
+    ) -> list[FeatureXTMetadata]:
+        c = self._vector_metadata_table.c
+        res = conn.execute(
+            sa.select(c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
+            .where(c.vector_id.in_(vid))
+            .order_by(
+                sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id)
+            )
+        )
+        res = [FeatureXTMetadata(BBoxXYWH(*x)) for x in res]
+        assert len(vid) == len(res)
+        return res
 
     def preprocess_image(
         self, images: Union[torch.Tensor, list[PIL.Image.Image]]
