@@ -9,6 +9,7 @@ import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/l
 
 import "./ImageDetailsModal.scss";
 import { ImageDetailsModalProps, ProcessedVideoSegment } from "./types";
+import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 
 interface ExternalMetadataProps {
@@ -130,14 +131,9 @@ const ImageDetailsModal = ({
       </MediaPlayer>
     );
   } else {
-    image_viewer = <img
-      src={imageDetails?.link}
-      // title={
-      //   imageDetails?.mediaInfo.filename +
-      //   (imageDetails?.distance
-      //     ? ` | Distance = ${imageDetails.distance.toFixed(2)}`
-      //     : "")
-      // }
+    image_viewer = <StillImageView
+      imageDetails={imageDetails}
+      isModalView={true}
     />;
   }
 

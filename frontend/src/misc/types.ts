@@ -280,3 +280,8 @@ export interface VideoOccurrencesViewProps {
   customHeaderSingular?: string;
   customHeaderPlural?: string;
 };
+
+export interface StillImageViewProps {
+  imageDetails: ProcessedImageVector;
+  isModalView: boolean;
+};
