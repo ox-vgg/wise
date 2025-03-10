@@ -226,6 +226,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             ## InsightFace returns gender/sex with two options only,
             ## so we use is_male so we can use boolean type.
             sa.Column("is_male", sa.Boolean, nullable=False),
+            keep_existing=True,
         )
         db_metadata_obj.create_all(db_engine)
 
