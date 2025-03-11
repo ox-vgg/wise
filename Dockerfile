@@ -35,11 +35,11 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
     if [[ ${APP} == 'wise' ]]; then \
         export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cu124' && \
         export CUDNN_PACKAGE='cudnn' && \
-        export ONNXRUNTIME_PACKAGE='onnxruntime-gpu' \
-    fi \
-    echo "Using Pip index url: $PIP_EXTRA_INDEX_URL CUDNN: ${CUDNN_PACAKGE:-none} ONNX: ${ONNXRUNTIME_PACKAGE}" && \
+        export ONNXRUNTIME_PACKAGE='onnxruntime-gpu'; \
+    fi && \
+    echo "Using Pip index url: ${PIP_EXTRA_INDEX_URL} CUDNN: ${CUDNN_PACAKGE:-none} ONNX: ${ONNXRUNTIME_PACKAGE} " && \
     micromamba create --always-copy --yes -n wise-env -f "wise.yml" "${CUDNN_PACKAGE}" && \
-    ${MAMBA_ROOT_PREFIX}/envs/wise-env/bin/python3 -m pip install ${ONNXRUNTIME_PACKAGE} && \
+    ${MAMBA_ROOT_PREFIX}/envs/wise-env/bin/python3 -m pip install "${ONNXRUNTIME_PACKAGE}" && \
     ${MAMBA_ROOT_PREFIX}/envs/wise-env/bin/python3 -m pip install --no-deps --no-cache-dir "msclap==1.3.3"
 
 FROM ${NODE_IMAGE} AS wise-frontend
