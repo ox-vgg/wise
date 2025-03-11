@@ -22,6 +22,9 @@ ENV APP=${APP} \
 
 USER root
 RUN mkdir -p ${HF_HOME} ${PYTHONPYCACHEPREFIX} && chmod 3777 -R /tmp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential && \
+    rm -rf /var/lib/apt /var/lib/dpkg /var/lib/cache /var/lib/log
 
 USER ${MAMBA_USER}
 WORKDIR /tmp
