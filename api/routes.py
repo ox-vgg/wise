@@ -1187,51 +1187,6 @@ def _get_search_router(config: APIConfig):
 
         return response
 
-    @router.get("/search", response_model=SearchResponse)
-    @add_response_time
-    async def handle_get_search(
-        q: List[str] = Query(default=[]),
-        start: int = Query(0, ge=0, le=980),
-        end: int = Query(20, gt=0, le=1000),
-        thumbnails_to_send: int = Query(0),
-    ):
-        if len(q) == 0:
-            raise HTTPException(400, {"message": "Missing search query"})
-
-        end = min(end, num_vectors)
-        if start > end:
-            raise HTTPException(
-                400, {"message": "'start' cannot be greater than 'end'"}
-            )
-
-        for query in q:
-            if query.strip() in config.query_blocklist:
-                message = (
-                    "One of the search terms you entered has been blocked"
-                    if len(q) > 1
-                    else "The search term you entered has been blocked"
-                )
-                raise HTTPException(403, {"message": message})
-
-        q = [dict(sign="positive", val=query) for query in q]
-
-        # Pick the first feature extractor for videos
-        search_in = MediaType.VIDEO
-        search_index = search_indices[search_in]
-
-        extract_text_features: Callable[[List[str]], ndarray] = search_index.feature_extractor.extract_text_features
-        extract_image_features: Callable[[List[Image.Image]], ndarray] = lambda x: search_index.feature_extractor.extract_image_features(
-            search_index.feature_extractor.preprocess_image(x)
-        )
-
-        return similarity_search(
-            q=q,
-            search_in=search_in,
-            search_index=search_index,
-            start=start, end=end, thumbnails_to_send=thumbnails_to_send,
-            extract_text_features=extract_text_features, extract_image_features=extract_image_features,
-        )
-
     @router.post("/search", response_model=SearchResponse)
     @add_response_time
     async def handle_post_search_multimodal(
