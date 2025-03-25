@@ -155,7 +155,7 @@ def resolve_media_path(db_engine, metadata):
                 metadata[i]['media_id'] = -1
                 failed_count += 1
         if failed_count:
-            print(f'failed to resolved media_path for {failed_count} metadata rows')
+            raise ValueError(f'failed to resolved media_path for {failed_count} metadata rows')
 
 def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metadata):
     colnames = []
@@ -191,7 +191,7 @@ def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metada
         conn.execute(metadata_table.insert(), media_metadata)
         conn.commit()
     print(f'inserted {len(media_metadata)} rows into table {metadata_tablename}')
-    
+
 ##
 ## Helper functions
 ##
