@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Button, Dropdown, Modal, Descriptions } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 // import sanitizeHtml from "sanitize-html";
@@ -32,6 +32,7 @@ const ImageDetailsModal = ({
   setSelectedImageId,
   isHomePage,
 }: ImageDetailsModalProps) => {
+  const [isModalOpen, setIsModalOpen] = useState(true);
   let title;
   // let caption, author, copyright;
 
@@ -39,43 +40,42 @@ const ImageDetailsModal = ({
 
   const playerRef = useRef<MediaPlayerInstance>(null);
 
-  if (imageDetails) {
-    title = (
-      <Button
-        type="text"
-        // href={imageDetails.mediaInfo.externalLink}
-        target='_blank'
-        size="large"
+  title = (
+    <Button
+      type="text"
+      // href={imageDetails.mediaInfo.externalLink}
+      target='_blank'
+      size="large"
+    >
+      <b>{imageDetails.mediaInfo.title}</b>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        height="24"
+        viewBox="0 0 24 24"
+        width="24"
       >
-        <b>{imageDetails.mediaInfo.title}</b>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          height="24"
-          viewBox="0 0 24 24"
-          width="24"
-        >
-          <path d="M0 0h24v24H0z" fill="none" />
-          <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
-        </svg>
-      </Button>
-    );
-    // ({ caption, author, copyright } = imageDetails.info);
+        <path d="M0 0h24v24H0z" fill="none" />
+        <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+      </svg>
+    </Button>
+  );
+  // ({ caption, author, copyright } = imageDetails.info);
 
-    // const width = imageDetails.info.width;
-    // const height = imageDetails.info.height;
-  }
+  // const width = imageDetails.info.width;
+  // const height = imageDetails.info.height;
+
   // Remove end time from timestamp (e.g. change "#t=16.0,20.0" to "#t=16.0") to prevent video from automatically pausing
-  const videoSrc = imageDetails?.link.replace(/(#t=[\d\.]+),[\d\.]+$/, '$1');
+  const videoSrc = imageDetails.link.replace(/(#t=[\d\.]+),[\d\.]+$/, '$1');
 
   const setStartTimestamp = () => {
     // This is needed because the video player doesn't automatically play the video from the start time in the URL (e.g. #t=16.0)
-    if (imageDetails && imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
+    if (imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails.ts;
   }
 
   const handleClickOccurrence = (videoSegment: ProcessedVideoSegment) => {
-    if (imageDetails && imageDetails.mediaType == 'VIDEO') {
+    if (imageDetails.mediaType == 'VIDEO') {
       if (imageDetails.vector_id === videoSegment.vector_id) {
-        if (playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
+        if (playerRef.current) playerRef.current.currentTime = imageDetails.ts;
       } else {
         setImageDetails(videoSegment);
       }
@@ -83,9 +83,7 @@ const ImageDetailsModal = ({
   }
 
   let image_viewer;
-  if (! imageDetails) {
-    image_viewer = <img />;
-  } else if (imageDetails.mediaType == 'VIDEO') {
+  if (imageDetails.mediaType == 'VIDEO') {
     let media_provider_track;
     if (isHomePage) {
       /*
@@ -140,7 +138,7 @@ const ImageDetailsModal = ({
   return (
     <Modal
       title={title}
-      open={!!imageDetails}
+      open={isModalOpen}
       closable={true}
       maskClosable={true}
       destroyOnClose={true}
@@ -151,7 +149,7 @@ const ImageDetailsModal = ({
               items: [
                 {
                   label: "Report image",
-                  key: imageDetails?.mediaInfo.filename || '',
+                  key: imageDetails.mediaInfo.filename || '',
                 },
               ],
               onClick: ({ key }) => {
@@ -174,7 +172,8 @@ const ImageDetailsModal = ({
         </>
       }
       zIndex={500} // The default zIndex is 1000. Setting this to 500 allows the ReportImageModal to be shown on top / in front of this modal, rather than behind
-      onCancel={() => setImageDetails()}
+      onCancel={() => setIsModalOpen(false)}
+      afterOpenChange={(is_open) => is_open || setImageDetails()}
       width="90vw"
       className="wise-image-details-modal"
     >
@@ -182,7 +181,7 @@ const ImageDetailsModal = ({
         { image_viewer }
       </div>
       {
-        (imageDetails && !isHomePage && imageDetails.mediaType == 'VIDEO') &&
+        (!isHomePage && imageDetails.mediaType == 'VIDEO') &&
         <VideoOccurrencesView videoInfo={imageDetails.mediaInfo}
           handleClickOccurrence={handleClickOccurrence}
           customHeaderSingular='search match in this video'
@@ -190,7 +189,7 @@ const ImageDetailsModal = ({
         />
       }
 
-      {imageDetails?.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails?.mediaInfo.external_metadata} />}
+      {imageDetails.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails.mediaInfo.external_metadata} />}
 
     </Modal>
   );
