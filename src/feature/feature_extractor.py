@@ -45,18 +45,18 @@ class BBoxXYWH(NamedTuple):
 
 
 @dataclass
-class FeatureXTMetadata:
+class FeatureExtMetadata:
     """Optional feature metadata that WISE "core" knows how to handle.
 
     Individual :class:`FeatureExtractor` keep whatever metadata they
     want for each feature, in whatever format they want, in their own
-    separate db table.  Those are the XT metadata, and separate from
+    separate db table.  Those are the Ext metadata, and separate from
     the vector metadata common to all `FeatureExtractor` and stored in
     the "core" vectors table.
 
     This is what :meth:`FeatureExtractor.get_vector_metadata` returns.
 
-    All XT metadata attributes are optional because feature extractors
+    All Ext metadata attributes are optional because feature extractors
     are not required to compute, store, or return any of them.
 
     """
@@ -101,8 +101,8 @@ class FeatureExtractor:
 
     def get_vector_metadata(
         self, conn: sa.Connection, vid: list[int]
-    ) -> list[FeatureXTMetadata]:
-        """Get XT vector metadata from the database.
+    ) -> list[FeatureExtMetadata]:
+        """Get Ext vector metadata from the database.
 
         Since `FeatureExtractor` are not required to have this
         metadata, default to return a list with none of it.
@@ -118,11 +118,11 @@ class FeatureExtractor:
 
         Returns
         -------
-        list[FeatureXTMetadata]
+        list[FeatureExtMetadata]
             One for each of input `vid` and in the same order.
 
         """
-        return [FeatureXTMetadata() for _ in range(len(vid))]
+        return [FeatureExtMetadata() for _ in range(len(vid))]
 
     def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
         """ Preprocess media to prepare it for feature extraction

@@ -44,7 +44,7 @@ import insightface.app
 from .feature_extractor import (
     BBoxXYWH,
     FeatureExtractor,
-    FeatureXTMetadata,
+    FeatureExtMetadata,
     Features,
 )
 
@@ -242,7 +242,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
     def get_vector_metadata(
         self, conn: sa.Connection, vid: list[int]
-    ) -> list[FeatureXTMetadata]:
+    ) -> list[FeatureExtMetadata]:
         c = self._vector_metadata_table.c
         res = conn.execute(
             sa.select(c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
@@ -251,7 +251,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
                 sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id)
             )
         )
-        res = [FeatureXTMetadata(BBoxXYWH(*x)) for x in res]
+        res = [FeatureExtMetadata(BBoxXYWH(*x)) for x in res]
         assert len(vid) == len(res)
         return res
 

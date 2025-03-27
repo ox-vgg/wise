@@ -54,7 +54,7 @@ from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollec
 from src.enums import IndexType
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
-from src.feature.feature_extractor import FeatureXTMetadata
+from src.feature.feature_extractor import FeatureExtMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -712,15 +712,15 @@ def _get_search_router(config: APIConfig):
     def construct_image_search_response(
         top_dist: List[float],
         all_metadata: List[VectorAndMediaMetadata],
-        all_xt_metadata: list[FeatureXTMetadata],
+        all_ext_metadata: list[FeatureExtMetadata],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
     ):
         images = {}
         image_vectors = []
-        for _dist, _metadata, _xt_metadata, (_thumb, _thumb_score) in zip(
+        for _dist, _metadata, _ext_metadata, (_thumb, _thumb_score) in zip(
             top_dist,
             all_metadata,
-            all_xt_metadata,
+            all_ext_metadata,
             get_thumbs_fn(all_metadata),
         ):
             image_id = str(_metadata.media_id)
@@ -745,7 +745,7 @@ def _get_search_router(config: APIConfig):
                 distance=_dist,
                 thumbnail=_thumb,
                 thumbnail_score=_thumb_score,
-                bbox=_xt_metadata.bbox,
+                bbox=_ext_metadata.bbox,
             )
             image_vectors.append(image_vector)
 
@@ -759,12 +759,12 @@ def _get_search_router(config: APIConfig):
         top_dist: List[float],
         top_ids: List[int],
         get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
-        get_xt_metadata_fn: Callable[[List[int]], list[FeatureXTMetadata]],
+        get_ext_metadata_fn: Callable[[List[int]], list[FeatureExtMetadata]],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
         search_in: MediaType = None,
     ):
         all_metadata = get_metadata_fn(top_ids)
-        all_xt_metadata = get_xt_metadata_fn(top_ids)
+        all_ext_metadata = get_ext_metadata_fn(top_ids)
         audio_results = None
         video_audio_results = None
         video_results = None
@@ -774,8 +774,8 @@ def _get_search_router(config: APIConfig):
             if len(image_indices) > 0:
                 image_top_dist = [top_dist[i] for i in image_indices]
                 image_all_metadata = [all_metadata[i] for i in image_indices]
-                image_xt_metadata = [all_xt_metadata[i] for i in image_indices]
-                image_results = construct_image_search_response(image_top_dist, image_all_metadata, image_xt_metadata, get_thumbs_fn)
+                image_ext_metadata = [all_ext_metadata[i] for i in image_indices]
+                image_results = construct_image_search_response(image_top_dist, image_all_metadata, image_ext_metadata, get_thumbs_fn)
         if search_in is None or search_in == MediaType.VIDEO:
             video_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.VIDEO]
             if len(video_indices) > 0:
@@ -1224,17 +1224,17 @@ def _get_search_router(config: APIConfig):
 
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
 
-            ## Return no XT metadata for the featured images, since at
+            ## Return no Ext metadata for the featured images, since at
             ## this stage we haven't actually made any search we are
             ## just showing a sample of the media we have.
-            _get_xt_metadata = lambda x: [FeatureXTMetadata()] * len(x)
+            _get_ext_metadata = lambda x: [FeatureExtMetadata()] * len(x)
 
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_search_response(
                 top_dist=dist[start:end],
                 top_ids=selected_ids[start:end],
                 get_metadata_fn=_get_metadata,
-                get_xt_metadata_fn=_get_xt_metadata,
+                get_ext_metadata_fn=_get_ext_metadata,
                 get_thumbs_fn=get_thumbs,
             )
 
@@ -1447,7 +1447,7 @@ def _get_search_router(config: APIConfig):
             extract_text_features=extract_text_features,
             extract_image_features=extract_image_features,
             extract_audio_features=extract_audio_features,
-            get_xt_metadata=search_index.feature_extractor.get_vector_metadata,
+            get_ext_metadata=search_index.feature_extractor.get_vector_metadata,
         )
 
     def similarity_search(
@@ -1460,7 +1460,7 @@ def _get_search_router(config: APIConfig):
         extract_text_features: Callable[[List[str]], ndarray] = None,
         extract_image_features: Callable[[List[Image.Image]], ndarray] = None,
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
-        get_xt_metadata: Callable[[list[int]], list[FeatureXTMetadata]] = None,
+        get_ext_metadata: Callable[[list[int]], list[FeatureExtMetadata]] = None,
     ):
         features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
         dist, ids = search_index.index.search(features, end)
@@ -1474,7 +1474,7 @@ def _get_search_router(config: APIConfig):
 
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
-            _get_xt_metadata = functools.partial(get_xt_metadata, conn)
+            _get_ext_metadata = functools.partial(get_ext_metadata, conn)
 
             get_thumbs = thumbs_reader(thumbs_conn, valid_dist, thumbnails_to_send)
 
@@ -1482,7 +1482,7 @@ def _get_search_router(config: APIConfig):
                 top_dist=valid_dist,
                 top_ids=valid_ids,
                 get_metadata_fn=_get_metadata,
-                get_xt_metadata_fn=_get_xt_metadata,
+                get_ext_metadata_fn=_get_ext_metadata,
                 get_thumbs_fn=get_thumbs,
                 search_in=search_in,
             )
