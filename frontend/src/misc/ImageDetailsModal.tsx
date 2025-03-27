@@ -11,7 +11,10 @@ import "./ImageDetailsModal.scss";
 import { ImageDetailsModalProps, ProcessedVideoSegment } from "./types";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 
-const ExternalMetadata = ({all_metadata}) => {
+interface ExternalMetadataProps {
+  all_metadata: Record<string, string>;
+}
+const ExternalMetadata = ({ all_metadata }: ExternalMetadataProps) => {
   return (
     <Descriptions title="Media Metadata" bordered column={1}>
       {Object.entries(all_metadata).map(([key, value]) => (
@@ -32,9 +35,9 @@ const ImageDetailsModal = ({
   // let caption, author, copyright;
 
   console.log(imageDetails)
-  
+
   const playerRef = useRef<MediaPlayerInstance>(null);
-  
+
   if (imageDetails) {
     title = (
       <Button
@@ -78,7 +81,7 @@ const ImageDetailsModal = ({
     }
   }
 
-  
+
 
   return (
     <Modal
@@ -137,16 +140,16 @@ const ImageDetailsModal = ({
             */}
             <MediaProvider>
               {
-                !isHomePage && 
+                !isHomePage &&
                 <Track content={{
                   // @ts-ignore
                   cues: [...imageDetails.mediaInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
-                      startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
+                    startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
                                                                   add 0.1s to the timestamp due to CSS rule
                                                                   requiring the matching chapter elements to be 'even' rather than odd */
-                      endTime: shot.te,
-                      text: 'Match found'
-                    })),
+                    endTime: shot.te,
+                    text: 'Match found'
+                  })),
                 }} kind="chapters" lang="en-US" default />
               }
             </MediaProvider>
@@ -157,12 +160,12 @@ const ImageDetailsModal = ({
         ) : (
           <img
             src={imageDetails?.link}
-            // title={
-            //   imageDetails?.mediaInfo.filename +
-            //   (imageDetails?.distance
-            //     ? ` | Distance = ${imageDetails.distance.toFixed(2)}`
-            //     : "")
-            // }
+          // title={
+          //   imageDetails?.mediaInfo.filename +
+          //   (imageDetails?.distance
+          //     ? ` | Distance = ${imageDetails.distance.toFixed(2)}`
+          //     : "")
+          // }
           />
         )}
       </div>
@@ -174,9 +177,9 @@ const ImageDetailsModal = ({
           customHeaderPlural='search matches in this video'
         />
       }
-      
-      { imageDetails?.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails?.mediaInfo.external_metadata} />}
-      
+
+      {imageDetails?.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails?.mediaInfo.external_metadata} />}
+
     </Modal>
   );
 };
