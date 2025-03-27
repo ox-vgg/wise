@@ -11,7 +11,7 @@ import logging
 import sqlalchemy as sa
 
 from src.dataloader.dataset import MediaChunk
-from src.dataloader import  get_dataset, get_metadata_for_valid_files, DatasetPayload
+from src.dataloader import get_dataset, get_metadata_for_valid_files, DatasetPayload
 from src.dataloader.streamreader import SourceMediaType, MediaChunkType
 from src.dataloader.utils import get_files_from_directory_with_extensions
 from src.wise_project import WiseProject
@@ -79,21 +79,28 @@ def initialise_feature_extractors(
 def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] = ['*']):
 
     # Get files matching extensions
-    input_files = list(get_files_from_directory_with_extensions(media_dir, include_extensions))
+    input_files = list(
+        get_files_from_directory_with_extensions(media_dir, include_extensions)
+    )
+
+    logger.info(
+        f"Found {len(input_files)} in {media_dir} (extensions: {include_extensions})"
+    )
 
     # Get metadata and media datasets corresponding to the files
     metadata, unknown_files = get_metadata_for_valid_files(input_files)
     if len(unknown_files) > 0:
-        logger.info(f'Skipping {len(unknown_files)} files that are not valid media in directory "{media_dir}"')
+        logger.info(
+            f'Skipping {len(unknown_files)} files that are not valid media in directory "{media_dir}"'
+        )
         logger.debug("\n".join(map(str, unknown_files)))
 
     # Add metadata to database
     dataset_payload: list[DatasetPayload] = []
+    logger.info(f"Writing metadata to database...")
     with tqdm(total=len(metadata)) as pbar, db_engine.begin() as conn:
         # Add each folder to source collection table
-        data = SourceCollection(
-            location=str(media_dir), type=SourceCollectionType.DIR
-        )
+        data = SourceCollection(location=str(media_dir), type=SourceCollectionType.DIR)
         media_source_collection = SourceCollectionRepo.create(conn, data=data)
 
         for media_metadata in metadata:
@@ -104,9 +111,7 @@ def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] 
                 conn,
                 data=MediaMetadata(
                     source_collection_id=media_source_collection.id,
-                    path=os.path.relpath(
-                        media_path, media_source_collection.location
-                    ),
+                    path=os.path.relpath(media_path, media_source_collection.location),
                     media_type=media_metadata.media_type,
                     checksum=media_metadata.md5sum,
                     size_in_bytes=os.path.getsize(media_path),
@@ -126,7 +131,9 @@ def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] 
             #     | media_metadata.extra,
             # )
             # MediaMetadataRepo.create(conn, data=extra_metadata)
-            dataset_payload.append(DatasetPayload(_metadata.id, media_path, _metadata.media_type))
+            dataset_payload.append(
+                DatasetPayload(_metadata.id, media_path, _metadata.media_type)
+            )
             pbar.update(1)
 
 
