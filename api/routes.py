@@ -440,6 +440,7 @@ def _get_search_router(config: APIConfig):
         title: str = ""
         caption: str = ""
         copyright: str = ""
+        external_metadata: dict
 
     # A search result containing the metadata fields from MediaInfo, as well as additional fields like `thumbnail` and `distance`
     class MediaInfo(MediaMetadata):
@@ -641,6 +642,7 @@ def _get_search_router(config: APIConfig):
                     duration=_metadata.duration,
                     thumbnail="",
                     timeline_hover_thumbnails=f"storyboard/{video_id}",
+                    external_metadata=_metadata.external_metadata
                 )
             ts = _metadata.timestamp
             te = _metadata.end_timestamp
@@ -871,6 +873,7 @@ def _get_search_router(config: APIConfig):
     project_assets = project.discover_assets()
     project_engine = db.init_project(project.dburi)
     thumbs_engine = db.init_thumbs(project.thumbs_uri)
+    external_metadata_tables = db.reflect_external_metadata(project_engine)
 
     """
     Load search indices for all feature extractors.
@@ -1448,7 +1451,7 @@ def _get_search_router(config: APIConfig):
         valid_dist = [float(top_dist[x]) for x in valid_indices]
 
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
-            _get_metadata = functools.partial(get_full_metadata_batch, conn)
+            _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
             # def _get_metadata(_id: int):
             #     m = MediaRepo.get(conn, int(_id))
             #     if m is None:

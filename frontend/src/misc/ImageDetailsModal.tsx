@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Button, Dropdown, Modal } from "antd";
+import { Button, Dropdown, Modal, Descriptions } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 // import sanitizeHtml from "sanitize-html";
 import '@vidstack/react/player/styles/default/theme.css';
@@ -51,7 +51,7 @@ const ImageDetailsModal = ({
   }
   // Remove end time from timestamp (e.g. change "#t=16.0,20.0" to "#t=16.0") to prevent video from automatically pausing
   const videoSrc = imageDetails?.link.replace(/(#t=[\d\.]+),[\d\.]+$/, '$1');
-  
+
   const setStartTimestamp = () => {
     // This is needed because the video player doesn't automatically play the video from the start time in the URL (e.g. #t=16.0)
     if (imageDetails && imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails?.ts;
@@ -65,6 +65,18 @@ const ImageDetailsModal = ({
         setImageDetails(videoSegment);
       }
     }
+  }
+
+  function ExternalMetadata({all_metadata}) {
+    return (
+      <Descriptions title="Media Metadata" bordered column={1}>
+        {Object.entries(all_metadata).map(([key, value]) => (
+          <Descriptions.Item key={key} label={key}>
+            {value}
+          </Descriptions.Item>
+        ))}
+      </Descriptions>
+    );
   }
 
   return (
@@ -162,28 +174,8 @@ const ImageDetailsModal = ({
         />
       }
       <p>
-        <b>Filename</b>
-        <br />
-        <span>{imageDetails?.mediaInfo.filename}</span>
+        { imageDetails?.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails?.mediaInfo.external_metadata} />}
       </p>
-
-      {/* <div className="wise-image-details-metadata">
-        <p>
-          <b>Description</b>
-          <br />
-          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(caption) }} />
-        </p>
-        <p>
-          <b>Author</b>
-          <br />
-          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(author) }} />
-        </p>
-        <p>
-          <b>License</b>
-          <br />
-          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(copyright) }} />
-        </p>
-      </div> */}
     </Modal>
   );
 };
