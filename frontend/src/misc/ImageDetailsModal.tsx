@@ -11,6 +11,17 @@ import "./ImageDetailsModal.scss";
 import { ImageDetailsModalProps, ProcessedVideoSegment } from "./types";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 
+const ExternalMetadata = ({all_metadata}) => {
+  return (
+    <Descriptions title="Media Metadata" bordered column={1}>
+      {Object.entries(all_metadata).map(([key, value]) => (
+        <Descriptions.Item key={key} label={key}>
+          {value}
+        </Descriptions.Item>
+      ))}
+    </Descriptions>
+  );
+}
 const ImageDetailsModal = ({
   imageDetails,
   setImageDetails,
@@ -67,17 +78,7 @@ const ImageDetailsModal = ({
     }
   }
 
-  function ExternalMetadata({all_metadata}) {
-    return (
-      <Descriptions title="Media Metadata" bordered column={1}>
-        {Object.entries(all_metadata).map(([key, value]) => (
-          <Descriptions.Item key={key} label={key}>
-            {value}
-          </Descriptions.Item>
-        ))}
-      </Descriptions>
-    );
-  }
+  
 
   return (
     <Modal
@@ -173,9 +174,9 @@ const ImageDetailsModal = ({
           customHeaderPlural='search matches in this video'
         />
       }
-      <p>
-        { imageDetails?.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails?.mediaInfo.external_metadata} />}
-      </p>
+      
+      { imageDetails?.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails?.mediaInfo.external_metadata} />}
+      
     </Modal>
   );
 };
