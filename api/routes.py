@@ -440,7 +440,7 @@ def _get_search_router(config: APIConfig):
         title: str = ""
         caption: str = ""
         copyright: str = ""
-        external_metadata: dict
+        external_metadata: dict = {}
 
     # A search result containing the metadata fields from MediaInfo, as well as additional fields like `thumbnail` and `distance`
     class MediaInfo(MediaMetadata):
