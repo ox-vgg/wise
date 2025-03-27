@@ -48,7 +48,7 @@
         // top: 0;
         // flex-grow: 1;
 
-        > video {
+        video {
           width: 100%;
           height: auto;
           max-height: 100%;
@@ -123,16 +123,16 @@
     .ant-modal-content > .ant-modal-body {
       overflow: scroll;
 
-      > .wise-image-wrapper {
-        width: 100%;
-        height: fit-content;
-        max-height: 80%;
-        position: unset;
+      // > .wise-image-wrapper {
+      //   width: 100%;
+      //   height: fit-content;
+      //   max-height: 80%;
+      //   position: unset;
 
-        > video {
-          height: unset;
-        }
-      }
+      //   video {
+      //     height: unset;
+      //   }
+      // }
 
       > .wise-image-details-metadata {
         width: 100%;
