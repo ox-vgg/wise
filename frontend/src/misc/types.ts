@@ -40,6 +40,7 @@ type MediaInfo = MediaMetadata & {
   link: string;
   thumbnail: string;
   distance?: number;
+  external_metadata?: Record<string, any>;
 };
 export type ImageInfo = MediaInfo & {};
 export type AudioInfo = MediaInfo & {};
