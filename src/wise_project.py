@@ -28,6 +28,15 @@ class WiseProject:
     def dburi(self) -> str:
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
+    def metadata_db_table(self, metadata_id: str, extension='.sqlite') -> tuple[Path, str]:
+        metadata_id_tok = metadata_id.split('/')
+        assert len(metadata_id_tok) == 3, 'metadata_id must be in "FOLDER_NAME/DB_NAME/TABLE_NAME" format'
+        metadata_db_dir = self.metadata_dir / metadata_id_tok[0]
+        metadata_db_dir.mkdir(parents=True, exist_ok=True)
+        metadata_db = metadata_db_dir / (metadata_id_tok[1] + extension)
+        metadata_table = metadata_id_tok[2]
+        return metadata_db, metadata_table
+
     def metadata_tablename(self, metadata_id: str) -> str:
         return "metadata-" + metadata_id
 

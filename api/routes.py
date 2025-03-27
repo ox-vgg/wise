@@ -1195,20 +1195,7 @@ def _get_search_router(config: APIConfig):
             # Use 0 as a filler value for the distance array since this is not relevant for the featured images
             dist = [0.0] * len(selected_ids)
 
-            _get_metadata = functools.partial(get_full_metadata_batch, conn)
-            # def _get_metadata(_id: int):
-            #     m = MetadataRepo.get(conn, int(_id) + 1)
-            #     if m is None:
-            #         raise RuntimeError()
-
-            #     if m.metadata.get("title") is None:
-            #         d = DatasetRepo.get(conn, int(m.dataset_id))
-            #         if d is None:
-            #             raise RuntimeError()
-            #         video_filename = Path(d.location).name
-            #         m.metadata["title"] = video_filename
-
-            #     return m
+            _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
 
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_search_response(
@@ -1452,19 +1439,6 @@ def _get_search_router(config: APIConfig):
 
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
-            # def _get_metadata(_id: int):
-            #     m = MediaRepo.get(conn, int(_id))
-            #     if m is None:
-            #         raise RuntimeError()
-
-            #     if m.metadata.get("title") is None:
-            #         d = DatasetRepo.get(conn, int(m.dataset_id))
-            #         if d is None:
-            #             raise RuntimeError()
-            #         video_filename = Path(d.location).name
-            #         m.metadata["title"] = video_filename
-
-            #     return m
 
             get_thumbs = thumbs_reader(thumbs_conn, valid_dist, thumbnails_to_send)
 
