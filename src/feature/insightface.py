@@ -6,7 +6,7 @@ import contextlib
 import logging
 import os
 from dataclasses import dataclass
-from typing import NamedTuple, Union
+from typing import Union
 
 import numpy as np
 import PIL.Image
@@ -41,7 +41,12 @@ import onnxruntime  # import before insightface for cleaner error
 import insightface.app
 # isort: on
 
-from .feature_extractor import FeatureExtractor, Features
+from .feature_extractor import (
+    BBoxXYWH,
+    FeatureExtractor,
+    FeatureExtMetadata,
+    Features,
+)
 
 
 _logger = logging.getLogger(__name__)
@@ -71,17 +76,10 @@ def pil_img_list_to_nhwc_tensor(images: list[PIL.Image.Image]) -> torch.Tensor:
     return torch.stack([rgb_pil_to_bgr_hwc_tensor(x) for x in images])
 
 
-class BBox(NamedTuple):
-    x: float
-    y: float
-    w: float
-    h: float
-
-
 @dataclass
 class FaceFeatureMetadata:
     detection_score: float
-    bbox: BBox
+    bbox: BBoxXYWH
     age: int
     is_male: bool
 
@@ -96,7 +94,7 @@ class FaceFeatureMetadata:
         bbox[(2, 3),] -= bbox[(0, 1),]
         return cls(
             detection_score=face.det_score,
-            bbox=BBox(*bbox),
+            bbox=BBoxXYWH(*bbox),
             age=face.age,
             is_male=(face.sex == "M"),
         )
@@ -226,6 +224,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             ## InsightFace returns gender/sex with two options only,
             ## so we use is_male so we can use boolean type.
             sa.Column("is_male", sa.Boolean, nullable=False),
+            keep_existing=True,
         )
         db_metadata_obj.create_all(db_engine)
 
@@ -240,6 +239,21 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
                 sa.insert(self._vector_metadata_table),
                 [x.to_sql_values(vid) for vid, x in zip(vid, metadata)],
             )
+
+    def get_vector_metadata(
+        self, conn: sa.Connection, vid: list[int]
+    ) -> list[FeatureExtMetadata]:
+        c = self._vector_metadata_table.c
+        res = conn.execute(
+            sa.select(c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
+            .where(c.vector_id.in_(vid))
+            .order_by(
+                sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id)
+            )
+        )
+        res = [FeatureExtMetadata(BBoxXYWH(*x)) for x in res]
+        assert len(vid) == len(res)
+        return res
 
     def preprocess_image(
         self, images: Union[torch.Tensor, list[PIL.Image.Image]]

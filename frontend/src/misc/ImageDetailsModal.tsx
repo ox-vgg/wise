@@ -9,6 +9,7 @@ import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/l
 
 import "./ImageDetailsModal.scss";
 import { ImageDetailsModalProps, ProcessedVideoSegment } from "./types";
+import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 
 interface ExternalMetadataProps {
@@ -81,7 +82,60 @@ const ImageDetailsModal = ({
     }
   }
 
-
+  let image_viewer;
+  if (! imageDetails) {
+    image_viewer = <img />;
+  } else if (imageDetails.mediaType == 'VIDEO') {
+    let media_provider_track;
+    if (isHomePage) {
+      /*
+        TODO - chapter markers by default use thumbnails from
+               storyboard - change this to use thumbnails from search
+               results instead
+      */
+      media_provider_track = <Track
+        content={{
+          // @ts-ignore
+          cues: [...imageDetails.mediaInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
+                      startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
+                                                                         add 0.1s to the timestamp due to CSS rule
+                                                                         requiring the matching chapter elements to be 'even' rather than odd */
+                      endTime: shot.te,
+                      text: 'Match found'
+                    })),
+        }}
+        kind="chapters"
+        lang="en-US"
+        default
+      />;
+    }
+    image_viewer = (
+      <MediaPlayer
+        src={videoSrc}
+        viewType="video"
+        playsInline
+        autoPlay
+        ref={playerRef}
+        onLoadedMetadata={setStartTimestamp}
+        clipEndTime={imageDetails.mediaInfo.duration} // This is needed due to a bug with the chapter markers https://github.com/vidstack/player/issues/1022
+      >
+        <MediaProvider>
+          { media_provider_track }
+        </MediaProvider>
+        <DefaultVideoLayout
+          thumbnails={imageDetails.mediaInfo.timeline_hover_thumbnails}
+          icons={defaultLayoutIcons}
+          noScrubGesture={false}
+          seekStep={5}
+        />
+      </MediaPlayer>
+    );
+  } else {
+    image_viewer = <StillImageView
+      imageDetails={imageDetails}
+      isModalView={true}
+    />;
+  }
 
   return (
     <Modal
@@ -125,49 +179,7 @@ const ImageDetailsModal = ({
       className="wise-image-details-modal"
     >
       <div className="wise-image-wrapper">
-        {imageDetails && imageDetails.mediaType == 'VIDEO' ? (
-          <MediaPlayer
-            src={videoSrc}
-            viewType="video"
-            playsInline
-            autoPlay
-            ref={playerRef}
-            onLoadedMetadata={setStartTimestamp}
-            clipEndTime={imageDetails.mediaInfo.duration} // This is needed due to a bug with the chapter markers https://github.com/vidstack/player/issues/1022
-          >
-            {/* 
-            TODO - chapter markers by default use thumbnails from storyboard - change this to use thumbnails from search results instead
-            */}
-            <MediaProvider>
-              {
-                !isHomePage &&
-                <Track content={{
-                  // @ts-ignore
-                  cues: [...imageDetails.mediaInfo.shots].sort((a, b) => a.ts - b.ts).map(shot => ({
-                    startTime: shot.ts + (shot.ts === 0 ? 0.1 : 0), /* if the first result is at 0 seconds,
-                                                                  add 0.1s to the timestamp due to CSS rule
-                                                                  requiring the matching chapter elements to be 'even' rather than odd */
-                    endTime: shot.te,
-                    text: 'Match found'
-                  })),
-                }} kind="chapters" lang="en-US" default />
-              }
-            </MediaProvider>
-            <DefaultVideoLayout
-              thumbnails={imageDetails.mediaInfo.timeline_hover_thumbnails}
-              icons={defaultLayoutIcons} noScrubGesture={false} seekStep={5} />
-          </MediaPlayer>
-        ) : (
-          <img
-            src={imageDetails?.link}
-          // title={
-          //   imageDetails?.mediaInfo.filename +
-          //   (imageDetails?.distance
-          //     ? ` | Distance = ${imageDetails.distance.toFixed(2)}`
-          //     : "")
-          // }
-          />
-        )}
+        { image_viewer }
       </div>
       {
         (imageDetails && !isHomePage && imageDetails.mediaType == 'VIDEO') &&

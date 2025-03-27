@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List, Union
+from typing import Any, List, NamedTuple, Optional, Union
 
 from PIL import Image
 import torch
@@ -31,6 +31,38 @@ class Features:
     vectors: np.ndarray  # shaped (n-features, embedding-length)
 
 
+class BBoxXYWH(NamedTuple):
+    """Bounding box in (x0, y0, w, h) coordinates relative to image size.
+
+    Coordinates (x0, y0, w, h) in range [0, 1], relative to the size
+    of the image.
+
+    """
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass
+class FeatureExtMetadata:
+    """Optional feature metadata that WISE "core" knows how to handle.
+
+    Individual :class:`FeatureExtractor` keep whatever metadata they
+    want for each feature, in whatever format they want, in their own
+    separate db table.  Those are the Ext metadata, and separate from
+    the vector metadata common to all `FeatureExtractor` and stored in
+    the "core" vectors table.
+
+    This is what :meth:`FeatureExtractor.get_vector_metadata` returns.
+
+    All Ext metadata attributes are optional because feature extractors
+    are not required to compute, store, or return any of them.
+
+    """
+    bbox: Optional[BBoxXYWH] = None
+
+
 class FeatureExtractor:
     """ABC for extractor of feature vectors from audio, image, and text.
 
@@ -49,7 +81,7 @@ class FeatureExtractor:
         pass  # default to no-op
 
     def add_to_vector_metadata_table(
-        self, conn:sa.Connection, vid: list[int], metadata: Any
+        self, conn: sa.Connection, vid: list[int], metadata: Any
     ) -> None:
         """Add vector metadata to the database.
 
@@ -66,6 +98,31 @@ class FeatureExtractor:
 
         """
         pass  # default to no-op
+
+    def get_vector_metadata(
+        self, conn: sa.Connection, vid: list[int]
+    ) -> list[FeatureExtMetadata]:
+        """Get Ext vector metadata from the database.
+
+        Since `FeatureExtractor` are not required to have this
+        metadata, default to return a list with none of it.
+        Subclasses may overload this if they want.
+
+        Parameters
+        ----------
+        conn
+        ----
+            Connection for the insert (if any).
+        vid
+            List of the ids in the vectors table.
+
+        Returns
+        -------
+        list[FeatureExtMetadata]
+            One for each of input `vid` and in the same order.
+
+        """
+        return [FeatureExtMetadata() for _ in range(len(vid))]
 
     def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
         """ Preprocess media to prepare it for feature extraction

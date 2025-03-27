@@ -8,6 +8,7 @@ import { ProcessedImageVector, ProcessedVideoSegment, SearchResultsProps } from 
 import ReportImageModal from './misc/ReportImageModal.tsx';
 // import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
+import StillImageView from "./misc/StillImageView.tsx";
 import VideoOccurrencesView from './misc/VideoOccurrencesView.tsx';
 // import config from './config.ts';
 
@@ -152,11 +153,11 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
             <i style={{paddingBottom: `${height/width*100}%`}}></i>
             <a onClick={() => setImageDetails(searchResult)}>
               {
-                (searchResult.mediaType == 'IMAGE') ? 
-                  <img src={searchResult.thumbnail}
-                      title={title + (searchResult.distance ? ` | Distance = ${searchResult.distance.toFixed(2)}` : '')}
-                      className="wise-image"
-                  ></img>
+                (searchResult.mediaType == 'IMAGE') ?
+                  <StillImageView
+                    imageDetails={searchResult}
+                    isModalView={false}
+                  />
                 :
                   <video src={searchResult.link}
                       poster={searchResult.thumbnail}

@@ -54,6 +54,7 @@ from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollec
 from src.enums import IndexType
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
+from src.feature.feature_extractor import FeatureExtMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -465,6 +466,17 @@ def _get_search_router(config: APIConfig):
     class VideoInfo(MediaInfo):
         timeline_hover_thumbnails: str
 
+    class BBoxXYWH(BaseModel):
+        x: float
+        y: float
+        w: float
+        h: float
+
+        @field_validator("x", "y", "w", "h")
+        @classmethod
+        def round_bbox(cls, v):
+            return round(v, config.precision)
+
     class VectorResult(BaseModel):
         vector_id: str
         media_id: str
@@ -479,11 +491,20 @@ def _get_search_router(config: APIConfig):
     class ImageVector(VectorResult):
         thumbnail: str
         thumbnail_score: float
+        bbox: Optional[BBoxXYWH]
 
         @field_validator("thumbnail_score")
         @classmethod
         def round_distance(cls, v):
             return round(v, config.precision)
+
+        @field_validator("bbox", mode="before")
+        @classmethod
+        def cast_bbox(cls, v):
+            if v is None:
+                return v
+            else:  # v is the NamedTuple in feature_extractor module
+                return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
 
     # An audio or video segment
     class MediaSegment(VectorResult):
@@ -691,13 +712,15 @@ def _get_search_router(config: APIConfig):
     def construct_image_search_response(
         top_dist: List[float],
         all_metadata: List[VectorAndMediaMetadata],
+        all_ext_metadata: list[FeatureExtMetadata],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
     ):
         images = {}
         image_vectors = []
-        for _dist, _metadata, (_thumb, _thumb_score) in zip(
+        for _dist, _metadata, _ext_metadata, (_thumb, _thumb_score) in zip(
             top_dist,
             all_metadata,
+            all_ext_metadata,
             get_thumbs_fn(all_metadata),
         ):
             image_id = str(_metadata.media_id)
@@ -722,6 +745,7 @@ def _get_search_router(config: APIConfig):
                 distance=_dist,
                 thumbnail=_thumb,
                 thumbnail_score=_thumb_score,
+                bbox=_ext_metadata.bbox,
             )
             image_vectors.append(image_vector)
 
@@ -735,10 +759,12 @@ def _get_search_router(config: APIConfig):
         top_dist: List[float],
         top_ids: List[int],
         get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
+        get_ext_metadata_fn: Callable[[List[int]], list[FeatureExtMetadata]],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
         search_in: MediaType = None,
     ):
         all_metadata = get_metadata_fn(top_ids)
+        all_ext_metadata = get_ext_metadata_fn(top_ids)
         audio_results = None
         video_audio_results = None
         video_results = None
@@ -748,7 +774,8 @@ def _get_search_router(config: APIConfig):
             if len(image_indices) > 0:
                 image_top_dist = [top_dist[i] for i in image_indices]
                 image_all_metadata = [all_metadata[i] for i in image_indices]
-                image_results = construct_image_search_response(image_top_dist, image_all_metadata, get_thumbs_fn)
+                image_ext_metadata = [all_ext_metadata[i] for i in image_indices]
+                image_results = construct_image_search_response(image_top_dist, image_all_metadata, image_ext_metadata, get_thumbs_fn)
         if search_in is None or search_in == MediaType.VIDEO:
             video_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.VIDEO]
             if len(video_indices) > 0:
@@ -907,7 +934,7 @@ def _get_search_router(config: APIConfig):
         asset = project_assets[media_type][asset_id]
         search_indices[media_type] = SearchIndexFactory(media_type, asset_id, asset)
         logger.info(f"Loading faiss index from {search_indices[media_type].get_index_filename(config.index_type)}")
-        if not search_indices[media_type].load_index(config.index_type):
+        if not search_indices[media_type].load_index(config.index_type, project_engine):
             print(f'failed to load {media_type} index: {asset_id}')
             del search_indices[media_type]
             continue
@@ -1197,11 +1224,17 @@ def _get_search_router(config: APIConfig):
 
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
 
+            ## Return no Ext metadata for the featured images, since at
+            ## this stage we haven't actually made any search we are
+            ## just showing a sample of the media we have.
+            _get_ext_metadata = lambda x: [FeatureExtMetadata()] * len(x)
+
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_search_response(
                 top_dist=dist[start:end],
                 top_ids=selected_ids[start:end],
                 get_metadata_fn=_get_metadata,
+                get_ext_metadata_fn=_get_ext_metadata,
                 get_thumbs_fn=get_thumbs,
             )
 
@@ -1414,6 +1447,7 @@ def _get_search_router(config: APIConfig):
             extract_text_features=extract_text_features,
             extract_image_features=extract_image_features,
             extract_audio_features=extract_audio_features,
+            get_ext_metadata=search_index.feature_extractor.get_vector_metadata,
         )
 
     def similarity_search(
@@ -1426,6 +1460,7 @@ def _get_search_router(config: APIConfig):
         extract_text_features: Callable[[List[str]], ndarray] = None,
         extract_image_features: Callable[[List[Image.Image]], ndarray] = None,
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
+        get_ext_metadata: Callable[[list[int]], list[FeatureExtMetadata]] = None,
     ):
         features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
         dist, ids = search_index.index.search(features, end)
@@ -1439,6 +1474,7 @@ def _get_search_router(config: APIConfig):
 
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
+            _get_ext_metadata = functools.partial(get_ext_metadata, conn)
 
             get_thumbs = thumbs_reader(thumbs_conn, valid_dist, thumbnails_to_send)
 
@@ -1446,6 +1482,7 @@ def _get_search_router(config: APIConfig):
                 top_dist=valid_dist,
                 top_ids=valid_ids,
                 get_metadata_fn=_get_metadata,
+                get_ext_metadata_fn=_get_ext_metadata,
                 get_thumbs_fn=get_thumbs,
                 search_in=search_in,
             )
