@@ -1,4 +1,4 @@
-import { Tooltip } from "antd";
+import { Popover } from "antd";
 
 import "./StillImageView.scss";
 import { StillImageViewProps } from "./types";
@@ -22,7 +22,7 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   if (imageDetails.bbox) {
     bounding_boxes = (
       <div className="wise-bounding-boxes">
-        <Tooltip title={distance_str}>
+        <Popover content={distance_str}>
           <div
             className="wise-bounding-box"
             style={{
@@ -32,7 +32,7 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
               height: `${100*imageDetails.bbox.h}%`,
             }}
           />
-        </Tooltip>
+        </Popover>
       </div>
     );
   }
