@@ -157,6 +157,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
                   <StillImageView
                     imageDetails={searchResult}
                     isModalView={false}
+                    handleInternalSearchButtonClick={handleInternalSearchButtonClick}
                   />
                 :
                   <video src={searchResult.link}
@@ -294,6 +295,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
         imageDetails={imageDetails}
         setImageDetails={setImageDetails}
         setSelectedImageId={setSelectedImageId}
+        handleInternalSearchButtonClick={handleInternalSearchButtonClick}
       />
     }
   </>

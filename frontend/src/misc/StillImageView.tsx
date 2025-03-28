@@ -1,11 +1,13 @@
-import { Popover } from "antd";
+import { Button, Popover } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 
 import "./StillImageView.scss";
 import { StillImageViewProps } from "./types";
 
 const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   imageDetails,
-  isModalView
+  isModalView,
+  handleInternalSearchButtonClick,
 }: StillImageViewProps) => {
 
   const img_src = isModalView ? imageDetails.link : imageDetails.thumbnail;
@@ -22,7 +24,26 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   if (imageDetails.bbox) {
     bounding_boxes = (
       <div className="wise-bounding-boxes">
-        <Popover content={distance_str}>
+        <Popover
+          content={
+            <>
+              <span>{distance_str}</span>
+              <Button
+                type="link"
+                size="small"
+                icon={<SearchOutlined />}
+                onClick={
+                  (e) => {
+                      e.stopPropagation();
+                      handleInternalSearchButtonClick(imageDetails.vector_id);
+                  }
+                }
+              >
+                Find Similar
+              </Button>
+            </>
+          }
+        >
           <div
             className="wise-bounding-box"
             style={{
