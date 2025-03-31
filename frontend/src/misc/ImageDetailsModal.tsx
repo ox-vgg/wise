@@ -157,7 +157,7 @@ const ImageDetailsModal = ({
               style={{ float: "left" }}
             />
           </Dropdown>
-          <Button type="primary" onClick={() => setImageDetails()}>
+          <Button type="primary" onClick={() => setIsModalOpen(false)}>
             Close
           </Button>
         </>
