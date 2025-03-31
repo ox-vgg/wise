@@ -33,14 +33,8 @@ const ImageDetailsModal = ({
   isHomePage,
 }: ImageDetailsModalProps) => {
   const [isModalOpen, setIsModalOpen] = useState(true);
-  let title;
-  // let caption, author, copyright;
-
   console.log(imageDetails)
-
-  const playerRef = useRef<MediaPlayerInstance>(null);
-
-  title = (
+  const title = (
     <Button
       type="text"
       // href={imageDetails.mediaInfo.externalLink}
@@ -59,10 +53,7 @@ const ImageDetailsModal = ({
       </svg>
     </Button>
   );
-  // ({ caption, author, copyright } = imageDetails.info);
-
-  // const width = imageDetails.info.width;
-  // const height = imageDetails.info.height;
+  const playerRef = useRef<MediaPlayerInstance>(null);
 
   // Remove end time from timestamp (e.g. change "#t=16.0,20.0" to "#t=16.0") to prevent video from automatically pausing
   const videoSrc = imageDetails.link.replace(/(#t=[\d\.]+),[\d\.]+$/, '$1');
@@ -173,7 +164,9 @@ const ImageDetailsModal = ({
       }
       zIndex={500} // The default zIndex is 1000. Setting this to 500 allows the ReportImageModal to be shown on top / in front of this modal, rather than behind
       onCancel={() => setIsModalOpen(false)}
-      afterOpenChange={(is_open) => is_open || setImageDetails()}
+      afterOpenChange={(is_open) => {
+        if (!is_open) setImageDetails();
+      }}
       width="90vw"
       className="wise-image-details-modal"
     >

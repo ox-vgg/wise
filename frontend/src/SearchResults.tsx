@@ -288,13 +288,13 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     <ReportImageModal dataService={dataService} isHomePage={isHomePage}
                       selectedImageId={selectedImageId} setSelectedImageId={setSelectedImageId} />
     {
-      imageDetails ?
-        <ImageDetailsModal
-          isHomePage={isHomePage}
-          imageDetails={imageDetails}
-          setImageDetails={setImageDetails}
-          setSelectedImageId={setSelectedImageId} />
-        : <></>
+      imageDetails &&
+      <ImageDetailsModal
+        isHomePage={isHomePage}
+        imageDetails={imageDetails}
+        setImageDetails={setImageDetails}
+        setSelectedImageId={setSelectedImageId}
+      />
     }
   </>
 };
