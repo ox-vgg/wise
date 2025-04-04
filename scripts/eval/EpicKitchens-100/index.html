@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>EpicKitchens-100 Retrieval Performance Visualisation</title>
+        <script src="retrieval-data-binary_relevancy.js"></script>
+        <script src="retrieval-data-noun_verb_relevancy.js"></script>
+        <style>
+            figure { display:inline-block; margin:0.2em; padding:0.2em;}
+            figure img { width:342px; height:192px; }
+            figure video { width:342px; height:192px; }
+            figure figcaption { text-align:center; }
+            #search_result { margin:2em 0; padding:0.5em;}
+            .relevant { border: 2px solid #5599ff; }
+            .partial_relevant { border: 2px dashed #5599ff; }
+        </style>
+    </head>
+    <body onload="init()">
+        <h1>EpicKitchens-100 Retrieval Performance Visualisation</h1>
+        <table>
+            <tr>
+                <td>Relevancy Type</td>
+                <td>
+                    <select id="relevancy_type_selector" onchange="update_query_selector()">
+                        <option value="noun_verb_relevancy" selected>Noun and verb based match (e.g. relevancy between "stir salmon" and "eat salmon" is 0.5)</option>
+                        <option value="binary_relevancy">Exact match (e.g. relevancy of "stir salmon" with "stir salmon" is 1.0 but with "eat salmon" is 0)</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td>Search Query</td>
+                <td><select id="query_selector"></select></td>
+            </tr>
+        </table>
+        <div id="search_result">Select a search query to show its result.</div>
+        <script>
+        var payload = {}
+        const thumb_dir = 'thumbs/'
+        const wise_project_baseurl = 'https://meru.robots.ox.ac.uk/EpicKitchens/'
+        function init() {
+            update_query_selector();
+        }
+        
+        function update_query_selector() {
+            const query_selector = document.getElementById('query_selector')
+            const relevancy_type_selector = document.getElementById('relevancy_type_selector')
+            const relevancy_type = relevancy_type_selector.options[relevancy_type_selector.selectedIndex].value;
+            
+            const payload_id = 'payload_' + relevancy_type
+            console.log('setting payload to ' + payload_id)
+            payload = eval(payload_id)
+
+            const n_query = payload['text_queries'].length
+            query_selector.innerHTML = ''
+            for(var i=0; i<n_query; ++i) {
+                const option = document.createElement('option')
+                const query_index = payload['sorted_by_ap'][i]['qindex']
+                const query_ap = payload['sorted_by_ap'][i]['ap']
+                option.setAttribute('value', i)
+                option.innerHTML = '[' + i + '] ' + payload['text_queries'][query_index] + ' ( AP=' + query_ap + ' )'
+                query_selector.appendChild(option)
+            }
+            query_selector.addEventListener('change', on_query_update)
+        }
+
+        function on_query_update(e) {
+            const sorted_ap_index = e.target.options[e.target.selectedIndex].value
+            const query_index = payload['sorted_by_ap'][sorted_ap_index]['qindex']
+            const query = payload['text_queries'][query_index]
+            console.log('Showing results for query [' + query + ']')
+            const search_result = document.getElementById('search_result');
+            search_result.innerHTML = ''
+            const h3 = document.createElement('h3')
+            console.log(payload['sorted_by_ap'][sorted_ap_index])
+            h3.innerHTML = 'Query: ' + query + ' (relevant videos=' + payload['sorted_by_ap'][sorted_ap_index]['nrel'] + ')'
+            search_result.appendChild(h3)
+            const result_count = payload['sorted_by_ap'][sorted_ap_index]['results'].length
+            for(var rank=0; rank<result_count; ++rank) {
+                const figure = document.createElement('figure')
+                const video_index = payload['sorted_by_ap'][sorted_ap_index]['results'][rank]['vi']
+                const media_id = payload['media_ids'][video_index]
+                const distance = payload['sorted_by_ap'][sorted_ap_index]['results'][rank]['d']
+                const relevancy = payload['sorted_by_ap'][sorted_ap_index]['results'][rank]['rel']
+                const video_id = payload['video_ids'][video_index]
+                const video_narration = payload['video_narration'][video_index]
+                const start_time = payload['start_times'][video_index].toFixed(3)
+                const stop_time = payload['stop_times'][video_index].toFixed(3)
+                var thumbnail_filename = String(video_index).padStart(5, '0') + '_' + video_id + '_' + start_time.replace('.', '-') + '_' + stop_time.replace('.', '-');
+                const figcaption = document.createElement('figcaption')
+                figcaption.innerHTML = '[' + rank + '] ' + video_id + ' (' + start_time + 's to ' + stop_time + 's)<br/>' + video_narration + '<br/>(relevance=' + relevancy + ')'
+
+                if(relevancy === "1.0") {
+                    figure.classList.add('relevant')
+                } else {
+                    if(relevancy !== "0.0") {
+                        figure.classList.add('partial_relevant')
+                    }
+                }
+
+                const video_url = wise_project_baseurl + 'media/' + media_id + '#t=' + parseInt(start_time) + ',' + parseInt(stop_time)
+                const video = document.createElement('video')
+                video.setAttribute('poster', thumb_dir + thumbnail_filename + '.jpg')
+                video.setAttribute('controls', '')
+                video.setAttribute('preload', 'none')
+                video.setAttribute('data-start', start_time)
+                video.setAttribute('data-stop', stop_time)
+                video.addEventListener('play', on_video_play)
+                
+                const source = document.createElement('source')
+                source.setAttribute('src', video_url)
+                source.setAttribute('type', 'video/mp4')
+                video.appendChild(source)
+
+                figure.appendChild(video)
+                figure.appendChild(figcaption)
+                search_result.appendChild(figure)
+            }
+
+            function on_video_play(e) {
+                const start_time = parseFloat(e.target.dataset.start);
+                e.target.currentTime = start_time
+            }
+        }
+        </script>
+    </body>
+</html>
