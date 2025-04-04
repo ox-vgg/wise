@@ -85,7 +85,7 @@ def serve(
 
     # Temporary Fix: set the project_name in frontend/dist/index.html
     print(f'WARNING: WISE currently does not support serving multiple projects simultaneously.')
-    index_filename = './frontend/dist/index.html'
+    index_filename = theme_asset_dir.joinpath('index.html')
     with open(index_filename, 'r') as f:
         index_html_content = f.readlines()
     with open(index_filename, 'w') as f2:
