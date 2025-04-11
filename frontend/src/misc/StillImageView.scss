@@ -39,3 +39,19 @@
     }
   }
 }
+
+.wise-bounding-box-tooltip .ant-popover-inner {
+  padding-top: 8px;
+  padding-bottom: 6px;
+  padding-right: 9px;
+
+  .wise-bounding-box-tooltip-divider {
+    display: inline-block;
+    height: 1.5em;
+    vertical-align: middle;
+    width: 0;
+    margin-left: 11px;
+    margin-right: 4px;
+    border-inline-start: 1px solid rgba(5, 5, 5, 0.15);
+  }
+}

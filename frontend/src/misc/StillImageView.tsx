@@ -25,9 +25,11 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
     bounding_boxes = (
       <div className="wise-bounding-boxes">
         <Popover
+          overlayClassName="wise-bounding-box-tooltip"
           content={
             <>
               <span>{distance_str}</span>
+              <div className="wise-bounding-box-tooltip-divider" />
               <Button
                 type="link"
                 size="small"
