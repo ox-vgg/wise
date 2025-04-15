@@ -16,7 +16,7 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   // distance to the search) is for the image, otherwise it is for the
   // bounding box.
   const distance_str = imageDetails.distance ?
-        `Distance = ${imageDetails.distance.toFixed(2)}`
+        `Similarity: ${imageDetails.distance.toFixed(2)}`
         : ""
   const img_title = imageDetails.bbox ? "" : distance_str;
 
