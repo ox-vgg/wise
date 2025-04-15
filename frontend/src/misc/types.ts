@@ -265,6 +265,7 @@ export interface ImageDetailsModalProps {
   imageDetails: ProcessedImageVector | ProcessedVideoSegment;
   setImageDetails: (x?: ProcessedImageVector | ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
+  handleInternalSearchButtonClick: (vector_id: string) => void;
 };
 
 export interface ReportImageModalProps {
@@ -284,4 +285,5 @@ export interface VideoOccurrencesViewProps {
 export interface StillImageViewProps {
   imageDetails: ProcessedImageVector;
   isModalView: boolean;
+  handleInternalSearchButtonClick: (vector_id: string) => void;
 };

@@ -1,11 +1,13 @@
-import { Tooltip } from "antd";
+import { Button, Popover } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 
 import "./StillImageView.scss";
 import { StillImageViewProps } from "./types";
 
 const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   imageDetails,
-  isModalView
+  isModalView,
+  handleInternalSearchButtonClick,
 }: StillImageViewProps) => {
 
   const img_src = isModalView ? imageDetails.link : imageDetails.thumbnail;
@@ -13,16 +15,35 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   // If there are bounding boxes, the "title" (which shows the
   // distance to the search) is for the image, otherwise it is for the
   // bounding box.
-  const distance_str = imageDetails.distance ?
-        `Distance = ${imageDetails.distance.toFixed(2)}`
-        : ""
+  const distance_str = `Similarity: ${imageDetails.distance.toFixed(2)}`;
   const img_title = imageDetails.bbox ? "" : distance_str;
 
   let bounding_boxes;
   if (imageDetails.bbox) {
     bounding_boxes = (
       <div className="wise-bounding-boxes">
-        <Tooltip title={distance_str}>
+        <Popover
+          overlayClassName="wise-bounding-box-tooltip"
+          content={
+            <>
+              <span>{distance_str}</span>
+              <div className="wise-bounding-box-tooltip-divider" />
+              <Button
+                type="link"
+                size="small"
+                icon={<SearchOutlined />}
+                onClick={
+                  (e) => {
+                      e.stopPropagation();
+                      handleInternalSearchButtonClick(imageDetails.vector_id);
+                  }
+                }
+              >
+                Find Similar
+              </Button>
+            </>
+          }
+        >
           <div
             className="wise-bounding-box"
             style={{
@@ -32,7 +53,7 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
               height: `${100*imageDetails.bbox.h}%`,
             }}
           />
-        </Tooltip>
+        </Popover>
       </div>
     );
   }

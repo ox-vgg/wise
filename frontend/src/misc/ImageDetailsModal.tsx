@@ -31,6 +31,7 @@ const ImageDetailsModal = ({
   setImageDetails,
   setSelectedImageId,
   isHomePage,
+  handleInternalSearchButtonClick,
 }: ImageDetailsModalProps) => {
   const [isModalOpen, setIsModalOpen] = useState(true);
   console.log(imageDetails)
@@ -71,6 +72,11 @@ const ImageDetailsModal = ({
         setImageDetails(videoSegment);
       }
     }
+  }
+
+  const doInternalSearchAndCloseDialog = (vector_id: string) => {
+    handleInternalSearchButtonClick(vector_id);
+    setIsModalOpen(false);
   }
 
   let image_viewer;
@@ -123,6 +129,7 @@ const ImageDetailsModal = ({
     image_viewer = <StillImageView
       imageDetails={imageDetails}
       isModalView={true}
+      handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
     />;
   }
 
