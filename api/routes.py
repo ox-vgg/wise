@@ -439,7 +439,6 @@ def _get_search_router(config: APIConfig):
         format: str
         duration: float
         title: str = ""
-        caption: str = ""
         copyright: str = ""
         external_metadata: dict = {}
 

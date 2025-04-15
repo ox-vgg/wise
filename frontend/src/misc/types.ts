@@ -32,7 +32,6 @@ type MediaMetadata = {
   format: string;
   duration: number;
   title: string;
-  caption: string;
   copyright: string;
   external_metadata: Record<string, any>;
 };
