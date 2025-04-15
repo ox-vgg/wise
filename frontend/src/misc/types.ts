@@ -32,7 +32,6 @@ type MediaMetadata = {
   format: string;
   duration: number;
   title: string;
-  copyright: string;
   external_metadata: Record<string, any>;
 };
 // A search result containing the metadata fields from MediaMetadata, as well as additional fields like `thumbnail` and `distance`
