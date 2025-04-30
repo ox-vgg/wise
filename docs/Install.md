@@ -9,10 +9,14 @@ The hardware and software requirements for installing WISE are as follows.
 
 To install WISE, we first download the WISE source code.
 
+The latest stable release of WISE are made available at https://gitlab.com/vgg/wise/wise/-/releases .
+
 ```
-## 1. Get the code
-git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
-cd wise
+## 1. Download the latest release and extract the WISE2 code
+curl -sLO https://gitlab.com/vgg/wise/wise/-/archive/wise-2.1.0/wise-wise-2.1.0.zip
+unzip wise-wise-2.1.0.zip
+mv wise-wise-2.1.0 wise-2.1.0
+cd wise-2.1.0
 ```
 
 The WISE software depends on several python libraries and there are the
