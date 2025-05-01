@@ -9,7 +9,7 @@ The hardware and software requirements for installing WISE are as follows.
 
 To install WISE, we first download the WISE source code.
 
-The latest stable release of WISE are made available at https://gitlab.com/vgg/wise/wise/-/releases .
+The latest stable release of WISE is available at https://gitlab.com/vgg/wise/wise/-/releases .
 
 ```
 ## 1. Download the latest release and extract the WISE2 code
@@ -68,9 +68,6 @@ WISE can be installed on a machine without a GPU. While the processing speed is 
 all the functionality of the WISE software remains available.
 
 ```
-git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
-cd wise
-
 python3 --version                  # must be >= 3.10
 sudo apt install ffmpeg            # ffmpeg is required to load videos
 python3 -m venv wise-dep/          # create virtual environment
