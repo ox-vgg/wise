@@ -1,33 +1,32 @@
 # Integration Test
 
-We use the Kinetics-6 dataset for quickly testing various
-functionalities of the WISE software. This dataset contains only 30
-videos and therefore the full test completes in less than 6
-minutes. This test can be executed as follows.
+We use the [wikimedia-commons-25](https://thor.robots.ox.ac.uk/wise/assets/test/wikimedia-commons-25.zip) dataset for quickly testing various
+functionalities of the WISE software. This dataset contains only 25 videos sourced from [Wikimedia Commons]() repository and therefore the 
+full test completes in less than 1 minute. This test can be executed as follows.
 
 ```
+cd $HOME
 git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
-cd wise/tests
-./test-kinetics-6.sh /tmp/wise-test/
+cd $HOME/wise/tests
+./test-wikimedia-commons-25.sh $HOME/wise/ $HOME/wise-test-data/
 
-Updating WISE2 code in /tmp/wise-test/wise-code/
-Ensuring dependencies are installed...
-Downloading Kinetics-6 dataset to /tmp/wise-test/wise-data ...
-Extracting features from videos (takes about 3 min.) ...
-Extracting features from 30 files
-Feature extraction completed in 78 sec (1.30 min)
-Importing metadata
-Adding 30 rows of metadata (discarded 0 rows)
-added 30 rows of metadata to table video_categories
-Creating index (takes about 1 min.) ...
-saved index to /tmp/wise-test/wise-projects/Kinetics-6/store/mlfoundations/open_clip/ViT-L-16-SigLIP-384/webli/index/video-IndexFlatIP.faiss
-saved index to /tmp/wise-test/wise-projects/Kinetics-6/store/microsoft/clap/2023/four-datasets/index/audio-IndexFlatIP.faiss
-Created metadata index for "Kinetics/6b/video_categories" with 30 entries
 ...
 ...
-Test 1 PASSED (completed in 164 sec.)
-Test 2 PASSED (completed in 190 sec.)
-Test 3 PASSED (completed in 118 sec.)
+Test 4.2.1 PASSED
+Test 4.2.2 PASSED
+Test 4.3.1 PASSED
+Test 4.3.2 PASSED
+Starting WISE2 server (takes about 1 min.) ...
+Waiting for 5 sec. before checking again (1/15) ...
+...
+Waiting for 5 sec. before checking again (12/15) ...
+Checking if server is running at http://0.0.0.0:10001/wikimedia-commons-25/info
+Server started successfully.
+Test 5.1 PASSED
+Test 5.2 PASSED
+Test 5.3 PASSED
+Test 5.4 PASSED
+*** All tests for wikimedia-commons-25 completed in 66 sec. ***
 ```
 
 # Unit Tests
