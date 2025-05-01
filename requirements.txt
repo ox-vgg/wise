@@ -8,10 +8,10 @@ pydantic-settings~=2.2.1
 h5py==3.11.0
 httpx[http2]~=0.27.0
 imageio~=2.34.0
-open_clip_torch==2.24.0
+open_clip_torch==2.32.0
 sqlalchemy~=2.0.29
 tqdm~=4.66.2
-transformers~=4.39.3
+transformers~=4.51.3
 typer~=0.12.3
 webdataset~=0.2.86
 insightface
