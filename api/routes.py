@@ -734,6 +734,7 @@ def _get_search_router(config: APIConfig):
                     media_type=_metadata.media_type,
                     format=_metadata.format,
                     duration=_metadata.duration,
+                    external_metadata=_metadata.external_metadata,
                     thumbnail=_thumb,
                     distance=_dist,
                 )
