@@ -8,8 +8,8 @@ variables:
   
 
 stages:
-  - build
   - test
+  - build
 
 workflow:
   rules:
@@ -94,6 +94,7 @@ push-manifest-cpu:
 
 test_wise2:
   stage: test
+  needs: []
   image: ubuntu:24.04
   before_script:
     - apt update && apt install -y git bash ffmpeg sqlite3 jq curl rsync unzip
