@@ -110,7 +110,7 @@ test_wise2:
   needs: []
   image: ubuntu:24.04
   before_script:
-    - apt update && apt install -y git bash ffmpeg sqlite3 jq curl rsync unzip
+    - apt update && apt install -y git bash python3-venv python3 ffmpeg sqlite3 jq curl rsync unzip
   script:
     - mkdir -p /tmp/wise/git/  # storage for WISE git repo
     - mkdir -p /tmp/wise/test/ # storage for WISE test data
