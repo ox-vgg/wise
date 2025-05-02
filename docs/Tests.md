@@ -5,18 +5,33 @@ functionalities of the WISE software. This dataset contains only 25 videos sourc
 full test completes in less than 1 minute. This test can be executed as follows.
 
 ```
+# 1. Clone WISE code repository
 cd $HOME
 git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
-cd $HOME/wise/tests
-./test-wikimedia-commons-25.sh $HOME/wise/ $HOME/wise-test-data/
 
+# 2. Activate virtual environment with all required python dependencies
+cd $HOME/wise/
+python3 -m venv venv
+source venv/bin/activate
+pip install ...  # see Install.md
+
+# 3. Run the test
+bash test-wikimedia-commons-25.sh  $HOME/wise-test/
+```
+
+Here is a sample output obtained by executing the test.
+```
 ...
+Extracting features from videos (takes about 3 min.) ...
 ...
-Test 4.2.1 PASSED
-Test 4.2.2 PASSED
-Test 4.3.1 PASSED
-Test 4.3.2 PASSED
-Starting WISE2 server (takes about 1 min.) ...
+inserted 25 rows into table metadata-wikimedia-commons-25
+...
+Test 3.1 PASSED
+Test 3.2 PASSED
+Creating index (takes about 1 min.) ...
+Test 4.1 PASSED
+Test 4.2 PASSED
+Starting WISE2 server on 0.0.0.0:10001 (takes about 1 min.) ...
 Waiting for 5 sec. before checking again (1/15) ...
 ...
 Waiting for 5 sec. before checking again (12/15) ...
