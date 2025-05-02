@@ -9,6 +9,7 @@ variables:
 
 stages:
   - build
+  - test
 
 workflow:
   rules:
@@ -88,3 +89,21 @@ push-manifest-cpu:
   variables:
     APP: wise-cpu
     CACHE_TAG: "ignored"
+
+test_wise2:
+  stage: test
+  image: ubuntu:24.04
+  before_script:
+    - apt update && apt install -y git bash ffmpeg sqlite3 jq curl rsync unzip
+  script:
+    - git clone --branch wise2 https://gitlab.com/vgg/wise/wise.git
+    - cd wise
+    - bash tests/test-wikimedia-commons-25.sh
+  rules:
+    # Run on direct pushes to wise2 branch
+    - if: '$CI_COMMIT_BRANCH == "wise2"'
+      when: always
+
+    # Run on merge requests targeting wise2 branch
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "wise2"'
+      when: always
