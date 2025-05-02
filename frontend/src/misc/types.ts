@@ -32,8 +32,6 @@ type MediaMetadata = {
   format: string;
   duration: number;
   title: string;
-  caption: string;
-  copyright: string;
   external_metadata: Record<string, any>;
 };
 // A search result containing the metadata fields from MediaMetadata, as well as additional fields like `thumbnail` and `distance`
@@ -106,17 +104,6 @@ export type SearchResponse = {
   video_audio_results?: VideoAudioResults;
   video_results?: VideoResults;
   image_results?: ImageResults;
-
-  // Delete later:
-  // unmerged_segments: VideoSegment[];
-  // shots: VideoSegment[];
-  // videos: Record<string, VideoInfo>;
-  // audio_segments?: VideoSegment[];
-  // audio_shots?: VideoSegment[];
-  // audio_videos?: Record<string, VideoInfo>;
-  // visual_segments?: VideoSegment[];
-  // visual_shots?: VideoSegment[];
-  // visual_videos?: Record<string, VideoInfo>;
 };
 
 // TODO update everything below
