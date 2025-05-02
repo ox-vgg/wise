@@ -50,6 +50,8 @@ build-wise:
         APP: [wise-cpu]
   tags: 
     - saas-linux-large-${PLATFORM}
+  when: manual
+  allow_failure: false
 
 .push-manifest: &push-manifest
   stage: build
