@@ -13,7 +13,20 @@ stages:
 
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH == "wise2" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api")
+    # Allow manual trigger from Web UI
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+
+    # Allow automatic pipeline on push to wise2
+    - if: '$CI_COMMIT_BRANCH == "wise2"'
+      when: always
+
+    # Allow pipeline on merge requests targeting wise2
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "wise2"'
+      when: always
+
+    # Default: do not run pipeline
+    - when: never
 
 default:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:26.1.4
@@ -99,9 +112,12 @@ test_wise2:
   before_script:
     - apt update && apt install -y git bash ffmpeg sqlite3 jq curl rsync unzip
   script:
+    - mkdir -p /tmp/wise/git/  # storage for WISE git repo
+    - mkdir -p /tmp/wise/test/ # storage for WISE test data
+    - cd /tmp/wise/git/
     - git clone --branch wise2 https://gitlab.com/vgg/wise/wise.git
-    - cd wise
-    - bash tests/test-wikimedia-commons-25.sh
+    - cd /tmp/wise/git/wise/tests/
+    - bash test-wikimedia-commons-25.sh /tmp/wise/git/wise/ /tmp/wise/test/
   rules:
     # Run on direct pushes to wise2 branch
     - if: '$CI_COMMIT_BRANCH == "wise2"'
