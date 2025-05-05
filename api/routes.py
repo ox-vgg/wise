@@ -400,6 +400,7 @@ def _get_report_image_router(config: APIConfig):
 
         # Write header row if the file doesn't exist
         if not os.path.exists(report_filename):
+            os.makedirs(os.path.dirname(report_filename), exist_ok=True)
             with open(report_filename, "a", newline="") as report_file:
                 csv.writer(report_file).writerow(fieldnames)
 
