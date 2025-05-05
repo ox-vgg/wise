@@ -444,7 +444,7 @@ def _get_search_router(config: APIConfig):
 
     # A search result containing the metadata fields from MediaInfo, as well as additional fields
     class MediaInfo(MediaMetadata):
-        link: str
+        pass
 
     # A subclass of MediaInfo for images
     class ImageInfo(MediaInfo):
@@ -623,7 +623,6 @@ def _get_search_router(config: APIConfig):
             if video_id not in videos:
                 videos[video_id] = VideoInfo(
                     id=video_id,
-                    link=f"media/{video_id}",
                     filename=_metadata.path,
                     width=_metadata.width,
                     height=_metadata.height,
@@ -692,7 +691,6 @@ def _get_search_router(config: APIConfig):
             if image_id not in images:
                 images[image_id] = ImageInfo(
                     id=image_id,
-                    link=f"media/{image_id}",
                     filename=_metadata.path,
                     width=_metadata.width,
                     height=_metadata.height,

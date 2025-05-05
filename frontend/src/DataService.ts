@@ -11,10 +11,6 @@ const FEATURED_IMAGES_RANDOM_SEED = Math.floor(Math.random()*100); // Generate a
 const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[]) => {
   return new Map(
     Object.entries(videos).map(([mediaId, videoInfo]) => {
-      if (!videoInfo.link.startsWith('http')) {
-        videoInfo.link = config.API_BASE_URL + videoInfo.link; // Fixes video URLs for dev mode
-      }
-
       // const title = videoInfo.filename;
       if (!videoInfo.timeline_hover_thumbnails.startsWith('http')) {
         videoInfo.timeline_hover_thumbnails = config.API_BASE_URL + videoInfo.timeline_hover_thumbnails; // Fixes URLs for dev mode

@@ -36,7 +36,6 @@ type MediaMetadata = {
 };
 // A search result containing the metadata fields from MediaMetadata, as well as additional fields
 type MediaInfo = MediaMetadata & {
-  link: string;
 };
 export type ImageInfo = MediaInfo & {};
 export type AudioInfo = MediaInfo & {};
