@@ -442,16 +442,10 @@ def _get_search_router(config: APIConfig):
         title: str = ""
         external_metadata: dict = {}
 
-    # A search result containing the metadata fields from MediaInfo, as well as additional fields like `thumbnail` and `distance`
+    # A search result containing the metadata fields from MediaInfo, as well as additional fields like `thumbnail`
     class MediaInfo(MediaMetadata):
         link: str
         thumbnail: str
-        distance: Optional[float] = None
-
-        @field_validator("distance")
-        @classmethod
-        def round_distance(cls, v):
-            return round(v, config.precision)
 
     # A subclass of MediaInfo for images
     class ImageInfo(MediaInfo):
@@ -715,7 +709,6 @@ def _get_search_router(config: APIConfig):
                     duration=_metadata.duration,
                     external_metadata=_metadata.external_metadata,
                     thumbnail=_thumb,
-                    distance=_dist,
                 )
             
             image_vector = ImageVector(
