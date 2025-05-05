@@ -64,7 +64,6 @@ type VectorResult = {
 };
 type ImageVector = VectorResult & {
   thumbnail: string;
-  thumbnail_score: number;
 };
 type MediaSegment = VectorResult & {
   ts: number;
@@ -73,7 +72,6 @@ type MediaSegment = VectorResult & {
 export type AudioSegment = MediaSegment & {};
 export type VideoSegment = MediaSegment & {
   thumbnail: string;
-  thumbnail_score: number;
 };
 
 export type AudioResults = {
