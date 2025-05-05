@@ -23,7 +23,7 @@ export type Query = {
 
 
 
-type MediaMetadata = {
+type MediaInfo = {
   id: string;
   filename: string;
   width: number;
@@ -33,9 +33,6 @@ type MediaMetadata = {
   duration: number;
   title: string;
   external_metadata: Record<string, any>;
-};
-// A search result containing the metadata fields from MediaMetadata, as well as additional fields
-type MediaInfo = MediaMetadata & {
 };
 export type ImageInfo = MediaInfo & {};
 export type AudioInfo = MediaInfo & {};

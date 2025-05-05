@@ -431,7 +431,7 @@ def _get_search_router(config: APIConfig):
     index_type = IndexType[config.index_type]
 
     # Metadata for a video/audio/image file, to be sent to the frontend
-    class MediaMetadata(BaseModel):
+    class MediaInfo(BaseModel):
         id: str
         filename: str
         width: int
@@ -441,10 +441,6 @@ def _get_search_router(config: APIConfig):
         duration: float
         title: str = ""
         external_metadata: dict = {}
-
-    # A search result containing the metadata fields from MediaInfo, as well as additional fields
-    class MediaInfo(MediaMetadata):
-        pass
 
     # A subclass of MediaInfo for images
     class ImageInfo(MediaInfo):
