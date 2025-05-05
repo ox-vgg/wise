@@ -34,10 +34,9 @@ type MediaMetadata = {
   title: string;
   external_metadata: Record<string, any>;
 };
-// A search result containing the metadata fields from MediaMetadata, as well as additional fields like `thumbnail`
+// A search result containing the metadata fields from MediaMetadata, as well as additional fields
 type MediaInfo = MediaMetadata & {
   link: string;
-  thumbnail: string;
 };
 export type ImageInfo = MediaInfo & {};
 export type AudioInfo = MediaInfo & {};
