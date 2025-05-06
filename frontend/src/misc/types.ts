@@ -112,7 +112,6 @@ export type ProcessedVideoSegment = VideoSegment & {
 };
 export type ProcessedVideoInfo = VideoInfo & {
   shots: VideoSegment[] | ProcessedVideoSegment[];
-  title: string;
 };
 export type ProcessedSearchResults = {
   Image: {
