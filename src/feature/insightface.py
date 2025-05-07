@@ -125,9 +125,9 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
         feature_id_parts = feature_id.split("/")
         assert (
             len(feature_id_parts) == 4
-            and feature_id_parts[0] == "insightface"
-            and feature_id_parts[1] == "_"
-            and feature_id_parts[3] == "_"
+            and feature_id_parts[0] == "deepinsight"
+            and feature_id_parts[1] == "insightface",
+            f"Invalid feature-id: {feature_id}, an example of a valid feature-id is 'deepinsight/insightface/buffalo_l/_unknown'"
         )
         model_name = feature_id_parts[2]
         ## XXX: investigate allowed_modules arg to FaceAnalysis
