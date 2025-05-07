@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from transformers import Owlv2Processor, Owlv2ForObjectDetection
 import torch
 import numpy as np
-from typing import List, Union
+from typing import Union
 from PIL import Image
 import sqlalchemy as sa
 
@@ -227,7 +227,7 @@ class TransformersOWLv2(FeatureExtractor):
         assert len(vid) == len(res)
         return res
 
-    def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> ImageBatchTensorWithOrigSizes:
+    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> ImageBatchTensorWithOrigSizes:
         # Save original image sizes in a list
         orig_sizes = [] # list of (width, height) tuples
         if isinstance(images, torch.Tensor):
@@ -347,7 +347,7 @@ class TransformersOWLv2(FeatureExtractor):
     @torch.inference_mode()
     def extract_text_features(
         self,
-        text_query: List[str],
+        text_query: list[str],
         return_augmented_features: bool = True
     ) -> np.ndarray:
         """
