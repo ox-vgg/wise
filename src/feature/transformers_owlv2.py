@@ -47,24 +47,24 @@ class OWLv2FeatureMetadata:
     @classmethod
     def from_owlv2(cls, owlv2_bbox: np.ndarray, objectness_score: float, im_width: int, im_height: int):
         """
-        Creates a OWLv2FeatureMetadata instance with the bounding box and 
-        objectness score of a single object (patch) detected by OWLv2. The 
+        Creates a OWLv2FeatureMetadata instance with the bounding box and
+        objectness score of a single object (patch) detected by OWLv2. The
         bounding box coordinates are also converted as follows:
-        - The original bounding box coordinates from OWLv2 are normalized 
-          between 0 and 1, based on a *square-padded* version of the input 
+        - The original bounding box coordinates from OWLv2 are normalized
+          between 0 and 1, based on a *square-padded* version of the input
           image
         - This method converts the coordinates so that they are normalized
-          relative to the original image dimensions instead of the 
+          relative to the original image dimensions instead of the
           square-padded image
         - This method also converts the coordinates from the
-          (x_center, y_center, width, height) format returned by OWLv2, to the 
+          (x_center, y_center, width, height) format returned by OWLv2, to the
           (x0, y0, width, height) format used by the frontend
 
         Parameters
         ----------
         owlv2_bbox : np.ndarray
             A numpy array with 4 elements, representing the predicted box
-            coordinates for a given object (image patch), in the form 
+            coordinates for a given object (image patch), in the form
             (x_center, y_center, width, height) normalized by
             max(width, height) to be between 0 and 1.
         objectness_score : float
@@ -141,8 +141,8 @@ class TransformersOWLv2(FeatureExtractor):
 
             Example: `transformers/owlv2/google/owlv2-base-patch16-ensemble`
         objectness_threshold : float
-            During feature extraction, all objects with an objectness score 
-            below this threshold are discarded to limit the number of feature 
+            During feature extraction, all objects with an objectness score
+            below this threshold are discarded to limit the number of feature
             vectors that need to be stored and indexed
         """
         if not id.startswith(self.ID_PREFIX):
@@ -156,7 +156,7 @@ class TransformersOWLv2(FeatureExtractor):
 
         self.model: Owlv2ForObjectDetection = Owlv2ForObjectDetection.from_pretrained(model_name).to(self.DEVICE)
         self.processor = Owlv2Processor.from_pretrained(model_name)
-        
+
         self.model.eval()
 
         self.objectness_threshold = objectness_threshold
@@ -245,7 +245,7 @@ class TransformersOWLv2(FeatureExtractor):
             orig_sizes = [image.size for image in images]
         else:
             raise TypeError("`images` must be either a tensor or a PIL Image")
-        
+
         preprocessed_images = self.processor(images=images, return_tensors="pt")['pixel_values'].to(self.DEVICE) # shape: (B, C, 960, 960)
         return ImageBatchTensorWithOrigSizes(preprocessed_images, orig_sizes)
 
@@ -258,11 +258,11 @@ class TransformersOWLv2(FeatureExtractor):
         """
         Extract features/embeddings, objectness scores, and box coordinates for each patch in
         a batch of input images
-        
+
         Parameters
         ----------
         images : torch.Tensor
-            A batch of preprocessed images with shape (B, H, W, C) where B denotes the 
+            A batch of preprocessed images with shape (B, H, W, C) where B denotes the
             batch size and H, W, C denote the height, width, and number of channels respectively
         return_augmented_features : bool, optional
             Whether to return 'augmented' feature vectors or not (True by default)
@@ -271,7 +271,7 @@ class TransformersOWLv2(FeatureExtractor):
             patch token that is applied after computing the dot products between
             the image patch tokens and the text embeddings (see link below):
             https://github.com/huggingface/transformers/blob/174890280b340b89c5bfa092f6b4fb0e2dc2d7fc/src/transformers/models/owlv2/modeling_owlv2.py#L1269-L1273
-            
+
             This makes it difficult to implement fast lookups with vector databases
             or approximate nearest neighbour search algorithms. Fortunately, there
             is a solution to this which involves augmenting the vectors as described
@@ -286,13 +286,13 @@ class TransformersOWLv2(FeatureExtractor):
             A list of `Features` objects, one for each image in the input batch.
             Each `Features` object contains these two attributes:
 
-            - vectors: the patch features/embeddings computed by OWLv2 for a 
-              given image. This is a numpy array of shape (P, D) where P is the 
-              number of image patches (3600 by default), and D is the embedding 
-              dimension (default 513). If `return_augmented_features = False` 
+            - vectors: the patch features/embeddings computed by OWLv2 for a
+              given image. This is a numpy array of shape (P, D) where P is the
+              number of image patches (3600 by default), and D is the embedding
+              dimension (default 513). If `return_augmented_features = False`
               then the last dimension is 512.
-            - metadata: a list of `OWLv2FeatureMetadata` objects containing the 
-              predicted bounding box coordinates and objectness score for each 
+            - metadata: a list of `OWLv2FeatureMetadata` objects containing the
+              predicted bounding box coordinates and objectness score for each
               patch in a given image.
         """
         if not isinstance(images, ImageBatchTensorWithOrigSizes):
@@ -361,7 +361,7 @@ class TransformersOWLv2(FeatureExtractor):
     ) -> np.ndarray:
         """
         Extract text features/embeddings for a list of text queries
-        
+
         Parameters
         ----------
         text_query : list of str
