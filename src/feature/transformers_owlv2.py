@@ -151,10 +151,6 @@ class TransformersOWLv2(FeatureExtractor):
 
         assert len(id_tokens) == 4
         model_name = id[len(self.ID_PREFIX):] # remove ID_PREFIX from id string
-        if model_name not in OWLv2_MODELS:
-            raise ValueError(f'Model ({model_name}) not available in {self.ID_PREFIX}')
-        self.pretrained_model_name = id_tokens[3]
-        # self.pretraining_dataset = id_tokens[3]
 
         self.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
