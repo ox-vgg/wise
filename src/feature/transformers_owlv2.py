@@ -41,7 +41,7 @@ class ImageBatchTensorWithOrigSizes(torch.Tensor):
 
 @dataclass
 class OWLv2FeatureMetadata:
-    detection_score: float
+    objectness_score: float
     bbox: BBoxXYWH
 
     @classmethod
@@ -90,14 +90,14 @@ class OWLv2FeatureMetadata:
             width *= im_height/im_width
 
         return cls(
-            detection_score=objectness_score,
+            objectness_score=objectness_score,
             bbox=BBoxXYWH(x0, y0, width, height),
         )
 
     def to_sql_values(self, vector_id: int):
         return {
             "vector_id": vector_id,
-            "detection_score" : self.detection_score,
+            "objectness_score" : self.objectness_score,
             "bbox_x": self.bbox.x,
             "bbox_y": self.bbox.y,
             "bbox_w": self.bbox.w,
@@ -202,7 +202,7 @@ class TransformersOWLv2(FeatureExtractor):
                 sa.ForeignKey("vectors.id", ondelete="cascade"),
                 nullable=False,
             ),
-            sa.Column("detection_score", sa.Float, nullable=False),
+            sa.Column("objectness_score", sa.Float, nullable=False),
             ## we store normalized (x0, y0, w, h) coordinates
             ## because that's what the frontend uses.
             sa.Column("bbox_x", sa.Float, nullable=False),  # [0.0-1.0]
