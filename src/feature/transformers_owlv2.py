@@ -320,10 +320,10 @@ class TransformersOWLv2(FeatureExtractor):
             orig_size,
         ) in zip(batch_image_class_embeds, batch_objectness_scores, batch_pred_boxes, images.orig_sizes):
             # Filter boxes by objectness score
-            remaining_indices = patchwise_objectness_scores >= self.objectness_threshold
-            patchwise_image_class_embeds = patchwise_image_class_embeds[remaining_indices]
-            patchwise_objectness_scores = patchwise_objectness_scores[remaining_indices]
-            patchwise_pred_boxes = patchwise_pred_boxes[remaining_indices]
+            remaining_mask = patchwise_objectness_scores >= self.objectness_threshold
+            patchwise_image_class_embeds = patchwise_image_class_embeds[remaining_mask]
+            patchwise_objectness_scores = patchwise_objectness_scores[remaining_mask]
+            patchwise_pred_boxes = patchwise_pred_boxes[remaining_mask]
 
             feature_metadata = [
                 OWLv2FeatureMetadata.from_owlv2(pred_box, objectness_score, *orig_size)
