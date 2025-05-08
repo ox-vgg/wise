@@ -16,7 +16,7 @@ class ImageBatchTensorWithOrigSizes(torch.Tensor):
     """
     orig_sizes: list[tuple[int, int]]
 
-    def __new__(cls, data, orig_sizes: list[tuple[int, int]] = None):
+    def __new__(cls, data, orig_sizes: list[tuple[int, int]]):
         # Create a new tensor instance
         obj = torch.as_tensor(data).as_subclass(cls)
         # Set custom attribute
