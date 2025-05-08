@@ -223,10 +223,12 @@ class TransformersOWLv2(FeatureExtractor):
         orig_sizes = [] # list of (width, height) tuples
         if isinstance(images, torch.Tensor):
             orig_sizes = [(image.shape[2], image.shape[1]) for image in images]
-        elif isinstance(images, Image.Image):
+        elif isinstance(images, list):
+            if not all([isinstance(x, Image.Image) for x in images]):
+                raise TypeError("expect list images to all be PIL Image")
             orig_sizes = [image.size for image in images]
         else:
-            raise TypeError("`images` must be either a tensor or a PIL Image")
+            raise TypeError("`images` must be either a tensor or a list of PIL Image")
 
         preprocessed_images = self.processor(images=images, return_tensors="pt")['pixel_values'].to(self.DEVICE) # shape: (B, C, 960, 960)
         return ImageBatchTensorWithOrigSizes(preprocessed_images, orig_sizes)
