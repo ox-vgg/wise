@@ -53,6 +53,7 @@ class MediaMetadata(BaseModel):
 class VectorMetadata(BaseModel):
     id: Optional[int] = None
     modality: ModalityType
+    feature_extractor_id: Optional[str] = None
     media_id: int
     timestamp: Optional[float] = None
     end_timestamp: Optional[float] = None

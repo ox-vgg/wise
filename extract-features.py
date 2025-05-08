@@ -7,7 +7,7 @@ import torch.utils.data as torch_data
 from tqdm import tqdm
 import numpy as np
 import logging
-
+import json
 import sqlalchemy as sa
 
 from src.dataloader.dataset import MediaChunk
@@ -41,7 +41,7 @@ from src.repository import (
 
 def initialise_feature_extractors(
     project: WiseProject,
-    feature_extractor_ids: dict[ModalityType, str],
+    feature_extractor_ids: dict[ModalityType, list],
     feature_store_type: Literal['webdataset', 'numpy'],
     shard_max_count: int,
     shard_max_size: int,
@@ -53,26 +53,29 @@ def initialise_feature_extractors(
     feature_extractors = {}
     feature_stores = {}
 
-    for modality_type, feature_extractor_id in feature_extractor_ids.items():
-        ## 3.1 Initialise feature extractor
-        feature_extractors[modality_type] = FeatureExtractorFactory(
-            feature_extractor_id
-        )
-        feature_extractors[modality_type].create_vector_metadata_table(db_engine)
-        print(f"Using {feature_extractor_id} for {modality_type}")
+    for modality_type, feature_extractor_id_map in feature_extractor_ids.items():
+        feature_extractors[modality_type] = {}
+        feature_stores[modality_type] = {}
+        for feature_extractor_id in feature_extractor_id_map:
+            ## 3.1 Initialise feature extractor
+            feature_extractors[modality_type][feature_extractor_id] = FeatureExtractorFactory(
+                feature_extractor_id
+            )
+            feature_extractors[modality_type][feature_extractor_id].create_vector_metadata_table(db_engine)
+            print(f"Using {feature_extractor_id} for {modality_type}")
 
-        ## 3.2 Create folders to store features, metadata and search index
-        project.create_features_dir(feature_extractor_id)
+            ## 3.2 Create folders to store features, metadata and search index
+            project.create_features_dir(feature_extractor_id)
 
-        ## 3.3 Initialise feature store to store features
-        feature_stores[modality_type] = FeatureStoreFactory.create_store(
-            feature_store_type,
-            modality_type,
-            project.features_dir(feature_extractor_id),
-        )
-        feature_stores[modality_type].enable_write(
-            shard_max_count, shard_max_size
-        )
+            ## 3.3 Initialise feature store to store features
+            feature_stores[modality_type][feature_extractor_id] = FeatureStoreFactory.create_store(
+                feature_store_type,
+                modality_type,
+                project.features_dir(feature_extractor_id),
+            )
+            feature_stores[modality_type][feature_extractor_id].enable_write(
+                shard_max_count, shard_max_size
+            )
 
     return feature_extractors, feature_stores
 
@@ -199,25 +202,31 @@ if __name__ == "__main__":
     parser.add_argument(
         "--image-feature-id",
         required=False,
+        action="append",
+        dest="image_feature_id_map",
+        default=["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"],
         type=str,
-        default="mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k",
-        help="use this feature extractor for images",
+        help="use one or more feature extractors for images",
     )
 
     parser.add_argument(
         "--video-feature-id",
         required=False,
+        action="append",
+        dest="video_feature_id_map",
+        default=["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"],
         type=str,
-        default="mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k",
-        help="use this feature extractor for video frames",
+        help="use one or more feature extractors for video frames",
     )
 
     parser.add_argument(
         "--audio-feature-id",
         required=False,
+        action="append",
+        dest="audio_feature_id_map",
+        default=["microsoft/clap/2023/four-datasets"],
         type=str,
-        default="microsoft/clap/2023/four-datasets",
-        help="use this feature extractor for audio samples",
+        help="use one or more feature extractors for audio samples",
     )
 
     # TODO: Temporarily disabling this feature
@@ -261,6 +270,14 @@ if __name__ == "__main__":
 
     assert all(Path(x).is_dir() for x in args.media_dir_list), "All values for media_dir_list must be directories"
 
+    # remove duplicate entries in feature extractor ids
+    unique_video_feature_ids = list(set(args.video_feature_id_map))
+    unique_image_feature_ids = list(set(args.image_feature_id_map))
+    unique_audio_feature_ids = list(set(args.audio_feature_id_map))
+    setattr(args, 'video_feature_id_map', unique_video_feature_ids)
+    setattr(args, 'image_feature_id_map', unique_image_feature_ids)
+    setattr(args, 'audio_feature_id_map', unique_audio_feature_ids)
+
     # we need a non-existing folder to initialise a new WISE project
     if Path(args.project_dir).exists():
         raise ValueError(f'project_dir {args.project_dir} already exists')
@@ -283,14 +300,14 @@ if __name__ == "__main__":
     media_types_present: set[SourceMediaType] = set(x.media_type for x in all_metadata)
 
     ## 5. extract video and audio features
-    feature_extractor_ids: dict[ModalityType, str] = {}
+    feature_extractor_ids: dict[ModalityType, list] = {}
     if SourceMediaType.VIDEO in media_types_present or SourceMediaType.AV in media_types_present:
-        feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id
+        feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id_map
     if SourceMediaType.IMAGE in media_types_present:
-        feature_extractor_ids[ModalityType.IMAGE] = args.image_feature_id
+        feature_extractor_ids[ModalityType.IMAGE] = args.image_feature_id_map
     if SourceMediaType.AUDIO in media_types_present or SourceMediaType.AV in media_types_present:
         # TODO: temporary disable - if not args.skip_audio_feature_extraction:
-        feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id
+        feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id_map
 
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
@@ -312,13 +329,22 @@ if __name__ == "__main__":
     params = {
         "video_frames_per_chunk": video_frames_per_chunk,
         "video_frame_rate": video_frame_rate,
-        "video_preprocessing_function": feature_extractors[ModalityType.VIDEO].preprocess_image if ModalityType.VIDEO in feature_extractors else None,
+        "video_preprocessing_function_map": {
+            feature_extractor_id: feature_extractors[ModalityType.VIDEO][feature_extractor_id].preprocess_image
+            for feature_extractor_id in feature_extractors.get(ModalityType.VIDEO, {})
+        } if ModalityType.VIDEO in feature_extractors else None,
 
         "audio_samples_per_chunk": audio_frames_per_chunk,
         "audio_sampling_rate": audio_sampling_rate,
-        "audio_preprocessing_function": feature_extractors[ModalityType.AUDIO].preprocess_audio if ModalityType.AUDIO in feature_extractors else None,
+        "audio_preprocessing_function_map": {
+            feature_extractor_id: feature_extractors[ModalityType.AUDIO][feature_extractor_id].preprocess_audio
+            for feature_extractor_id in feature_extractors.get(ModalityType.AUDIO, {})
+        } if ModalityType.AUDIO in feature_extractors else None,
 
-        "image_preprocessing_function": feature_extractors[ModalityType.IMAGE].preprocess_image if ModalityType.IMAGE in feature_extractors else None,
+        "image_preprocessing_function_map": {
+            feature_extractor_id: feature_extractors[ModalityType.IMAGE][feature_extractor_id].preprocess_image
+            for feature_extractor_id in feature_extractors.get(ModalityType.IMAGE, {})
+        } if ModalityType.IMAGE in feature_extractors else None,
 
         "offset": None,
         "thumbnails": args.thumbnails
@@ -336,62 +362,69 @@ if __name__ == "__main__":
         chunks: Dict[MediaChunkType, MediaChunk | None] # type annotation
         for idx, (mid, chunks) in enumerate(av_data_loader):
             for media_type in feature_extractor_ids:
-                if media_type not in chunks or chunks[media_type] is None:
-                    continue
-                segment_tensor = chunks[media_type].tensor
-                segment_pts = chunks[media_type].pts
-
-                if media_type == "image" or media_type == "video":
-                    segment_feature = feature_extractors[
-                        media_type
-                    ].extract_image_features(segment_tensor)
-                elif media_type == "audio":
-                    if segment_tensor.shape[2] < audio_frames_per_chunk:
-                        # we discard any malformed audio segments
+                for feature_extractor_id in feature_extractor_ids[media_type]:
+                    if media_type not in chunks or chunks[media_type] is None:
                         continue
-                    segment_feature = feature_extractors[
-                        media_type
-                    ].extract_audio_features(segment_tensor)
-                else:
-                    raise ValueError("Unknown media_type {media_type}")
 
-                # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
-                if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
-                    for frame_idx, frame_features in enumerate(segment_feature):
-                        vector_ids: list[int] = []
-                        for frame_single_vector in frame_features.vectors:
-                            feature_metadata = VectorRepo.create(
-                                conn,
-                                data=VectorMetadata(
-                                    modality=media_type,
-                                    media_id=mid,
-                                    timestamp=segment_pts + frame_idx * (1 / video_frame_rate),
-                                ),
-                            )
-                            feature_stores[media_type].add(
-                                feature_metadata.id,
-                                np.expand_dims(frame_single_vector, axis=0),
-                            )
-                            vector_ids.append(feature_metadata.id)
-                        feature_extractors[media_type].add_to_vector_metadata_table(
-                            conn, vector_ids, frame_features.metadata
+                    if feature_extractor_id not in chunks[media_type] or chunks[media_type][feature_extractor_id] is None:
+                        continue
+
+                    segment_tensor = chunks[media_type][feature_extractor_id].tensor
+                    segment_pts = chunks[media_type][feature_extractor_id].pts
+
+                    if media_type == "image" or media_type == "video":
+                        segment_feature = feature_extractors[media_type][feature_extractor_id].extract_image_features(
+                            segment_tensor
                         )
-                else:
-                    # Add whole segment
-                    _start_time = segment_pts
-                    _end_time = segment_pts + audio_segment_length
-                    feature_metadata = VectorRepo.create(
-                        conn,
-                        data=VectorMetadata(
-                            modality=media_type,
-                            media_id=mid,
-                            timestamp=_start_time,
-                            end_timestamp=_end_time,
-                        ),
-                    )
-                    feature_stores[media_type].add(
-                        feature_metadata.id, segment_feature
-                    )
+                    elif media_type == "audio":
+                        if segment_tensor.shape[2] < audio_frames_per_chunk:
+                            # we discard any malformed audio segments
+                            continue
+                        segment_feature = feature_extractors[media_type][feature_extractor_id].extract_audio_features(
+                            segment_tensor
+                        )
+                    else:
+                        raise ValueError("Unknown media_type {media_type}")
+
+                    # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
+                    if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
+                        for frame_idx, frame_features in enumerate(segment_feature):
+                            vector_ids: list[int] = []
+                            for frame_single_vector in frame_features.vectors:
+                                feature_metadata = VectorRepo.create(
+                                    conn,
+                                    data=VectorMetadata(
+                                        modality=media_type,
+                                        feature_extractor_id=feature_extractor_id,
+                                        media_id=mid,
+                                        timestamp=segment_pts + frame_idx * (1 / video_frame_rate),
+                                    ),
+                                )
+                                feature_stores[media_type][feature_extractor_id].add(
+                                    feature_metadata.id,
+                                    np.expand_dims(frame_single_vector, axis=0),
+                                )
+                                vector_ids.append(feature_metadata.id)
+                            feature_extractors[media_type][feature_extractor_id].add_to_vector_metadata_table(
+                                conn, vector_ids, frame_features.metadata
+                            )
+                    else:
+                        # Add whole segment
+                        _start_time = segment_pts
+                        _end_time = segment_pts + audio_segment_length
+                        feature_metadata = VectorRepo.create(
+                            conn,
+                            data=VectorMetadata(
+                                modality=media_type,
+                                feature_extractor_id=feature_extractor_id,
+                                media_id=mid,
+                                timestamp=_start_time,
+                                end_timestamp=_end_time,
+                            ),
+                        )
+                        feature_stores[media_type][feature_extractor_id].add(
+                            feature_metadata.id, segment_feature
+                        )
 
             if 'thumbnails' in chunks and chunks['thumbnails'] is not None:
                 # Handle thumbnails
@@ -414,7 +447,9 @@ if __name__ == "__main__":
             # Update progress bar
             _media = chunks.get('video') or chunks.get('audio') or chunks.get('image')
             if _media is not None:
-                pbar.update(_media.tensor.shape[0])
+                a_feature_extractor = next( iter(_media.values()), None)
+                if a_feature_extractor is not None:
+                    pbar.update(a_feature_extractor.tensor.shape[0])
 
             if idx % MAX_BULK_INSERT == 0:
                 conn.commit()
@@ -424,8 +459,8 @@ if __name__ == "__main__":
         thumbs_conn.commit()
 
     for id in feature_stores:
-        store = feature_stores[id]
-        store.close()
+        for feature_extractor_id in feature_stores[id]:
+            feature_stores[id][feature_extractor_id].close()
 
     end_time = time.time()
     elapsed_time = end_time - start_time

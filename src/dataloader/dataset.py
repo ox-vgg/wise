@@ -287,24 +287,37 @@ class MediaDataset(torch_data.IterableDataset):
                 if not isinstance(self, ImageDataset):
                     reader.seek(self._offset)
 
-
                 media_chunk_types = [get_media_chunk_type(opts) for opts in output_stream_opts]
 
                 for c in reader.stream():
                     # Might contain 1 or many output streams. Apply the corresponding transform
-                    media_chunks = {
-                        media_chunk_type: (
-                            MediaChunk(
-                                tensor=stream_transform(torch.Tensor(stream_chunk)),
-                                pts=stream_chunk.pts,
-                            )
-                            if stream_chunk is not None
-                            else None
-                        )
-                        for (stream_chunk, stream_transform, media_chunk_type) in zip(
+                    media_chunks = {}
+                    for (stream_chunk, stream_transform, media_chunk_type) in zip(
                             c, stream_transforms, media_chunk_types
-                        )
-                    }
+                        ):
+                        media_chunks[media_chunk_type] = {}
+                        if isinstance(stream_transform, dict):
+                            # audiovisual features
+                            for feature_extractor_id in stream_transform:
+                                media_chunks[media_chunk_type][feature_extractor_id] = (
+                                    MediaChunk(
+                                        tensor=stream_transform[feature_extractor_id](torch.Tensor(stream_chunk)),
+                                        pts=stream_chunk.pts,
+                                    )
+                                    if stream_chunk is not None
+                                    else None
+                                )
+                        else:
+                            # thumbnails
+                            media_chunks[media_chunk_type] = (
+                                MediaChunk(
+                                    tensor=stream_transform(torch.Tensor(stream_chunk)),
+                                    pts=stream_chunk.pts,
+                                )
+                                if stream_chunk is not None
+                                else None
+                            )
+
                     yield _id, media_chunks
             except Exception:
                 logger.exception(f'Exception when processing "{_id}: {path}"')
@@ -423,11 +436,11 @@ class AVDataset(MediaDataset):
         video_frames_per_chunk: int,
         audio_samples_per_chunk: int,
         *,
-        audio_preprocessing_function: Optional[
-            Callable[[torch.Tensor], torch.Tensor]
+        audio_preprocessing_function_map: Optional[
+            List[Callable[[torch.Tensor], torch.Tensor]]
         ] = None,
-        video_preprocessing_function: Optional[
-            Callable[[torch.Tensor], torch.Tensor]
+        video_preprocessing_function_map: Optional[
+            List[Callable[[torch.Tensor], torch.Tensor]]
         ] = None,
         video_frame_rate: Optional[int] = None,
         audio_sample_rate: Optional[int] = None,
@@ -446,18 +459,18 @@ class AVDataset(MediaDataset):
             ),
         ]
 
-        transforms = [
-            (
-                video_preprocessing_function
-                if video_preprocessing_function is not None
-                else IdentityTransform
-            ),
-            (
-                audio_preprocessing_function
-                if audio_preprocessing_function is not None
-                else IdentityTransform
-            ),
-        ]
+        transforms = [{}, {}]
+        for feature_extractor_id in video_preprocessing_function_map:
+            if video_preprocessing_function_map is None:
+                transforms[0][feature_extractor_id] = IdentityTransform
+            else:
+                transforms[0][feature_extractor_id] = video_preprocessing_function_map[feature_extractor_id]
+        for feature_extractor_id in audio_preprocessing_function_map:
+            if audio_preprocessing_function_map is None:
+                transforms[1][feature_extractor_id] = IdentityTransform
+            else:
+                transforms[1][feature_extractor_id] = audio_preprocessing_function_map[feature_extractor_id]
+
         super(AVDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,
@@ -569,9 +582,9 @@ def _get_dataset(
         audio_samples_per_chunk: int,
         video_frame_rate: int | None = None,
         audio_sampling_rate: int | None = None,
-        video_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-        audio_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-        image_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
+        video_preprocessing_function_map: List[Callable[[torch.Tensor], torch.Tensor]] | None = None,
+        audio_preprocessing_function_map: List[Callable[[torch.Tensor], torch.Tensor]] | None = None,
+        image_preprocessing_function_map: List[Callable[[torch.Tensor], torch.Tensor]] | None = None,
         offset: float | None = None,
         thumbnails: bool = True ):
     if media_type == SourceMediaType.AV:
@@ -579,10 +592,10 @@ def _get_dataset(
             input_files,
             video_frames_per_chunk=video_frames_per_chunk,
             video_frame_rate=video_frame_rate,
-            video_preprocessing_function=video_preprocessing_function,
+            video_preprocessing_function_map=video_preprocessing_function_map,
             audio_samples_per_chunk=audio_samples_per_chunk,
             audio_sample_rate=audio_sampling_rate,
-            audio_preprocessing_function=audio_preprocessing_function,
+            audio_preprocessing_function_map=audio_preprocessing_function_map,
             offset=offset,
             thumbnails=thumbnails,
         )
@@ -590,24 +603,23 @@ def _get_dataset(
         stream = VideoDataset(
             input_files,
             frames_per_chunk=video_frames_per_chunk,
-            preprocessing_function=video_preprocessing_function,
+            preprocessing_function=video_preprocessing_function_map,
             frame_rate=video_frame_rate,
             offset=offset,
             thumbnails=thumbnails
         )
-
     elif media_type == SourceMediaType.AUDIO:
         stream = AudioDataset(
             input_files,
             samples_per_chunk=audio_samples_per_chunk,
             sample_rate=audio_sampling_rate,
-            preprocessing_function=audio_preprocessing_function,
+            preprocessing_function=audio_preprocessing_function_map,
             offset=offset,
         )
     elif media_type == SourceMediaType.IMAGE:
         stream = ImageDataset(
             input_files,
-            preprocessing_function=image_preprocessing_function,
+            preprocessing_function=image_preprocessing_function_map,
             thumbnails=thumbnails
         )
     else:
