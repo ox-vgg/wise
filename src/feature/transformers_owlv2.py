@@ -152,28 +152,8 @@ class TransformersOWLv2(FeatureExtractor):
 
         self.objectness_threshold = objectness_threshold
 
-        # query model to get input image size and output feature dimension
+        # get input image size
         self.input_image_size = (self.processor.image_processor.size['height'], self.processor.image_processor.size['width'])
-        self._find_output_dim()
-
-    def _find_output_dim(self):
-        """
-        Run a random image through the model to find the output_dim
-        """
-        if not hasattr(self, 'output_dim'):
-            random_image = torch.randint(0, 255, (1, 3,) + (self.input_image_size) )
-            model_image_input = self.preprocess_image(random_image)
-            model_image_features_list = self.extract_image_features(model_image_input)
-            model_text_input = ['some random text']
-            model_text_features  = self.extract_text_features(model_text_input)
-            assert all(
-                model_image_features.vectors.shape[1] == model_text_features.shape[1]
-                for model_image_features in model_image_features_list
-            )
-            self.output_dim = model_text_features.shape[1]
-
-    def get_output_dim(self):
-        return self.output_dim
 
     def get_input_image_size(self):
         return self.input_image_size
