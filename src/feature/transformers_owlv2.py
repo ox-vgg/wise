@@ -117,6 +117,10 @@ class TransformersOWLv2(FeatureExtractor):
     ID_PREFIX = 'transformers/owlv2/'
     DESCRIPTION = 'See https://huggingface.co/docs/transformers/en/model_doc/owlv2'
 
+    ## OWLv2 does not support audio
+    preprocess_audio = None
+    extract_audio_features = None
+
     def __init__(self, id: str, objectness_threshold=0.02):
         """
         Parameters
