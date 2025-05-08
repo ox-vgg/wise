@@ -8,6 +8,13 @@ import sqlalchemy as sa
 
 from .feature_extractor import BBoxXYWH, FeatureExtMetadata, FeatureExtractor, Features
 
+
+def flatten_patch_features(feature_map: torch.Tensor) -> torch.Tensor:
+    assert feature_map.ndim == 4
+    batch_sz, num_patches_h, num_patches_w, hidden_dim = feature_map.shape
+    return feature_map.reshape((batch_sz, num_patches_h * num_patches_w, hidden_dim))
+
+
 class ImageBatchTensorWithOrigSizes(torch.Tensor):
     """
     Subclass of torch.Tensor representing a preprocessed (resized) batch of
@@ -275,8 +282,7 @@ class TransformersOWLv2(FeatureExtractor):
 
         # --- Code below is adapted from Owlv2ForObjectDetection.forward() source code ---
         batch_feature_map, _ = self.model.image_embedder(images) # shape of batch_feature_map: (B, 60, 60, 768)
-        batch_size, num_patches, num_patches, hidden_dim = batch_feature_map.shape
-        batch_image_feats = torch.reshape(batch_feature_map, (batch_size, num_patches * num_patches, hidden_dim)) # shape: (B, 3600, 768)
+        batch_image_feats = flatten_patch_features(batch_feature_map) # shape: (B, 3600, 768)
 
         _, batch_image_class_embeds = self.model.class_predictor(batch_image_feats)
         # Normalize image features
