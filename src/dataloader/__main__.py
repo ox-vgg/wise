@@ -140,13 +140,13 @@ def run(
     params = {
         "video_frames_per_chunk": video_frames_per_chunk,
         "video_frame_rate": video_frame_rate,
-        "video_preprocessing_function": preprocess,
+        "video_preprocessing_function_map": { model: preprocess },
 
         "audio_samples_per_chunk": audio_frames_per_chunk,
         "audio_sampling_rate": audio_sampling_rate,
-        "audio_preprocessing_function": None,
+        "audio_preprocessing_function_map": {},
 
-        "image_preprocessing_function": preprocess,
+        "image_preprocessing_function_map": { model: preprocess },
 
         "offset": None,
         "thumbnails": thumbnails
@@ -163,13 +163,25 @@ def run(
     loader = torch_data.DataLoader(stream, batch_size=None, num_workers=0)
     logger.info(f"Iterating over {len(metadata)} file(s)")
     for mid, chunks in tqdm(loader):
-        logger.debug([{
-            media_chunk_type: (
-                f"List length: {len(chunk.tensor)} | Shapes: {[t.shape for t in chunk.tensor]}" if isinstance(chunk.tensor, list) else chunk.tensor.shape,
-                chunk.pts
-            ) if chunk else None
-        } for media_chunk_type, chunk in chunks.items()])
+        for media_chunk_type, chunk in chunks.items():
+            if media_chunk_type == "video" or media_chunk_type == "audio" or media_chunk_type == "image":
+                for feature_extractor_id in chunk:
+                    if chunk[model] is None:
+                        continue # end of stream indicator
+                    logger.debug([{
+                        media_chunk_type: (
+                            f"List length: {len(chunk[model].tensor)} | Shapes: {[t.shape for t in chunk[feature_extractor_id].tensor]}" if isinstance(chunk[feature_extractor_id].tensor, list) else chunk[feature_extractor_id].tensor.shape,
+                            chunk[feature_extractor_id].pts
+                        )
+                    }])
+            if media_chunk_type == "thumbnails":
+                if chunk is None:
+                    continue # end of stream indicator
+                logger.debug([{
+                    media_chunk_type: (
+                        f"List length: {len(chunk.tensor)} | Shapes: {[t.shape for t in chunk.tensor]}" if isinstance(chunk.tensor, list) else chunk.tensor.shape,
+                        chunk.pts
+                    )
+                }])
         pass
-
-
 app()
