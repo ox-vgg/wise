@@ -104,15 +104,6 @@ class OWLv2FeatureMetadata:
             "bbox_h": self.bbox.h,
         }
 
-# TODO change this to follow {architecture}/{dataset} naming convention?
-OWLv2_MODELS = [
-    "google/owlv2-base-patch16",
-    "google/owlv2-base-patch16-finetuned",
-    "google/owlv2-base-patch16-ensemble",
-    "google/owlv2-large-patch14",
-    "google/owlv2-large-patch14-finetuned",
-    "google/owlv2-large-patch14-ensemble",
-]
 
 class TransformersOWLv2(FeatureExtractor):
     """
