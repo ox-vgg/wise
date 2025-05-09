@@ -204,7 +204,6 @@ if __name__ == "__main__":
         required=False,
         action="append",
         dest="image_feature_id_map",
-        default=["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"],
         type=str,
         help="use one or more feature extractors for images",
     )
@@ -214,7 +213,6 @@ if __name__ == "__main__":
         required=False,
         action="append",
         dest="video_feature_id_map",
-        default=["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"],
         type=str,
         help="use one or more feature extractors for video frames",
     )
@@ -224,7 +222,6 @@ if __name__ == "__main__":
         required=False,
         action="append",
         dest="audio_feature_id_map",
-        default=["microsoft/clap/2023/four-datasets"],
         type=str,
         help="use one or more feature extractors for audio samples",
     )
@@ -249,6 +246,14 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    # Set default for {image,audio,video}_feature_id_map only if the argument was not provided
+    if args.video_feature_id_map is None:
+        args.video_feature_id_map = ["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"]
+    if args.image_feature_id_map is None:
+        args.image_feature_id_map = ["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"]
+    if args.audio_feature_id_map is None:
+        args.audio_feature_id_map = ["microsoft/clap/2023/four-datasets"]
 
     logging.basicConfig(
         level=logging.INFO,
