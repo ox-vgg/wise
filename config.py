@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Literal, Set, Optional
+from typing import Literal, Set, Optional, Dict
 from pathlib import Path
+from src.enums import SearchTarget
 
 
 class APIConfig(BaseSettings):
@@ -17,3 +18,4 @@ class APIConfig(BaseSettings):
     query_blocklist: Set[str] = set()
     project_dir: Path
     thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
+    search_targets: Dict[SearchTarget, str] = {}

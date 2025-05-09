@@ -908,48 +908,37 @@ def _get_search_router(config: APIConfig):
     and value is a SearchIndex object
     """
     search_indices: dict[str, SearchIndex] = {}
-    for media_type in project_assets:
-        asset_id_list = list(project_assets[media_type].keys())
-        asset_index = 0
-        N = len(asset_id_list)
-        if N == 0:
-            continue
-        if N == 1:
-            asset_index = 0
-        else:
-            print(f'{media_type} can be searched using the following search index:')
-            for asset_index in range(0, N):
-                print(f'  {asset_index}. {asset_id_list[asset_index]}')
-            selected_asset_index = -1
-            while True:
-                try:
-                    input_index = input(f'Enter the index of desired search index [0-{N-1}] : ')
-                    selected_asset_index = int(input_index)
-                    if selected_asset_index >= 0 and selected_asset_index < N:
-                        break
-                except:
-                    print(f'invalid input {input_index}')
-            asset_index = selected_asset_index
-        asset_id = asset_id_list[asset_index]
-        asset = project_assets[media_type][asset_id]
-        search_indices[media_type] = SearchIndexFactory(media_type, asset_id, asset)
-        logger.info(f"Loading faiss index from {search_indices[media_type].get_index_filename(config.index_type)}")
-        if not search_indices[media_type].load_index(config.index_type, project_engine):
-            print(f'failed to load {media_type} index: {asset_id}')
-            del search_indices[media_type]
-            continue
+    search_target_matches = {}
+    for search_target in config.search_targets:
+        user_provided_feature_id = config.search_targets[search_target]
+        for media_type in project_assets:
+            for feature_extractor_id in project_assets[media_type]:
+                if user_provided_feature_id in feature_extractor_id:
+                    if search_target not in search_indices:
+                        search_indices[search_target] = SearchIndexFactory(
+                            media_type, feature_extractor_id, project_assets[media_type][feature_extractor_id]
+                        )
+                        logger.info(f"Loading faiss index from {search_indices[search_target].get_index_filename(config.index_type)}")
+                        if not search_indices[search_target].load_index(config.index_type, project_engine):
+                            print(f'failed to load {media_type} index: {feature_extractor_id}')
+                            del search_indices[search_target]
+                            continue
+                        search_target_matches[search_target] = feature_extractor_id
+                        if hasattr(search_indices[search_target].index, "nprobe"):
+                            # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
+                            search_indices[search_target].index.parallel_mode = 1
+                            search_indices[search_target].index.nprobe = getattr(config, "nprobe", 32)
 
-        if hasattr(search_indices[media_type].index, "nprobe"):
-            # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
-            search_indices[media_type].index.parallel_mode = 1
-            search_indices[media_type].index.nprobe = getattr(config, "nprobe", 32)
-
-        if not search_indices[media_type].is_internal_search_supported:
-            logger.info(
-                "This faiss index does not support internal search. To enable "
-                "internal search, please re-create the index by running "
-                f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {search_indices[media_type].index_type} --overwrite`",
-            )
+                        if not search_indices[search_target].is_internal_search_supported:
+                            logger.info(
+                                "This faiss index does not support internal search. To enable "
+                                "internal search, please re-create the index by running "
+                                f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {search_indices[search_target].index_type} --overwrite`",
+                            )
+                    else:
+                        print(f"search target {search_target}:{user_provided_feature_id} matches to multiple assets. Skipping")
+                        continue
+    logger.info("Initialised mapping between search target and search index:\n%s", json.dumps(search_target_matches, indent=4))
 
     # Get counts
     with project_engine.connect() as conn:
