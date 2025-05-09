@@ -56,6 +56,8 @@ from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtMetadata
 
+from src.enums import SearchTarget
+
 logger = logging.getLogger(__name__)
 
 
@@ -1308,12 +1310,12 @@ def _get_search_router(config: APIConfig):
         Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
         input images/text, and then using this as the query vector.
         """
-        media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-        if media_type not in search_indices:
+        search_target = SearchTarget.Audio if search_in == MediaType.AV else search_in
+        if search_target not in search_indices:
             raise HTTPException(400, {
-                "message": f"No search index exists for this modality: {search_in}"
+                "message": f"No search index exists for this modality: {search_target}"
             })
-        search_index = search_indices[media_type]
+        search_index = search_indices[search_target]
 
         def extract_text_features(text: List[str]) -> ndarray:
             if search_index.feature_extractor.extract_text_features is None:
