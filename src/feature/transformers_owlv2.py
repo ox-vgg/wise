@@ -104,7 +104,7 @@ class OWLv2FeatureMetadata:
     bbox: BBoxXYWH
 
     @classmethod
-    def from_owlv2(cls, owlv2_bbox: np.ndarray, objectness_score: float, im_width: int, im_height: int):
+    def from_owlv2(cls, owlv2_bbox: np.ndarray, objectness_score: np.floating, im_width: int, im_height: int):
         """
         Creates a OWLv2FeatureMetadata instance with the bounding box and
         objectness score of a single object (patch) detected by OWLv2. The
@@ -137,8 +137,8 @@ class OWLv2FeatureMetadata:
             owlv2_bbox, im_width, im_height
         )
         return cls(
-            objectness_score=objectness_score,
-            bbox=BBoxXYWH(x0, y0, width, height),
+            objectness_score=objectness_score.item(),
+            bbox=BBoxXYWH(x0.item(), y0.item(), width.item(), height.item()),
         )
 
     def to_sql_values(self, vector_id: int):
