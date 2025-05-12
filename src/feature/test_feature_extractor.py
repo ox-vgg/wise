@@ -53,7 +53,7 @@ class TestFeatureExtractor(unittest.TestCase):
         pass
 
 
-class TestInsigthFaceFeatureExtractor(unittest.TestCase):
+class TestInsightFaceFeatureExtractor(unittest.TestCase):
     def setUp(self):
         self._extractor = FeatureExtractorFactory("deepinsight/insightface/buffalo_l/_")
 
