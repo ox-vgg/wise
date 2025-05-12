@@ -55,7 +55,7 @@ class TestFeatureExtractor(unittest.TestCase):
 
 class TestInsigthFaceFeatureExtractor(unittest.TestCase):
     def setUp(self):
-        self._extractor = FeatureExtractorFactory("insightface/_/buffalo_l/_")
+        self._extractor = FeatureExtractorFactory("deepinsight/insightface/buffalo_l/_")
 
     def _preprocess_and_extract_features(self, images):
         return self._extractor.extract_image_features(
