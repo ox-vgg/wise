@@ -68,6 +68,36 @@ class ImageBatchTensorWithOrigSizes(torch.Tensor):
             return self
         return ImageBatchTensorWithOrigSizes(new_obj, self.orig_sizes)
 
+
+def owlv2_bbox_to_xywh(
+        owlv2_bbox: np.ndarray, im_width: int, im_height: int
+    ) -> np.ndarray:
+    """Convert bbox coordinates from OWLv2 format to XYWH.
+
+    The original bounding box coordinates from OWLv2 are normalized
+    between 0 and 1, based on a *square-padded* version of the input
+    image, and in the (x_center, y_center, width, height) format.
+
+    This function converts those coordinates to the (x0, y0, w, h)
+    format relative to the original image size.
+    """
+    x_center, y_center, width, height = owlv2_bbox
+
+    # Get coordinates of top left corner
+    x0 = x_center - width/2
+    y0 = y_center - height/2
+
+    # Adjust bounding box coordinates to account for square padding applied
+    # to the input image
+    if im_width > im_height:
+        y0 *= im_width/im_height
+        height *= im_width/im_height
+    else:
+        x0 *= im_height/im_width
+        width *= im_height/im_width
+    return np.array([x0, y0, width, height])
+
+
 @dataclass
 class OWLv2FeatureMetadata:
     objectness_score: float
@@ -103,21 +133,9 @@ class OWLv2FeatureMetadata:
         im_height : int
             The original image height (before square padding and resizing)
         """
-        x_center, y_center, width, height = owlv2_bbox
-
-        # Get coordinates of top left corner
-        x0 = x_center - width/2
-        y0 = y_center - height/2
-
-        # Adjust bounding box coordinates to account for square padding applied
-        # to the input image
-        if im_width > im_height:
-            y0 *= im_width/im_height
-            height *= im_width/im_height
-        else:
-            x0 *= im_height/im_width
-            width *= im_height/im_width
-
+        x0, y0, width, height = owlv2_bbox_to_xywh(
+            owlv2_bbox, im_width, im_height
+        )
         return cls(
             objectness_score=objectness_score,
             bbox=BBoxXYWH(x0, y0, width, height),

@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from PIL import Image
 
+from .transformers_owlv2 import owlv2_bbox_to_xywh
 from .feature_extractor_factory import FeatureExtractorFactory
 
 ## Typically, imports from external libraries come before local
@@ -138,6 +139,25 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
         images = torch.empty([0, 3, 768, 1024])
         features = self._preprocess_and_extract_features(images)
         self.assertListEqual(features, [])
+
+
+class TestOWLv2BBoxConversion(unittest.TestCase):
+    ## Test values picked so they can be visualised on a 20x20 grid.
+    def test_original_square_image(self):
+        owlv2_bbox = np.array([0.15, 0.35, 0.20, 0.10])
+        xywh = owlv2_bbox_to_xywh(owlv2_bbox, 20, 20)
+        np.testing.assert_allclose(xywh, np.array([0.05, 0.30, 0.20, 0.10]))
+
+    def test_original_landscape_image(self):
+        owlv2_bbox = np.array([0.15, 0.35, 0.20, 0.10])
+        xywh = owlv2_bbox_to_xywh(owlv2_bbox, 20, 10)
+        np.testing.assert_allclose(xywh, np.array([0.05, 0.6, 0.20, 0.20]))
+
+    def test_original_portrait_image(self):
+        owlv2_bbox = np.array([0.15, 0.35, 0.20, 0.10])
+        xywh = owlv2_bbox_to_xywh(owlv2_bbox, 10, 20)
+        np.testing.assert_allclose(xywh, np.array([0.1, 0.30, 0.40, 0.10]))
+
 
 
 if __name__ == '__main__':
