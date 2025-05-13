@@ -11,16 +11,9 @@ const FEATURED_IMAGES_RANDOM_SEED = Math.floor(Math.random()*100); // Generate a
 const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[]) => {
   return new Map(
     Object.entries(videos).map(([mediaId, videoInfo]) => {
-      if (!videoInfo.link.startsWith('http')) {
-        videoInfo.link = config.API_BASE_URL + videoInfo.link; // Fixes video URLs for dev mode
-      }
-
       // const title = videoInfo.filename;
       if (!videoInfo.timeline_hover_thumbnails.startsWith('http')) {
         videoInfo.timeline_hover_thumbnails = config.API_BASE_URL + videoInfo.timeline_hover_thumbnails; // Fixes URLs for dev mode
-      }
-      if (!videoInfo.thumbnail.startsWith('http') && !videoInfo.thumbnail.startsWith('data:')) {
-        videoInfo.thumbnail = config.API_BASE_URL + videoInfo.thumbnail; // Fixes URLs for dev mode
       }
 
       return [
@@ -105,9 +98,6 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
     processedSearchResults.Image.mediaInfo = new Map(
       Object.entries(results.image_results.images)
         .map(([mediaId, imageInfo]) => {
-          if (!imageInfo.thumbnail.startsWith('http') && !imageInfo.thumbnail.startsWith('data:')) {
-            imageInfo.thumbnail = config.API_BASE_URL + imageInfo.thumbnail; // Fixes URLs for dev mode
-          }
           // Populate title field with filename if it doesn't exist
           if (!imageInfo.title) imageInfo.title = imageInfo.filename;
           return [

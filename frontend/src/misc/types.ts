@@ -23,7 +23,7 @@ export type Query = {
 
 
 
-type MediaMetadata = {
+type MediaInfo = {
   id: string;
   filename: string;
   width: number;
@@ -33,12 +33,6 @@ type MediaMetadata = {
   duration: number;
   title: string;
   external_metadata: Record<string, any>;
-};
-// A search result containing the metadata fields from MediaMetadata, as well as additional fields like `thumbnail` and `distance`
-type MediaInfo = MediaMetadata & {
-  link: string;
-  thumbnail: string;
-  distance?: number;
 };
 export type ImageInfo = MediaInfo & {};
 export type AudioInfo = MediaInfo & {};
@@ -64,7 +58,6 @@ type VectorResult = {
 };
 type ImageVector = VectorResult & {
   thumbnail: string;
-  thumbnail_score: number;
 };
 type MediaSegment = VectorResult & {
   ts: number;
@@ -73,7 +66,6 @@ type MediaSegment = VectorResult & {
 export type AudioSegment = MediaSegment & {};
 export type VideoSegment = MediaSegment & {
   thumbnail: string;
-  thumbnail_score: number;
 };
 
 export type AudioResults = {
@@ -120,7 +112,6 @@ export type ProcessedVideoSegment = VideoSegment & {
 };
 export type ProcessedVideoInfo = VideoInfo & {
   shots: VideoSegment[] | ProcessedVideoSegment[];
-  title: string;
 };
 export type ProcessedSearchResults = {
   Image: {
