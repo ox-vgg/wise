@@ -236,10 +236,10 @@ else
 fi
 
 # Test 5.3 : check if the server returns correct results (including metadata) for query on video
-if [ "$VIDEO_FEATURE_ID" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
+if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
     SEARCH_QUERY="bees"
     RESULT_COUNT=60
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&text_queries=${SEARCH_QUERY}"
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
     response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
 
     # The WISE server's JSON response for search query is as follows:
@@ -306,12 +306,12 @@ if [ "$VIDEO_FEATURE_ID" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
 fi
 
 # Test 5.4 : check if the server returns correct results (including metadata) for query on audio
-SEARCH_QUERY="fire+engine+siren"
-RESULT_COUNT=1
-SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&text_queries=${SEARCH_QUERY}"
-response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
-
 if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
+    SEARCH_QUERY="fire+engine+siren"
+    RESULT_COUNT=1
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}&text_queries=${SEARCH_QUERY}"
+    response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+
     response_selected_json=$(echo "$response" | jq -c '{
         merged_windows: [
         .video_audio_results.merged_windows[] as $mw
@@ -345,7 +345,7 @@ if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
 fi
 
 # Test 5.5 : check if the server returns correct results (including metadata) for query on face
-if [ "$VIDEO_FEATURE_ID" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
+if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
     FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
     FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
     if [ ! -f "${FACE_IMG_FILE}" ]; then
@@ -358,8 +358,9 @@ if [ "$VIDEO_FEATURE_ID" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
         exit 1
     fi
     RESULT_COUNT=3
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=face"
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
     response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    echo $response
     response_selected_json=$(echo "$response" | jq -c '{
     results: [
         .video_results.merged_windows[]
