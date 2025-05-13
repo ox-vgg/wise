@@ -864,6 +864,14 @@ def _get_search_router(config: APIConfig):
     search_indices: dict[str, dict[str, SearchIndex]] = {}
     active_search_targets: dict[str, list[str]] = {}
     for media_type in project_assets:
+        if media_type not in {MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO}:
+            # Added to ensure projects created with older versions
+            # remain compatible (TODO: remove this in the future)
+            logger.warning(
+                f"Media type {media_type} is not supported. "
+                "Please use IMAGE, VIDEO, or AUDIO media types."
+            )
+            continue
         for feature_extractor_id in project_assets[media_type]:
             if media_type not in search_indices:
                 search_indices[media_type] = {}
