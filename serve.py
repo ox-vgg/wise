@@ -4,25 +4,12 @@ from typing import Optional, List, Dict
 import logging
 import json
 from src.wise_project import WiseProject
-from src.enums import IndexType, SearchTarget
+from src.enums import IndexType
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
 )
-
-def parse_search_targets(raw_search_targets: List[str]) -> Dict[SearchTarget, str]:
-    targets = {}
-    for item in raw_search_targets:
-        if ":" not in item:
-            raise typer.BadParameter(f"Invalid format for --search-target: '{item}' (expected key:value)")
-        key, value = item.split(":", 1)
-        try:
-            target_enum = SearchTarget(key.lower())
-        except ValueError:
-            raise typer.BadParameter(f"Invalid search target type: '{key}'")
-        targets[target_enum] = value
-    return targets
 
 app = typer.Typer()
 @app.command(
@@ -80,28 +67,10 @@ def main(
     )
     project_assets = project.discover_assets()
 
-    search_targets = parse_search_targets(search_targets)
-    if not search_targets:
-        # initialise defaults for backward compatibility
-        # TODO: remove this when the frontend starts using the new search target format
-        if 'video' in project_assets:
-            for feature_extractor_id in project_assets['video']:
-                if 'insightface' in feature_extractor_id:
-                    search_targets[SearchTarget.Video] = "insightface"
-                    break
-        if 'audio' in project_assets:
-            search_targets[SearchTarget.Audio] = "clap"
-        if SearchTarget.Video not in search_targets and 'video' in project_assets:
-            search_targets[SearchTarget.Video] = "open_clip"
-        print("No search targets specified. Using the following default values (for backward compatibility):")
-        print(json.dumps(search_targets, indent=4))
-        print("In future, default search targets will be taken from config.py")
-
     serve(
         project_dir,
         theme_asset_dir,
         index_type.value if index_type else None,
-        search_targets,
         query_blocklist
     )
 

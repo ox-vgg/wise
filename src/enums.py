@@ -18,9 +18,3 @@ class IndexType(BaseStrEnum):
     IndexFlatIP = "IndexFlatIP"
     IndexIVFFlat = "IndexIVFFlat"
     IndexIVFPQ = "IndexIVFPQ"
-
-class SearchTarget(BaseStrEnum):
-    Image = "image"
-    Video = "video"
-    Audio = "audio"
-    Face = "face"

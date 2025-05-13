@@ -56,8 +56,6 @@ from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtMetadata
 
-from src.enums import SearchTarget
-
 logger = logging.getLogger(__name__)
 
 
@@ -124,14 +122,15 @@ def get_project_router(config: APIConfig):
 
     project_name = config.project_dir.stem
     router = APIRouter(prefix=f"/{project_name}", tags=[f"{project_name}"])
-    router.include_router(_get_project_data_router(config))
+    search_router, active_search_targets = _get_search_router(config)
+    router.include_router(_get_project_data_router(config, active_search_targets))
     router.include_router(_get_report_image_router(config))
-    router.include_router(_get_search_router(config))
+    router.include_router(search_router)
 
     return router
 
 
-def _get_project_data_router(config: APIConfig):
+def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str, List[str]]):
     """
     Returns a router with API routes for reading the project data
 
@@ -355,17 +354,13 @@ def _get_project_data_router(config: APIConfig):
             feature_extractor_id for feature_extractor_id in project_assets[media_type]
         ] for media_type in project_assets
     }
-    # search modalities available in the frontend
-    # the order of this list determines the order of the options shown in the frontend
-    search_modalities = ['image', 'video', 'audio']
-    search_modalities = [x for x in search_modalities if x in project_assets]
 
     @router.get("/info")
     def get_info():
         return {
             "project_name": config.project_dir.stem,
             "models": models,
-            "search_modalities": search_modalities,
+            "search_targets": active_search_targets,
             "num_vectors": num_vectors,
             "num_media_files": num_media_files, # Total number of media files
             "media_file_counts": media_file_counts, # Number of media files by media type
@@ -905,42 +900,38 @@ def _get_search_router(config: APIConfig):
     external_metadata_tables = db.reflect_external_metadata(project_engine)
 
     """
-    Load search indices for all feature extractors.
-    `search_indices` is a dictionary of SearchIndex objects, where the key is a media_type
-    and value is a SearchIndex object
+    Load all available search indices by default
+    `search_indices` is a dictionary of SearchIndex objects, where the key is the
+    feature_extractor_id and value is a SearchIndex object
     """
-    search_indices: dict[str, SearchIndex] = {}
-    search_target_matches = {}
-    for search_target in config.search_targets:
-        user_provided_feature_id = config.search_targets[search_target]
-        for media_type in project_assets:
-            for feature_extractor_id in project_assets[media_type]:
-                if user_provided_feature_id in feature_extractor_id:
-                    if search_target not in search_indices:
-                        search_indices[search_target] = SearchIndexFactory(
-                            media_type, feature_extractor_id, project_assets[media_type][feature_extractor_id]
-                        )
-                        logger.info(f"Loading faiss index from {search_indices[search_target].get_index_filename(config.index_type)}")
-                        if not search_indices[search_target].load_index(config.index_type, project_engine):
-                            print(f'failed to load {media_type} index: {feature_extractor_id}')
-                            del search_indices[search_target]
-                            continue
-                        search_target_matches[search_target] = feature_extractor_id
-                        if hasattr(search_indices[search_target].index, "nprobe"):
-                            # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
-                            search_indices[search_target].index.parallel_mode = 1
-                            search_indices[search_target].index.nprobe = getattr(config, "nprobe", 32)
+    search_indices: dict[str, dict[str, SearchIndex]] = {}
+    active_search_targets: dict[str, list[str]] = {}
+    for media_type in project_assets:
+        for feature_extractor_id in project_assets[media_type]:
+            if media_type not in search_indices:
+                search_indices[media_type] = {}
+                active_search_targets[media_type] = []
+            search_indices[media_type][feature_extractor_id] = SearchIndexFactory(
+                media_type, feature_extractor_id, project_assets[media_type][feature_extractor_id]
+            )
+            logger.info(f"Loading faiss index from {search_indices[media_type][feature_extractor_id].get_index_filename(config.index_type)}")
+            if not search_indices[media_type][feature_extractor_id].load_index(config.index_type, project_engine):
+                print(f'failed to load {media_type} index: {feature_extractor_id}')
+                del search_indices[media_type][feature_extractor_id]
+                continue
+            active_search_targets[media_type].append(feature_extractor_id)
+            if hasattr(search_indices[media_type][feature_extractor_id].index, "nprobe"):
+                # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
+                search_indices[media_type][feature_extractor_id].index.parallel_mode = 1
+                search_indices[media_type][feature_extractor_id].index.nprobe = getattr(config, "nprobe", 32)
 
-                        if not search_indices[search_target].is_internal_search_supported:
-                            logger.info(
-                                "This faiss index does not support internal search. To enable "
-                                "internal search, please re-create the index by running "
-                                f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {search_indices[search_target].index_type} --overwrite`",
-                            )
-                    else:
-                        print(f"search target {search_target}:{user_provided_feature_id} matches to multiple assets. Skipping")
-                        continue
-    logger.info("Initialised mapping between search target and search index:\n%s", json.dumps(search_target_matches, indent=4))
+                if not search_indices[media_type][feature_extractor_id].is_internal_search_supported:
+                    logger.info(
+                        "This faiss index does not support internal search. To enable "
+                        "internal search, please re-create the index by running "
+                        f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {search_indices[media_type][feature_extractor_id].index_type} --overwrite`",
+                    )
+    logger.info("Loaded the following search indices:\n%s", json.dumps(active_search_targets, indent=4))
 
     # Get counts
     with project_engine.connect() as conn:
@@ -1283,6 +1274,7 @@ def _get_search_router(config: APIConfig):
         # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
         # "audio" refers to pure audio files, and "image" refers to images
         search_in: MediaType = Query(),
+        feature_extractor_id: str = Query(),
 
         # Positive queries
         text_queries: List[str] = Query(default=[]),
@@ -1310,12 +1302,12 @@ def _get_search_router(config: APIConfig):
         Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
         input images/text, and then using this as the query vector.
         """
-        search_target = SearchTarget.Audio if search_in == MediaType.AV else search_in
-        if search_target not in search_indices:
+        media_type = 'audio' if search_in == MediaType.AV else search_in
+        if media_type not in search_indices:
             raise HTTPException(400, {
-                "message": f"No search index exists for this modality: {search_target}"
+                "message": f"No search index exists for this modality: {media_type}"
             })
-        search_index = search_indices[search_target]
+        search_index = search_indices[media_type][feature_extractor_id]
 
         def extract_text_features(text: List[str]) -> ndarray:
             if search_index.feature_extractor.extract_text_features is None:
@@ -1480,4 +1472,4 @@ def _get_search_router(config: APIConfig):
 
         return response
 
-    return router
+    return router, active_search_targets
