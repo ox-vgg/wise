@@ -428,7 +428,7 @@ def _get_search_router(config: APIConfig):
     index_type = IndexType[config.index_type]
 
     # Metadata for a video/audio/image file, to be sent to the frontend
-    class MediaMetadata(BaseModel):
+    class MediaInfo(BaseModel):
         id: str
         filename: str
         width: int
@@ -438,17 +438,6 @@ def _get_search_router(config: APIConfig):
         duration: float
         title: str = ""
         external_metadata: dict = {}
-
-    # A search result containing the metadata fields from MediaInfo, as well as additional fields like `thumbnail` and `distance`
-    class MediaInfo(MediaMetadata):
-        link: str
-        thumbnail: str
-        distance: Optional[float] = None
-
-        @field_validator("distance")
-        @classmethod
-        def round_distance(cls, v):
-            return round(v, config.precision)
 
     # A subclass of MediaInfo for images
     class ImageInfo(MediaInfo):
@@ -486,13 +475,7 @@ def _get_search_router(config: APIConfig):
 
     class ImageVector(VectorResult):
         thumbnail: str
-        thumbnail_score: float
         bbox: Optional[BBoxXYWH]
-
-        @field_validator("thumbnail_score")
-        @classmethod
-        def round_distance(cls, v):
-            return round(v, config.precision)
 
         @field_validator("bbox", mode="before")
         @classmethod
@@ -514,12 +497,6 @@ def _get_search_router(config: APIConfig):
     # A subclass of MediaSegment for videos
     class VideoSegment(MediaSegment):
         thumbnail: str
-        thumbnail_score: float
-
-        @field_validator("thumbnail_score")
-        @classmethod
-        def round_distance(cls, v):
-            return round(v, config.precision)
 
     class AudioResults(BaseModel):
         total: int # maximum number of audio results that can be returned
@@ -556,7 +533,6 @@ def _get_search_router(config: APIConfig):
         start = None
         current = None
         best_thumbnail = None
-        best_thumbnail_score = 0
         best_segment_score = 0
         for k in _keyframes:
             if start is None:
@@ -564,16 +540,13 @@ def _get_search_router(config: APIConfig):
                 start = k
                 current = k
                 best_thumbnail = k.thumbnail
-                best_thumbnail_score = k.thumbnail_score
                 best_segment_score = k.distance
 
             elif (k.ts - current.te) <= 4:
                 current = k
-                if current.thumbnail_score > best_thumbnail_score:
-                    best_thumbnail_score = current.thumbnail_score
-                    best_thumbnail = current.thumbnail
                 if current.distance > best_segment_score:
                     best_segment_score = current.distance
+                    best_thumbnail = current.thumbnail
 
             else:
                 merged_segments.append(
@@ -585,12 +558,10 @@ def _get_search_router(config: APIConfig):
                         link=f"media/{start.media_id}#t={start.ts},{current.te}",
                         distance=best_segment_score,
                         thumbnail=best_thumbnail,
-                        thumbnail_score=best_thumbnail_score,
                     )
                 )
                 start = k
                 current = k
-                best_thumbnail_score = k.thumbnail_score
                 best_thumbnail = k.thumbnail
                 best_segment_score = k.distance
 
@@ -604,7 +575,6 @@ def _get_search_router(config: APIConfig):
                     link=f"media/{start.media_id}#t={start.ts},{current.te}",
                     distance=best_segment_score,
                     thumbnail=best_thumbnail,
-                    thumbnail_score=best_thumbnail_score,
                 )
             )
 
@@ -614,14 +584,10 @@ def _get_search_router(config: APIConfig):
         # Sort by video_id, timestamp
         sorted_segments = sorted(segments, key=lambda x: (x.media_id, x.ts))
 
-        # for each key, merge keyframes with <= 4s gap and keep track of best thumbnail per video
-        best_thumbnail = {}
+        # for each key, merge keyframes with <= 4s gap
         all_merged_segments = []
         for vid, g in itertools.groupby(sorted_segments, key=lambda x: x.media_id):
             merged_segments = merge_close_segments(vid, list(g))
-            best_thumbnail[vid] = sorted(
-                merged_segments, key=lambda x: x.thumbnail_score, reverse=True
-            )[0]
             all_merged_segments.extend(merged_segments)
 
         # sort the merged segments by distance
@@ -630,7 +596,7 @@ def _get_search_router(config: APIConfig):
             key=lambda x: x.distance,
             reverse=True,
         )
-        return all_merged_segments, best_thumbnail
+        return all_merged_segments
 
     def construct_video_search_response(
         search_in: MediaType,
@@ -641,7 +607,7 @@ def _get_search_router(config: APIConfig):
         videos = {}
         shots = []
         segments = []
-        for _dist, _metadata, (_thumb, _thumb_score) in zip(
+        for _dist, _metadata, (_thumb, _) in zip(
             top_dist,
             all_metadata,
             get_thumbs_fn(all_metadata),
@@ -650,14 +616,12 @@ def _get_search_router(config: APIConfig):
             if video_id not in videos:
                 videos[video_id] = VideoInfo(
                     id=video_id,
-                    link=f"media/{video_id}",
                     filename=_metadata.path,
                     width=_metadata.width,
                     height=_metadata.height,
                     media_type=_metadata.media_type,
                     format=_metadata.format,
                     duration=_metadata.duration,
-                    thumbnail="",
                     timeline_hover_thumbnails=f"storyboard/{video_id}",
                     external_metadata=_metadata.external_metadata
                 )
@@ -679,14 +643,11 @@ def _get_search_router(config: APIConfig):
                 link=f"media/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'media/{video_id}{_metadata.path}'}",
                 distance=_dist,
                 thumbnail=_thumb,
-                thumbnail_score=_thumb_score,
             )
 
             segments.append(segment)
 
-        shots, best_thumbnails = get_shots_from_segments(segments)
-        for v in videos:
-            videos[v].thumbnail = best_thumbnails[v].thumbnail
+        shots = get_shots_from_segments(segments)
 
         if search_in == MediaType.VIDEO:
             return VideoResults(
@@ -713,7 +674,7 @@ def _get_search_router(config: APIConfig):
     ):
         images = {}
         image_vectors = []
-        for _dist, _metadata, _ext_metadata, (_thumb, _thumb_score) in zip(
+        for _dist, _metadata, _ext_metadata, (_thumb, _) in zip(
             top_dist,
             all_metadata,
             all_ext_metadata,
@@ -723,7 +684,6 @@ def _get_search_router(config: APIConfig):
             if image_id not in images:
                 images[image_id] = ImageInfo(
                     id=image_id,
-                    link=f"media/{image_id}",
                     filename=_metadata.path,
                     width=_metadata.width,
                     height=_metadata.height,
@@ -731,8 +691,6 @@ def _get_search_router(config: APIConfig):
                     format=_metadata.format,
                     duration=_metadata.duration,
                     external_metadata=_metadata.external_metadata,
-                    thumbnail=_thumb,
-                    distance=_dist,
                 )
             
             image_vector = ImageVector(
@@ -741,7 +699,6 @@ def _get_search_router(config: APIConfig):
                 link=f"media/{image_id}",
                 distance=_dist,
                 thumbnail=_thumb,
-                thumbnail_score=_thumb_score,
                 bbox=_ext_metadata.bbox,
             )
             image_vectors.append(image_vector)
