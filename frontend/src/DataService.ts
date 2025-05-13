@@ -234,7 +234,7 @@ const convertQueriesToFormData = (queries: Query[]) => {
   return formData;
 }
 
-const fetchSearchResults = (queries: Query[], viewModality: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
+const fetchSearchResults = (queries: Query[], viewModality: string, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
@@ -257,6 +257,7 @@ const fetchSearchResults = (queries: Query[], viewModality: string, pageStart: n
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
     ['search_in', searchIn],
+    ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
   ]);
@@ -369,14 +370,14 @@ export const useDataService = (): DataServiceOutput => {
   // }
 
   // Get results for a new search query
-  const performNewSearch = async (queries: Query[], viewModality: string) => {
+  const performNewSearch = async (queries: Query[], viewModality: string, featureExtractorId: string) => {
     setSearchingState((_searchingState) => ({
       ..._searchingState,
       isLoadingNewSearch: true
     }));
     let searchResponseJSON: ProcessedSearchResponse;
     try {
-      searchResponseJSON = await fetchSearchResults(queries, viewModality, 0, config.NUM_PAGES_PER_REQUEST);
+      searchResponseJSON = await fetchSearchResults(queries, viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST);
     } catch (e) {
       setSearchingState((_searchingState) => ({
         ..._searchingState,

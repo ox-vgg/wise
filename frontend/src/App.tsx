@@ -17,6 +17,7 @@ export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
   const [viewModality, setViewModality] = useState<keyof ProcessedSearchResults>('Image');
+  const [featureExtractorId, setFeatureExtractorId] = useState<string>('');
 
   const dataService = useDataService();
   const [isHomePage, setIsHomePage] = useState(true);
@@ -61,19 +62,23 @@ export const App: React.FunctionComponent = () => {
   }, []);
 
   useEffect(() => {
-    // Set viewModality based on the first search modality listed in projectInfo.search_modalities
-    if (projectInfo.search_modalities && projectInfo.search_modalities.length > 0) {
+    // Set viewModality based on the first search modality listed in projectInfo.search_targets
+    if (projectInfo.search_targets && Object.keys(projectInfo.search_targets).length > 0) {
+      const media_types = Object.keys(projectInfo.search_targets) as Array<keyof typeof projectInfo.search_targets>;
+      const default_media_type = media_types[0];
+      const default_feature_extractor_id = projectInfo.search_targets[default_media_type]?.[0];
       const _viewModality = {
         'image': 'Image',
         'video': 'Video',
         'audio': 'VideoAudio'
-      }[projectInfo.search_modalities[0]]
+      }[default_media_type];
       setViewModality(_viewModality as keyof ProcessedSearchResults)
-    } 
+      setFeatureExtractorId(default_feature_extractor_id ?? '');
+    }
   }, [projectInfo]);
 
   const _submitSearch = (queries: Query[]) => {
-    dataService.performNewSearch(queries, viewModality).then(_ => {
+    dataService.performNewSearch(queries, viewModality, featureExtractorId).then(_ => {
       setIsHomePage(false); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
     }).catch((err) => {
       Modal.error({
@@ -119,6 +124,7 @@ export const App: React.FunctionComponent = () => {
     <WiseHeader multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                 searchText={searchText} setSearchText={setSearchText}
                 viewModality={viewModality} setViewModality={setViewModality}
+                featureExtractorId={featureExtractorId} setFeatureExtractorId={setFeatureExtractorId}
                 submitSearch={submitSearch}
                 refsForTour={refsForTour}
                 projectInfo={projectInfo}

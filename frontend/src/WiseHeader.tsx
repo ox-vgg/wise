@@ -1,13 +1,13 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
 import { Alert, Button, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
-import { CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
+import { CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, PlusOutlined, SearchOutlined, SoundOutlined, UploadOutlined} from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
 import { WiseLogo } from './misc/logo.tsx';
 import config from './config.ts';
-import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query } from './misc/types.ts';
+import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query, ProcessedSearchResults } from './misc/types.ts';
 
 // TODO
 // Update Tour feature, remove refsForTour.visualSearchButton and refsForTour.multimodalSearchButton
@@ -394,6 +394,7 @@ const QUERY_COLORS = {
   'AUDIO_URL': 'orange'
 }
 
+/*
 const VIEW_MODALITY_OPTIONS = {
   image: {
     icon: <PictureTwoTone />,
@@ -414,10 +415,12 @@ const VIEW_MODALITY_OPTIONS = {
     value: 'VideoAudio',
   },
 }
+*/
 
 const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   multimodalQueries, setMultimodalQueries, searchText, setSearchText,
   viewModality, setViewModality,
+  featureExtractorId, setFeatureExtractorId,
   submitSearch, refsForTour, projectInfo,
   isHomePage = false, isLoadingNewSearch = false
 }: WiseHeaderProps) => {
@@ -428,6 +431,22 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
 
   const handleTextInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
+  }
+
+  const handleSearchTargetChange = (value: string) => {
+    const [media_type, feature_extractor_id] = value.split(':');
+
+    const _viewModality = {
+        'image': 'Image',
+        'video': 'Video',
+        'audio': 'VideoAudio'
+      }[media_type];
+    if (typeof _viewModality !== 'string') {
+      console.error('Invalid view modality', media_type);
+      return;
+    }
+    setViewModality(_viewModality as keyof ProcessedSearchResults);
+    setFeatureExtractorId(feature_extractor_id);
   }
 
   const clearSearchBar = () => {
@@ -513,30 +532,34 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
           <WiseLogo />
         </a>
         {
-          projectInfo.search_modalities &&
-          // only show the selection menu when there is more than 1 modality in the project
-          projectInfo.search_modalities.length > 1 &&
-          <Tooltip title="Choose the media track / media type to search on">
-            <Select
+          projectInfo.search_targets &&
+          Object.keys(projectInfo.search_targets).length > 1 &&
+            <Tooltip title="Choose the media track / media type to search on">
+              <Select
               size="large"
               variant="borderless"
               className="wise-view-modality-select"
-              value={viewModality}
-              onChange={setViewModality}
+              value={viewModality + ':' + featureExtractorId.split('/')[1]}
+              onChange={handleSearchTargetChange}
               options={
-                projectInfo.search_modalities
-                  .map((k) => VIEW_MODALITY_OPTIONS[k])
-                  .map(option => ({
-                    ...option,
-                    label: <Space>{option.icon}{option.label}</Space>,
-                  }))
+                projectInfo.search_targets
+                  ? Object.keys(projectInfo.search_targets).map((media_type) => ({
+                      label: <span>{media_type.charAt(0).toUpperCase() + media_type.slice(1)}</span>,
+                      title: media_type.charAt(0).toUpperCase() + media_type.slice(1),
+                      options: (projectInfo.search_targets?.[media_type as keyof typeof projectInfo.search_targets] || []).map((feature_extractor_id: string) => ({
+                        label: <span>{feature_extractor_id.split('/')[1]}</span>,
+                        value: media_type + ':' + feature_extractor_id,
+                      })),
+                    }))
+                  : []
               }
               optionRender={(option) => (
-                <Space>{option.data.icon}{option.data.longLabel}</Space>
+                <Space>{option.label}</Space>
               )}
+
               popupMatchSelectWidth={false}
-            />
-          </Tooltip>
+              />
+            </Tooltip>
         }
         <Dropdown
           overlayClassName="wise-search-dropdown"

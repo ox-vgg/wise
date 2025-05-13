@@ -155,7 +155,7 @@ export interface DataServiceOutput {
   totalResults: number;
   // pageNum: number;
   // changePageNum: (x: number) => void;
-  performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults) => Promise<void>;
+  performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => Promise<void>;
   fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
 };
@@ -166,8 +166,12 @@ export interface ProjectInfo {
     image?: string[],
     video?: string[],
     audio?: string[],
-  },
-  search_modalities?: ('image' | 'video' | 'audio')[],
+  };
+  search_targets?: {
+    image?: string[],
+    video?: string[],
+    audio?: string[],
+  };
   num_vectors?: number;
   num_media_files?: number;
   media_file_counts?: {
@@ -225,6 +229,8 @@ export interface WiseHeaderProps {
   setSearchText: (x: string) => void;
   viewModality: keyof ProcessedSearchResults;
   setViewModality: (x: keyof ProcessedSearchResults) => void;
+  featureExtractorId: string;
+  setFeatureExtractorId: (x: string) => void;
   submitSearch: () => void;
   refsForTour: RefsForTour;
   projectInfo: ProjectInfo;
