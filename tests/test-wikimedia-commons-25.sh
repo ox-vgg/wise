@@ -26,7 +26,8 @@ fi
 # Set these variables to the appropriate values
 # for your environment
 TEST_ID="wikimedia-commons-25"
-VIDEO_FEATURE_ID="mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
+VIDEO_FEATURE_ID1="mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
+VIDEO_FEATURE_ID2="deepinsight/insightface/buffalo_l/_unknown"
 AUDIO_FEATURE_ID="microsoft/clap/2023/four-datasets"
 FAISS_INDEX_TYPE="IndexFlatIP"
 HTTP_SERVER_HOST="0.0.0.0"
@@ -35,13 +36,16 @@ MAX_POLL_SERVER_COUNT=15
 
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
-OUTDIR="${TMP_DIR}/wise-test/${TEST_ID}"
+OUTDIR="${TMP_DIR}/wise-test/"
 mkdir -p "${OUTDIR}"
 
 DATA_DIR="${OUTDIR}/test-data"
 TEST_DATA_DIR="${DATA_DIR}/${TEST_ID}/"
 TEST_DATA_DOWNLOAD_URL="https://thor.robots.ox.ac.uk/wise/assets/test/${TEST_ID}.zip"
 WISE_PROJECT_DIR="${OUTDIR}/wise-project/${TEST_ID}/"
+
+QUERY_DATA_DIR="${OUTDIR}/test-query/${TEST_ID}/"
+mkdir -p "${QUERY_DATA_DIR}"
 
 # check if required tools exist
 REQUIRED_TOOLS=(ffmpeg sqlite3 jq curl unzip)
@@ -100,7 +104,8 @@ if [ ! -d "${WISE_PROJECT_DIR}" ]; then
            --shard-maxsize 20971520 \
            --num-workers 0 \
            --feature-store webdataset \
-           --video-feature-id "${VIDEO_FEATURE_ID}" \
+           --video-feature-id "${VIDEO_FEATURE_ID1}" \
+           --video-feature-id "${VIDEO_FEATURE_ID2}" \
            --audio-feature-id "${AUDIO_FEATURE_ID}" \
            --project-dir "$WISE_PROJECT_DIR"
 fi
@@ -139,9 +144,10 @@ else
 fi
 
 ## Task 4. Create search index for features and metadata
-VIDEO_INDEX_FILENAME="${WISE_PROJECT_DIR}store/${VIDEO_FEATURE_ID}/index/video-${FAISS_INDEX_TYPE}.faiss"
+VIDEO_INDEX_FILENAME1="${WISE_PROJECT_DIR}store/${VIDEO_FEATURE_ID1}/index/video-${FAISS_INDEX_TYPE}.faiss"
+VIDEO_INDEX_FILENAME2="${WISE_PROJECT_DIR}store/${VIDEO_FEATURE_ID2}/index/video-${FAISS_INDEX_TYPE}.faiss"
 AUDIO_INDEX_FILENAME="${WISE_PROJECT_DIR}store/${AUDIO_FEATURE_ID}/index/audio-${FAISS_INDEX_TYPE}.faiss"
-if [ ! -f "${VIDEO_INDEX_FILENAME}" ] || [ ! -f "${AUDIO_INDEX_FILENAME}" ]; then
+if [ ! -f "${VIDEO_INDEX_FILENAME1}" ] || [ ! -f "${VIDEO_INDEX_FILENAME2}" ] || [ ! -f "${AUDIO_INDEX_FILENAME}" ]; then
     echo "Creating index (takes about 1 min.) ..."
     cd "${WISE_CODE_DIR}"
     python create-index.py \
@@ -149,15 +155,15 @@ if [ ! -f "${VIDEO_INDEX_FILENAME}" ] || [ ! -f "${AUDIO_INDEX_FILENAME}" ]; the
            --project-dir "$WISE_PROJECT_DIR"
 fi
 # Test 4.1 : check if the video index files exist
-if [ ! -f $VIDEO_INDEX_FILENAME ]; then
-    echo "Test 4.1 FAILED: video index file ${VIDEO_INDEX_FILENAME} does not exist"
+if [ ! -f "${VIDEO_INDEX_FILENAME1}" ] && [ ! -f "${VIDEO_INDEX_FILENAME2}" ]; then
+    echo "Test 4.1 FAILED: video index files ${VIDEO_INDEX_FILENAME1} and ${VIDEO_INDEX_FILENAME2} do not exist"
     exit 1
 else
     echo "Test 4.1 PASSED"
 fi
 
 # Test 4.2 : check if the audio index files exist
-if [ ! -f $AUDIO_INDEX_FILENAME ]; then
+if [ ! -f "${AUDIO_INDEX_FILENAME}" ]; then
     echo "Test 4.2 FAILED: audio index file ${AUDIO_INDEX_FILENAME} does not exist"
     exit 1
 else
@@ -177,6 +183,9 @@ echo "Starting WISE2 server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} (takes ab
 cd "${WISE_CODE_DIR}"
 LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
         --index-type "${FAISS_INDEX_TYPE}" \
+        --search-target video:open_clip \
+        --search-target face:insightface \
+        --search-target audio:clap \
         --project-dir "$WISE_PROJECT_DIR" & # to start the server in the background
 SERVER_PID=$!
 trap cleanup SIGINT
@@ -216,7 +225,7 @@ else
 fi
 
 # Test 5.2 : check project info
-response=$(curl curl -s -X GET -H "Content-Type: application/json" "${PROJECT_INFO_URL}")
+response=$(curl -s -X GET -H "Content-Type: application/json" "${PROJECT_INFO_URL}")
 project_name=$(echo "$response" | jq -r '.project_name')
 if [ "$project_name" == "$TEST_ID" ]; then
     echo "Test 5.2 PASSED"
@@ -227,12 +236,12 @@ else
 fi
 
 # Test 5.3 : check if the server returns correct results (including metadata) for query on video
-SEARCH_QUERY="bees"
-RESULT_COUNT=60
-SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&text_queries=${SEARCH_QUERY}"
-response=$(curl curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
+    SEARCH_QUERY="bees"
+    RESULT_COUNT=60
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
+    response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
 
-if [ "$TEST_ID" == "wikimedia-commons-25" ]; then
     # The WISE server's JSON response for search query is as follows:
     # {
     #     ...
@@ -297,12 +306,12 @@ if [ "$TEST_ID" == "wikimedia-commons-25" ]; then
 fi
 
 # Test 5.4 : check if the server returns correct results (including metadata) for query on audio
-SEARCH_QUERY="fire+engine+siren"
-RESULT_COUNT=1
-SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&text_queries=${SEARCH_QUERY}"
-response=$(curl curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
+    SEARCH_QUERY="fire+engine+siren"
+    RESULT_COUNT=1
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}&text_queries=${SEARCH_QUERY}"
+    response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
 
-if [ "$TEST_ID" == "wikimedia-commons-25" ]; then
     response_selected_json=$(echo "$response" | jq -c '{
         merged_windows: [
         .video_audio_results.merged_windows[] as $mw
@@ -327,6 +336,60 @@ if [ "$TEST_ID" == "wikimedia-commons-25" ]; then
         echo "Test 5.4 PASSED"
     else
         echo "Test 5.4 FAILED: unexpected search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
+fi
+
+# Test 5.5 : check if the server returns correct results (including metadata) for query on face
+if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
+    FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
+    FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Downloading face image to ${FACE_IMG_FILE} ..."
+        curl -sLO "${FACE_IMG_URL}"
+        mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
+    fi
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Failed to download face image from ${FACE_IMG_URL}"
+        exit 1
+    fi
+    RESULT_COUNT=3
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
+    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    echo $response
+    response_selected_json=$(echo "$response" | jq -c '{
+    results: [
+        .video_results.merged_windows[]
+        as $w
+        | {
+            filename: .video_results.videos[$w.media_id].filename,
+            ts: $w.ts,
+            te: $w.te
+        }
+    ]
+    }')
+    expected_json='{
+    "results": [
+        {
+        "filename": "Celebrities_Against_Smoking_Christy_Turlington_PSA.mp4",
+        "ts": 28,
+        "te": 33.5
+        },
+        {
+        "filename": "Celebrities_Against_Smoking_Christy_Turlington_PSA.mp4",
+        "ts": 16,
+        "te": 20
+        }
+    ]
+    }'
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test 5.5 PASSED"
+    else
+        echo "Test 5.5 FAILED: unexpected search results"
         echo "Expected:"
         echo "$expected_json" | jq .
         echo "Actual:"

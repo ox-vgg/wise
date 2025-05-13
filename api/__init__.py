@@ -1,6 +1,6 @@
 import logging
 
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 import uvicorn

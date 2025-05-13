@@ -1,7 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Literal, Set, Optional
+from typing import Literal, Set, Optional, Dict
 from pathlib import Path
-
 
 class APIConfig(BaseSettings):
     mode: Literal['production', 'development'] = 'production'
