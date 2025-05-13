@@ -37,38 +37,6 @@ def flatten_patch_features(feature_map: torch.Tensor) -> torch.Tensor:
     return feature_map.reshape((batch_sz, num_patches_h * num_patches_w, hidden_dim))
 
 
-class ImageBatchTensorWithOrigSizes(torch.Tensor):
-    """
-    Subclass of torch.Tensor representing a preprocessed (resized) batch of
-    images, with a custom attribute `orig_sizes` storing the original image
-    sizes as a list of (width, height) tuples
-    """
-    orig_sizes: list[tuple[int, int]]
-
-    def __new__(cls, data, orig_sizes: list[tuple[int, int]]):
-        # Create a new tensor instance
-        obj = torch.as_tensor(data).as_subclass(cls)
-        # Set custom attribute
-        obj.orig_sizes = orig_sizes
-        return obj
-
-    def __repr__(self):
-        return f"ImageBatchTensorWithOrigSizes(data={super().__repr__()}, orig_sizes={self.orig_sizes})"
-
-    # Override `clone()` method to preserve orig_sizes
-    def clone(self, *args, **kwargs):
-        cloned = super().clone(*args, **kwargs).as_subclass(ImageBatchTensorWithOrigSizes)
-        cloned.orig_sizes = self.orig_sizes
-        return cloned
-
-    # Override `to()` method to preserve orig_sizes
-    def to(self, *args, **kwargs):
-        new_obj = super().to(*args, **kwargs)
-        if new_obj is self:
-            return self
-        return ImageBatchTensorWithOrigSizes(new_obj, self.orig_sizes)
-
-
 def owlv2_bbox_to_xywh(
         owlv2_bbox: np.ndarray, im_width: int, im_height: int
     ) -> np.ndarray:
@@ -258,25 +226,15 @@ class TransformersOWLv2(FeatureExtractor):
         assert len(vid) == len(res)
         return res
 
-    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> ImageBatchTensorWithOrigSizes:
-        # Save original image sizes in a list
-        orig_sizes = [] # list of (width, height) tuples
-        if isinstance(images, torch.Tensor):
-            orig_sizes = [(image.shape[2], image.shape[1]) for image in images]
-        elif isinstance(images, list):
-            if not all([isinstance(x, Image.Image) for x in images]):
-                raise TypeError("expect list images to all be PIL Image")
-            orig_sizes = [image.size for image in images]
-        else:
-            raise TypeError("`images` must be either a tensor or a list of PIL Image")
-
-        preprocessed_images = self.processor(images=images, return_tensors="pt")['pixel_values'].to(self.DEVICE) # shape: (B, C, 960, 960)
-        return ImageBatchTensorWithOrigSizes(preprocessed_images, orig_sizes)
+    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> torch.Tensor:
+        if not isinstance(images, torch.Tensor):
+            raise NotImplementedError("`images` must be a tensor. Other types are not supported at the moment.")
+        return images
 
     @torch.inference_mode()
     def extract_image_features(
         self,
-        images: ImageBatchTensorWithOrigSizes,
+        images: torch.Tensor,
         return_augmented_features: bool = True
     ) -> list[Features]:
         """
@@ -319,8 +277,13 @@ class TransformersOWLv2(FeatureExtractor):
               predicted bounding box coordinates and objectness score for each
               patch in a given image.
         """
-        if not isinstance(images, ImageBatchTensorWithOrigSizes):
-            raise ValueError('input to extract_features() must be an instance of ImageBatchTensorWithOrigSizes')
+        if not isinstance(images, torch.Tensor):
+            raise ValueError('input to extract_features() must be an instance of torch.Tensor')
+
+        # Save original image sizes in a list before they get resized
+        orig_sizes = [(image.shape[2], image.shape[1]) for image in images] # list of (width, height) tuples
+        # Preprocess image (including resizing)
+        images = self.processor(images=images, return_tensors="pt")['pixel_values'].to(self.DEVICE) # shape: (B, C, 960, 960)
 
         # --- Code below is adapted from Owlv2ForObjectDetection.forward() source code ---
         batch_feature_map, _ = self.model.image_embedder(images) # shape of batch_feature_map: (B, 60, 60, 768)
@@ -360,7 +323,7 @@ class TransformersOWLv2(FeatureExtractor):
             patchwise_objectness_scores,
             patchwise_pred_boxes,
             orig_size,
-        ) in zip(batch_image_class_embeds, batch_objectness_scores, batch_pred_boxes, images.orig_sizes):
+        ) in zip(batch_image_class_embeds, batch_objectness_scores, batch_pred_boxes, orig_sizes):
             # Filter boxes by objectness score
             remaining_mask = patchwise_objectness_scores >= self.objectness_threshold
             patchwise_image_class_embeds = patchwise_image_class_embeds[remaining_mask]

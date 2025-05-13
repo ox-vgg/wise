@@ -199,18 +199,18 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
                 for m in f.metadata
             ]))
 
-    def test_with_one_element_list(self):
-        images = [Image.new('RGB', self._extractor.input_image_size)]
-        self._test_images(images, 1)
+    # def test_with_one_element_list(self):
+    #     images = [Image.new('RGB', self._extractor.input_image_size)]
+    #     self._test_images(images, 1)
 
     def test_with_one_image_tensor(self):
         input_width, input_height = self._extractor.input_image_size
         random_image = torch.randint(0, 255, (1, 3, input_width, input_height))
         self._test_images(random_image, 1)
 
-    def test_with_n_elements_list(self):
-        images = [Image.new('RGB', self._extractor.input_image_size) for _ in range(4)]
-        self._test_images(images, 4)
+    # def test_with_n_elements_list(self):
+    #     images = [Image.new('RGB', self._extractor.input_image_size) for _ in range(4)]
+    #     self._test_images(images, 4)
 
     def test_with_n_images_tensor(self):
         input_width, input_height = self._extractor.input_image_size
