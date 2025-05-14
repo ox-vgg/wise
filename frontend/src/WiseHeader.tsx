@@ -544,7 +544,9 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                 onChange={handleSearchTargetChange}
                 options={
                   projectInfo.search_targets
-                  ? Object.keys(projectInfo.search_targets).map((media_type) => {
+                  ? ['image', 'video', 'audio']
+                    .filter((media_type) => projectInfo.search_targets && Object.keys(projectInfo.search_targets).includes(media_type))
+                    .map((media_type) => {
                       const key = media_type as ViewModalityKey;
                       return ({
                         label: (
