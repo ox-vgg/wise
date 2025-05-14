@@ -171,12 +171,6 @@ class TransformersOWLv2(FeatureExtractor):
 
         self.objectness_threshold = objectness_threshold
 
-        # get input image size
-        self.input_image_size = (self.processor.image_processor.size['height'], self.processor.image_processor.size['width'])
-
-    def get_input_image_size(self):
-        return self.input_image_size
-
     def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
         db_metadata_obj = sa.MetaData()
         db_metadata_obj.reflect(db_engine)
