@@ -453,10 +453,6 @@ def _get_search_router(config: APIConfig):
     class ImageInfo(MediaInfo):
         pass
 
-    # A subclass of MediaInfo for pure audio files
-    class AudioInfo(MediaInfo):
-        pass
-
     # A subclass of MediaInfo for videos
     class VideoInfo(MediaInfo):
         timeline_hover_thumbnails: str
@@ -500,18 +496,9 @@ def _get_search_router(config: APIConfig):
         ts: float
         te: float
 
-    # A subclass of MediaSegment for pure audio files
-    class AudioSegment(MediaSegment):
-        pass
-
     # A subclass of MediaSegment for videos
     class VideoSegment(MediaSegment):
         thumbnail: str
-
-    class AudioResults(BaseModel):
-        total: int # maximum number of audio results that can be returned
-        unmerged_windows: List[AudioSegment] # e.g. 7-second windows
-        audios: Dict[str, AudioInfo]
 
     class VideoAudioResults(BaseModel):
         total: int # maximum number of unmerged_windows that can be returned
@@ -532,7 +519,6 @@ def _get_search_router(config: APIConfig):
 
     class SearchResponse(BaseModel):
         time: float # backend search time in seconds
-        audio_results: Optional[AudioResults] # search results from pure audio files
         video_audio_results: Optional[VideoAudioResults] # search results from audio stream of video files
         video_results: Optional[VideoResults] # search results from video stream of video files
         image_results: Optional[ImageResults] # search results from image files
@@ -729,7 +715,6 @@ def _get_search_router(config: APIConfig):
     ):
         all_metadata = get_metadata_fn(top_ids)
         all_ext_metadata = get_ext_metadata_fn(top_ids)
-        audio_results = None
         video_audio_results = None
         video_results = None
         image_results = None
@@ -757,7 +742,6 @@ def _get_search_router(config: APIConfig):
 
         return SearchResponse(
             time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
-            audio_results=audio_results,
             video_audio_results=video_audio_results,
             video_results=video_results,
             image_results=image_results,

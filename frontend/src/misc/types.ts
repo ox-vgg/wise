@@ -35,7 +35,6 @@ type MediaInfo = {
   external_metadata: Record<string, any>;
 };
 export type ImageInfo = MediaInfo & {};
-export type AudioInfo = MediaInfo & {};
 export type VideoInfo = MediaInfo & {
   timeline_hover_thumbnails: string;
 };
@@ -63,16 +62,10 @@ type MediaSegment = VectorResult & {
   ts: number;
   te: number;
 };
-export type AudioSegment = MediaSegment & {};
 export type VideoSegment = MediaSegment & {
   thumbnail: string;
 };
 
-export type AudioResults = {
-  total: number;
-  unmerged_windows: AudioSegment[];
-  audios: Record<string, AudioInfo>;
-};
 export type VideoAudioResults = {
   total: number;
   unmerged_windows: VideoSegment[];
@@ -92,7 +85,6 @@ export type ImageResults = {
 };
 export type SearchResponse = {
   time: number;
-  audio_results?: AudioResults;
   video_audio_results?: VideoAudioResults;
   video_results?: VideoResults;
   image_results?: ImageResults;
@@ -124,11 +116,6 @@ export type ProcessedSearchResults = {
     mediaInfo: Map<string, ProcessedVideoInfo>;
   };
   VideoAudio: {
-    unmerged_windows: ProcessedVideoSegment[];
-    merged_windows: ProcessedVideoSegment[];
-    mediaInfo: Map<string, ProcessedVideoInfo>;
-  };
-  Audio: {
     unmerged_windows: ProcessedVideoSegment[];
     merged_windows: ProcessedVideoSegment[];
     mediaInfo: Map<string, ProcessedVideoInfo>;

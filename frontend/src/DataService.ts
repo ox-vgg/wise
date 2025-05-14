@@ -88,11 +88,6 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
       merged_windows: [],
       mediaInfo: new Map(),
     },
-    Audio: {
-      unmerged_windows: [],
-      merged_windows: [],
-      mediaInfo: new Map(),
-    },
   } as ProcessedSearchResults;
   if (results.image_results) {
     processedSearchResults.Image.mediaInfo = new Map(
@@ -306,7 +301,6 @@ export const useDataService = (): DataServiceOutput => {
     Image: { vectors: [], mediaInfo: new Map() },
     Video: { unmerged_windows: [], merged_windows: [], mediaInfo: new Map() },
     VideoAudio: { unmerged_windows: [], merged_windows: [], mediaInfo: new Map() },
-    Audio: { unmerged_windows: [], merged_windows: [], mediaInfo: new Map() },
   });
 
   // Get featured images to display on home page
