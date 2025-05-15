@@ -37,6 +37,7 @@ vectors_table = sa.Table(
     project_metadata_obj,
     sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
     sa.Column("modality", sa.Enum(ModalityType), nullable=False),
+    sa.Column("feature_extractor_id", sa.Unicode(255), nullable=False),
     sa.Column(
         "media_id",
         sa.Integer,
