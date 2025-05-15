@@ -46,17 +46,17 @@ class MicrosoftClap(FeatureExtractor):
     def preprocess_text(self, text: str) -> str:
         return self.model.preprocess_text(text)
 
+    @torch.inference_mode()
     def extract_audio_features(self, preprocessed_audio: torch.Tensor) -> np.ndarray:
-        with torch.no_grad():
-            preprocessed_audio = preprocessed_audio.reshape(
-                preprocessed_audio.shape[0], preprocessed_audio.shape[2]).to(device=self.DEVICE)
-            audio_embeddings = self.model.clap.audio_encoder(preprocessed_audio)[0]
-            audio_embeddings = audio_embeddings/torch.norm(audio_embeddings, dim=-1, keepdim=True)
-            return audio_embeddings.cpu().numpy()
+        preprocessed_audio = preprocessed_audio.reshape(
+            preprocessed_audio.shape[0], preprocessed_audio.shape[2]).to(device=self.DEVICE)
+        audio_embeddings = self.model.clap.audio_encoder(preprocessed_audio)[0]
+        audio_embeddings = audio_embeddings/torch.norm(audio_embeddings, dim=-1, keepdim=True)
+        return audio_embeddings.cpu().numpy()
 
+    @torch.inference_mode()
     def extract_text_features(self, text: List[str]) -> np.ndarray:
         preprocessed_text = self.model.preprocess_text(text)
-        with torch.no_grad():
-            text_embeddings = self.model.clap.caption_encoder(preprocessed_text)
-            text_embeddings = text_embeddings/torch.norm(text_embeddings, dim=-1, keepdim=True)
-            return text_embeddings.cpu().numpy()
+        text_embeddings = self.model.clap.caption_encoder(preprocessed_text)
+        text_embeddings = text_embeddings/torch.norm(text_embeddings, dim=-1, keepdim=True)
+        return text_embeddings.cpu().numpy()

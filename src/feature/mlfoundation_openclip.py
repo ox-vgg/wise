@@ -93,22 +93,22 @@ class MlfoundationOpenClip(FeatureExtractor):
         else:
             raise ValueError('all input to preprocess_image() must be an instance of torch.Tensor or PIL.Image')
 
+    @torch.inference_mode()
     def extract_image_features(self, images: torch.Tensor) -> list[Features]:
         if isinstance(images, torch.Tensor):
             model_input = images.to(device=self.DEVICE)
         else:
             raise ValueError('input to extract_features() must be an instance of torch.Tensor')
 
-        with torch.no_grad():
-            model_output = self.model.encode_image(model_input).float()
-            model_output /= torch.linalg.norm(model_output, dim=-1, keepdims=True)
+        model_output = self.model.encode_image(model_input).float()
+        model_output /= torch.linalg.norm(model_output, dim=-1, keepdims=True)
         model_output = model_output.cpu().numpy()
         feature_vectors = list(np.expand_dims(model_output, axis=1))
         return [Features(vectors=x, metadata=None) for x in feature_vectors]
 
+    @torch.inference_mode()
     def extract_text_features(self, text_query: List[str]) -> np.ndarray:
-        with torch.no_grad():
-            model_input = self.tokenizer(text_query).to(device=self.DEVICE)
-            model_output = self.model.encode_text(model_input).float()
-            model_output /= torch.linalg.norm(model_output, dim=-1, keepdims=True)
-            return model_output.cpu().numpy()
+        model_input = self.tokenizer(text_query).to(device=self.DEVICE)
+        model_output = self.model.encode_text(model_input).float()
+        model_output /= torch.linalg.norm(model_output, dim=-1, keepdims=True)
+        return model_output.cpu().numpy()
