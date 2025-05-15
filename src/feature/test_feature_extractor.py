@@ -2,9 +2,11 @@ import tempfile
 import unittest
 
 import numpy as np
+from sklearn.datasets import load_sample_image
 import torch
 from PIL import Image
 
+from .transformers_owlv2 import TransformersOWLv2, owlv2_bbox_to_xywh
 from .feature_extractor_factory import FeatureExtractorFactory
 
 ## Typically, imports from external libraries come before local
@@ -138,6 +140,103 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
         images = torch.empty([0, 3, 768, 1024])
         features = self._preprocess_and_extract_features(images)
         self.assertListEqual(features, [])
+
+
+class TestOWLv2BBoxConversion(unittest.TestCase):
+    ## Test values picked so they can be visualised on a 20x20 grid.
+    def test_original_square_image(self):
+        owlv2_bbox = np.array([0.15, 0.35, 0.20, 0.10])
+        xywh = owlv2_bbox_to_xywh(owlv2_bbox, 20, 20)
+        np.testing.assert_allclose(xywh, np.array([0.05, 0.30, 0.20, 0.10]))
+
+    def test_original_landscape_image(self):
+        owlv2_bbox = np.array([0.15, 0.35, 0.20, 0.10])
+        xywh = owlv2_bbox_to_xywh(owlv2_bbox, 20, 10)
+        np.testing.assert_allclose(xywh, np.array([0.05, 0.6, 0.20, 0.20]))
+
+    def test_original_portrait_image(self):
+        owlv2_bbox = np.array([0.15, 0.35, 0.20, 0.10])
+        xywh = owlv2_bbox_to_xywh(owlv2_bbox, 10, 20)
+        np.testing.assert_allclose(xywh, np.array([0.1, 0.30, 0.40, 0.10]))
+
+
+class TestOWLv2FeatureExtractor(unittest.TestCase):
+    def setUp(self):
+        # use an objectness threshold of 0.0 to avoid filtering out any boxes in the output
+        self._extractor = TransformersOWLv2("transformers/owlv2/google/owlv2-base-patch16-ensemble", objectness_threshold=0.0)
+
+    def test_feature_extractor_factory_setup(self):
+        # try setting up using the feature extractor factory (just to check no errors were raised)
+        FeatureExtractorFactory("transformers/owlv2/google/owlv2-base-patch16-ensemble")
+
+    def test_text_encoder(self):
+        text_input = ['some random text']
+        text_features = self._extractor.extract_text_features(text_input)
+        self.assertTrue(text_features.shape == (1, 513))
+
+    def _preprocess_and_extract_features(self, images):
+        return self._extractor.extract_image_features(
+            self._extractor.preprocess_image(images)
+        )
+
+    def _get_sample_image_tensor(self):
+        np_img = load_sample_image('flower.jpg')
+        np_img = np_img.transpose([2, 0, 1])  # H,W,C -> C,H,W
+        return torch.tensor(np_img.copy())
+
+    def _get_sample_image_pil(self):
+        np_img = load_sample_image('flower.jpg')
+        return Image.fromarray(np_img, 'RGB')
+
+    def _test_images(self, images, n_images):
+        assert n_images > 0
+        features = self._preprocess_and_extract_features(images)
+        ## Check vectors
+        self.assertIsInstance(features, list)
+        self.assertEqual(len(features), n_images)
+        self.assertTrue(all([isinstance(x.vectors, np.ndarray) for x in features]))
+        self.assertTrue(all([x.vectors.shape == (3600, 513) for x in features]))
+        ## Check metadata
+        self.assertTrue(all([isinstance(x.metadata, list) for x in features]))
+        for f in features:
+            self.assertEqual(len(f.metadata), 3600)
+            self.assertTrue(all([
+                isinstance(m.objectness_score, float)
+                and isinstance(m.bbox.x, float)
+                and isinstance(m.bbox.y, float)
+                and isinstance(m.bbox.w, float)
+                and isinstance(m.bbox.h, float)
+                for m in f.metadata
+            ]))
+            
+            ## Check if top detected objects (in terms of objectness score) are the same as expected
+            top_objects = [m for m in f.metadata if m.objectness_score > 0.2]
+            self.assertEqual(len(top_objects), 2) # there should only be 2 objects with an objectness score above 0.2
+
+            # object #1: check objectness score and bbox coordinates
+            np.testing.assert_allclose(top_objects[0].objectness_score, 0.475717157125473, rtol=1e-5)
+            np.testing.assert_allclose(np.array(top_objects[0].bbox), np.array([0.26258963346481323, 0.20182788232450463, 0.4356532692909241, 0.6405366723375522]), rtol=1e-5)
+
+            # object #2: check objectness score and bbox coordinates
+            np.testing.assert_allclose(top_objects[1].objectness_score, 0.2692972719669342, rtol=1e-5)
+            np.testing.assert_allclose(np.array(top_objects[1].bbox), np.array([0.4490808695554733, 0.8730822033848641, 0.2807672321796417, 0.12563285559625204]), rtol=1e-5)
+
+    # def test_with_one_element_list(self):
+    #     images = [self._get_sample_image_pil()]
+    #     self._test_images(images, 1)
+
+    def test_with_one_image_tensor(self):
+        self._test_images(self._get_sample_image_tensor().unsqueeze(0), 1)
+
+    # def test_with_n_elements_list(self):
+    #     images = [self._get_sample_image_pil() for _ in range(4)]
+    #     self._test_images(images, 4)
+
+    def test_with_n_images_tensor(self):
+        image_batch = torch.stack([
+            self._get_sample_image_tensor() for _ in range(4)
+        ])
+        self._test_images(image_batch, 4)
 
 
 if __name__ == '__main__':
