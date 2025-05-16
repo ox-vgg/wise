@@ -477,15 +477,12 @@ def _get_search_router(config: APIConfig):
         media_id: str
         link: str
         distance: float
+        bbox: Optional[BBoxXYWH] = None
 
         @field_validator("distance")
         @classmethod
         def round_distance(cls, v):
             return round(v, config.precision)
-
-    class ImageVector(VectorResult):
-        thumbnail: str
-        bbox: Optional[BBoxXYWH]
 
         @field_validator("bbox", mode="before")
         @classmethod
@@ -494,6 +491,9 @@ def _get_search_router(config: APIConfig):
                 return v
             else:  # v is the NamedTuple in feature_extractor module
                 return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
+
+    class ImageVector(VectorResult):
+        thumbnail: str
 
     # An audio or video segment
     class MediaSegment(VectorResult):
