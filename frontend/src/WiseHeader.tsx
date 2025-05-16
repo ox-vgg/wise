@@ -533,8 +533,10 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
           <WiseLogo />
         </a>
         {
-          projectInfo.search_targets &&
-          Object.values(projectInfo.search_targets).some(arr => Array.isArray(arr) && arr.length > 1) &&
+          projectInfo.search_targets && (
+            Object.keys(projectInfo.search_targets).length > 1 ||
+            Object.values(projectInfo.search_targets).some(arr => Array.isArray(arr) && arr.length > 1)
+          ) && (
             <Tooltip title="Choose the media track / media type to search on">
               <Select
                 size="large"
@@ -573,7 +575,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                 popupMatchSelectWidth={false}
               />
             </Tooltip>
-        }
+        )}
         <Dropdown
           overlayClassName="wise-search-dropdown"
           dropdownRender={_ => 
