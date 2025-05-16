@@ -52,16 +52,14 @@ type VectorResult = {
   vector_id: string;
   media_id: string;
   link: string;
+  thumbnail: string;
   distance: number;
   bbox?: BBoxXYWH;
 };
-type ImageVector = VectorResult & {
-  thumbnail: string;
-};
+type ImageVector = VectorResult;
 export type VideoSegment = VectorResult & {
   ts: number;
   te: number;
-  thumbnail: string;
 };
 
 export type VideoAudioResults = {

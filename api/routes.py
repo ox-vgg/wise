@@ -472,6 +472,7 @@ def _get_search_router(config: APIConfig):
         vector_id: str
         media_id: str
         link: str
+        thumbnail: str
         distance: float
         bbox: Optional[BBoxXYWH] = None
 
@@ -489,12 +490,11 @@ def _get_search_router(config: APIConfig):
                 return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
 
     class ImageVector(VectorResult):
-        thumbnail: str
+        pass
 
     class VideoSegment(VectorResult):
         ts: float
         te: float
-        thumbnail: str
 
     class VideoAudioResults(BaseModel):
         total: int # maximum number of unmerged_windows that can be returned
