@@ -11,12 +11,12 @@ const secondsToMinSecPadded = (time: number) => {
   return `${minutes}:${seconds}`;
 };
 
-const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> = ({videoInfo, handleClickOccurrence, customHeaderSingular = 'occurrence', customHeaderPlural = 'occurrences'}) => {
-  if (videoInfo.shots.length === 0) {
+const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> = ({shots, handleClickOccurrence, customHeaderSingular = 'occurrence', customHeaderPlural = 'occurrences'}) => {
+  if (shots.length === 0) {
     return <></>;
   }
 
-  const occurrences = [...videoInfo.shots].sort((a, b) => a.ts - b.ts); // Sort occurrences by timestamp
+  const occurrences = shots.sort((a, b) => a.ts - b.ts); // Sort occurrences by timestamp
   const topMatch = occurrences.reduce((maxScoreOccurrence, currentOccurrence) => {
     return (maxScoreOccurrence.distance > currentOccurrence.distance) ? maxScoreOccurrence : currentOccurrence;
   });
@@ -28,7 +28,7 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
         title={searchResult.distance ? `Distance = ${searchResult.distance.toFixed(2)}` : ''}
       />
       <span className="wise-occurrence-timestamp">{secondsToMinSecPadded(searchResult.ts)}</span>
-      { (videoInfo.shots.length >= 2 && searchResult.vector_id === topMatch.vector_id) ? <span className="wise-top-match-label"><StarFilled /> Top match</span> : <></> }
+      { (shots.length >= 2 && searchResult.vector_id === topMatch.vector_id) ? <span className="wise-top-match-label"><StarFilled /> Top match</span> : <></> }
     </div>
   });
 
@@ -49,12 +49,12 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
                 <></> :
                 <img src={topMatch.thumbnail} className="wise-occurrences-preview-thumbnail" />
               }
-              <span>{videoInfo.shots.length} {videoInfo.shots.length === 1 ? customHeaderSingular : customHeaderPlural}</span>
+              <span>{shots.length} {shots.length === 1 ? customHeaderSingular : customHeaderPlural}</span>
             </>,
             children: (<>
               <div className="wise-occurrences-wrapper">
                 {occurrencesHTML}
-                <div className="wise-occurrences-timeline" style={{width: (videoInfo.shots.length - 1) * 181}} />
+                <div className="wise-occurrences-timeline" style={{width: (shots.length - 1) * 181}} />
               </div>
               <Button className="wise-occurrences-left-arrow" shape="circle" icon={<LeftOutlined />} />
               <Button className="wise-occurrences-right-arrow" shape="circle" icon={<RightOutlined />} />

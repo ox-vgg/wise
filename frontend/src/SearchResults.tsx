@@ -224,7 +224,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
             {/* <p>Some metadata here</p> */}
             {
               !isHomePage &&
-              <VideoOccurrencesView videoInfo={video} handleClickOccurrence={setImageDetails} />
+              <VideoOccurrencesView shots={video.shots} handleClickOccurrence={setImageDetails} />
             }
           </div>
         </div>
