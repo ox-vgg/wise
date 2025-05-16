@@ -491,13 +491,9 @@ def _get_search_router(config: APIConfig):
     class ImageVector(VectorResult):
         thumbnail: str
 
-    # An audio or video segment
-    class MediaSegment(VectorResult):
+    class VideoSegment(VectorResult):
         ts: float
         te: float
-
-    # A subclass of MediaSegment for videos
-    class VideoSegment(MediaSegment):
         thumbnail: str
 
     class VideoAudioResults(BaseModel):

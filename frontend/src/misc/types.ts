@@ -58,11 +58,9 @@ type VectorResult = {
 type ImageVector = VectorResult & {
   thumbnail: string;
 };
-type MediaSegment = VectorResult & {
+export type VideoSegment = VectorResult & {
   ts: number;
   te: number;
-};
-export type VideoSegment = MediaSegment & {
   thumbnail: string;
 };
 
