@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse, ProcessedImageInfo, ProcessedImageVector } from './misc/types.ts';
+import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse, ProcessedImageInfo } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
 
@@ -121,7 +121,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
         ...vector,
         mediaType: 'IMAGE',
         mediaInfo: processedSearchResults.Image.mediaInfo.get(vector.media_id)!
-      } as ProcessedImageVector;
+      };
     });
     for (let [mediaId, processedImageInfo] of processedSearchResults.Image.mediaInfo) {
       processedImageInfo.vectors = processedSearchResults.Image.vectors.filter(vector => vector.media_id === mediaId)

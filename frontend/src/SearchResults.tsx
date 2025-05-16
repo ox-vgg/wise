@@ -195,7 +195,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   
       return (
         <div className="wise-video-wrapper" key={videoId}
-            onClick={() => setImageDetails(topMatch as ProcessedVideoSegment)}
+            onClick={() => setImageDetails(topMatch)}
             onMouseEnter={(e) => e.currentTarget.querySelector('video')?.play()}
             onMouseLeave={(e) => e.currentTarget.querySelector('video')?.load()}
         >

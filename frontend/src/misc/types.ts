@@ -86,20 +86,28 @@ export type SearchResponse = {
   image_results?: ImageResults;
 };
 
-// TODO update everything below
+// The Processed* vectors types have the corresponding Processed*Info
+// as an attribute which has the related Processed* vectors/shots as
+// an attribute themselves.  This introduces a circular reference but
+// enables jumping from vector to media easily which is only used for
+// the "Videos" view.
+//
+// ProcessedImageInfo.vectors and ProcessedSearchResults.Image.vectors
+// attributes are unused but they provide a nice symmetry to the video
+// shots.
 export type ProcessedImageVector = ImageVector & {
   mediaType: 'IMAGE';
   mediaInfo: ProcessedImageInfo;
 };
 export type ProcessedImageInfo = ImageInfo & {
-  vectors: ImageVector[] | ProcessedImageVector[];
+  vectors: ProcessedImageVector[];
 };
 export type ProcessedVideoSegment = VideoSegment & {
   mediaType: 'VIDEO';
   mediaInfo: ProcessedVideoInfo;
 };
 export type ProcessedVideoInfo = VideoInfo & {
-  shots: VideoSegment[] | ProcessedVideoSegment[];
+  shots: ProcessedVideoSegment[];
 };
 export type ProcessedSearchResults = {
   Image: {
