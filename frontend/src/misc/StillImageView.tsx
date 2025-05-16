@@ -35,7 +35,7 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
                 onClick={
                   (e) => {
                       e.stopPropagation();
-                      handleInternalSearchButtonClick(imageDetails.vector_id);
+                      handleInternalSearchButtonClick(imageDetails);
                   }
                 }
               >

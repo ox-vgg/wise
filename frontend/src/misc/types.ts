@@ -17,7 +17,7 @@ export type Query = {
   id: string;
   type: 'INTERNAL_IMAGE';
   displayText: string;
-  value: ProcessedImageVector | ProcessedVideoSegment;
+  value: VectorResult;
   isNegative?: boolean;
 };
 
@@ -48,7 +48,7 @@ type BBoxXYWH = {
   h: number;
 };
 
-type VectorResult = {
+export type VectorResult = {
   vector_id: string;
   media_id: string;
   link: string;
@@ -240,7 +240,7 @@ export interface ImageDetailsModalProps {
   imageDetails: ProcessedImageVector | ProcessedVideoSegment;
   setImageDetails: (x?: ProcessedImageVector | ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
-  handleInternalSearchButtonClick: (vector_id: string) => void;
+  handleInternalSearchButtonClick: (vector: VectorResult) => void;
 };
 
 export interface ReportImageModalProps {
@@ -260,5 +260,5 @@ export interface VideoOccurrencesViewProps {
 export interface StillImageViewProps {
   imageDetails: ProcessedImageVector;
   isModalView: boolean;
-  handleInternalSearchButtonClick: (vector_id: string) => void;
+  handleInternalSearchButtonClick: (vector: VectorResult) => void;
 };

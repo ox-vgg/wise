@@ -4,7 +4,7 @@ import { AppstoreOutlined, BarsOutlined, FlagFilled, LoadingOutlined, MinusCircl
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
-import { ProcessedImageVector, ProcessedVideoSegment, SearchResultsProps } from './misc/types.ts';
+import { ProcessedImageVector, ProcessedVideoSegment, SearchResultsProps, VectorResult } from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
 // import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
@@ -68,13 +68,8 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     }
   }
 
-  const handleInternalSearchButtonClick = (imageId: string) => {
+  const handleInternalSearchButtonClick = (vector: VectorResult) => {
     setSearchText('');
-    const vector = searchResults.Image.vectors.find(v => v.vector_id === imageId);
-    if (!vector) {
-      console.error(`Could not find vector with id ${imageId}`)
-      return;
-    }
     setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector }]);
     setIsSubmitSearch(true);
   }
@@ -133,7 +128,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
               <>
                 <Tooltip title="Find visually similar images">
                   <img src="internal_search_icon.png" className="wise-internal-image-search-button"
-                        onClick={() => handleInternalSearchButtonClick(searchResult.vector_id)} />
+                        onClick={() => handleInternalSearchButtonClick(searchResult)} />
                 </Tooltip>
                 <Tooltip title="More options">
                   <Dropdown menu={{
