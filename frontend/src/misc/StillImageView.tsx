@@ -2,7 +2,64 @@ import { Button, Popover } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 
 import "./StillImageView.scss";
-import { StillImageViewProps } from "./types";
+import { ProcessedImageVector, StillImageViewProps } from "./types";
+
+
+type ProcessedImageVectorWithBBox = ProcessedImageVector & {
+  bbox: NonNullable<ProcessedImageVector['bbox']>
+};
+
+const isWithBBox = (
+  vector_info: ProcessedImageVector
+): vector_info is ProcessedImageVectorWithBBox => {
+  return Boolean(vector_info.bbox);
+}
+
+
+const BoundingBox: React.FunctionComponent<{
+  vector: ProcessedImageVectorWithBBox;
+  bbox_text: string;
+  handleInternalSearchButtonClick: (vector: ProcessedImageVector) => void;
+}> = ({
+  vector,
+  bbox_text,
+  handleInternalSearchButtonClick,
+}) => {
+  return (
+    <Popover
+      overlayClassName="wise-bounding-box-tooltip"
+      content={
+        <>
+          <span>{bbox_text}</span>
+          <div className="wise-bounding-box-tooltip-divider" />
+          <Button
+            type="link"
+            size="small"
+            icon={<SearchOutlined />}
+            onClick={
+              (e) => {
+                e.stopPropagation();
+                handleInternalSearchButtonClick(vector);
+              }
+            }
+          >
+            Find Similar
+          </Button>
+        </>
+      }
+    >
+      <div
+        className="wise-bounding-box"
+        style={{
+          left: `${100*vector.bbox.x}%`,
+          top: `${100*vector.bbox.y}%`,
+          width: `${100*vector.bbox.w}%`,
+          height: `${100*vector.bbox.h}%`,
+        }}
+      />
+    </Popover>
+  );
+};
 
 const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   imageDetails,
@@ -18,45 +75,13 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   const distance_str = `Similarity: ${imageDetails.distance.toFixed(2)}`;
   const img_title = imageDetails.bbox ? "" : distance_str;
 
-  let bounding_boxes;
-  if (imageDetails.bbox) {
-    bounding_boxes = (
-      <div className="wise-bounding-boxes">
-        <Popover
-          overlayClassName="wise-bounding-box-tooltip"
-          content={
-            <>
-              <span>{distance_str}</span>
-              <div className="wise-bounding-box-tooltip-divider" />
-              <Button
-                type="link"
-                size="small"
-                icon={<SearchOutlined />}
-                onClick={
-                  (e) => {
-                      e.stopPropagation();
-                      handleInternalSearchButtonClick(imageDetails);
-                  }
-                }
-              >
-                Find Similar
-              </Button>
-            </>
-          }
-        >
-          <div
-            className="wise-bounding-box"
-            style={{
-              left: `${100*imageDetails.bbox.x}%`,
-              top: `${100*imageDetails.bbox.y}%`,
-              width: `${100*imageDetails.bbox.w}%`,
-              height: `${100*imageDetails.bbox.h}%`,
-            }}
-          />
-        </Popover>
-      </div>
-    );
-  }
+  let bounding_box;
+  if (isWithBBox(imageDetails))
+    bounding_box = <BoundingBox
+      vector={imageDetails}
+      bbox_text={distance_str}
+      handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+    />;
 
   const width = imageDetails.mediaInfo.width;
   const height = imageDetails.mediaInfo.height
@@ -67,7 +92,9 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
       style={{aspectRatio: `${width} / ${height}`}}
     >
       <img src={img_src} title={img_title}/>
-      { bounding_boxes }
+      <div className="wise-bounding-boxes">
+        { bounding_box }
+      </div>
     </div>
   );
 }
