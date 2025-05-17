@@ -36,3 +36,11 @@ export const interleaveArrayWithElement = <T>(elems: T[], divider: T): T[] => {
     }
   return divided_elems;
 }
+
+
+// This incantation removes an object property that may not exist
+// without triggering TypeScript TS2339.
+export const excludeKey = <T extends object, U extends keyof any>(obj: T, key: U) => {
+  const { [key]: _, ...newObj } = obj;
+  return newObj;
+}

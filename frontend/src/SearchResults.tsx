@@ -9,6 +9,7 @@ import ReportImageModal from './misc/ReportImageModal.tsx';
 // import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
 import StillImageView from "./misc/StillImageView.tsx";
+import { excludeKey } from "./misc/utils.ts";
 import VideoOccurrencesView from './misc/VideoOccurrencesView.tsx';
 // import config from './config.ts';
 
@@ -70,7 +71,11 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
 
   const handleInternalSearchButtonClick = (vector: ProcessedVectorInfo) => {
     setSearchText('');
-    setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector }]);
+    // If this was a search result, vector comes with the distance
+    // property.  We remove the distance property so it is no longer
+    // identified as a result and it doesn't show up on WiseHeader.
+    const vectorInfo = excludeKey(vector, "distance");
+    setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vectorInfo }]);
     setIsSubmitSearch(true);
   }
 

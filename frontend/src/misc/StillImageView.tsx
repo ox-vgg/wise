@@ -46,7 +46,8 @@ const BoundingBox: React.FunctionComponent<{
 
   const tooltip_divider = <div className="wise-bounding-box-tooltip-divider" />;
   const contents = [];
-  contents.push(<span>{bbox_text}</span>);
+  if (bbox_text)
+    contents.push(<span>{bbox_text}</span>);
   if (handleInternalSearchButtonClick) {
     contents.push(
       <Button
@@ -65,14 +66,18 @@ const BoundingBox: React.FunctionComponent<{
     );
   }
 
-  return (
-    <Popover
-      overlayClassName="wise-bounding-box-tooltip"
-      content={interleaveArrayWithElement(contents, tooltip_divider)}
-    >
-      { innerBBox }
-    </Popover>
-  );
+  if (contents.length === 0) {
+    return innerBBox;
+  } else {
+    return (
+      <Popover
+        overlayClassName="wise-bounding-box-tooltip"
+        content={interleaveArrayWithElement(contents, tooltip_divider)}
+      >
+        { innerBBox }
+      </Popover>
+    );
+  }
 };
 
 const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
