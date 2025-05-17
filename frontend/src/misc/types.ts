@@ -260,5 +260,7 @@ export interface VideoOccurrencesViewProps {
 export interface StillImageViewProps {
   imageDetails: ProcessedImageVector;
   isModalView: boolean;
-  handleInternalSearchButtonClick: (vector: VectorResult) => void;
+  // If handleInternalSearchButtonClick is missing, the "Find Similar"
+  // button is omitted.
+  handleInternalSearchButtonClick?: (vector: VectorResult) => void;
 };

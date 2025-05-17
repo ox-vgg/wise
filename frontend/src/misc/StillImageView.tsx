@@ -21,7 +21,7 @@ const isWithBBox = (
 const BoundingBox: React.FunctionComponent<{
   vector: ProcessedImageVectorWithBBox;
   bbox_text: string;
-  handleInternalSearchButtonClick: (vector: ProcessedImageVector) => void;
+  handleInternalSearchButtonClick?: (vector: ProcessedImageVector) => void;
 }> = ({
   vector,
   bbox_text,
@@ -40,21 +40,24 @@ const BoundingBox: React.FunctionComponent<{
   const tooltip_divider = <div className="wise-bounding-box-tooltip-divider" />;
   const contents = [];
   contents.push(<span>{bbox_text}</span>);
-  contents.push(
-    <Button
-      type="link"
-      size="small"
-      icon={<SearchOutlined />}
-      onClick={
-        (e) => {
-          e.stopPropagation();
-          handleInternalSearchButtonClick(vector);
+  if (handleInternalSearchButtonClick) {
+    contents.push(
+      <Button
+        type="link"
+        size="small"
+        icon={<SearchOutlined />}
+        onClick={
+          (e) => {
+            e.stopPropagation();
+            handleInternalSearchButtonClick(vector);
+          }
         }
-      }
-    >
-      Find Similar
-    </Button>
-  );
+      >
+        Find Similar
+      </Button>
+    );
+  }
+
   return (
     <Popover
       overlayClassName="wise-bounding-box-tooltip"
