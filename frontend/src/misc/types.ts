@@ -17,10 +17,9 @@ export type Query = {
   id: string;
   type: 'INTERNAL_IMAGE';
   displayText: string;
-  value: VectorResult;
+  value: ProcessedVectorInfo;
   isNegative?: boolean;
 };
-
 
 
 type MediaInfo = {
@@ -48,14 +47,26 @@ type BBoxXYWH = {
   h: number;
 };
 
-export type VectorResult = {
+export type VectorInfo = {
   vector_id: string;
   media_id: string;
   link: string;
   thumbnail: string;
-  distance: number;
   bbox?: BBoxXYWH;
 };
+
+// The backend VectorInfo does not come with the related MediaInfo, it
+// is added when the backend response is processed.  mediaInfo will
+// actually then be one of the Processed*Info types, all of which are
+// derived from MediaInfo (see the Processed*Info types below).
+export type ProcessedVectorInfo = VectorInfo & {
+  mediaInfo: MediaInfo;
+};
+
+type VectorResult = VectorInfo & {
+  distance: number;
+};
+
 type ImageVector = VectorResult;
 export type VideoSegment = VectorResult & {
   ts: number;
@@ -240,7 +251,7 @@ export interface ImageDetailsModalProps {
   imageDetails: ProcessedImageVector | ProcessedVideoSegment;
   setImageDetails: (x?: ProcessedImageVector | ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
-  handleInternalSearchButtonClick: (vector: VectorResult) => void;
+  handleInternalSearchButtonClick: (vector: ProcessedVectorInfo) => void;
 };
 
 export interface ReportImageModalProps {
@@ -258,9 +269,9 @@ export interface VideoOccurrencesViewProps {
 };
 
 export interface StillImageViewProps {
-  imageDetails: ProcessedImageVector;
+  imageDetails: ProcessedVectorInfo;
   isModalView: boolean;
   // If handleInternalSearchButtonClick is missing, the "Find Similar"
   // button is omitted.
-  handleInternalSearchButtonClick?: (vector: VectorResult) => void;
+  handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;
 };

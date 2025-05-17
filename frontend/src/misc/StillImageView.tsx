@@ -4,24 +4,31 @@ import { SearchOutlined } from "@ant-design/icons";
 import { interleaveArrayWithElement } from "./utils.ts";
 
 import "./StillImageView.scss";
-import { ProcessedImageVector, StillImageViewProps } from "./types";
+import { ProcessedImageVector, ProcessedVectorInfo, StillImageViewProps } from "./types";
 
 
-type ProcessedImageVectorWithBBox = ProcessedImageVector & {
-  bbox: NonNullable<ProcessedImageVector['bbox']>
+type ProcessedVectorInfoWithBBox = ProcessedVectorInfo & {
+  bbox: NonNullable<ProcessedVectorInfo['bbox']>
 };
 
 const isWithBBox = (
-  vector_info: ProcessedImageVector
-): vector_info is ProcessedImageVectorWithBBox => {
+  vector_info: ProcessedVectorInfo
+): vector_info is ProcessedVectorInfoWithBBox => {
   return Boolean(vector_info.bbox);
 }
 
 
+const isResult = (
+  vector: ProcessedVectorInfo
+): vector is ProcessedImageVector => {
+  return Boolean("distance" in vector);
+}
+
+
 const BoundingBox: React.FunctionComponent<{
-  vector: ProcessedImageVectorWithBBox;
+  vector: ProcessedVectorInfoWithBBox;
   bbox_text: string;
-  handleInternalSearchButtonClick?: (vector: ProcessedImageVector) => void;
+  handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;
 }> = ({
   vector,
   bbox_text,
@@ -76,10 +83,13 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
 
   const img_src = isModalView ? imageDetails.link : imageDetails.thumbnail;
 
-  // If there are bounding boxes, the "title" (which shows the
-  // distance to the search) is for the image, otherwise it is for the
-  // bounding box.
-  const distance_str = `Similarity: ${imageDetails.distance.toFixed(2)}`;
+  // If there is no distance, we are showing for a vector that is not
+  // a search result (e.g., landing page or thumbnail on WiseHeader).
+  const distance_str = isResult(imageDetails)
+                       ? `Similarity: ${imageDetails.distance.toFixed(2)}`
+                       : "";
+  // If there are bounding boxes, the "title" is for the image,
+  // otherwise it is for the bounding box.
   const img_title = imageDetails.bbox ? "" : distance_str;
 
   let bounding_box;

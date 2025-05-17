@@ -4,7 +4,7 @@ import { AppstoreOutlined, BarsOutlined, FlagFilled, LoadingOutlined, MinusCircl
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
-import { ProcessedImageVector, ProcessedVideoSegment, SearchResultsProps, VectorResult } from './misc/types.ts';
+import { ProcessedImageVector, ProcessedVectorInfo, ProcessedVideoSegment, SearchResultsProps } from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
 // import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
@@ -68,7 +68,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     }
   }
 
-  const handleInternalSearchButtonClick = (vector: VectorResult) => {
+  const handleInternalSearchButtonClick = (vector: ProcessedVectorInfo) => {
     setSearchText('');
     setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector }]);
     setIsSubmitSearch(true);

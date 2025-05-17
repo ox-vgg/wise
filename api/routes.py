@@ -468,18 +468,12 @@ def _get_search_router(config: APIConfig):
         def round_bbox(cls, v):
             return round(v, config.precision)
 
-    class VectorResult(BaseModel):
+    class VectorInfo(BaseModel):
         vector_id: str
         media_id: str
         link: str
         thumbnail: str
-        distance: float
         bbox: Optional[BBoxXYWH] = None
-
-        @field_validator("distance")
-        @classmethod
-        def round_distance(cls, v):
-            return round(v, config.precision)
 
         @field_validator("bbox", mode="before")
         @classmethod
@@ -488,6 +482,14 @@ def _get_search_router(config: APIConfig):
                 return v
             else:  # v is the NamedTuple in feature_extractor module
                 return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
+
+    class VectorResult(VectorInfo):
+        distance: float
+
+        @field_validator("distance")
+        @classmethod
+        def round_distance(cls, v):
+            return round(v, config.precision)
 
     class ImageVector(VectorResult):
         pass
