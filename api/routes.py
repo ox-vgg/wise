@@ -49,6 +49,7 @@ from src.repository import (
     get_media_counts_by_media_type,
     get_project_total_duration,
     get_thumbnail_by_timestamp,
+    get_related_vectors_rows,
 )
 from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollectionType, VectorAndMediaMetadata
 from src.enums import IndexType
@@ -1178,6 +1179,47 @@ def _get_search_router(config: APIConfig):
             )
 
         return response
+
+
+    @router.get(
+        "/related-vectors/{_vector_id}",
+        response_model=list[VectorInfo],
+        responses={200: {"content": "application/json"}},
+    )
+    def get_related_vectors(_vector_id: int):
+        vectors_info = []
+        with project_engine.connect() as conn:
+            related_rows = get_related_vectors_rows(conn, _vector_id)
+            for (
+                feature_extractor_id, related_rows_group,
+            ) in itertools.groupby(
+                related_rows, lambda r: r.feature_extractor_id
+            ):
+                # Store group iterator as a list, because we will need to
+                # iterate the group twice.
+                related_rows_group = list(related_rows_group)
+                modality = related_rows_group[0].modality
+                feature_extractor = search_indices[modality][
+                    feature_extractor_id
+                ].feature_extractor
+
+                vectors_ext_metadata = (
+                    feature_extractor.get_vector_metadata(
+                        conn, [v.id for v in related_rows_group]
+                    )
+                )
+                for row, extm in zip(related_rows_group, vectors_ext_metadata):
+                    vectors_info.append(
+                        VectorInfo(
+                            vector_id=str(row.id),
+                            media_id=str(row.media_id),
+                            link=f"media/{row.media_id}#t={row.timestamp},{row.end_timestamp}",
+                            thumbnail=f"thumbnail?media_id={row.media_id}&timestamp={row.timestamp}",
+                            bbox=extm.bbox,
+                        )
+                    )
+        return vectors_info
+
 
     @router.post("/search", response_model=SearchResponse)
     @add_response_time

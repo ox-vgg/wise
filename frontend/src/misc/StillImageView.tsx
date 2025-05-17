@@ -28,14 +28,16 @@ const isResult = (
 const BoundingBox: React.FunctionComponent<{
   vector: ProcessedVectorInfoWithBBox;
   bbox_text: string;
+  is_primary: boolean;
   handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;
 }> = ({
   vector,
   bbox_text,
+  is_primary,
   handleInternalSearchButtonClick,
 }) => {
   const innerBBox = <div
-    className="wise-bounding-box"
+    className={`wise-bounding-box ${is_primary ? "wise-bounding-box-primary" : ""}`}
     style={{
       left: `${100*vector.bbox.x}%`,
       top: `${100*vector.bbox.y}%`,
@@ -97,13 +99,43 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   // otherwise it is for the bounding box.
   const img_title = imageDetails.bbox ? "" : distance_str;
 
-  let bounding_box;
-  if (isWithBBox(imageDetails))
-    bounding_box = <BoundingBox
-      vector={imageDetails}
-      bbox_text={distance_str}
-      handleInternalSearchButtonClick={handleInternalSearchButtonClick}
-    />;
+  // An image may have any number of bounding boxes.  If there is a
+  // bbox in imageDetails then that bbox is the result of a search and
+  // is the "primary" bbox.  The primary bbox is shown in the search
+  // results page and is coloured in the modal dialog.  In addition to
+  // imageDetails.bbox, there may be other bboxes associated to the
+  // image.  Those are only shown in the modal dialog to not overcrowd
+  // the search results page.  They are also only fetched when the
+  // user selects the image for viewing on the modal dialog.
+  const bounding_boxes = [];
+  if (isWithBBox(imageDetails)) {
+    bounding_boxes.push(
+      <BoundingBox
+        vector={imageDetails}
+        bbox_text={distance_str}
+        is_primary={true}
+        handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+      />
+    );
+  }
+
+  if (isModalView && imageDetails.related_vectors) {
+    for (const vector of imageDetails.related_vectors) {
+      // We don't need to skip the "primary bbox" because it is not
+      // supposed to be on the related vectors.
+      if (isWithBBox(vector)) {
+        bounding_boxes.push(
+          <BoundingBox
+            vector={vector}
+            bbox_text={""}
+            is_primary={false}
+            handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+          />
+        );
+      }
+    }
+  }
+
 
   const width = imageDetails.mediaInfo.width;
   const height = imageDetails.mediaInfo.height
@@ -115,7 +147,7 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
     >
       <img src={img_src} title={img_title}/>
       <div className="wise-bounding-boxes">
-        { bounding_box }
+        { bounding_boxes }
       </div>
     </div>
   );

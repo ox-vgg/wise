@@ -79,8 +79,18 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     setIsSubmitSearch(true);
   }
 
-  const [imageDetails, setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
-  
+  // setImageDetails is called when the user selects an image/video
+  // for view on the modal dialog.  Only at that point, do we fetch
+  // info about related vectors (other vectors for the same image or
+  // timestamp).
+  const [imageDetails, _setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
+  const setImageDetails = (d: ProcessedVideoSegment | ProcessedImageVector | undefined) => {
+    if (d && d.mediaType === "IMAGE" && ! d.related_vectors)
+      dataService.fillRelatedVectors(d).then(x => _setImageDetails(x));
+    else
+      _setImageDetails(d);
+  };
+
   let searchResultsHTML;
   let totalResultsCount;
   if (viewModality == 'Image' || viewMode == 'UnmergedSegments' || viewMode == 'Segments') {

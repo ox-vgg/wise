@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse, ProcessedImageInfo } from './misc/types.ts';
+import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse, ProcessedImageInfo, ProcessedImageVector, VectorInfo } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
 
@@ -219,6 +219,18 @@ const convertQueriesToFormData = (queries: Query[]) => {
   return formData;
 }
 
+
+const fetchRelatedVectors = (vector_id: string): Promise<VectorInfo[]> => {
+  return fetchWithTimeout(
+    config.API_BASE_URL + "related-vectors/" + vector_id,
+    config.FETCH_TIMEOUT,
+    {method: "GET"},
+  ).then(
+      r => r.json()
+  );
+}
+
+
 const fetchSearchResults = (queries: Query[], viewModality: string, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
@@ -353,6 +365,20 @@ export const useDataService = (): DataServiceOutput => {
   //   }
   // }
 
+
+  const fillRelatedVectors = async (imageDetails: ProcessedImageVector) => {
+    const vectors = await fetchRelatedVectors(imageDetails.vector_id);
+    // This mediaInfo is used to get the image width/height which is
+    // used in a bunch of places to draw the thumbnail in a manner
+    // compatible with the compact/justified image grid in the search
+    // results.
+    imageDetails.related_vectors = vectors.map(
+      v => {return {...v, mediaInfo: imageDetails.mediaInfo}}
+    );
+    return imageDetails;
+  };
+
+
   // Get results for a new search query
   const performNewSearch = async (queries: Query[], viewModality: string, featureExtractorId: string) => {
     setSearchingState((_searchingState) => ({
@@ -416,6 +442,7 @@ export const useDataService = (): DataServiceOutput => {
     // changePageNum,
     performNewSearch,
     fetchFeaturedImagesAndSetState,
-    reportImage
+    reportImage,
+    fillRelatedVectors,
   }
 }

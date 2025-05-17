@@ -53,6 +53,7 @@ export type VectorInfo = {
   link: string;
   thumbnail: string;
   bbox?: BBoxXYWH;
+  related_vectors?: ProcessedVectorInfo[];  // fetched by request only
 };
 
 // The backend VectorInfo does not come with the related MediaInfo, it
@@ -151,6 +152,7 @@ export interface DataServiceOutput {
   performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => Promise<void>;
   fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
+  fillRelatedVectors: (imageDetails: ProcessedImageVector) => Promise<ProcessedImageVector>;
 };
 
 export interface ProjectInfo {
