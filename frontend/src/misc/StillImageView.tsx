@@ -1,6 +1,8 @@
 import { Button, Popover } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 
+import { interleaveArrayWithElement } from "./utils.ts";
+
 import "./StillImageView.scss";
 import { ProcessedImageVector, StillImageViewProps } from "./types";
 
@@ -25,38 +27,40 @@ const BoundingBox: React.FunctionComponent<{
   bbox_text,
   handleInternalSearchButtonClick,
 }) => {
+  const innerBBox = <div
+    className="wise-bounding-box"
+    style={{
+      left: `${100*vector.bbox.x}%`,
+      top: `${100*vector.bbox.y}%`,
+      width: `${100*vector.bbox.w}%`,
+      height: `${100*vector.bbox.h}%`,
+    }}
+  />;
+
+  const tooltip_divider = <div className="wise-bounding-box-tooltip-divider" />;
+  const contents = [];
+  contents.push(<span>{bbox_text}</span>);
+  contents.push(
+    <Button
+      type="link"
+      size="small"
+      icon={<SearchOutlined />}
+      onClick={
+        (e) => {
+          e.stopPropagation();
+          handleInternalSearchButtonClick(vector);
+        }
+      }
+    >
+      Find Similar
+    </Button>
+  );
   return (
     <Popover
       overlayClassName="wise-bounding-box-tooltip"
-      content={
-        <>
-          <span>{bbox_text}</span>
-          <div className="wise-bounding-box-tooltip-divider" />
-          <Button
-            type="link"
-            size="small"
-            icon={<SearchOutlined />}
-            onClick={
-              (e) => {
-                e.stopPropagation();
-                handleInternalSearchButtonClick(vector);
-              }
-            }
-          >
-            Find Similar
-          </Button>
-        </>
-      }
+      content={interleaveArrayWithElement(contents, tooltip_divider)}
     >
-      <div
-        className="wise-bounding-box"
-        style={{
-          left: `${100*vector.bbox.x}%`,
-          top: `${100*vector.bbox.y}%`,
-          width: `${100*vector.bbox.w}%`,
-          height: `${100*vector.bbox.h}%`,
-        }}
-      />
+      { innerBBox }
     </Popover>
   );
 };
