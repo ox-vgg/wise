@@ -111,7 +111,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
 
     searchResultsHTML = _searchResults
       .slice(pageNum*FRONTEND_PAGE_SIZE,(pageNum+1)*FRONTEND_PAGE_SIZE)
-      .map((searchResult: ProcessedImageVector | ProcessedVideoSegment) => {
+      .map((searchResult: ProcessedImageVector | ProcessedVideoSegment, index) => {
         const { title, width, height } = searchResult.mediaInfo;
 
         const dropdownItems = [
@@ -131,15 +131,16 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
             icon: <MinusCircleFilled style={{color: '#cf1322'}} />,
           }
         ];
-
+        const isVector = (searchResult.vector_id != 'None');
+        const renderKey = isVector ? searchResult.vector_id : `result-${pageNum*FRONTEND_PAGE_SIZE + index}`
         return (
-          <div key={searchResult.vector_id}
+          <div key={renderKey}
               style={{width: `${width*170/height}px`, flexGrow: width*170/height}}
               className={'wise-image-wrapper ' + ((dropdownImageId === searchResult.vector_id) ? 'wise-image-dropdown-open' : '')}
           >
             {
               /* Enable internal search only for images for now */
-              (searchResult.mediaType === 'IMAGE') &&
+              (searchResult.mediaType === 'IMAGE' && isVector) &&
               <>
                 <Tooltip title="Find visually similar images">
                   <img src="internal_search_icon.png" className="wise-internal-image-search-button"
