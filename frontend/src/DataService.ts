@@ -1,5 +1,18 @@
 import { useState } from 'react';
-import { DataServiceOutput, ProcessedSearchResults, ProcessedVideoSegment, ProcessedVideoInfo, Query, SearchResponse, VideoSegment, VideoInfo, ProcessedSearchResponse, ProcessedImageInfo, ProcessedImageVector, VectorInfo } from './misc/types.ts';
+import { 
+  DataServiceOutput,
+  ProcessedSearchResults,
+  ProcessedVideoSegment,
+  ProcessedVideoInfo,
+  Query,
+  SearchResponse,
+  VideoSegment,
+  VideoInfo,
+  ProcessedSearchResponse,
+  ProcessedImageInfo,
+  ProcessedImageVector,
+  VectorInfo,
+  ASRSegment } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
 
@@ -15,6 +28,11 @@ const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[])
       if (!videoInfo.timeline_hover_thumbnails.startsWith('http')) {
         videoInfo.timeline_hover_thumbnails = config.API_BASE_URL + videoInfo.timeline_hover_thumbnails; // Fixes URLs for dev mode
       }
+      const { external_metadata } = videoInfo;
+      let asr_segments: ASRSegment[] = [];
+      if (external_metadata.asr_segments) {
+        asr_segments = external_metadata.asr_segments.slice();
+      }
 
       return [
         mediaId,
@@ -22,6 +40,7 @@ const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[])
           ...videoInfo,
           shots: shots.filter(shot => shot.media_id === mediaId), // populate shots
           title: videoInfo.filename,
+          asrSegments: asr_segments,
         }
       ] as [string, ProcessedVideoInfo]
     })
