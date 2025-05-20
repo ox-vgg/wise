@@ -861,8 +861,8 @@ def _get_search_router(config: APIConfig):
 
     # TODO: Fix this to handle other media types. Right now it assumes metadata_fts to be for videos only
     if 'metadata_fts' in db.project_metadata_obj.tables:
-        search_indices[MediaType.VIDEO] = {'metadata': FTSSearch(db.project_metadata_obj)}
-        active_search_targets[MediaType.VIDEO] = ['metadata']
+        search_indices[MediaType.VIDEO] = {'wise/metadata': FTSSearch(db.project_metadata_obj)}
+        active_search_targets[MediaType.VIDEO] = ['wise/metadata']
     
     
     for media_type in project_assets:
@@ -1373,7 +1373,7 @@ def _get_search_router(config: APIConfig):
                     "message": "Cannot search on images using an audio query"
                 })
         elif search_in == MediaType.VIDEO:
-            if feature_extractor_id == 'metadata':
+            if feature_extractor_id == 'wise/metadata':
                 # ASR search
                 if start > end:
                     raise HTTPException(

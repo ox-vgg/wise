@@ -274,7 +274,7 @@ class FTSSearch:
                     "id": None,
                     "timestamp": None,
                     "end_timestamp": None,
-                    "feature_extractor_id": "metadata"
+                    "feature_extractor_id": "wise/metadata"
                 }
                 | {
                     "external_metadata": {
