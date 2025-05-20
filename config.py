@@ -16,3 +16,16 @@ class APIConfig(BaseSettings):
     query_blocklist: Set[str] = set()
     project_dir: Path
     thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
+
+    # If you want to serve the media files from a different static file server,
+    # set redirect_media_url_by_path to True to redirect the media urls from 
+    # /media/{media_id} to {config.redirect_media_url_prefix}/media/{file_path}
+    #
+    # For example, requests to http://server:port/prefix/project-name/media/1 gets
+    # redirected to http://another_server/another_prefix/[path]/[to]/filename.mp4
+    # The file_path can either be just the filename (media.path) or
+    # redirect_media_url_num_components from the end of the absolute path
+    # i.e. (source_collection.location / media.path)
+    redirect_media_url_by_path: bool = False
+    redirect_media_url_prefix: str = "."
+    redirect_media_url_num_components: int = 1
