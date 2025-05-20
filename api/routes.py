@@ -152,6 +152,11 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
     project_engine = db.init_project(project.dburi)
     thumbs_engine = db.init_thumbs(project.thumbs_uri)
 
+    if config.redirect_media_url_by_path and config.redirect_media_url_num_components < 1:
+        raise ValueError(
+            "redirect_media_url_num_components must be greater than 0 when redirect_media_url_by_path is True"
+        )
+
     @router.api_route(
         "/media/{media_id}",
         response_class=Union[FileResponse, StreamingResponse],
@@ -186,6 +191,11 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
                 )
 
             file_path = Path(source_collection.location) / metadata.path
+
+            if config.redirect_media_url_by_path:
+                num_components = min(config.redirect_media_url_num_components, len(file_path.parts) - 1)
+                parts = (config.redirect_media_url_prefix,) + file_path.parts[-num_components:]
+                return RedirectResponse(f"{'/'.join(parts)}", status_code=302)
 
             if metadata.media_type in {MediaType.VIDEO, MediaType.AV, MediaType.AUDIO}:
                 file_size = file_path.stat().st_size
