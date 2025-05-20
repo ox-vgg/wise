@@ -21,6 +21,11 @@ export type Query = {
   isNegative?: boolean;
 };
 
+export type ASRSegment = {
+  start: number;
+  end: number;
+  text: string;
+}
 
 type MediaInfo = {
   id: string;
@@ -31,7 +36,9 @@ type MediaInfo = {
   format: string;
   duration: number;
   title: string;
-  external_metadata: Record<string, any>;
+  external_metadata: {
+    asr_segments?: ASRSegment[];
+  }
 };
 export type ImageInfo = MediaInfo & {};
 export type VideoInfo = MediaInfo & {
@@ -120,6 +127,7 @@ export type ProcessedVideoSegment = VideoSegment & {
 };
 export type ProcessedVideoInfo = VideoInfo & {
   shots: ProcessedVideoSegment[];
+  asrSegments?: ASRSegment[];
 };
 export type ProcessedSearchResults = {
   Image: {
