@@ -56,6 +56,7 @@ from src.enums import IndexType
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtMetadata
+from src.search.fts import FTSSearch, WISEFTSQuery
 
 logger = logging.getLogger(__name__)
 
@@ -849,6 +850,7 @@ def _get_search_router(config: APIConfig):
     thumbs_engine = db.init_thumbs(project.thumbs_uri)
     external_metadata_tables = db.reflect_external_metadata(project_engine)
 
+
     """
     Load all available search indices by default
     `search_indices` is a dictionary of SearchIndex objects, where the key is the
@@ -856,6 +858,13 @@ def _get_search_router(config: APIConfig):
     """
     search_indices: dict[str, dict[str, SearchIndex]] = {}
     active_search_targets: dict[str, list[str]] = {}
+
+    # TODO: Fix this to handle other media types. Right now it assumes metadata_fts to be for videos only
+    if 'metadata_fts' in db.project_metadata_obj.tables:
+        search_indices[MediaType.VIDEO] = {'metadata': FTSSearch(db.project_metadata_obj)}
+        active_search_targets[MediaType.VIDEO] = ['metadata']
+    
+    
     for media_type in project_assets:
         if media_type not in {MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO}:
             # Added to ensure projects created with older versions
@@ -889,6 +898,7 @@ def _get_search_router(config: APIConfig):
                         "internal search, please re-create the index by running "
                         f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {search_indices[media_type][feature_extractor_id].index_type} --overwrite`",
                     )
+    
     logger.info("Loaded the following search indices:\n%s", json.dumps(active_search_targets, indent=4))
 
     # Get counts
@@ -1363,6 +1373,18 @@ def _get_search_router(config: APIConfig):
                     "message": "Cannot search on images using an audio query"
                 })
         elif search_in == MediaType.VIDEO:
+            if feature_extractor_id == 'metadata':
+                # ASR search
+                if start > end:
+                    raise HTTPException(
+                        400, {"message": "'start' cannot be greater than 'end'"}
+                    )
+                
+                # TODO escape special characters
+                text = " ".join(text_queries)
+                q = WISEFTSQuery.model_validate({"$match": text})
+                return asr_search(q, search_index, start, end)
+            
             if len([query for query in q if query['modality'] == 'audio']) > 0:
                 raise HTTPException(400, {
                     "message": "Cannot search on visual stream of video files using an audio query"
@@ -1434,4 +1456,25 @@ def _get_search_router(config: APIConfig):
 
         return response
 
+    def asr_search(
+        q: WISEFTSQuery,
+        search_index: FTSSearch,
+        start: int,
+        end: int,
+        thumbnails_to_send: int = 0,
+    ):
+        with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
+            _get_metadata = functools.partial(search_index.search, conn, q, start, end)
+            dist = itertools.count(start=-1, step=-1)
+            get_thumbs = thumbs_reader(thumbs_conn, iter(dist), thumbnails_to_send)
+
+            return SearchResponse(
+                time=0.0,  # Dummy value to be overwritten by the @add_response_time decorator function
+                audio_results=None,
+                video_results=construct_video_search_response(
+                    MediaType.VIDEO, iter(dist), _get_metadata(), get_thumbs
+                ),
+                video_audio_results=None,
+                image_results=None,
+            )
     return router, active_search_targets

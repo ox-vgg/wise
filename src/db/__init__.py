@@ -8,6 +8,7 @@ from .tables import (
     thumbnails_table,
 )
 
+__wise_tables = ['metadata_fts', 'metadata-asr']
 
 def _init(dburi: str, metadata_obj: MetaData, **kwargs) -> Engine:
     engine = create_engine(dburi, **kwargs)
@@ -24,4 +25,5 @@ def init_thumbs(dburi: str, **kwargs) -> Engine:
 
 def reflect_external_metadata(db_engine):
     project_metadata_obj.reflect(bind=db_engine)
-    return [ v for k, v in project_metadata_obj.tables.items() if k.startswith('metadata-') ]
+
+    return [ v for k, v in project_metadata_obj.tables.items() if k.startswith('metadata-') and k not in __wise_tables]
