@@ -44,3 +44,8 @@ export const excludeKey = <T extends object, U extends keyof any>(obj: T, key: U
   const { [key]: _, ...newObj } = obj;
   return newObj;
 }
+export const secondsToMinSecPadded = (time: number) => {
+  const minutes = Math.floor(time / 60);
+  const seconds = `${Math.floor(time % 60)}`.padStart(2, "0");
+  return `${minutes}:${seconds}`;
+};
