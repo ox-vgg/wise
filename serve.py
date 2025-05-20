@@ -59,6 +59,12 @@ def main(
         ),
     )
 ):
+    # ensure that the frontend assets are built
+    if not Path(theme_asset_dir / 'index.html').exists():
+        raise FileNotFoundError(
+            f"Frontend assets not found at {theme_asset_dir}. "
+            "Please build the frontend assets using `npm run build`."
+        )
     from api import serve
 
     project = WiseProject(
