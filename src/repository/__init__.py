@@ -209,10 +209,7 @@ def get_media_counts_by_media_type(conn: sa.Connection) -> dict[MediaType, int]:
 
 
 def get_related_vectors_rows(conn: sa.Connection, vid: int):
-    """Get all other vectors for same image/timestamp.
-
-    The results are ordered by feature_extractor_id to make it easier
-    to iterate them with groupby.
+    """Get all other vectors for same image/timestamp, modality, and feature extractor.
     """
     subq = sa.select(_vtable).where(_vtable.c.id == vid).subquery()
     stmt = (
@@ -222,9 +219,10 @@ def get_related_vectors_rows(conn: sa.Connection, vid: int):
             (
                 _vtable.c.media_id == subq.c.media_id
                 and _vtable.c.timestamp == subq.c.timestamp
+                and _vtable.c.modality == subq.c.modality
+                and _vtable.c.feature_extractor_id == subq.c.feature_extractor_id
             )
         )
         .where(_vtable.c.id != vid)
-        .order_by(_vtable.c.feature_extractor_id)
     )
     return conn.execute(stmt)
