@@ -1194,11 +1194,10 @@ def _get_search_router(config: APIConfig):
 
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
 
-            ## Return no Ext metadata for the featured images, since at
-            ## this stage we haven't actually made any search we are
-            ## just showing a sample of the media we have.
-            _get_ext_metadata = lambda x: [FeatureExtMetadata()] * len(x)
-
+            search_index = search_indices[modality][feature_extractor_id]
+            _get_ext_metadata = functools.partial(
+                search_index.feature_extractor.get_vector_metadata, conn
+            )
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_search_response(
                 top_dist=dist[start:end],
