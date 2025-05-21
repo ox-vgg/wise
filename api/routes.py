@@ -1298,6 +1298,16 @@ def _get_search_router(config: APIConfig):
                     status_code=500, content=f"Internal search not supported in this project"
                 )
 
+            # Apply hook to transform internal image query vectors
+            internal_image_queries = [
+                search_index.feature_extractor.transform_internal_image_queries_hook(x)
+                for x in internal_image_queries
+            ]
+            negative_internal_image_queries = [
+                search_index.feature_extractor.transform_internal_image_queries_hook(x)
+                for x in negative_internal_image_queries
+            ]
+
         for tq in text_queries:
             if tq.strip() in config.query_blocklist:
                 message = (
@@ -1377,6 +1387,9 @@ def _get_search_router(config: APIConfig):
     ):
         features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
         dist, ids = search_index.index.search(features, end)
+
+        # Apply hook to transform Faiss distance scores
+        dist = search_index.feature_extractor.transform_faiss_distances_hook(dist)
 
         top_ids, top_dist = ids[0, start:end], dist[0, start:end]
 

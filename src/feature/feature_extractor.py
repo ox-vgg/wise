@@ -175,3 +175,41 @@ class FeatureExtractor:
 
     def extract_audio_features(self, preprocessed_audio: torch.Tensor) -> np.ndarray:
         raise NotImplementedError
+
+    def transform_internal_image_queries_hook(self, vec: np.ndarray) -> np.ndarray:
+        """Hook method to transform internal image queries.
+
+        This method can be overridden by subclasses to apply specific 
+        transformations to internal image queries. By default, it does nothing.
+
+        Parameters
+        ----------
+        vec : np.ndarray
+            The input feature vector, with shape (num_queries, vector_dim).
+
+        Returns
+        -------
+        np.ndarray
+            The transformed feature vector, with shape
+            (num_queries, vector_dim).
+        """
+        return vec
+
+    def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
+        """Hook method to transform Faiss distance scores.
+
+        This method can be overridden by subclasses to apply specific 
+        transformations to the distance scores returned by Faiss. By default, 
+        it does nothing.
+
+        Parameters
+        ----------
+        dist : np.ndarray
+            The input Faiss distance scores, with shape (num_queries, k).
+
+        Returns
+        -------
+        np.ndarray
+            The transformed Faiss distance scores, with shape (num_queries, k).
+        """
+        return dist
