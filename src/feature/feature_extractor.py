@@ -177,7 +177,9 @@ class FeatureExtractor:
         raise NotImplementedError
 
     def transform_internal_image_queries_hook(self, vec: np.ndarray) -> np.ndarray:
-        """Hook method to transform internal image queries.
+        """Hook method to transform internal image queries. This hook is useful for
+        models like OWLv2 which requires feature vectors to be 'augmented'. See
+        src/feature/transformers_owlv2.py::extract_image_features() for an example.
 
         This method can be overridden by subclasses to apply specific 
         transformations to internal image queries. By default, it does nothing.
@@ -196,7 +198,10 @@ class FeatureExtractor:
         return vec
 
     def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
-        """Hook method to transform Faiss distance scores.
+        """Hook method to transform Faiss distance scores. This is useful for models
+        like OWLv2 which requires a sigmoid function to be applied to the similarity
+        scores returned by Faiss. This transformation ensures that similarity scores
+        are in the range of 0 and 1 and therefore ready for the frontend.
 
         This method can be overridden by subclasses to apply specific 
         transformations to the distance scores returned by Faiss. By default, 
