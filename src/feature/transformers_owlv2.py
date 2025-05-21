@@ -390,3 +390,21 @@ class TransformersOWLv2(FeatureExtractor):
             ) # shape: (N, 513)
 
         return text_embeds.cpu().numpy() # shape: (N, 513)
+
+    def transform_internal_image_queries_hook(self, vec: np.ndarray) -> np.ndarray:
+        ## Change the vector augmentation of the internal feature vector
+
+        # Un-augment feature vector
+        # Original shape of vec: (N, 769)
+        vec = vec[:, :-1]  # Remove extra logit_shift element (new shape: (N, 768))
+        vec /= np.linalg.norm(vec, axis=-1, keepdims=True)  # Normalize vector to undo logit_scale
+
+        # Re-augment
+        vec = np.concatenate(
+            [vec, np.ones_like(vec[..., :1])], axis=-1
+        )  # Shape: (N, 769)
+        return vec
+
+    def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
+        # Apply sigmoid transformation to the logits (dot products) from Faiss.
+        return 1. / (1. + np.exp(-dist))
