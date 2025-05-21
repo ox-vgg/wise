@@ -217,10 +217,10 @@ def get_related_vectors_rows(conn: sa.Connection, vid: int):
         .join(
             subq,
             (
-                _vtable.c.media_id == subq.c.media_id
-                and _vtable.c.timestamp == subq.c.timestamp
-                and _vtable.c.modality == subq.c.modality
-                and _vtable.c.feature_extractor_id == subq.c.feature_extractor_id
+                (_vtable.c.media_id == subq.c.media_id)
+                & (_vtable.c.timestamp == subq.c.timestamp)
+                & (_vtable.c.modality == subq.c.modality)
+                & (_vtable.c.feature_extractor_id == subq.c.feature_extractor_id)
             )
         )
         .where(_vtable.c.id != vid)
