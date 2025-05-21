@@ -158,7 +158,7 @@ export interface DataServiceOutput {
   // pageNum: number;
   // changePageNum: (x: number) => void;
   performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => Promise<void>;
-  fetchFeaturedImagesAndSetState: () => Promise<void>;
+  fetchFeaturedImagesAndSetState: (viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
   fillRelatedVectors: (imageDetails: ProcessedImageVector) => Promise<ProcessedImageVector>;
 };

@@ -32,17 +32,6 @@ export const App: React.FunctionComponent = () => {
   }
 
   useEffect(() => {
-    // Initialise home page with featured images
-    dataService.fetchFeaturedImagesAndSetState().then(_ => {
-      setIsHomePage(true); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
-    }).catch((err) => {
-      Modal.error({
-        title: 'Error: unable to load featured images',
-        content: 'Please try again later',
-      });
-      console.error(err);
-    });
-
     // Fetch project info
     fetchWithTimeout(config.API_BASE_URL+"info", 30000, { method: 'GET' })
       .then((response) => {
@@ -76,6 +65,27 @@ export const App: React.FunctionComponent = () => {
       setFeatureExtractorId(default_feature_extractor_id ?? '');
     }
   }, [projectInfo]);
+
+  useEffect(() => {
+    // When WISE starts, these may be the empty string.  Wait until
+    // they are set before fetching featured images.
+    if (! viewModality || ! featureExtractorId)
+      return;
+
+    // Now that we have set the feature extractor and modality, we can
+    // initialise home page with featured images
+    dataService.fetchFeaturedImagesAndSetState(
+      viewModality, featureExtractorId
+    ).then(_ => {
+      setIsHomePage(true); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
+    }).catch((err) => {
+      Modal.error({
+        title: 'Error: unable to load featured images',
+        content: 'Please try again later',
+      });
+      console.error(err);
+    });
+  }, [viewModality, featureExtractorId]);
 
   const _submitSearch = (queries: Query[]) => {
     dataService.performNewSearch(queries, viewModality, featureExtractorId).then(_ => {

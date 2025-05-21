@@ -174,11 +174,25 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
   } as ProcessedSearchResponse;
 };
 
-const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
+const fetchFeaturedImages = (
+  viewModality: keyof ProcessedSearchResults,
+  featureExtractorId: string,
+  pageStart: number,
+  pageEnd: number
+): Promise<ProcessedSearchResponse> => {
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(MAX_FEATURED_IMAGES, pageEnd*config.PAGE_SIZE);
 
+  const viewModalityToVectorModality = {
+    'Image': 'image',
+    'Video': 'video',
+    'VideoAudio': 'video',
+    'Audio': 'audio',
+  };
+
   const urlParams = new URLSearchParams([
+    ['modality', viewModalityToVectorModality[viewModality]],
+    ['feature_extractor_id', featureExtractorId],
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
@@ -335,8 +349,12 @@ export const useDataService = (): DataServiceOutput => {
   });
 
   // Get featured images to display on home page
-  const fetchFeaturedImagesAndSetState = () => {
-    return fetchFeaturedImages(0, config.NUM_PAGES_PER_REQUEST).then((_searchResponse: ProcessedSearchResponse) => {
+  const fetchFeaturedImagesAndSetState = (
+    viewModality: keyof ProcessedSearchResults, featureExtractorId: string
+  ) => {
+    return fetchFeaturedImages(
+      viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST
+    ).then((_searchResponse: ProcessedSearchResponse) => {
       setSearchingState({
         queries: [],
         isFeaturedImages: true,

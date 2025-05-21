@@ -1149,16 +1149,25 @@ def _get_search_router(config: APIConfig):
         return wrapper
 
     # Create a random array of featured images (1 per video)
+    ids: dict[str: dict[str: list[int]]] = {}
     with project_engine.connect() as conn:
-        ids = get_featured_images(conn)
+        for modality in search_indices:
+            ids[modality] = {}
+            for feature_extractor_id in search_indices[modality]:
+                this_ids = get_featured_images(
+                    conn, modality, feature_extractor_id
+                )
 
-        # Select a random subset of up to 10000 image ids (for performance reasons)
-        default_rng(seed=42).shuffle(ids)
-        ids = ids[:10000]
+                # Select a random subset of up to 10000 image ids (for performance reasons)
+                default_rng(seed=42).shuffle(this_ids)
+                ids[modality][feature_extractor_id] = this_ids[:10000]
+                del this_ids
 
     @router.get("/featured", response_model=SearchResponse)
     @add_response_time
     async def handle_get_featured(
+        modality: ModalityType = Query(),
+        feature_extractor_id: str = Query(),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbnails_to_send: int = Query(0),
@@ -1167,7 +1176,7 @@ def _get_search_router(config: APIConfig):
     ):
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
-            selected_ids = ids.copy()
+            selected_ids = ids[modality][feature_extractor_id].copy()
             default_rng(seed=random_seed).shuffle(selected_ids)
             selected_ids = selected_ids[:1000]
 
