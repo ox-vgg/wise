@@ -28,6 +28,10 @@ class WiseProject:
     def dburi(self) -> str:
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
+    @property
+    def fts_config_file(self) -> Path:
+        return self.metadata_dir / 'fts_config.json'
+    
     def metadata_db_table(self, metadata_id: str, extension='.sqlite') -> tuple[Path, str]:
         metadata_id_tok = metadata_id.split('/')
         assert len(metadata_id_tok) == 3, 'metadata_id must be in "FOLDER_NAME/DB_NAME/TABLE_NAME" format'

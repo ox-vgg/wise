@@ -4,14 +4,10 @@ import { CaretRightOutlined, LeftOutlined, RightOutlined, StarFilled } from "@an
 
 import './VideoOccurrencesView.scss';
 import { VideoOccurrencesViewProps } from "./types";
+import { secondsToMinSecPadded } from "./utils";
 
-const secondsToMinSecPadded = (time: number) => {
-  const minutes = Math.floor(time / 60);
-  const seconds = `${Math.floor(time % 60)}`.padStart(2, "0");
-  return `${minutes}:${seconds}`;
-};
 
-const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> = ({shots, handleClickOccurrence, customHeaderSingular = 'occurrence', customHeaderPlural = 'occurrences'}) => {
+const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> = ({ shots, handleClickOccurrence, customHeaderSingular = 'occurrence', customHeaderPlural = 'occurrences' }) => {
   if (shots.length === 0) {
     return <></>;
   }
@@ -20,15 +16,18 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
   const topMatch = occurrences.reduce((maxScoreOccurrence, currentOccurrence) => {
     return (maxScoreOccurrence.distance > currentOccurrence.distance) ? maxScoreOccurrence : currentOccurrence;
   });
-  
-  const occurrencesHTML = occurrences.map(searchResult => {
-    return <div className="wise-occurrence" onClick={() => handleClickOccurrence(searchResult)} key={searchResult.vector_id}>
+
+  const occurrencesHTML = occurrences.map((searchResult, index) => {
+    const isVector = searchResult.vector_id !== 'None';
+    const renderKey = isVector ? searchResult.vector_id : `occurrence-${searchResult.media_id}-${index}`;
+
+    return <div className="wise-occurrence" onClick={() => handleClickOccurrence(searchResult)} key={renderKey}>
       <img
         src={searchResult.thumbnail}
         title={searchResult.distance ? `Distance = ${searchResult.distance.toFixed(2)}` : ''}
       />
       <span className="wise-occurrence-timestamp">{secondsToMinSecPadded(searchResult.ts)}</span>
-      { (shots.length >= 2 && searchResult.vector_id === topMatch.vector_id) ? <span className="wise-top-match-label"><StarFilled /> Top match</span> : <></> }
+      {(isVector && shots.length >= 2 && searchResult.vector_id === topMatch.vector_id) ? <span className="wise-top-match-label"><StarFilled /> Top match</span> : <></>}
     </div>
   });
 
@@ -45,7 +44,7 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
           {
             key: '0',
             label: <>
-              { isOpen ?
+              {isOpen ?
                 <></> :
                 <img src={topMatch.thumbnail} className="wise-occurrences-preview-thumbnail" />
               }
@@ -54,7 +53,7 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
             children: (<>
               <div className="wise-occurrences-wrapper">
                 {occurrencesHTML}
-                <div className="wise-occurrences-timeline" style={{width: (shots.length - 1) * 181}} />
+                <div className="wise-occurrences-timeline" style={{ width: (shots.length - 1) * 181 }} />
               </div>
               <Button className="wise-occurrences-left-arrow" shape="circle" icon={<LeftOutlined />} />
               <Button className="wise-occurrences-right-arrow" shape="circle" icon={<RightOutlined />} />
