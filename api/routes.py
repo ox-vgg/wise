@@ -482,6 +482,8 @@ def _get_search_router(config: APIConfig):
         def cast_bbox(cls, v):
             if v is None:
                 return v
+            elif isinstance(v, BBoxXYWH):
+                return v
             else:  # v is the NamedTuple in feature_extractor module
                 return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
 
@@ -528,21 +530,18 @@ def _get_search_router(config: APIConfig):
         merged_segments: List[VideoSegment] = []
         start = None
         current = None
-        best_thumbnail = None
-        best_segment_score = 0
+        best = None
         for k in _keyframes:
             if start is None:
                 # Start a new group
                 start = k
                 current = k
-                best_thumbnail = k.thumbnail
-                best_segment_score = k.distance
+                best = k
 
             elif (k.ts - current.te) <= 4:
                 current = k
-                if current.distance > best_segment_score:
-                    best_segment_score = current.distance
-                    best_thumbnail = current.thumbnail
+                if current.distance > best.distance:
+                    best = current
 
             else:
                 merged_segments.append(
@@ -552,14 +551,14 @@ def _get_search_router(config: APIConfig):
                         ts=start.ts,
                         te=current.te,
                         link=f"media/{start.media_id}#t={start.ts},{current.te}",
-                        distance=best_segment_score,
-                        thumbnail=best_thumbnail,
+                        distance=best.distance,
+                        thumbnail=best.thumbnail,
+                        bbox=best.bbox,
                     )
                 )
                 start = k
                 current = k
-                best_thumbnail = k.thumbnail
-                best_segment_score = k.distance
+                best = k
 
         if start is not None:
             merged_segments.append(
@@ -569,8 +568,9 @@ def _get_search_router(config: APIConfig):
                     ts=start.ts,
                     te=current.te,
                     link=f"media/{start.media_id}#t={start.ts},{current.te}",
-                    distance=best_segment_score,
-                    thumbnail=best_thumbnail,
+                    distance=best.distance,
+                    thumbnail=best.thumbnail,
+                    bbox=best.bbox,
                 )
             )
 
@@ -598,14 +598,16 @@ def _get_search_router(config: APIConfig):
         search_in: MediaType,
         top_dist: List[float],
         all_metadata: List[VectorAndMediaMetadata],
+        all_ext_metadata: list[FeatureExtMetadata],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
     ):
         videos = {}
         shots = []
         segments = []
-        for _dist, _metadata, (_thumb, _) in zip(
+        for _dist, _metadata, _ext_metadata, (_thumb, _) in zip(
             top_dist,
             all_metadata,
+            all_ext_metadata,
             get_thumbs_fn(all_metadata),
         ):
             video_id = str(_metadata.media_id)
@@ -639,6 +641,7 @@ def _get_search_router(config: APIConfig):
                 link=f"media/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'media/{video_id}{_metadata.path}'}",
                 distance=_dist,
                 thumbnail=_thumb,
+                bbox=_ext_metadata.bbox,
             )
 
             segments.append(segment)
@@ -730,13 +733,15 @@ def _get_search_router(config: APIConfig):
             if len(video_indices) > 0:
                 video_top_dist = [top_dist[i] for i in video_indices]
                 video_all_metadata = [all_metadata[i] for i in video_indices]
-                video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, get_thumbs_fn)
+                video_ext_metadata = [all_ext_metadata[i] for i in video_indices]
+                video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, video_ext_metadata, get_thumbs_fn)
         if search_in is None or search_in == MediaType.AV:
             av_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.AUDIO and x.media_type == MediaType.AV]
             if len(av_indices) > 0:
                 av_top_dist = [top_dist[i] for i in av_indices]
                 av_all_metadata = [all_metadata[i] for i in av_indices]
-                video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, get_thumbs_fn)
+                av_ext_metadata = [all_ext_metadata[i] for i in av_indices]
+                video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, av_ext_metadata, get_thumbs_fn)
         if search_in is not None and search_in not in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AV]:
             raise NotImplementedError("`search_in` must be either `MediaType.IMAGE`, `MediaType.VIDEO`, or `MediaType.AV`. Support for `MediaType.AUDIO` is not available yet")
 
