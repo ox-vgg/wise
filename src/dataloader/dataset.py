@@ -233,7 +233,7 @@ class MediaDataset(torch_data.IterableDataset):
         self,
         input_files: Union[List[str], Dict[str, str]],
         output_stream_opts=List[StreamOutputOptions],
-        transforms: Optional[List[Callable[[torch.Tensor], torch.Tensor]]] = None,
+        transforms: Optional[List[Callable[[torch.Tensor], torch.Tensor] | Dict[str, Callable[[torch.Tensor], torch.Tensor]]]] = None,
         offset: Optional[float] = None,
         thumbnails: bool = True,
     ):
@@ -247,7 +247,7 @@ class MediaDataset(torch_data.IterableDataset):
         self._transforms = (
             transforms
             if transforms is not None
-            else [IdentityTransform for _ in range(len(self._output_stream_opts))]
+            else [IdentityTransform for _ in range(len(output_stream_opts))]
         )
 
         self._segment_length = validate_segment_lengths_from_options(output_stream_opts)
@@ -271,7 +271,7 @@ class MediaDataset(torch_data.IterableDataset):
         # verify if length of output_stream_opts and transform matches up
         assert len(self._transforms) == len(self._output_stream_opts)
 
-    def _get_media_iterator(self, id_list: List[Union[str, int]]) -> Generator[Tuple[str | int, Dict[MediaChunkType, MediaChunk | None]], Any, None]:
+    def _get_media_iterator(self, id_list: List[Union[str, int]]) -> Generator[Tuple[str | int, Dict[MediaChunkType,  MediaChunk | None | Dict[str, MediaChunk | None]]], Any, None]:
         for _id in id_list:
             path = self._filelist[_id]
             try:
@@ -291,7 +291,7 @@ class MediaDataset(torch_data.IterableDataset):
 
                 for c in reader.stream():
                     # Might contain 1 or many output streams. Apply the corresponding transform
-                    media_chunks = {}
+                    media_chunks: Dict[MediaChunkType,  Dict[str, MediaChunk | None]] = {}
                     for (stream_chunk, stream_transform, media_chunk_type) in zip(
                             c, stream_transforms, media_chunk_types
                         ):
@@ -308,7 +308,7 @@ class MediaDataset(torch_data.IterableDataset):
                                     else None
                                 )
                         else:
-                            # thumbnails
+                            # thumbnails / identity transform
                             media_chunks[media_chunk_type] = (
                                 MediaChunk(
                                     tensor=stream_transform(torch.Tensor(stream_chunk)),
@@ -322,7 +322,7 @@ class MediaDataset(torch_data.IterableDataset):
             except Exception:
                 logger.exception(f'Exception when processing "{_id}: {path}"')
 
-    def __iter__(self) -> Generator[Tuple[str | int, Dict[MediaChunkType, MediaChunk | None]], Any, None]:
+    def __iter__(self) -> Generator[Tuple[str | int, Dict[MediaChunkType,  MediaChunk | None | Dict[str, MediaChunk | None]]], Any, None]:
         """
         Creates the iterator used by the dataloader
 
@@ -367,7 +367,7 @@ class AudioDataset(MediaDataset):
                 sample_rate=sample_rate,
             )
         ]
-        transforms = [preprocessing_function]
+        transforms = [preprocessing_function] if preprocessing_function else None
         super(AudioDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,
@@ -395,7 +395,7 @@ class VideoDataset(MediaDataset):
                 frames_per_chunk=frames_per_chunk, frame_rate=frame_rate
             )
         ]
-        transforms = [preprocessing_function]
+        transforms = [preprocessing_function] if preprocessing_function else None
         super(VideoDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,
@@ -418,7 +418,7 @@ class ImageDataset(MediaDataset):
         stream_opts = [
             BasicImageStreamOutputOptions(frames_per_chunk=1)
         ]
-        transforms = [preprocessing_function]
+        transforms = [preprocessing_function] if preprocessing_function else None
         super(ImageDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,
@@ -460,17 +460,17 @@ class AVDataset(MediaDataset):
         ]
 
         transforms = [{}, {}]
-        for feature_extractor_id in video_preprocessing_function_map:
-            if video_preprocessing_function_map is None:
-                transforms[0][feature_extractor_id] = IdentityTransform
-            else:
-                transforms[0][feature_extractor_id] = video_preprocessing_function_map[feature_extractor_id]
-        for feature_extractor_id in audio_preprocessing_function_map:
-            if audio_preprocessing_function_map is None:
-                transforms[1][feature_extractor_id] = IdentityTransform
-            else:
-                transforms[1][feature_extractor_id] = audio_preprocessing_function_map[feature_extractor_id]
+        if video_preprocessing_function_map is None:
+            transforms[0] = IdentityTransform
+        else:
+            transforms[0] = video_preprocessing_function_map
 
+        
+        if audio_preprocessing_function_map is None:
+            transforms[1] = IdentityTransform
+        else:
+            transforms[1] = audio_preprocessing_function_map
+            
         super(AVDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,

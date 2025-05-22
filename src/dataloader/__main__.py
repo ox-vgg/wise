@@ -103,6 +103,7 @@ def run(
        "ViT-B-32:openai", help="Pass in a open_clip model string (or) internvideo"
     ),
     thumbnails: bool = typer.Option(True, help="Flag to control thumbnail extraction"),
+    num_workers: int | None = typer.Option(None, help='number of data loading workers'),
 ):
     """
     Dummy CLI to test the dataloader
@@ -144,7 +145,7 @@ def run(
 
         "audio_samples_per_chunk": audio_frames_per_chunk,
         "audio_sampling_rate": audio_sampling_rate,
-        "audio_preprocessing_function_map": {},
+        "audio_preprocessing_function_map": None,
 
         "image_preprocessing_function_map": { model: preprocess },
 
@@ -160,11 +161,13 @@ def run(
     metadata, _ = get_metadata_for_valid_files(input_files)
     stream = torch_data.ChainDataset(get_dataset(metadata, params))
     # Construct the dataloader
-    loader = torch_data.DataLoader(stream, batch_size=None, num_workers=0)
+    loader = torch_data.DataLoader(stream, batch_size=None, num_workers=num_workers)
     logger.info(f"Iterating over {len(metadata)} file(s)")
     for mid, chunks in tqdm(loader):
         for media_chunk_type, chunk in chunks.items():
-            if media_chunk_type == "video" or media_chunk_type == "audio" or media_chunk_type == "image":
+            if chunk is None:
+                continue
+            if isinstance(chunk, dict):
                 for feature_extractor_id in chunk:
                     if chunk[model] is None:
                         continue # end of stream indicator
@@ -174,9 +177,7 @@ def run(
                             chunk[feature_extractor_id].pts
                         )
                     }])
-            if media_chunk_type == "thumbnails":
-                if chunk is None:
-                    continue # end of stream indicator
+            else:
                 logger.debug([{
                     media_chunk_type: (
                         f"List length: {len(chunk.tensor)} | Shapes: {[t.shape for t in chunk.tensor]}" if isinstance(chunk.tensor, list) else chunk.tensor.shape,

@@ -30,7 +30,7 @@ class MediaChunkType(str, enum.Enum):
 @dataclasses.dataclass
 class BaseStreamOutputOptions(object):
     frames_per_chunk: int
-    buffer_chunk_size: int = 3
+    buffer_chunk_size: int = -1
     stream_index: Optional[int] = None
 
 
@@ -148,7 +148,7 @@ def _update_video_info(streamer: StreamReader, video_stream_info):
     if n_images is None:
         logger.debug("Guessing n_images")
         # Guess from duration and fps
-        streamer.add_basic_video_stream(1)
+        streamer.add_basic_video_stream(1, -1)
 
         if duration != 0 and fps is not None:
             n_images = math.floor(duration * fps)
