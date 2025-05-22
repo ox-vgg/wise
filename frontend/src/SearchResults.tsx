@@ -163,25 +163,11 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
             }
             <i style={{paddingBottom: `${height/width*100}%`}}></i>
             <a onClick={() => setImageDetails(searchResult)}>
-              {
-                (searchResult.mediaType == 'IMAGE') ?
-                  <StillImageView
-                    imageDetails={searchResult}
-                    isModalView={false}
-                    handleInternalSearchButtonClick={handleInternalSearchButtonClick}
-                  />
-                :
-                  <video src={searchResult.link}
-                      poster={searchResult.thumbnail}
-                      // title={searchResult.distance ? `Distance = ${searchResult.distance.toFixed(2)}` : ''}
-                      playsInline
-                      muted
-                      preload="none"
-                      className="wise-video-preview"
-                      onMouseEnter={(e) => e.currentTarget.play()}
-                      onMouseLeave={(e) => e.currentTarget.load()}
-                  />
-              }
+              <StillImageView
+                imageDetails={searchResult}
+                isModalView={false}
+                handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+              />
             </a>
             <div className="wise-image-hover-display">{title}</div>
             {/* <SensitiveImageWarning isSensitive={searchResult.is_nsfw || false} /> */}
