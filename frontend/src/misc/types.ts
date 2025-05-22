@@ -17,10 +17,9 @@ export type Query = {
   id: string;
   type: 'INTERNAL_IMAGE';
   displayText: string;
-  value: ProcessedImageVector | ProcessedVideoSegment;
+  value: ProcessedVectorInfo;
   isNegative?: boolean;
 };
-
 
 
 type MediaInfo = {
@@ -35,7 +34,6 @@ type MediaInfo = {
   external_metadata: Record<string, any>;
 };
 export type ImageInfo = MediaInfo & {};
-export type AudioInfo = MediaInfo & {};
 export type VideoInfo = MediaInfo & {
   timeline_hover_thumbnails: string;
 };
@@ -49,30 +47,33 @@ type BBoxXYWH = {
   h: number;
 };
 
-type VectorResult = {
+export type VectorInfo = {
   vector_id: string;
   media_id: string;
   link: string;
-  distance: number;
-  bbox?: BBoxXYWH;
-};
-type ImageVector = VectorResult & {
   thumbnail: string;
+  bbox?: BBoxXYWH;
+  related_vectors?: ProcessedVectorInfo[];  // fetched by request only
 };
-type MediaSegment = VectorResult & {
+
+// The backend VectorInfo does not come with the related MediaInfo, it
+// is added when the backend response is processed.  mediaInfo will
+// actually then be one of the Processed*Info types, all of which are
+// derived from MediaInfo (see the Processed*Info types below).
+export type ProcessedVectorInfo = VectorInfo & {
+  mediaInfo: MediaInfo;
+};
+
+type VectorResult = VectorInfo & {
+  distance: number;
+};
+
+type ImageVector = VectorResult;
+export type VideoSegment = VectorResult & {
   ts: number;
   te: number;
 };
-export type AudioSegment = MediaSegment & {};
-export type VideoSegment = MediaSegment & {
-  thumbnail: string;
-};
 
-export type AudioResults = {
-  total: number;
-  unmerged_windows: AudioSegment[];
-  audios: Record<string, AudioInfo>;
-};
 export type VideoAudioResults = {
   total: number;
   unmerged_windows: VideoSegment[];
@@ -92,26 +93,33 @@ export type ImageResults = {
 };
 export type SearchResponse = {
   time: number;
-  audio_results?: AudioResults;
   video_audio_results?: VideoAudioResults;
   video_results?: VideoResults;
   image_results?: ImageResults;
 };
 
-// TODO update everything below
+// The Processed* vectors types have the corresponding Processed*Info
+// as an attribute which has the related Processed* vectors/shots as
+// an attribute themselves.  This introduces a circular reference but
+// enables jumping from vector to media easily which is only used for
+// the "Videos" view.
+//
+// ProcessedImageInfo.vectors and ProcessedSearchResults.Image.vectors
+// attributes are unused but they provide a nice symmetry to the video
+// shots.
 export type ProcessedImageVector = ImageVector & {
   mediaType: 'IMAGE';
   mediaInfo: ProcessedImageInfo;
 };
 export type ProcessedImageInfo = ImageInfo & {
-  vectors: ImageVector[] | ProcessedImageVector[];
+  vectors: ProcessedImageVector[];
 };
 export type ProcessedVideoSegment = VideoSegment & {
   mediaType: 'VIDEO';
   mediaInfo: ProcessedVideoInfo;
 };
 export type ProcessedVideoInfo = VideoInfo & {
-  shots: VideoSegment[] | ProcessedVideoSegment[];
+  shots: ProcessedVideoSegment[];
 };
 export type ProcessedSearchResults = {
   Image: {
@@ -124,11 +132,6 @@ export type ProcessedSearchResults = {
     mediaInfo: Map<string, ProcessedVideoInfo>;
   };
   VideoAudio: {
-    unmerged_windows: ProcessedVideoSegment[];
-    merged_windows: ProcessedVideoSegment[];
-    mediaInfo: Map<string, ProcessedVideoInfo>;
-  };
-  Audio: {
     unmerged_windows: ProcessedVideoSegment[];
     merged_windows: ProcessedVideoSegment[];
     mediaInfo: Map<string, ProcessedVideoInfo>;
@@ -149,6 +152,7 @@ export interface DataServiceOutput {
   performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => Promise<void>;
   fetchFeaturedImagesAndSetState: () => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
+  fillRelatedVectors: (imageDetails: ProcessedImageVector) => Promise<ProcessedImageVector>;
 };
 
 export interface ProjectInfo {
@@ -249,7 +253,7 @@ export interface ImageDetailsModalProps {
   imageDetails: ProcessedImageVector | ProcessedVideoSegment;
   setImageDetails: (x?: ProcessedImageVector | ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
-  handleInternalSearchButtonClick: (vector_id: string) => void;
+  handleInternalSearchButtonClick: (vector: ProcessedVectorInfo) => void;
 };
 
 export interface ReportImageModalProps {
@@ -267,7 +271,9 @@ export interface VideoOccurrencesViewProps {
 };
 
 export interface StillImageViewProps {
-  imageDetails: ProcessedImageVector;
+  imageDetails: ProcessedVectorInfo;
   isModalView: boolean;
-  handleInternalSearchButtonClick: (vector_id: string) => void;
+  // If handleInternalSearchButtonClick is missing, the "Find Similar"
+  // button is omitted.
+  handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;
 };

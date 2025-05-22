@@ -49,6 +49,7 @@ from src.repository import (
     get_media_counts_by_media_type,
     get_project_total_duration,
     get_thumbnail_by_timestamp,
+    get_related_vectors_rows,
 )
 from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollectionType, VectorAndMediaMetadata
 from src.enums import IndexType
@@ -453,10 +454,6 @@ def _get_search_router(config: APIConfig):
     class ImageInfo(MediaInfo):
         pass
 
-    # A subclass of MediaInfo for pure audio files
-    class AudioInfo(MediaInfo):
-        pass
-
     # A subclass of MediaInfo for videos
     class VideoInfo(MediaInfo):
         timeline_hover_thumbnails: str
@@ -472,20 +469,12 @@ def _get_search_router(config: APIConfig):
         def round_bbox(cls, v):
             return round(v, config.precision)
 
-    class VectorResult(BaseModel):
+    class VectorInfo(BaseModel):
         vector_id: str
         media_id: str
         link: str
-        distance: float
-
-        @field_validator("distance")
-        @classmethod
-        def round_distance(cls, v):
-            return round(v, config.precision)
-
-    class ImageVector(VectorResult):
         thumbnail: str
-        bbox: Optional[BBoxXYWH]
+        bbox: Optional[BBoxXYWH] = None
 
         @field_validator("bbox", mode="before")
         @classmethod
@@ -495,23 +484,20 @@ def _get_search_router(config: APIConfig):
             else:  # v is the NamedTuple in feature_extractor module
                 return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
 
-    # An audio or video segment
-    class MediaSegment(VectorResult):
-        ts: float
-        te: float
+    class VectorResult(VectorInfo):
+        distance: float
 
-    # A subclass of MediaSegment for pure audio files
-    class AudioSegment(MediaSegment):
+        @field_validator("distance")
+        @classmethod
+        def round_distance(cls, v):
+            return round(v, config.precision)
+
+    class ImageVector(VectorResult):
         pass
 
-    # A subclass of MediaSegment for videos
-    class VideoSegment(MediaSegment):
-        thumbnail: str
-
-    class AudioResults(BaseModel):
-        total: int # maximum number of audio results that can be returned
-        unmerged_windows: List[AudioSegment] # e.g. 7-second windows
-        audios: Dict[str, AudioInfo]
+    class VideoSegment(VectorResult):
+        ts: float
+        te: float
 
     class VideoAudioResults(BaseModel):
         total: int # maximum number of unmerged_windows that can be returned
@@ -532,7 +518,6 @@ def _get_search_router(config: APIConfig):
 
     class SearchResponse(BaseModel):
         time: float # backend search time in seconds
-        audio_results: Optional[AudioResults] # search results from pure audio files
         video_audio_results: Optional[VideoAudioResults] # search results from audio stream of video files
         video_results: Optional[VideoResults] # search results from video stream of video files
         image_results: Optional[ImageResults] # search results from image files
@@ -729,7 +714,6 @@ def _get_search_router(config: APIConfig):
     ):
         all_metadata = get_metadata_fn(top_ids)
         all_ext_metadata = get_ext_metadata_fn(top_ids)
-        audio_results = None
         video_audio_results = None
         video_results = None
         image_results = None
@@ -757,7 +741,6 @@ def _get_search_router(config: APIConfig):
 
         return SearchResponse(
             time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
-            audio_results=audio_results,
             video_audio_results=video_audio_results,
             video_results=video_results,
             image_results=image_results,
@@ -1196,6 +1179,42 @@ def _get_search_router(config: APIConfig):
             )
 
         return response
+
+
+    @router.get(
+        "/related-vectors/{_vector_id}",
+        response_model=list[VectorInfo],
+        responses={200: {"content": "application/json"}},
+    )
+    def get_related_vectors(_vector_id: int):
+        with project_engine.connect() as conn:
+            related_rows = list(get_related_vectors_rows(conn, _vector_id))
+            if not related_rows:
+                vectors_ext_metadata = []
+            else:
+                feature_extractor = search_indices[related_rows[0].modality][
+                    related_rows[0].feature_extractor_id
+                ].feature_extractor
+
+                vectors_ext_metadata = (
+                    feature_extractor.get_vector_metadata(
+                        conn, [v.id for v in related_rows]
+                    )
+                )
+
+        vectors_info = []
+        for row, extm in zip(related_rows, vectors_ext_metadata):
+            vectors_info.append(
+                VectorInfo(
+                    vector_id=str(row.id),
+                    media_id=str(row.media_id),
+                    link=f"media/{row.media_id}#t={row.timestamp},{row.end_timestamp}",
+                    thumbnail=f"thumbnail?media_id={row.media_id}&timestamp={row.timestamp}",
+                    bbox=extm.bbox,
+                )
+            )
+        return vectors_info
+
 
     @router.post("/search", response_model=SearchResponse)
     @add_response_time

@@ -7,6 +7,7 @@ import { nanoid } from 'nanoid'
 import './WiseHeader.scss';
 import { WiseLogo } from './misc/logo.tsx';
 import config from './config.ts';
+import StillImageView from './misc/StillImageView.tsx';
 import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query, ProcessedSearchResults } from './misc/types.ts';
 
 // TODO
@@ -519,8 +520,20 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     } else if (query.type === 'AUDIO_URL') {
       return <Popover content={<audio controls src={query.value} />} key={query.id} title="Online audio file">{tag}</Popover>
     } else if (query.type === 'INTERNAL_IMAGE') {
-      const thumbnail = <img src={query.value.thumbnail} />;
-      return <Popover content={thumbnail} key={query.id} title="Internal image" overlayClassName="wise-search-image-preview">{tag}</Popover>
+      return (
+        <Popover
+          content={
+            <div className='wise-image-wrapper'>
+              <StillImageView imageDetails={query.value} isModalView={false} />
+            </div>
+          }
+          key={query.id}
+          title="Internal image"
+          overlayClassName="wise-search-image-preview"
+        >
+          {tag}
+        </Popover>
+      );
     } else if (query.type === 'TEXT') {
       return <Tooltip title="Text query">{tag}</Tooltip>
     }

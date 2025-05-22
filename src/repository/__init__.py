@@ -206,3 +206,23 @@ def get_media_counts_by_media_type(conn: sa.Connection) -> dict[MediaType, int]:
 #     result = conn.execute(stmt)
 
 #     return [row[0] for row in result]
+
+
+def get_related_vectors_rows(conn: sa.Connection, vid: int):
+    """Get all other vectors for same image/timestamp, modality, and feature extractor.
+    """
+    subq = sa.select(_vtable).where(_vtable.c.id == vid).subquery()
+    stmt = (
+        sa.select(_vtable)
+        .join(
+            subq,
+            (
+                (_vtable.c.media_id == subq.c.media_id)
+                & (_vtable.c.timestamp == subq.c.timestamp)
+                & (_vtable.c.modality == subq.c.modality)
+                & (_vtable.c.feature_extractor_id == subq.c.feature_extractor_id)
+            )
+        )
+        .where(_vtable.c.id != vid)
+    )
+    return conn.execute(stmt)

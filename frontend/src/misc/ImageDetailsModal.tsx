@@ -8,7 +8,7 @@ import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vi
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
 import "./ImageDetailsModal.scss";
-import { ImageDetailsModalProps, ProcessedVideoSegment } from "./types";
+import { ImageDetailsModalProps, ProcessedVideoSegment, ProcessedVectorInfo } from "./types";
 import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 
@@ -74,8 +74,8 @@ const ImageDetailsModal = ({
     }
   }
 
-  const doInternalSearchAndCloseDialog = (vector_id: string) => {
-    handleInternalSearchButtonClick(vector_id);
+  const doInternalSearchAndCloseDialog = (vector: ProcessedVectorInfo) => {
+    handleInternalSearchButtonClick(vector);
     setIsModalOpen(false);
   }
 

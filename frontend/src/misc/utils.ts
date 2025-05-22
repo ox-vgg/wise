@@ -25,3 +25,22 @@ export const chunk = (arr: any[], chunkSize: number) => {
 export const getArrayOfEmptyArrays = (length: number): any[][] => {
   return Array.from(Array(Math.ceil(length))).map(_ => [])
 }
+
+export const interleaveArrayWithElement = <T>(elems: T[], divider: T): T[] => {
+  const divided_elems = [];
+  for (let i = 0; i < ((elems.length *2) -1); i++) {
+    if ((i % 2) == 0)
+      divided_elems.push(elems[i/2]);
+    else
+      divided_elems.push(divider);
+    }
+  return divided_elems;
+}
+
+
+// This incantation removes an object property that may not exist
+// without triggering TypeScript TS2339.
+export const excludeKey = <T extends object, U extends keyof any>(obj: T, key: U) => {
+  const { [key]: _, ...newObj } = obj;
+  return newObj;
+}

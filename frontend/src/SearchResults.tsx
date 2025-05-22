@@ -4,11 +4,12 @@ import { AppstoreOutlined, BarsOutlined, FlagFilled, LoadingOutlined, MinusCircl
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
-import { ProcessedImageVector, ProcessedVideoSegment, SearchResultsProps } from './misc/types.ts';
+import { ProcessedImageVector, ProcessedVectorInfo, ProcessedVideoSegment, SearchResultsProps } from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
 // import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
 import StillImageView from "./misc/StillImageView.tsx";
+import { excludeKey } from "./misc/utils.ts";
 import VideoOccurrencesView from './misc/VideoOccurrencesView.tsx';
 // import config from './config.ts';
 
@@ -68,19 +69,28 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     }
   }
 
-  const handleInternalSearchButtonClick = (imageId: string) => {
+  const handleInternalSearchButtonClick = (vector: ProcessedVectorInfo) => {
     setSearchText('');
-    const vector = searchResults.Image.vectors.find(v => v.vector_id === imageId);
-    if (!vector) {
-      console.error(`Could not find vector with id ${imageId}`)
-      return;
-    }
-    setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector }]);
+    // If this was a search result, vector comes with the distance
+    // property.  We remove the distance property so it is no longer
+    // identified as a result and it doesn't show up on WiseHeader.
+    const vectorInfo = excludeKey(vector, "distance");
+    setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vectorInfo }]);
     setIsSubmitSearch(true);
   }
 
-  const [imageDetails, setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
-  
+  // setImageDetails is called when the user selects an image/video
+  // for view on the modal dialog.  Only at that point, do we fetch
+  // info about related vectors (other vectors for the same image or
+  // timestamp).
+  const [imageDetails, _setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
+  const setImageDetails = (d: ProcessedVideoSegment | ProcessedImageVector | undefined) => {
+    if (d && d.mediaType === "IMAGE" && ! d.related_vectors)
+      dataService.fillRelatedVectors(d).then(x => _setImageDetails(x));
+    else
+      _setImageDetails(d);
+  };
+
   let searchResultsHTML;
   let totalResultsCount;
   if (viewModality == 'Image' || viewMode == 'UnmergedSegments' || viewMode == 'Segments') {
@@ -133,7 +143,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
               <>
                 <Tooltip title="Find visually similar images">
                   <img src="internal_search_icon.png" className="wise-internal-image-search-button"
-                        onClick={() => handleInternalSearchButtonClick(searchResult.vector_id)} />
+                        onClick={() => handleInternalSearchButtonClick(searchResult)} />
                 </Tooltip>
                 <Tooltip title="More options">
                   <Dropdown menu={{
@@ -195,7 +205,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   
       return (
         <div className="wise-video-wrapper" key={videoId}
-            onClick={() => setImageDetails(topMatch as ProcessedVideoSegment)}
+            onClick={() => setImageDetails(topMatch)}
             onMouseEnter={(e) => e.currentTarget.querySelector('video')?.play()}
             onMouseLeave={(e) => e.currentTarget.querySelector('video')?.load()}
         >

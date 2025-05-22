@@ -3,7 +3,7 @@ import { Button, Collapse } from "antd";
 import { CaretRightOutlined, LeftOutlined, RightOutlined, StarFilled } from "@ant-design/icons";
 
 import './VideoOccurrencesView.scss';
-import { ProcessedVideoSegment, VideoOccurrencesViewProps } from "./types";
+import { VideoOccurrencesViewProps } from "./types";
 
 const secondsToMinSecPadded = (time: number) => {
   const minutes = Math.floor(time / 60);
@@ -22,7 +22,7 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
   });
   
   const occurrencesHTML = occurrences.map(searchResult => {
-    return <div className="wise-occurrence" onClick={() => handleClickOccurrence(searchResult as ProcessedVideoSegment)} key={searchResult.vector_id}>
+    return <div className="wise-occurrence" onClick={() => handleClickOccurrence(searchResult)} key={searchResult.vector_id}>
       <img
         src={searchResult.thumbnail}
         title={searchResult.distance ? `Distance = ${searchResult.distance.toFixed(2)}` : ''}
