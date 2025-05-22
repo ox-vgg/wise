@@ -1148,26 +1148,44 @@ def _get_search_router(config: APIConfig):
 
         return wrapper
 
-    # Create a random array of featured images (1 per video)
+    # Generate a list of random featured images for each modality and feature extractor
+    ids: dict[str: dict[str: list[int]]] = {}
     with project_engine.connect() as conn:
-        ids = get_featured_images(conn)
+        for modality in search_indices:
+            ids[modality] = {}
+            for feature_extractor_id in search_indices[modality]:
+                this_ids = get_featured_images(
+                    conn, modality, feature_extractor_id
+                )
 
-        # Select a random subset of up to 10000 image ids (for performance reasons)
-        default_rng(seed=42).shuffle(ids)
-        ids = ids[:10000]
+                # Select a random subset of up to 10000 image ids (for performance reasons)
+                default_rng(seed=42).shuffle(this_ids)
+                ids[modality][feature_extractor_id] = this_ids[:10000]
+                del this_ids
 
     @router.get("/featured", response_model=SearchResponse)
     @add_response_time
     async def handle_get_featured(
+        # The "media type" used for "featured_in" does not actually
+        # refer to the media_type in the database.  It is actually
+        # closer, but not the same, to the frontend viewModality but
+        # we use MediaType because it uses a subset of its keys.  This
+        # is just a convenience to get the values checked.
+        featured_in: MediaType = Query(),
+        feature_extractor_id: str = Query(),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbnails_to_send: int = Query(0),
         # This seed is used to randomly select the set of images used for the featured images
         random_seed: int = Query(123),
     ):
+        if featured_in == MediaType.AV:
+            modality = ModalityType.AUDIO
+        else:
+            modality = ModalityType(featured_in)
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
-            selected_ids = ids.copy()
+            selected_ids = ids[modality][feature_extractor_id].copy()
             default_rng(seed=random_seed).shuffle(selected_ids)
             selected_ids = selected_ids[:1000]
 
@@ -1176,11 +1194,10 @@ def _get_search_router(config: APIConfig):
 
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
 
-            ## Return no Ext metadata for the featured images, since at
-            ## this stage we haven't actually made any search we are
-            ## just showing a sample of the media we have.
-            _get_ext_metadata = lambda x: [FeatureExtMetadata()] * len(x)
-
+            search_index = search_indices[modality][feature_extractor_id]
+            _get_ext_metadata = functools.partial(
+                search_index.feature_extractor.get_vector_metadata, conn
+            )
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_search_response(
                 top_dist=dist[start:end],

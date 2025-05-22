@@ -174,11 +174,25 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
   } as ProcessedSearchResponse;
 };
 
-const fetchFeaturedImages = (pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
+const viewModalityToSearchInType = {
+  'Image': 'image',
+  'Video': 'video',
+  'VideoAudio': 'av',
+  'Audio': 'audio',
+};
+
+const fetchFeaturedImages = (
+  viewModality: keyof ProcessedSearchResults,
+  featureExtractorId: string,
+  pageStart: number,
+  pageEnd: number
+): Promise<ProcessedSearchResponse> => {
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(MAX_FEATURED_IMAGES, pageEnd*config.PAGE_SIZE);
 
   const urlParams = new URLSearchParams([
+    ['featured_in', viewModalityToSearchInType[viewModality]],
+    ['feature_extractor_id', featureExtractorId],
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
@@ -250,7 +264,7 @@ const fetchRelatedVectors = (vector_id: string): Promise<VectorInfo[]> => {
 }
 
 
-const fetchSearchResults = (queries: Query[], viewModality: string, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
+const fetchSearchResults = (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
@@ -263,16 +277,11 @@ const fetchSearchResults = (queries: Query[], viewModality: string, featureExtra
     formData = convertQueriesToFormData(otherQueries);
   }
 
-  let searchIn = 'undefined';
-  if (viewModality == 'Image') searchIn = 'image';
-  else if (viewModality == 'Video') searchIn = 'video';
-  else if (viewModality == 'VideoAudio') searchIn = 'av';
-
   const urlParams = new URLSearchParams([
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
-    ['search_in', searchIn],
+    ['search_in', viewModalityToSearchInType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
@@ -335,8 +344,12 @@ export const useDataService = (): DataServiceOutput => {
   });
 
   // Get featured images to display on home page
-  const fetchFeaturedImagesAndSetState = () => {
-    return fetchFeaturedImages(0, config.NUM_PAGES_PER_REQUEST).then((_searchResponse: ProcessedSearchResponse) => {
+  const fetchFeaturedImagesAndSetState = (
+    viewModality: keyof ProcessedSearchResults, featureExtractorId: string
+  ) => {
+    return fetchFeaturedImages(
+      viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST
+    ).then((_searchResponse: ProcessedSearchResponse) => {
       setSearchingState({
         queries: [],
         isFeaturedImages: true,
@@ -399,7 +412,7 @@ export const useDataService = (): DataServiceOutput => {
 
 
   // Get results for a new search query
-  const performNewSearch = async (queries: Query[], viewModality: string, featureExtractorId: string) => {
+  const performNewSearch = async (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => {
     setSearchingState((_searchingState) => ({
       ..._searchingState,
       isLoadingNewSearch: true

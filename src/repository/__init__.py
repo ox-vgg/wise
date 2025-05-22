@@ -140,7 +140,9 @@ def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp:
     result = conn.execute(stmt)
     return result.scalar()
 
-def get_featured_images(conn: sa.Connection) -> List[int]:
+def get_featured_images(
+    conn: sa.Connection, modality: ModalityType, feature_extractor_id: str
+) -> List[int]:
     """
     Get a set of featured images to be shown on the frontend.
     Returns a list of vector ids of the 4th second from each video.
@@ -149,25 +151,33 @@ def get_featured_images(conn: sa.Connection) -> List[int]:
     ----------
     conn : sqlalchemy.Connection
         Database connection for the internal metadata database
-    
+
+    modality: ModalityType
+        Modality to which to limit the search.
+
+    feature_extractor_id: string
+        Feature extractor id to which to limit the search.
+
     Returns
     -------
     list of int
         List of vector ids from the 4th second from each video
     """
+    where_clause = sa.and_(
+        _vtable.c.modality == modality,
+        _vtable.c.feature_extractor_id == feature_extractor_id
+    )
+    if modality != ModalityType.IMAGE:
+        # Get the vector id from the 4th second of each video (non-image)
+        where_clause = sa.and_(
+            where_clause,
+            _vtable.c.timestamp >= 4,
+            _vtable.c.timestamp < 4.5,
+        )
+
     stmt = (
         sa.select(_vtable.c.id)
-        .select_from(_vtable.join(_mtable))
-        .where(
-            (
-                # Get the vector id from the 4th second of each video (non-image)
-                (_vtable.c.modality != ModalityType.IMAGE) &
-                (_vtable.c.timestamp >= 4) &
-                (_vtable.c.timestamp < 4.5)
-            ) | 
-            # Ignore timestamp if modality type is image
-            (_vtable.c.modality == ModalityType.IMAGE)
-        )
+        .where(where_clause)
     )
     return conn.execute(stmt).scalars().all()
 
