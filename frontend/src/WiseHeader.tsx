@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
 import { Alert, Button, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
-import { CaretRightOutlined, CloseOutlined, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone} from '@ant-design/icons';
+import { CaretRightOutlined, CloseOutlined, FileTextTwoTone, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone} from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
@@ -415,7 +415,14 @@ const VIEW_MODALITY_OPTIONS = {
     value: 'VideoAudio',
   },
 } as const;
-
+const VIEW_MODALITY_OPTIONS_EXTRA = {
+  "video:wise/metadata": {
+    icon: <FileTextTwoTone />,
+    label: 'Metadata',
+    longLabel: 'Media Metadata',
+    value: 'video:wise/metadata',
+  }
+}
 type ViewModalityKey = keyof typeof VIEW_MODALITY_OPTIONS;
 
 
@@ -555,35 +562,39 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                 size="large"
                 variant="borderless"
                 className="wise-view-modality-select"
-                value={ {'Image': 'image', 'Video': 'video', 'Audio': 'audio', 'VideoAudio': 'audio'}[viewModality] + ':' + featureExtractorId }
+                value={{ 'Image': 'image', 'Video': 'video', 'Audio': 'audio', 'VideoAudio': 'audio' }[viewModality] + ':' + featureExtractorId}
                 onChange={handleSearchTargetChange}
                 options={
                   projectInfo.search_targets
-                  ? ['image', 'video', 'audio']
-                    .filter((media_type) => projectInfo.search_targets && Object.keys(projectInfo.search_targets).includes(media_type))
-                    .map((media_type) => {
-                      const key = media_type as ViewModalityKey;
-                      return ({
-                        label: (
-                          <Space>
-                            {VIEW_MODALITY_OPTIONS[key]?.icon}
-                            {VIEW_MODALITY_OPTIONS[key].longLabel}
-                          </Space>
-                        ),
-                        title: media_type.charAt(0).toUpperCase() + media_type.slice(1),
-                        options: (projectInfo.search_targets?.[key] || []).map((feature_extractor_id: string) => ({
-                          ...VIEW_MODALITY_OPTIONS[key],
+                    ? ['image', 'video', 'audio']
+                      .filter((media_type) => projectInfo.search_targets && Object.keys(projectInfo.search_targets).includes(media_type))
+                      .map((media_type) => {
+                        const key = media_type as ViewModalityKey;
+                        return ({
                           label: (
                             <Space>
                               {VIEW_MODALITY_OPTIONS[key]?.icon}
-                              {feature_extractor_id.split('/')[1]}
+                              {VIEW_MODALITY_OPTIONS[key].longLabel}
                             </Space>
                           ),
-                          value: media_type + ':' + feature_extractor_id,
-                        })),
+                          title: media_type.charAt(0).toUpperCase() + media_type.slice(1),
+                          options: (projectInfo.search_targets?.[key] || []).map((feature_extractor_id: string) => {
+                            const extra_key = `${media_type}:${feature_extractor_id}` as keyof typeof VIEW_MODALITY_OPTIONS_EXTRA;
+                            const default_label = feature_extractor_id.split('/')[1];
+                            return {
+                              ...VIEW_MODALITY_OPTIONS[key],
+                              label: (
+                                <Space>
+                                  {VIEW_MODALITY_OPTIONS_EXTRA[extra_key]?.icon || VIEW_MODALITY_OPTIONS[key]?.icon}
+                                  {VIEW_MODALITY_OPTIONS_EXTRA[extra_key]?.label || default_label}
+                                </Space>
+                              ),
+                              value: extra_key,
+                            }
+                          }),
+                        })
                       })
-                    })
-                  : []
+                    : []
                 }
                 popupMatchSelectWidth={false}
               />

@@ -236,19 +236,22 @@ const ImageDetailsModal = ({
           <span>{imageDetails?.mediaInfo.filename}</span>
         </p>
       </div>
-      <div>
-        <p>
-          <b>Transcript</b>
-        </p>
-        <List
-          size="small"
-          bordered
-          dataSource={imageDetails?.mediaType == 'VIDEO' && imageDetails.mediaInfo.asrSegments || []}
-          renderItem={(item) => <List.Item onClick={() => handleTranscriptItemClick(item)}>
-            <span className="wise-asr-timestamp">{secondsToMinSecPadded(item.start)}</span> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.text || '') }} />
-          </List.Item>}
-        />
-      </div>
+      {
+        (imageDetails?.mediaType == 'VIDEO' && imageDetails.mediaInfo.asrSegments?.length) &&
+        <div>
+          <p>
+            <b>Transcript</b>
+          </p>
+          <List
+            size="small"
+            bordered
+            dataSource={imageDetails?.mediaType == 'VIDEO' && imageDetails.mediaInfo.asrSegments || []}
+            renderItem={(item) => <List.Item onClick={() => handleTranscriptItemClick(item)}>
+              <span className="wise-asr-timestamp">{secondsToMinSecPadded(item.start)}</span> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.text || '') }} />
+            </List.Item>}
+          />
+        </div> || <></>
+      }
 
 
 
