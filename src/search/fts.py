@@ -1,14 +1,19 @@
 import bisect
+from collections import defaultdict
 import itertools
 import functools
+import json
 import logging
 from typing import Literal, Annotated
 
 from src import db
 from src.data_models import VectorAndMediaMetadata, ModalityType
+from src.wise_project import WiseProject
 
 from pydantic import Field, RootModel
 import sqlalchemy as sa
+from sqlalchemy.ext import compiler
+from sqlalchemy.schema import DDLElement
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +151,132 @@ def get_join_onclause(
         ],
     )
 
+def parse_fts_config(fts_config: dict):
+    # generates a mapping from old name to new name and vice-versa
+    column2fts = defaultdict(dict)
+    fts2column = defaultdict(dict)
+    for table, fts_cols in fts_config.items():
+        for c in fts_cols:
+            if ':' in c:
+                old_name, new_name = c.split(":", 1)
+            else:
+                old_name, new_name = c, c
+            
+            column2fts[table][old_name] = new_name
+            fts2column[table][new_name] = old_name
+    
+    return column2fts, fts2column
+
+def get_metadata_selectable_from_fts5_config(
+    extra_metadata_tables: dict[str, sa.Table], fts_config: dict
+):
+    """
+    Provide an fts_config object with the metadata tables as keys and a list of columns as values
+    """
+    media_table = db.media_table
+    if len(extra_metadata_tables) == 0:
+        raise ValueError("No metadata tables found")
+    # Based on the config, create a view and fts5 table pair
+    from_clause = media_table
+    columns = []
+    cols2fts, _ = parse_fts_config(fts_config)
+    for name, col2fts_map in cols2fts.items():
+        m = extra_metadata_tables[name]
+        from_clause = from_clause.join(
+            m, m.c["media_id"] == media_table.c.id, isouter=True
+        )
+        mcols = [ m.c[old_name].label(new_name) for old_name, new_name in col2fts_map.items() ]
+        columns.extend(mcols)
+
+    if len(columns) == 0:
+        raise ValueError(
+            "No valid columns found in the metadata tables for building fts5 index"
+        )
+
+    return sa.select(media_table.c.id, *columns).select_from(from_clause)
+
+
+class CreateView(DDLElement):
+    def __init__(self, name, selectable):
+        self.name = name
+        self.selectable = selectable
+
+
+class DropView(DDLElement):
+    def __init__(self, name):
+        self.name = name
+
+
+@compiler.compiles(CreateView)
+def _create_view(element, compiler, **kw):
+    return "CREATE VIEW %s AS %s" % (
+        element.name,
+        compiler.sql_compiler.process(element.selectable, literal_binds=True),
+    )
+
+
+@compiler.compiles(DropView)
+def _drop_view(element, compiler, **kw):
+    return "DROP VIEW %s" % (element.name)
+
+
+def view_exists(ddl, target, connection, **kw):
+    return ddl.name in sa.inspect(connection).get_view_names()
+
+
+def view_doesnt_exist(ddl, target, connection, **kw):
+    return not view_exists(ddl, target, connection, **kw)
+
+
+def create_fts_table_from_selectable(name, metadata, selectable):
+    t = FTS5Table(
+        name,
+        metadata,
+        *(
+            sa.Column(c.name, c.type)
+            for c in selectable.selected_columns
+            if c.name != "id"
+        ),
+    )
+    view_name = f"{name}_view"
+    sa.event.listen(
+        t,
+        "before_create",
+        DropView(view_name).execute_if(callable_=view_exists),
+    )
+    sa.event.listen(
+        t,
+        "before_create",
+        CreateView(view_name, selectable),
+    )
+    sa.event.listen(
+        t,
+        "after_drop",
+        DropView(view_name),
+    )
+    return t
+
+
+class FTS5Table(sa.Table):
+    pass
+
+
+@compiler.compiles(sa.schema.CreateTable, "sqlite")
+def _compile(element: sa.schema.CreateTable, compiler, **kw):
+    if not isinstance(element.target, FTS5Table):
+        return compiler.visit_create_table(element, **kw)
+    name = compiler.preparer.format_table(element.target)
+    cols = ", ".join(
+        compiler.preparer.format_column(col) for col in element.target.columns
+    )
+
+    # content
+    content = f"{name}_view"
+    rowid = "id"
+    # rowid
+
+    return f"CREATE VIRTUAL TABLE {name} USING fts5({cols}, content='{content}', content_rowid='{rowid}')"
+
 
 Operators = Literal["$match"]
 OperatorQuery = Annotated[
@@ -170,14 +301,42 @@ class WISEFTSQuery(RootModel[OperatorQuery]):
 
 class FTSSearch:
     is_internal_search_supported = False
-    def __init__(self, metadata):
+    table_name =  db._WISE_FTS_TABLE
+    def __init__(self, project: WiseProject, metadata):
+        self.project = project
+        self.db_metadata = metadata
+
         self.tables = {
             t: metadata.tables[t]
             for t in metadata.tables
-            if t.startswith("metadata-") and "fts" not in t
+            if t.startswith("metadata-")
         }
-        self.fts_table = metadata.tables["metadata_fts"]
+        self.fts_table = metadata.tables.get(self.table_name)
 
+        try:
+            with self.project.fts_config_file.open() as f:
+                self.fts_config = json.load(f)
+        except Exception:
+            raise ValueError('fts_config could not be found!')
+
+    def build_index(self, conn: sa.Connection):
+        fts_selectable = get_metadata_selectable_from_fts5_config(
+            self.tables, self.fts_config
+        )
+        
+        self.fts_table = create_fts_table_from_selectable(
+            self.table_name, self.db_metadata, fts_selectable
+        )
+        logger.info('Dropping existing fts5 table')
+        self.fts_table.drop(conn, checkfirst=True)
+        logger.info('Building fts5 index')
+        self.fts_table.create(conn)
+        stmt = sa.text(
+            f"INSERT INTO [{self.fts_table.name}] ([{self.fts_table.name}]) VALUES ('rebuild')"
+        )
+        conn.execute(stmt)
+
+        
     def search(
         self,
         conn: sa.Connection,
@@ -191,15 +350,15 @@ class FTSSearch:
         TODO, make it fine-grained and return the segment to allow further filtering
         """
         if self.fts_table is None:
-            raise ValueError("Cannot use match operator without the fts clause")
+            raise ValueError("Cannot use match operator without the fts table - build it with create_index.py and make sure the table is reflected from the db before calling this function")
 
+        col2fts, _ = parse_fts_config(self.fts_config)
         where_clause = q.convert_query_to_sql(self.fts_table)
         from_clause = db.media_table.join(
             self.fts_table,
             db.media_table.c.id == sa.literal_column(f"[{self.fts_table.name}].rowid"),
         )
         columns = []
-        fts_counter = 0
         col_count = {}
         fts_cols = list(dict.fromkeys([x.name for x in self.fts_table.c]))
         for t, m in self.tables.items():
@@ -209,14 +368,16 @@ class FTSSearch:
 
             _count = 0
             for x in (c for c in m.c if c.name not in COMMON_COLUMNS):
-                if x.name in fts_cols:
-                    column = sa.column(
-                        f"highlight([{self.fts_table.name}], {fts_counter}, '<b>', '</b>')",
+                fts_name = col2fts[m.name].get(x.name, x.name)
+                
+                column = (
+                    sa.column(
+                        f"highlight([{self.fts_table.name}], {fts_cols.index(fts_name)}, '<b>', '</b>')",
                         is_literal=True,
-                    ).label(x.name)
-                    fts_counter += 1
-                else:
-                    column = x
+                    ).label(fts_name)
+                    if fts_name in fts_cols
+                    else x
+                )
                 _count += 1
                 columns.append(column)
             col_count[t] = _count

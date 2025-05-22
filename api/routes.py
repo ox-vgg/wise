@@ -860,8 +860,10 @@ def _get_search_router(config: APIConfig):
     active_search_targets: dict[str, list[str]] = {}
 
     # TODO: Fix this to handle other media types. Right now it assumes metadata_fts to be for videos only
-    if 'metadata_fts' in db.project_metadata_obj.tables:
-        search_indices[MediaType.VIDEO] = {'wise/metadata': FTSSearch(db.project_metadata_obj)}
+    db_inspector = sa.inspect(project_engine)
+    if db_inspector.has_table(db._WISE_FTS_TABLE):
+        db.project_metadata_obj.reflect(bind=project_engine, only=[db._WISE_FTS_TABLE])
+        search_indices[MediaType.VIDEO] = {'wise/metadata': FTSSearch(project, db.project_metadata_obj)}
         active_search_targets[MediaType.VIDEO] = ['wise/metadata']
     
     
