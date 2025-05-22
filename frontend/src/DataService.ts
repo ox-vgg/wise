@@ -174,7 +174,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
   } as ProcessedSearchResponse;
 };
 
-const viewModalityToMediaType = {
+const viewModalityToSearchInType = {
   'Image': 'image',
   'Video': 'video',
   'VideoAudio': 'av',
@@ -190,9 +190,8 @@ const fetchFeaturedImages = (
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(MAX_FEATURED_IMAGES, pageEnd*config.PAGE_SIZE);
 
-
   const urlParams = new URLSearchParams([
-    ['media_type', viewModalityToMediaType[viewModality]],
+    ['featured_in', viewModalityToSearchInType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
     ['start', start.toString()],
     ['end', end.toString()],
@@ -278,13 +277,11 @@ const fetchSearchResults = (queries: Query[], viewModality: keyof ProcessedSearc
     formData = convertQueriesToFormData(otherQueries);
   }
 
-  let searchIn = viewModalityToMediaType[viewModality];
-
   const urlParams = new URLSearchParams([
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
-    ['search_in', searchIn],
+    ['search_in', viewModalityToSearchInType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
