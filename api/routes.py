@@ -528,21 +528,18 @@ def _get_search_router(config: APIConfig):
         merged_segments: List[VideoSegment] = []
         start = None
         current = None
-        best_thumbnail = None
-        best_segment_score = 0
+        best = None
         for k in _keyframes:
             if start is None:
                 # Start a new group
                 start = k
                 current = k
-                best_thumbnail = k.thumbnail
-                best_segment_score = k.distance
+                best = k
 
             elif (k.ts - current.te) <= 4:
                 current = k
-                if current.distance > best_segment_score:
-                    best_segment_score = current.distance
-                    best_thumbnail = current.thumbnail
+                if current.distance > best.distance:
+                    best = current
 
             else:
                 merged_segments.append(
@@ -552,14 +549,13 @@ def _get_search_router(config: APIConfig):
                         ts=start.ts,
                         te=current.te,
                         link=f"media/{start.media_id}#t={start.ts},{current.te}",
-                        distance=best_segment_score,
-                        thumbnail=best_thumbnail,
+                        distance=best.distance,
+                        thumbnail=best.thumbnail,
                     )
                 )
                 start = k
                 current = k
-                best_thumbnail = k.thumbnail
-                best_segment_score = k.distance
+                best = k
 
         if start is not None:
             merged_segments.append(
@@ -569,8 +565,8 @@ def _get_search_router(config: APIConfig):
                     ts=start.ts,
                     te=current.te,
                     link=f"media/{start.media_id}#t={start.ts},{current.te}",
-                    distance=best_segment_score,
-                    thumbnail=best_thumbnail,
+                    distance=best.distance,
+                    thumbnail=best.thumbnail,
                 )
             )
 
