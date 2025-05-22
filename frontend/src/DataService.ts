@@ -183,15 +183,15 @@ const fetchFeaturedImages = (
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(MAX_FEATURED_IMAGES, pageEnd*config.PAGE_SIZE);
 
-  const viewModalityToVectorModality = {
+  const viewModalityToMediaType = {
     'Image': 'image',
     'Video': 'video',
-    'VideoAudio': 'video',
+    'VideoAudio': 'av',
     'Audio': 'audio',
   };
 
   const urlParams = new URLSearchParams([
-    ['modality', viewModalityToVectorModality[viewModality]],
+    ['media_type', viewModalityToMediaType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
     ['start', start.toString()],
     ['end', end.toString()],

@@ -1166,7 +1166,10 @@ def _get_search_router(config: APIConfig):
     @router.get("/featured", response_model=SearchResponse)
     @add_response_time
     async def handle_get_featured(
-        modality: ModalityType = Query(),
+        # Which media type to get featured media for
+        # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+        # "audio" refers to pure audio files, and "image" refers to images
+        media_type: MediaType = Query(),
         feature_extractor_id: str = Query(),
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
@@ -1174,9 +1177,10 @@ def _get_search_router(config: APIConfig):
         # This seed is used to randomly select the set of images used for the featured images
         random_seed: int = Query(123),
     ):
+        media_type = 'audio' if media_type == MediaType.AV else media_type
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
-            selected_ids = ids[modality][feature_extractor_id].copy()
+            selected_ids = ids[media_type][feature_extractor_id].copy()
             default_rng(seed=random_seed).shuffle(selected_ids)
             selected_ids = selected_ids[:1000]
 
