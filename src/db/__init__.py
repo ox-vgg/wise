@@ -9,7 +9,7 @@ from .tables import (
 )
 
 _WISE_FTS_TABLE = 'metadata_fts'
-_WISE_ASR_TABLE = 'metdata-asr'
+_WISE_ASR_TABLE = 'metadata-asr'
 __wise_tables = [_WISE_FTS_TABLE, _WISE_ASR_TABLE]
 
 def _init(dburi: str, metadata_obj: MetaData, **kwargs) -> Engine:

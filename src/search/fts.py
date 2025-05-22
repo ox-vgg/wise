@@ -7,7 +7,7 @@ import logging
 from typing import Literal, Annotated
 
 from src import db
-from src.data_models import VectorAndMediaMetadata, ModalityType
+from src.data_models import MediaMetadata, VectorAndMediaMetadata, MediaType, ModalityType
 from src.wise_project import WiseProject
 
 from pydantic import Field, RootModel
@@ -406,7 +406,7 @@ class FTSSearch:
         for r in res.all():
             row = r[:]
             media_cols, row = get_columns(db.media_table.c, row)
-            media_metadata = dict(zip(db.media_table.c.keys(), media_cols))
+            media_metadata = MediaMetadata.model_validate(dict(zip(db.media_table.c.keys(), media_cols)))
             extra_metadata = {}
             for m in self.tables.values():
                 cols, row = get_columns(
@@ -418,7 +418,7 @@ class FTSSearch:
                         cols,
                     )
                 )
-            vals = extra_metadata.pop("metadata-asr", {})
+            vals = extra_metadata.pop(db._WISE_ASR_TABLE, {})
             text, segments = (
                 vals.pop("asr", ""),
                 vals.pop("segments", []),
@@ -428,10 +428,10 @@ class FTSSearch:
             # Merge nearby segments
             merged_segments = merge_close_segments(updated_segments)
             vector_media_metadata = VectorAndMediaMetadata.model_validate(
-                media_metadata
+                media_metadata.model_dump()
                 | {
                     "modality": ModalityType.TEXT,
-                    "media_id": media_metadata["id"],
+                    "media_id": media_metadata.id,
                     "id": None,
                     "timestamp": None,
                     "end_timestamp": None,
@@ -440,7 +440,7 @@ class FTSSearch:
                 | {
                     "external_metadata": {
                         "asr_segments": merged_segments,
-                        **{k: v for m in extra_metadata.values() for k, v in m.items()},
+                        **{k: v for m in extra_metadata.values() for k, v in m.items() if v},
                     }
                 }
             )
@@ -451,21 +451,28 @@ class FTSSearch:
                 for s in filtered_segments:
                     m = vector_media_metadata.model_copy(
                         update={
+                            "modality": media_metadata.media_type if media_metadata.media_type != MediaType.AV else MediaType.VIDEO,
                             "timestamp": s["start"],
                             "end_timestamp": s["end"],
                         }
                     )
                     responses.append(m)
+                    if media_metadata.media_type == MediaType.AV:
+                        m_audio = m.model_copy(update={"modality": ModalityType.AUDIO})
+                        responses.append(m_audio)
             else:
                 # if no segments, add the media metadata
-                responses.append(
-                    vector_media_metadata.model_copy(
-                        update={
-                            "timestamp": 0,
-                            "end_timestamp": None,
-                        }
-                    )
+                m = vector_media_metadata.model_copy(
+                    update={
+                        "modality": media_metadata.media_type if media_metadata.media_type != MediaType.AV else MediaType.VIDEO,
+                        "timestamp": 0,
+                        "end_timestamp": None,
+                    }
                 )
+                responses.append(m)
+                if media_metadata.media_type == MediaType.AV:
+                    m_audio = m.model_copy(update={"modality": ModalityType.AUDIO})
+                    responses.append(m_audio)
         logger.info(f"Num responses: {len(responses)}")
         return responses
 
