@@ -1148,7 +1148,7 @@ def _get_search_router(config: APIConfig):
 
         return wrapper
 
-    # Create a random array of featured images (1 per video)
+    # Generate a list of random featured images for each modality and feature extractor
     ids: dict[str: dict[str: list[int]]] = {}
     with project_engine.connect() as conn:
         for modality in search_indices:
