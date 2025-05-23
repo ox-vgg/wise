@@ -27,7 +27,7 @@ from fastapi.responses import (
     RedirectResponse,
     StreamingResponse,
 )
-from pydantic import field_validator, BaseModel
+from pydantic import field_validator, BaseModel, ConfigDict
 import typer
 import csv
 import json
@@ -51,7 +51,7 @@ from src.repository import (
     get_thumbnail_by_timestamp,
     get_related_vectors_rows,
 )
-from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollectionType, VectorAndMediaMetadata
+from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollectionType, VectorAndMediaMetadata, VideoShot
 from src.enums import IndexType
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
@@ -525,8 +525,32 @@ def _get_search_router(config: APIConfig):
         video_results: Optional[VideoResults] # search results from video stream of video files
         image_results: Optional[ImageResults] # search results from image files
 
+    _prefix = {
+        MediaType.IMAGE: config.query_prefix.strip(),
+        MediaType.VIDEO: config.query_prefix.strip(),
+        MediaType.AV: "This is the sound of", # TODO add this to config
+        MediaType.AUDIO: "This is the sound of",
+    }
+    project_assets = project.discover_assets()
+    project_engine = db.init_project(project.dburi)
+    thumbs_engine = db.init_thumbs(project.thumbs_uri)
+    external_metadata_tables = db.reflect_external_metadata(project_engine)
+    
+    shots_table = db.shots_table
 
-    def merge_close_segments(video_id: int, _keyframes: List[VideoSegment]):
+    if config.use_shots:
+        
+        with project_engine.connect() as conn:
+            shots_count = conn.execute(sa.select(sa.func.count(shots_table.c.id))).scalar()
+
+        if shots_count == 0:
+            logger.warning('use_shots is set to True, but shots table is empty! Please make sure to populate the shots table before using this feature.')
+    
+    def merge_close_segments(_keyframes: List[VideoSegment]):
+        """
+        Takes a list of segments of a media file and merges them if they are close - within 4 seconds of each other
+        The merged segment is represented by the best matching segment based on distance
+        """
         merged_segments: List[VideoSegment] = []
         start = None
         current = None
@@ -546,11 +570,11 @@ def _get_search_router(config: APIConfig):
             else:
                 merged_segments.append(
                     VideoSegment(
-                        vector_id=start.vector_id,
-                        media_id=start.media_id,
+                        vector_id=best.vector_id,
+                        media_id=best.media_id,
                         ts=start.ts,
                         te=current.te,
-                        link=f"media/{start.media_id}#t={start.ts},{current.te}",
+                        link=f"media/{best.media_id}#t={start.ts},{current.te}",
                         distance=best.distance,
                         thumbnail=best.thumbnail,
                         bbox=best.bbox,
@@ -563,11 +587,11 @@ def _get_search_router(config: APIConfig):
         if start is not None:
             merged_segments.append(
                 VideoSegment(
-                    vector_id=start.vector_id,
-                    media_id=start.media_id,
+                    vector_id=best.vector_id,
+                    media_id=best.media_id,
                     ts=start.ts,
                     te=current.te,
-                    link=f"media/{start.media_id}#t={start.ts},{current.te}",
+                    link=f"media/{best.media_id}#t={start.ts},{current.te}",
                     distance=best.distance,
                     thumbnail=best.thumbnail,
                     bbox=best.bbox,
@@ -576,14 +600,23 @@ def _get_search_router(config: APIConfig):
 
         return merged_segments
 
-    def get_shots_from_segments(segments: List[VideoSegment]):
+    def get_shots_from_segments(
+            segments: List[VideoSegment],
+            merge_function: Callable[[list[VideoSegment]], list[VideoSegment]] = merge_close_segments
+        ):
+        """
+        Functions that takes a list of segments and returns a list of merged segments
+        based on the merge function passed in
+
+        The merge function by default merges close segments
+        """
         # Sort by video_id, timestamp
         sorted_segments = sorted(segments, key=lambda x: (x.media_id, x.ts))
 
-        # for each key, merge keyframes with <= 4s gap
+        # for each key, apply merge logic
         all_merged_segments = []
-        for vid, g in itertools.groupby(sorted_segments, key=lambda x: x.media_id):
-            merged_segments = merge_close_segments(vid, list(g))
+        for _, g in itertools.groupby(sorted_segments, key=lambda x: x.media_id):
+            merged_segments = merge_function(list(g))
             all_merged_segments.extend(merged_segments)
 
         # sort the merged segments by distance
@@ -594,12 +627,77 @@ def _get_search_router(config: APIConfig):
         )
         return all_merged_segments
 
+    # configure lookup functions
+    def query_shot_by_timestamp(conn, *, media_id: int, timestamp: float):
+        # Join the table and query by dataset_path, and return the id
+
+        start_timestamp_expr = (timestamp + 0.2) >= shots_table.c.ts
+        end_timestamp_expr = timestamp < shots_table.c.te
+        dataset_expr = shots_table.c.media_id == media_id
+        stmt = sa.select(shots_table).where(
+            (dataset_expr & start_timestamp_expr & end_timestamp_expr)
+        )
+        result = conn.execute(stmt)
+        for row in result.mappings():
+            yield VideoShot.model_validate(row)
+
+    def keyframes_to_shots(_keyframes: List[VideoSegment]):
+        """
+        Get Shot corresponding to a keyframe
+        """
+        with project_engine.connect() as shots_conn:
+            # Assuming segment maps to only one shot (no duplicates)
+            return list(
+                next(
+                    query_shot_by_timestamp(
+                        shots_conn, media_id=int(x.media_id), timestamp=x.ts
+                    ),
+                    None,
+                )
+                for x in _keyframes
+            )
+    
+    def get_shots_from_keyframes(_keyframes: List[VideoSegment]):
+        """
+        Get unique shots from list of keyframes belonging to a single video
+        """
+        # Input are keyframes from same video
+        shots = keyframes_to_shots(_keyframes)
+
+        # Ignore where segment doesn't have a shot mapping
+        shots_iter = filter(lambda x: x[0], zip(shots, _keyframes))
+
+        shots_list = []
+        for _, g in itertools.groupby(shots_iter, key=lambda x: x[0].id):
+            shot_group, keyframes_group = list(zip(*g))
+            _shot = shot_group[0]
+
+            # Computing best matching segment and best thumbnail to represent the segment with
+            # For clip case, it will be same. For internvideo it will be different
+            best_segment = sorted(
+                keyframes_group, key=lambda x: x.distance, reverse=True
+            )[0]
+            shots_list.append(
+                VideoSegment(
+                    vector_id=best_segment.vector_id,
+                    media_id=best_segment.media_id,
+                    ts=_shot.ts,
+                    te=_shot.te,
+                    link=f"media/{best_segment.media_id}#t={_shot.ts},{_shot.te}",
+                    distance=best_segment.distance,
+                    thumbnail=best_segment.thumbnail,
+                )
+            )
+        return shots_list
+    
+
     def construct_video_search_response(
         search_in: MediaType,
         top_dist: List[float],
         all_metadata: List[VectorAndMediaMetadata],
         all_ext_metadata: list[FeatureExtMetadata],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
+        merge_function: Callable[[list[VideoSegment]], list[VideoSegment]],
     ):
         videos = {}
         shots = []
@@ -646,7 +744,7 @@ def _get_search_router(config: APIConfig):
 
             segments.append(segment)
 
-        shots = get_shots_from_segments(segments)
+        shots = get_shots_from_segments(segments, merge_function=merge_function)
 
         if search_in == MediaType.VIDEO:
             return VideoResults(
@@ -714,6 +812,7 @@ def _get_search_router(config: APIConfig):
         get_metadata_fn: Callable[[List[int]], List[VectorAndMediaMetadata]],
         get_ext_metadata_fn: Callable[[List[int]], list[FeatureExtMetadata]],
         get_thumbs_fn: Callable[[List[VectorAndMediaMetadata]], Iterable[Tuple[str, float]]],
+        merge_function: Callable[[list[VideoSegment]], list[VideoSegment]] = merge_close_segments,
         search_in: MediaType = None,
     ):
         all_metadata = get_metadata_fn(top_ids)
@@ -734,14 +833,14 @@ def _get_search_router(config: APIConfig):
                 video_top_dist = [top_dist[i] for i in video_indices]
                 video_all_metadata = [all_metadata[i] for i in video_indices]
                 video_ext_metadata = [all_ext_metadata[i] for i in video_indices]
-                video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, video_ext_metadata, get_thumbs_fn)
+                video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, video_ext_metadata, get_thumbs_fn, merge_function)
         if search_in is None or search_in == MediaType.AV:
             av_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.AUDIO and x.media_type == MediaType.AV]
             if len(av_indices) > 0:
                 av_top_dist = [top_dist[i] for i in av_indices]
                 av_all_metadata = [all_metadata[i] for i in av_indices]
                 av_ext_metadata = [all_ext_metadata[i] for i in av_indices]
-                video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, av_ext_metadata, get_thumbs_fn)
+                video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, av_ext_metadata, get_thumbs_fn, merge_function)
         if search_in is not None and search_in not in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AV]:
             raise NotImplementedError("`search_in` must be either `MediaType.IMAGE`, `MediaType.VIDEO`, or `MediaType.AV`. Support for `MediaType.AUDIO` is not available yet")
 
@@ -843,19 +942,7 @@ def _get_search_router(config: APIConfig):
         average_features = average(feature_vectors, axis=0, weights=weights)
         average_features /= norm(average_features, axis=-1, keepdims=True)
         return average_features
-
-    _prefix = {
-        MediaType.IMAGE: config.query_prefix.strip(),
-        MediaType.VIDEO: config.query_prefix.strip(),
-        MediaType.AV: "This is the sound of", # TODO add this to config
-        MediaType.AUDIO: "This is the sound of",
-    }
-    project_assets = project.discover_assets()
-    project_engine = db.init_project(project.dburi)
-    thumbs_engine = db.init_thumbs(project.thumbs_uri)
-    external_metadata_tables = db.reflect_external_metadata(project_engine)
-
-
+  
     """
     Load all available search indices by default
     `search_indices` is a dictionary of SearchIndex objects, where the key is the
@@ -1486,6 +1573,8 @@ def _get_search_router(config: APIConfig):
         valid_ids = [int(top_ids[x]) for x in valid_indices]
         valid_dist = [float(top_dist[x]) for x in valid_indices]
 
+        # supports shots
+        is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
             _get_ext_metadata = functools.partial(get_ext_metadata, conn)
@@ -1498,6 +1587,7 @@ def _get_search_router(config: APIConfig):
                 get_metadata_fn=_get_metadata,
                 get_ext_metadata_fn=_get_ext_metadata,
                 get_thumbs_fn=get_thumbs,
+                merge_function=get_shots_from_keyframes if is_shot_merge_supported else merge_close_segments,
                 search_in=search_in,
             )
 

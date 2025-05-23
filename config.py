@@ -29,3 +29,7 @@ class APIConfig(BaseSettings):
     redirect_media_url_by_path: bool = False
     redirect_media_url_prefix: str = "."
     redirect_media_url_num_components: int = 1
+
+    # flag to configure if shots must be used
+    # if the flag is set to True, wise will look for shots table and use it, and raise an error if it is not found
+    use_shots: bool = False

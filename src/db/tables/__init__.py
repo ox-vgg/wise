@@ -75,3 +75,19 @@ thumbnails_table = sa.Table(
     sa.Column("content", sa.LargeBinary(), nullable=False),
     sa.schema.Index("ix_thumbnails_media_id_and_timestamp", "media_id", "timestamp"),
 )
+
+shots_table = sa.Table(
+    "shots",
+    project_metadata_obj,
+    sa.Column("id", sa.Integer, nullable=False, primary_key=True),
+    sa.Column(
+        "media_id",
+        sa.Integer,
+        sa.ForeignKey("media.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        primary_key=True,
+    ),
+    sa.Column("ts", sa.Float, nullable=False, index=True),
+    sa.Column("te", sa.Float, nullable=False, index=True),
+)
