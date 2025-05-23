@@ -15,11 +15,14 @@ python3 -m venv venv
 source venv/bin/activate
 pip install ...  # see Install.md
 
-# 3. Run the test
-bash test-wikimedia-commons-25.sh  $HOME/wise-test/
+# 3. Run the tests based on videos
+bash test-wikimedia-commons-25.sh  $HOME/temp/
+
+# 4. Run tests based on images
+bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
 ```
 
-Here is a sample output obtained by executing the test.
+Here is a sample output obtained by executing the test based on videos.
 ```
 ...
 Extracting features from videos (takes about 3 min.) ...
@@ -42,6 +45,26 @@ Test 5.2 PASSED
 Test 5.3 PASSED
 Test 5.4 PASSED
 *** All tests for wikimedia-commons-25 completed in 66 sec. ***
+```
+
+Here is a sample output obtained by executing the test based on images.
+```
+Starting tests for wikimedia-commons-images-25 ...
+Skipping test dataset download
+Test 3.1 PASSED
+Test 3.2 PASSED
+Test 4.1 PASSED
+Test 4.2 PASSED
+Starting WISE2 server on 0.0.0.0:10001 (takes about 1 min.) ...
+Waiting for 5 sec. before checking again (1/15) ...
+...
+Waiting for 5 sec. before checking again (8/15) ...
+Checking if server is running at http://0.0.0.0:10001/wikimedia-commons-images-25/info
+Server started successfully.
+Test 5.1 PASSED
+Test 5.2 PASSED
+Test 5.3 PASSED
+*** All tests for wikimedia-commons-images-25 completed in 46 sec. ***
 ```
 
 # Unit Tests
