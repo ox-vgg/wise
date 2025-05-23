@@ -6,7 +6,7 @@ from sklearn.datasets import load_sample_image
 import torch
 from PIL import Image
 
-from .transformers_owlv2 import TransformersOWLv2, owlv2_bbox_to_xywh
+from .transformers_owlv2 import TransformersOWLv2, owlv2_bbox_to_xywh, sort_by_objectness
 from .feature_extractor_factory import FeatureExtractorFactory
 
 ## Typically, imports from external libraries come before local
@@ -158,6 +158,135 @@ class TestOWLv2BBoxConversion(unittest.TestCase):
         owlv2_bbox = np.array([0.15, 0.35, 0.20, 0.10])
         xywh = owlv2_bbox_to_xywh(owlv2_bbox, 10, 20)
         np.testing.assert_allclose(xywh, np.array([0.1, 0.30, 0.40, 0.10]))
+
+
+class TestOWLv2PatchSorting(unittest.TestCase):
+    ## Test values picked so they can be visualised on a 20x20 grid.
+    def test_1_batch_5_predictions_sorting(self):
+        # Use integers and fake embedding with length 3 for simplicity
+        scores = torch.Tensor([[0, 3, 2, 4, 1]])
+        embeds = torch.Tensor(
+            [[[5, 5, 5], [6, 6, 6], [7, 7, 7], [8, 8, 8], [9, 9, 9]]]
+        )
+        boxes = torch.Tensor(
+            [
+                [
+                    [5, 5, 5, 5],
+                    [6, 6, 6, 6],
+                    [7, 7, 7, 7],
+                    [8, 8, 8, 8],
+                    [9, 9, 9, 9],
+                ]
+            ]
+        )
+        scores, embeds, boxes = sort_by_objectness(scores, embeds, boxes)
+        torch.testing.assert_close(scores, torch.Tensor([[4, 3, 2, 1, 0]]))
+        torch.testing.assert_close(
+            embeds,
+            torch.Tensor(
+                [[[8, 8, 8], [6, 6, 6], [7, 7, 7], [9, 9, 9], [5, 5, 5]]]
+            ),
+        )
+        torch.testing.assert_close(
+            boxes,
+            torch.Tensor(
+                [
+                    [
+                        [8, 8, 8, 8],
+                        [6, 6, 6, 6],
+                        [7, 7, 7, 7],
+                        [9, 9, 9, 9],
+                        [5, 5, 5, 5],
+                    ]
+                ]
+            ),
+        )
+
+    def test_2_batch_5_predictions_sorting(self):
+        # Use integers and fake embedding with length 2 for simplicity
+        scores = torch.Tensor([[0, 3, 2, 4, 1], [5, 7, 6, 9, 8]])
+        embeds = torch.Tensor(
+            [
+                [
+                    [5, 5, 5],
+                    [6, 6, 6],
+                    [7, 7, 7],
+                    [8, 8, 8],
+                    [9, 9, 9],
+                ],
+                [
+                    [0, 0, 0],
+                    [1, 1, 1],
+                    [2, 2, 2],
+                    [3, 3, 3],
+                    [4, 4, 4],
+                ],
+            ],
+        )
+        boxes = torch.Tensor(
+            [
+                [
+                    [5, 5, 5, 5],
+                    [6, 6, 6, 6],
+                    [7, 7, 7, 7],
+                    [8, 8, 8, 8],
+                    [9, 9, 9, 9],
+                ],
+                [
+                    [0, 0, 0, 0],
+                    [1, 1, 1, 1],
+                    [2, 2, 2, 2],
+                    [3, 3, 3, 3],
+                    [4, 4, 4, 4],
+                ],
+            ]
+        )
+        scores, embeds, boxes = sort_by_objectness(scores, embeds, boxes)
+        torch.testing.assert_close(
+            scores, torch.Tensor([[4, 3, 2, 1, 0], [9, 8, 7, 6, 5]])
+        )
+        torch.testing.assert_close(
+            embeds,
+            torch.Tensor(
+                [
+                    [
+                        [8, 8, 8],
+                        [6, 6, 6],
+                        [7, 7, 7],
+                        [9, 9, 9],
+                        [5, 5, 5],
+                    ],
+                    [
+                        [3, 3, 3],
+                        [4, 4, 4],
+                        [1, 1, 1],
+                        [2, 2, 2],
+                        [0, 0, 0],
+                    ],
+                ],
+            ),
+        )
+        torch.testing.assert_close(
+            boxes,
+            torch.Tensor(
+                [
+                    [
+                        [8, 8, 8, 8],
+                        [6, 6, 6, 6],
+                        [7, 7, 7, 7],
+                        [9, 9, 9, 9],
+                        [5, 5, 5, 5],
+                    ],
+                    [
+                        [3, 3, 3, 3],
+                        [4, 4, 4, 4],
+                        [1, 1, 1, 1],
+                        [2, 2, 2, 2],
+                        [0, 0, 0, 0],
+                    ],
+                ]
+            ),
+        )
 
 
 class TestOWLv2FeatureExtractor(unittest.TestCase):

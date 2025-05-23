@@ -37,6 +37,29 @@ def flatten_patch_features(feature_map: torch.Tensor) -> torch.Tensor:
     return feature_map.reshape((batch_sz, num_patches_h * num_patches_w, hidden_dim))
 
 
+def sort_by_objectness(objectness_scores, embeds, pred_boxes):
+    assert (
+        objectness_scores.ndim == 2
+        and embeds.ndim == 3
+        and pred_boxes.ndim == 3
+        and objectness_scores.shape[-1] == embeds.shape[-2]
+        and objectness_scores.shape[-1] == pred_boxes.shape[-2]
+        and objectness_scores.shape[-2] == embeds.shape[-3]
+        and objectness_scores.shape[-2] == pred_boxes.shape[-3]
+    )
+    sort_idx = torch.argsort(objectness_scores, descending=True)
+    objectness_scores = torch.take_along_dim(
+        objectness_scores, sort_idx, dim=1
+    )
+    embeds = torch.take_along_dim(
+        embeds, sort_idx.unsqueeze(-1).expand_as(embeds), dim=1
+    )
+    pred_boxes = torch.take_along_dim(
+        pred_boxes, sort_idx.unsqueeze(-1).expand_as(pred_boxes), dim=1
+    )
+    return (objectness_scores, embeds, pred_boxes)
+
+
 def owlv2_bbox_to_xywh(
         owlv2_bbox: np.ndarray, im_width: int, im_height: int
     ) -> np.ndarray:
@@ -305,6 +328,16 @@ class TransformersOWLv2(FeatureExtractor):
 
         # Predict object boxes
         batch_pred_boxes = self.model.box_predictor(batch_image_feats, batch_feature_map) # shape: (B, 3600, 4)
+
+        # Having the feature for the "most object" first is important for
+        # searching with images since only the first feature is used.
+        batch_objectness_scores, batch_image_class_embeds, batch_pred_boxes = (
+            sort_by_objectness(
+                batch_objectness_scores,
+                batch_image_class_embeds,
+                batch_pred_boxes,
+            )
+        )
 
         # Convert to numpy
         batch_image_class_embeds = batch_image_class_embeds.cpu().numpy()
