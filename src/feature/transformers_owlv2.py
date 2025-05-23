@@ -23,6 +23,7 @@
 from dataclasses import dataclass
 from transformers import Owlv2Processor, Owlv2ForObjectDetection
 import torch
+from torchvision.transforms.functional import pil_to_tensor
 import numpy as np
 from typing import Union
 from PIL import Image
@@ -244,8 +245,15 @@ class TransformersOWLv2(FeatureExtractor):
         return res
 
     def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> torch.Tensor:
-        if not isinstance(images, torch.Tensor):
-            raise NotImplementedError("`images` must be a tensor. Other types are not supported at the moment.")
+        if isinstance(images, torch.Tensor):
+            if images.ndim != 4 or images.shape[1] != 3:
+                raise ValueError("expect tensor images to be RGB in NCHW order")
+        elif isinstance(images, list):
+            if not all([isinstance(x, Image.Image) for x in images]):
+                raise TypeError("expect list images to all be PIL Image")
+            images = torch.stack([pil_to_tensor(img) for img in images])
+        else:
+            raise TypeError("unexpected input images of type %s" % type(images))
         return images
 
     @torch.inference_mode()

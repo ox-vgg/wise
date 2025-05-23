@@ -337,7 +337,7 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
                 and isinstance(m.bbox.h, float)
                 for m in f.metadata
             ]))
-            
+
             ## Check if top detected objects (in terms of objectness score) are the same as expected
             top_objects = [m for m in f.metadata if m.objectness_score > 0.2]
             self.assertEqual(len(top_objects), 2) # there should only be 2 objects with an objectness score above 0.2
@@ -350,16 +350,16 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
             np.testing.assert_allclose(top_objects[1].objectness_score, 0.2692972719669342, rtol=1e-5)
             np.testing.assert_allclose(np.array(top_objects[1].bbox), np.array([0.4490808695554733, 0.8730822033848641, 0.2807672321796417, 0.12563285559625204]), rtol=1e-5)
 
-    # def test_with_one_element_list(self):
-    #     images = [self._get_sample_image_pil()]
-    #     self._test_images(images, 1)
+    def test_with_one_element_list(self):
+        images = [self._get_sample_image_pil()]
+        self._test_images(images, 1)
 
     def test_with_one_image_tensor(self):
         self._test_images(self._get_sample_image_tensor().unsqueeze(0), 1)
 
-    # def test_with_n_elements_list(self):
-    #     images = [self._get_sample_image_pil() for _ in range(4)]
-    #     self._test_images(images, 4)
+    def test_with_n_elements_list(self):
+        images = [self._get_sample_image_pil() for _ in range(4)]
+        self._test_images(images, 4)
 
     def test_with_n_images_tensor(self):
         image_batch = torch.stack([
