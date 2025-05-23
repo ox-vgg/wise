@@ -1199,7 +1199,16 @@ def _get_search_router(config: APIConfig):
             modality = ModalityType(featured_in)
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
             # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
-            selected_ids = ids[modality][feature_extractor_id].copy()
+            if feature_extractor_id == "wise/metadata":
+                # use other feature_extractor_id from the modality because "wise/metadata"
+                # is a FTS search index and it does not support "feature_extractor.get_vector_metadata()"
+                other_ids = [fid for fid in active_search_targets[modality] if fid != "wise/metadata"]
+                if not other_ids:
+                    selected_ids = [] # i.e featured images not available
+                else:
+                    selected_ids = ids[modality][other_ids[0]].copy()
+            else:
+                selected_ids = ids[modality][feature_extractor_id].copy()
             default_rng(seed=random_seed).shuffle(selected_ids)
             selected_ids = selected_ids[:1000]
 
@@ -1207,11 +1216,15 @@ def _get_search_router(config: APIConfig):
             dist = [0.0] * len(selected_ids)
 
             _get_metadata = functools.partial(get_full_metadata_batch, conn, external_metadata_tables=external_metadata_tables)
-
             search_index = search_indices[modality][feature_extractor_id]
-            _get_ext_metadata = functools.partial(
-                search_index.feature_extractor.get_vector_metadata, conn
-            )
+            if feature_extractor_id == "wise/metadata":
+                # ensure that other_ids[0] (i.e. feature_extractor_id) specific vector metadata
+                # are not shown in the featured images
+                _get_ext_metadata = lambda _: [FeatureExtMetadata()] * len(selected_ids)
+            else:
+                _get_ext_metadata = functools.partial(
+                    search_index.feature_extractor.get_vector_metadata, conn
+                )
             get_thumbs = _thumbs_with_score(thumbs_conn, dist[start:end], thumbnails_to_send)
             response = construct_search_response(
                 top_dist=dist[start:end],
