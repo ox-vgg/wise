@@ -60,20 +60,28 @@ export type VectorInfo = {
   link: string;
   thumbnail: string;
   bbox?: BBoxXYWH;
-  related_vectors?: ProcessedVectorInfo[];  // fetched by request only
 };
 
 // The backend VectorInfo does not come with the related MediaInfo, it
 // is added when the backend response is processed.  mediaInfo will
 // actually then be one of the Processed*Info types, all of which are
-// derived from MediaInfo (see the Processed*Info types below).
-export type ProcessedVectorInfo = VectorInfo & {
+// derived from MediaInfo (see the Processed*Info types below).  In
+// addition, the frontend will also add related_vectors when
+// inspecting the vector in the Image details modal dialog (a second
+// "processing" step).
+type ProcessedVectorMixin = {
   mediaInfo: MediaInfo;
+  related_vectors?: ProcessedVectorInfo[];
 };
 
-type VectorResult = VectorInfo & {
+type VectorResultMixin = {
   distance: number;
 };
+
+export type ProcessedVectorInfo = VectorInfo & ProcessedVectorMixin;
+
+export type VectorResult = VectorInfo & VectorResultMixin;
+
 
 type ImageVector = VectorResult;
 export type VideoSegment = VectorResult & {
@@ -114,14 +122,14 @@ export type SearchResponse = {
 // ProcessedImageInfo.vectors and ProcessedSearchResults.Image.vectors
 // attributes are unused but they provide a nice symmetry to the video
 // shots.
-export type ProcessedImageVector = ImageVector & {
+export type ProcessedImageVector = ImageVector & ProcessedVectorMixin & {
   mediaType: 'IMAGE';
   mediaInfo: ProcessedImageInfo;
 };
 export type ProcessedImageInfo = ImageInfo & {
   vectors: ProcessedImageVector[];
 };
-export type ProcessedVideoSegment = VideoSegment & {
+export type ProcessedVideoSegment = VideoSegment & ProcessedVectorMixin & {
   mediaType: 'VIDEO';
   mediaInfo: ProcessedVideoInfo;
 };
