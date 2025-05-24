@@ -686,6 +686,7 @@ def _get_search_router(config: APIConfig):
                     link=f"media/{best_segment.media_id}#t={_shot.ts},{_shot.te}",
                     distance=best_segment.distance,
                     thumbnail=best_segment.thumbnail,
+                    bbox=best_segment.bbox,
                 )
             )
         return shots_list
@@ -1616,7 +1617,7 @@ def _get_search_router(config: APIConfig):
                 _get_metadata_fn,
                 _get_ext_metadata_fn,
                 get_thumbs,
-                search_in
+                search_in=search_in
             )
             return response
     return router, active_search_targets
