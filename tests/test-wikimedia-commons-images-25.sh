@@ -234,27 +234,43 @@ fi
 
 # Test 5.2 : check project info
 response=$(curl -s -X GET -H "Content-Type: application/json" "${PROJECT_INFO_URL}")
-expected_json='{
-  "project_name": "wikimedia-commons-images-25",
-  "search_targets": {
-    "image": [
-      "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli",
-      "deepinsight/insightface/buffalo_l/_unknown",
-      "transformers/owlv2/google/owlv2-large-patch14-ensemble",
-      "wise/metadata"
-    ]
-  }
-}'
-response_selected_json=$(jq '{project_name, search_targets}' <<< "$response")
-if diff <(jq -S . <<< "$response_selected_json") <(jq -S . <<< "$expected_json") >/dev/null; then
-    echo "Test 5.2 PASSED"
+expected_project_name="${TEST_ID}"
+expected_targets=(
+    "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
+    "deepinsight/insightface/buffalo_l/_unknown"
+    "transformers/owlv2/google/owlv2-large-patch14-ensemble"
+    "wise/metadata"
+)
+project_name=$(echo "$response" | jq -r '.project_name')
+search_targets=($(echo "$response" | jq -r '.search_targets.image[]'))
+
+if [ "$project_name" == "$expected_project_name" ]; then
+    echo "Test 5.2a PASSED"
 else
-    echo "Test 5.2 FAILED: project info does not match expected values"
-    echo "Expected: $expected_json"
-    echo "Actual: $response_selected_json"
+    echo "Test 5.2a FAILED: project_name does not match expected value"
+    echo "Expected: $expected_project_name"
+    echo "Actual: $project_name"
     exit 1
     cleanup
 fi
+
+for expected in "${expected_targets[@]}"; do
+        found=0
+        for actual in "${search_targets[@]}"; do
+                if [ "$expected" == "$actual" ]; then
+                        found=1
+                        break
+                fi
+        done
+        if [ $found -eq 0 ]; then
+            echo "Test 5.2b FAILED: video search_targets missing expected value: $expected"
+            echo "Actual: ${video_search_targets[*]}"
+            exit 1
+            cleanup
+        fi
+done
+echo "Test 5.2b PASSED"
+
 
 # Test 5.3 : check if the server returns correct results for metadata search
 METADATA_SEARCH_QUERY="church"

@@ -223,11 +223,63 @@ fi
 
 # Test 5.2 : check project info
 response=$(curl -s -X GET -H "Content-Type: application/json" "${PROJECT_INFO_URL}")
+expected_project_name="${TEST_ID}"
+expected_video_targets=(
+    "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
+    "deepinsight/insightface/buffalo_l/_unknown"
+)
+expected_audio_targets=(
+    "microsoft/clap/2023/four-datasets"
+)
+
 project_name=$(echo "$response" | jq -r '.project_name')
-if [ "$project_name" == "$TEST_ID" ]; then
-    echo "Test 5.2 PASSED"
+video_search_targets=($(echo "$response" | jq -r '.search_targets.video[]'))
+audio_search_targets=($(echo "$response" | jq -r '.search_targets.audio[]'))
+
+if [ "$project_name" = "$expected_project_name" ]; then
+    echo "Test 5.2a PASSED"
 else
-    echo "Test 5.2 FAILED : project name is $project_name, expected $TEST_ID"
+    echo "Test 5.2a FAILED: project_name does not match expected value"
+    echo "Expected: $expected_project_name"
+    echo "Actual: $project_name"
+    exit 1
+    cleanup
+fi
+
+# Function to check if two arrays have the same elements (order-independent)
+arrays_equal_any_order() {
+    local -n arr1=$1
+    local -n arr2=$2
+    local sorted1 sorted2
+    sorted1=($(printf "%s\n" "${arr1[@]}" | sort))
+    sorted2=($(printf "%s\n" "${arr2[@]}" | sort))
+    if [ "${#sorted1[@]}" -ne "${#sorted2[@]}" ]; then
+        return 1
+    fi
+    for i in "${!sorted1[@]}"; do
+        if [ "${sorted1[$i]}" != "${sorted2[$i]}" ]; then
+            return 1
+        fi
+    done
+    return 0
+}
+
+if arrays_equal_any_order video_search_targets expected_video_targets; then
+    echo "Test 5.2b PASSED"
+else
+    echo "Test 5.2b FAILED: video search_targets do not match expected values"
+    echo "Expected: ${expected_video_targets[*]}"
+    echo "Actual: ${video_search_targets[*]}"
+    exit 1
+    cleanup
+fi
+
+if arrays_equal_any_order audio_search_targets expected_audio_targets; then
+    echo "Test 5.2c PASSED"
+else
+    echo "Test 5.2c FAILED: audio search_targets do not match expected values"
+    echo "Expected: ${expected_audio_targets[*]}"
+    echo "Actual: ${audio_search_targets[*]}"
     exit 1
     cleanup
 fi
