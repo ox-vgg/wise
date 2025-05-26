@@ -59,7 +59,7 @@ def main():
     parser.add_argument('--metadata-id',
                         required=False,
                         type=str,
-                        help='a unique id of the form FOLDER_NAME/DB_NAME/TABLE_NAME (e.g. "EpicKitchens-100/retrieval_annotations/train"')
+                        help='imported metadata will be uniquely identified in WISE project using this id')
 
     parser.add_argument('--from-csv',
                         required=False,
@@ -208,9 +208,13 @@ def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metada
     colnames = []
     ## All external metadata must have these columns:
     ## media_id, timestamp, end_timestamp, vector_id
+    ##
+    ## We create an index on media_id column so that full text search results
+    ## on metadata can be resolved to parent media files quickly.
     colnames.append( sa.Column('media_id',
                                sa.Integer,
                                sa.ForeignKey("media.id", ondelete="CASCADE"),
+                               index=True,
                                nullable=False) )
     colnames.append( sa.Column('timestamp',
                                sa.Numeric(6,2),
