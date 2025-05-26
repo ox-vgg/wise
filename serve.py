@@ -35,15 +35,6 @@ def main(
         None,
         help="The faiss index to use for serving"
     ),
-    search_targets: List[str] = typer.Option(
-        [],
-        "--search-target",
-        help=(
-            "One or more TARGET:FEATURE-ID pairs, where TARGET is one of {video, audio, face, image} "
-            "and FEATURE-ID is the name (can be partial) of {audio,video,image}-feature-id. "
-            "For example: --search-target video:open_clip --search-target audio:clap --search-target face:insightface"
-        ),
-    ),
     query_blocklist: Path = typer.Option(
         None,
         '--query-blocklist',
@@ -63,7 +54,7 @@ def main(
     if not Path(theme_asset_dir / 'index.html').exists():
         raise FileNotFoundError(
             f"Frontend assets not found at {theme_asset_dir}. "
-            "Please build the frontend assets using `npm run build`."
+            "Please build the frontend assets using `npm install && npm run build`."
         )
     from api import serve
 

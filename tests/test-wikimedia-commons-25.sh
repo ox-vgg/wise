@@ -183,9 +183,6 @@ echo "Starting WISE2 server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} (takes ab
 cd "${WISE_CODE_DIR}"
 LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
         --index-type "${FAISS_INDEX_TYPE}" \
-        --search-target video:open_clip \
-        --search-target face:insightface \
-        --search-target audio:clap \
         --project-dir "$WISE_PROJECT_DIR" & # to start the server in the background
 SERVER_PID=$!
 trap cleanup SIGINT
