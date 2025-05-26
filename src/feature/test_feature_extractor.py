@@ -6,7 +6,7 @@ from sklearn.datasets import load_sample_image
 import torch
 from PIL import Image
 
-from .transformers_owlv2 import TransformersOWLv2, owlv2_bbox_to_xywh
+from .transformers_owlv2 import TransformersOWLv2, owlv2_bbox_to_xywh, sort_by_objectness
 from .feature_extractor_factory import FeatureExtractorFactory
 
 ## Typically, imports from external libraries come before local
@@ -160,6 +160,135 @@ class TestOWLv2BBoxConversion(unittest.TestCase):
         np.testing.assert_allclose(xywh, np.array([0.1, 0.30, 0.40, 0.10]))
 
 
+class TestOWLv2PatchSorting(unittest.TestCase):
+    ## Test values picked so they can be visualised on a 20x20 grid.
+    def test_1_batch_5_predictions_sorting(self):
+        # Use integers and fake embedding with length 3 for simplicity
+        scores = torch.Tensor([[0, 3, 2, 4, 1]])
+        embeds = torch.Tensor(
+            [[[5, 5, 5], [6, 6, 6], [7, 7, 7], [8, 8, 8], [9, 9, 9]]]
+        )
+        boxes = torch.Tensor(
+            [
+                [
+                    [5, 5, 5, 5],
+                    [6, 6, 6, 6],
+                    [7, 7, 7, 7],
+                    [8, 8, 8, 8],
+                    [9, 9, 9, 9],
+                ]
+            ]
+        )
+        scores, embeds, boxes = sort_by_objectness(scores, embeds, boxes)
+        torch.testing.assert_close(scores, torch.Tensor([[4, 3, 2, 1, 0]]))
+        torch.testing.assert_close(
+            embeds,
+            torch.Tensor(
+                [[[8, 8, 8], [6, 6, 6], [7, 7, 7], [9, 9, 9], [5, 5, 5]]]
+            ),
+        )
+        torch.testing.assert_close(
+            boxes,
+            torch.Tensor(
+                [
+                    [
+                        [8, 8, 8, 8],
+                        [6, 6, 6, 6],
+                        [7, 7, 7, 7],
+                        [9, 9, 9, 9],
+                        [5, 5, 5, 5],
+                    ]
+                ]
+            ),
+        )
+
+    def test_2_batch_5_predictions_sorting(self):
+        # Use integers and fake embedding with length 2 for simplicity
+        scores = torch.Tensor([[0, 3, 2, 4, 1], [5, 7, 6, 9, 8]])
+        embeds = torch.Tensor(
+            [
+                [
+                    [5, 5, 5],
+                    [6, 6, 6],
+                    [7, 7, 7],
+                    [8, 8, 8],
+                    [9, 9, 9],
+                ],
+                [
+                    [0, 0, 0],
+                    [1, 1, 1],
+                    [2, 2, 2],
+                    [3, 3, 3],
+                    [4, 4, 4],
+                ],
+            ],
+        )
+        boxes = torch.Tensor(
+            [
+                [
+                    [5, 5, 5, 5],
+                    [6, 6, 6, 6],
+                    [7, 7, 7, 7],
+                    [8, 8, 8, 8],
+                    [9, 9, 9, 9],
+                ],
+                [
+                    [0, 0, 0, 0],
+                    [1, 1, 1, 1],
+                    [2, 2, 2, 2],
+                    [3, 3, 3, 3],
+                    [4, 4, 4, 4],
+                ],
+            ]
+        )
+        scores, embeds, boxes = sort_by_objectness(scores, embeds, boxes)
+        torch.testing.assert_close(
+            scores, torch.Tensor([[4, 3, 2, 1, 0], [9, 8, 7, 6, 5]])
+        )
+        torch.testing.assert_close(
+            embeds,
+            torch.Tensor(
+                [
+                    [
+                        [8, 8, 8],
+                        [6, 6, 6],
+                        [7, 7, 7],
+                        [9, 9, 9],
+                        [5, 5, 5],
+                    ],
+                    [
+                        [3, 3, 3],
+                        [4, 4, 4],
+                        [1, 1, 1],
+                        [2, 2, 2],
+                        [0, 0, 0],
+                    ],
+                ],
+            ),
+        )
+        torch.testing.assert_close(
+            boxes,
+            torch.Tensor(
+                [
+                    [
+                        [8, 8, 8, 8],
+                        [6, 6, 6, 6],
+                        [7, 7, 7, 7],
+                        [9, 9, 9, 9],
+                        [5, 5, 5, 5],
+                    ],
+                    [
+                        [3, 3, 3, 3],
+                        [4, 4, 4, 4],
+                        [1, 1, 1, 1],
+                        [2, 2, 2, 2],
+                        [0, 0, 0, 0],
+                    ],
+                ]
+            ),
+        )
+
+
 class TestOWLv2FeatureExtractor(unittest.TestCase):
     def setUp(self):
         # use an objectness threshold of 0.0 to avoid filtering out any boxes in the output
@@ -208,7 +337,7 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
                 and isinstance(m.bbox.h, float)
                 for m in f.metadata
             ]))
-            
+
             ## Check if top detected objects (in terms of objectness score) are the same as expected
             top_objects = [m for m in f.metadata if m.objectness_score > 0.2]
             self.assertEqual(len(top_objects), 2) # there should only be 2 objects with an objectness score above 0.2
@@ -221,16 +350,16 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
             np.testing.assert_allclose(top_objects[1].objectness_score, 0.2692972719669342, rtol=1e-5)
             np.testing.assert_allclose(np.array(top_objects[1].bbox), np.array([0.4490808695554733, 0.8730822033848641, 0.2807672321796417, 0.12563285559625204]), rtol=1e-5)
 
-    # def test_with_one_element_list(self):
-    #     images = [self._get_sample_image_pil()]
-    #     self._test_images(images, 1)
+    def test_with_one_element_list(self):
+        images = [self._get_sample_image_pil()]
+        self._test_images(images, 1)
 
     def test_with_one_image_tensor(self):
         self._test_images(self._get_sample_image_tensor().unsqueeze(0), 1)
 
-    # def test_with_n_elements_list(self):
-    #     images = [self._get_sample_image_pil() for _ in range(4)]
-    #     self._test_images(images, 4)
+    def test_with_n_elements_list(self):
+        images = [self._get_sample_image_pil() for _ in range(4)]
+        self._test_images(images, 4)
 
     def test_with_n_images_tensor(self):
         image_batch = torch.stack([
