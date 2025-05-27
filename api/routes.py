@@ -207,11 +207,10 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
                 headers = {
                     "content-type": content_type,
                     "accept-ranges": "bytes",
-                    "content-encoding": "identity",
                     "content-length": str(file_size),
                     "access-control-expose-headers": (
                         "content-type, accept-ranges, content-length, "
-                        "content-range, content-encoding"
+                        "content-range"
                     ),
                 }
                 start = 0
