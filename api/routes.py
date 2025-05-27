@@ -310,7 +310,10 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
             thumbnail_rows = thumbnail_rows[::4] # Get every 4th item in the list
                                             # (i.e. 1 thumbnail per 2 seconds of video if the sampling rate was 2fps)
                                             # TODO make this change based on sampling rate
-            
+            if len(thumbnail_rows) > 30*60//4:
+                # For videos longer than 30 minutes, reduce the frequency of thumbnails to 1 every 4 seconds
+                thumbnail_rows = thumbnail_rows[::2]
+
             # Get thumbnails
             ids = [thumbnail_row['id'] for thumbnail_row in thumbnail_rows]
             thumbs = [Image.open(io.BytesIO(thumbnail_row['content'])) for thumbnail_row in thumbnail_rows]
