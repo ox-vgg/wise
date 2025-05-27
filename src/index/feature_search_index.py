@@ -95,7 +95,7 @@ class FeatureSearchIndex(SearchIndex):
         if not index_fn.exists():
             print(f'  index {index_fn} does not exist')
             print(f'  use create-index.py script to create an index')
-            False
+            return False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
         self.feature_extractor = FeatureExtractorFactory(self.feature_extractor_id)
         self.feature_extractor.create_vector_metadata_table(db_engine)
