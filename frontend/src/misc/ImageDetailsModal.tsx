@@ -21,6 +21,7 @@ const ExternalMetadata = ({ all_metadata }: ExternalMetadataProps) => {
   if (Object.keys(rest).length === 0) {
     return <p>
       <b>Media Metadata</b>
+      <br />
       <i>No metadata available</i>
     </p>
   }
