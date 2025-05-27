@@ -54,7 +54,11 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
         console.error(`Could not find vector with id ${key}`)
         return;
       }
-      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector }]);
+      // If this was a search result, vector comes with the distance
+      // property.  We remove the distance property so it is no longer
+      // identified as a result and it doesn't show up on WiseHeader.
+      const vectorInfo = excludeKey(vector, "distance");
+      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vectorInfo }]);
       setIsSubmitSearch(true);
     } else if (key.startsWith('add_negative_image_query_')) {
       key = key.replace(/^add_negative_image_query_/, '');
@@ -64,7 +68,11 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
         console.error(`Could not find vector with id ${key}`)
         return;
       }
-      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vector, isNegative: true }]);
+      // If this was a search result, vector comes with the distance
+      // property.  We remove the distance property so it is no longer
+      // identified as a result and it doesn't show up on WiseHeader.
+      const vectorInfo = excludeKey(vector, "distance");
+      setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vectorInfo, isNegative: true }]);
       setIsSubmitSearch(true);
     }
   }
