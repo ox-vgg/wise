@@ -1,10 +1,13 @@
+from functools import cached_property
 from pathlib import Path
 import sqlite3
+
+from . import db as wise_db
 
 DB_SCHEME = "sqlite+pysqlite://"
 
 class WiseProject:
-    def __init__(self, project_dir: Path, create_project=False):
+    def __init__(self, project_dir: Path, *, create_project=False, **kwargs):
         self.project_dir = Path(project_dir)
         self.store_dir = self.project_dir / "store"
         self.media_dir = self.project_dir / "media"
@@ -19,6 +22,9 @@ class WiseProject:
                 self.metadata_dir.mkdir(parents=True, exist_ok=True)
             else:
                 raise ValueError(f"project folder {self.project_dir} does not exist")
+            
+        self._db_kwargs = kwargs.get('db_kwargs', {})
+        self._thumbsdb_kwargs = kwargs.get('thumbsdb_kwargs', {})
 
     @property
     def thumbs_uri(self) -> str:
@@ -27,6 +33,14 @@ class WiseProject:
     @property
     def dburi(self) -> str:
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
+
+    @cached_property
+    def db_engine(self):
+        return wise_db.init_project(self.dburi, **self._db_kwargs)
+
+    @cached_property
+    def thumbsdb_engine(self):
+        return wise_db.init_thumbs(self.thumbs_uri, **self._thumbsdb_kwargs)
 
     @property
     def fts_config_file(self) -> Path:

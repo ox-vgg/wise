@@ -90,8 +90,8 @@ def main():
 ##
 
 def import_shots(args):
-    project = WiseProject(args.project_dir, create_project=False)
-    db_engine = db.init_project(project.dburi, echo=False)
+    project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
+    db_engine = project.db_engine
 
     def add_shots(_metadata):
         with db_engine.begin() as conn:
@@ -137,12 +137,12 @@ def import_shots(args):
 ##
 
 def import_media_metadata(args):
-    project = WiseProject(args.project_dir, create_project=False)
+    project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
     project_assets = project.discover_assets()
     if len(project_assets) == 0:
         print(f'failed to load assets from {args.project_dir}')
         sys.exit(1)
-    db_engine = db.init_project(project.dburi, echo=False)
+    db_engine = project.db_engine
     db_inspector = sa.inspect(db_engine)
 
     metadata_tablename = project.metadata_tablename(args.metadata_id)

@@ -767,12 +767,12 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    project = WiseProject(args.project_dir, create_project=False)
+    project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
     project_assets = project.discover_assets()
     if len(project_assets) == 0:
         print(f'failed to load assets from {args.project_dir}')
         sys.exit(1)
-    db_engine = db.init_project(project.dburi, echo=False)
+    db_engine = project.db_engine
 
     # sanity check of some CLI arguments
     if args.media_type_list is None and args.media_type_not_list is not None:

@@ -72,7 +72,7 @@ if __name__ == '__main__':
                 fts_tables_columns = json.load(f)
 
             logger.info(f'creating fts index with config {fts_tables_columns}')
-            project_engine = db.init_project(project.dburi)
+            project_engine = project.db_engine
             db.reflect_external_metadata(project_engine)            
             try:
                 project.fts_config_file.write_text(json.dumps(fts_tables_columns, sort_keys=True))

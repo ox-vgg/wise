@@ -308,8 +308,8 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
     router = APIRouter(
         on_shutdown=[lambda: print("shutting down") and router_cm.close()],
     )
-    project_engine = db.init_project(project.dburi)
-    thumbs_engine = db.init_thumbs(project.thumbs_uri)
+    project_engine = project.db_engine
+    thumbs_engine = project.thumbsdb_engine
 
     if config.redirect_media_url_by_path and config.redirect_media_url_num_components < 1:
         raise ValueError(
@@ -702,8 +702,8 @@ def _get_search_router(config: APIConfig):
         MediaType.AUDIO: "This is the sound of",
     }
     project_assets = project.discover_assets()
-    project_engine = db.init_project(project.dburi)
-    thumbs_engine = db.init_thumbs(project.thumbs_uri)
+    project_engine = project.db_engine
+    thumbs_engine = project.thumbsdb_engine
     external_metadata_tables = db.reflect_external_metadata(project_engine)
 
     shots_table = db.shots_table
