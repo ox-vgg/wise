@@ -503,6 +503,7 @@ def _get_search_router(config: APIConfig):
     class VideoSegment(VectorResult):
         ts: float
         te: float
+        thumbnail_ts: float
 
     class VideoAudioResults(BaseModel):
         total: int # maximum number of unmerged_windows that can be returned
@@ -579,6 +580,7 @@ def _get_search_router(config: APIConfig):
                         link=f"media/{best.media_id}#t={start.ts},{current.te}",
                         distance=best.distance,
                         thumbnail=best.thumbnail,
+                        thumbnail_ts=best.thumbnail_ts,
                         bbox=best.bbox,
                     )
                 )
@@ -596,6 +598,7 @@ def _get_search_router(config: APIConfig):
                     link=f"media/{best.media_id}#t={start.ts},{current.te}",
                     distance=best.distance,
                     thumbnail=best.thumbnail,
+                    thumbnail_ts=best.thumbnail_ts,
                     bbox=best.bbox,
                 )
             )
@@ -688,6 +691,7 @@ def _get_search_router(config: APIConfig):
                     link=f"media/{best_segment.media_id}#t={_shot.ts},{_shot.te}",
                     distance=best_segment.distance,
                     thumbnail=best_segment.thumbnail,
+                    thumbnail_ts=best_segment.thumbnail_ts,
                     bbox=best_segment.bbox,
                 )
             )
@@ -742,6 +746,7 @@ def _get_search_router(config: APIConfig):
                 link=f"media/{video_id}#t={ts},{te}", # f"{_metadata.source_uri if _metadata.source_uri else f'media/{video_id}{_metadata.path}'}",
                 distance=_dist,
                 thumbnail=_thumb,
+                thumbnail_ts=float(ts),
                 bbox=_ext_metadata.bbox,
             )
 
