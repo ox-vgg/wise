@@ -128,7 +128,7 @@ def compute_text_embedding(project_dir, text_queries):
     
     print(f'Initialising feature extractor for {feature_extractor_id}')
     feature_extractor = FeatureExtractorFactory(feature_extractor_id)
-    feature_dim = feature_extractor.get_output_dim()
+    feature_dim = feature_extractor.output_dim
     text_embeddings = np.zeros((len(text_queries), feature_dim), dtype=np.float32)
     for i in tqdm(range(0, len(text_queries))):
         prefixed_query = f"{query_prefix} {text_queries[i].strip()}".strip()

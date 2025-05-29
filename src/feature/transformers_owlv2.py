@@ -21,6 +21,8 @@
 ## limitations under the License.
 
 from dataclasses import dataclass
+from functools import cached_property
+import logging
 from transformers import Owlv2Processor, Owlv2ForObjectDetection
 import torch
 from torchvision.transforms.functional import pil_to_tensor
@@ -29,8 +31,9 @@ from typing import Union
 from PIL import Image
 import sqlalchemy as sa
 
-from .feature_extractor import BBoxXYWH, FeatureExtMetadata, FeatureExtractor, Features
+from .feature_extractor import BBoxXYWH, FeatureExtMetadata, FeatureExtractor, Features, get_torch_device
 
+logger = logging.getLogger(__name__)
 
 def flatten_patch_features(feature_map: torch.Tensor) -> torch.Tensor:
     assert feature_map.ndim == 4
@@ -160,7 +163,13 @@ class TransformersOWLv2(FeatureExtractor):
     preprocess_audio = None
     extract_audio_features = None
 
-    def __init__(self, id: str, objectness_threshold=0.02):
+    def __init__(
+        self,
+        id: str,
+        objectness_threshold=0.02,
+        device: str | torch.device | None = None,
+        warmup: bool = False,
+    ):
         """
         Parameters
         ----------
@@ -184,16 +193,24 @@ class TransformersOWLv2(FeatureExtractor):
         id_tokens = id.split('/')
 
         assert len(id_tokens) == 4
-        model_name = id[len(self.ID_PREFIX):] # remove ID_PREFIX from id string
+        self.model_name = id[len(self.ID_PREFIX):] # remove ID_PREFIX from id string
 
-        self.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-        self.model: Owlv2ForObjectDetection = Owlv2ForObjectDetection.from_pretrained(model_name).to(self.DEVICE)
-        self.processor = Owlv2Processor.from_pretrained(model_name)
-
-        self.model.eval()
-
+        self.DEVICE = get_torch_device(device)
         self.objectness_threshold = objectness_threshold
+
+        if warmup:
+            self.warmup()
+
+    @cached_property
+    def model(self) -> Owlv2ForObjectDetection:
+        logger.info(f'Initialising model {self.ID_PREFIX} - {self.model_name} (device={self.DEVICE})')
+        _model = Owlv2ForObjectDetection.from_pretrained(self.model_name).to(self.DEVICE)
+        _model.eval()
+        return _model
+
+    @cached_property
+    def processor(self):
+        return Owlv2Processor.from_pretrained(self.model_name)
 
     def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
         db_metadata_obj = sa.MetaData()
@@ -450,3 +467,12 @@ class TransformersOWLv2(FeatureExtractor):
     def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
         # Apply sigmoid transformation to the logits (dot products) from Faiss.
         return 1. / (1. + np.exp(-dist))
+
+    def warmup(self):
+        random_image = torch.rand((1, 3, 512, 512))
+        image_features = self.extract_image_features(
+            self.preprocess_image(random_image)
+        )
+        text_features = self.extract_text_features(["some random text"])
+        assert image_features[0].vectors.shape[1] == text_features.shape[1]
+        return

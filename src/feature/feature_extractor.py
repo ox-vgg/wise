@@ -218,3 +218,28 @@ class FeatureExtractor:
             The transformed Faiss distance scores, with shape (num_queries, k).
         """
         return dist
+
+    def warmup(self):
+        """
+        Warmup method to be implemented by subclasses
+        Useful when the models are lazy loaded and if someone wants to
+        eagerly load them and allocate memory beforehand
+        """
+        pass
+
+
+def get_torch_device(device: str | torch.device | None = None):
+    """
+    Get the torch device object for use in feature extractors.
+    Useful when the calling code wants to override placement, or use other special accelerators
+
+    torch.device -> torch.device
+    "" or None -> cuda if available else cpu
+    any other string -> torch.device(string)
+    """
+    if isinstance(device, torch.device):
+        return device
+    
+    _default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    _device = device or _default_device
+    return torch.device(_device)
