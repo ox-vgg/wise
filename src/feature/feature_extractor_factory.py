@@ -3,7 +3,20 @@ from .microsoft_clap import MicrosoftClap
 from .transformers_owlv2 import TransformersOWLv2
 from .insightface import InsightFaceFeatureExtractor
 
-def FeatureExtractorFactory(id):
+def get_feature_extractor_class(id: str):
+    if id.startswith('mlfoundations/open_clip/'):
+        return MlfoundationOpenClip
+    elif id.startswith('microsoft/clap/'):
+        return MicrosoftClap
+    elif id.startswith('transformers/owlv2/'):
+        return TransformersOWLv2
+    elif id.startswith('deepinsight/insightface/'):
+        return InsightFaceFeatureExtractor
+    else:
+        raise ValueError(f'Unknown feature extractor id {id}')
+
+
+def FeatureExtractorFactory(id, **kwargs):
     """
     Extract features (e.g. a vector of length 256) from images, videos and audio.
 
@@ -36,18 +49,11 @@ def FeatureExtractorFactory(id):
             (e.g. microsoft/clap/2023/four-datasets/)
     """
     if len(id.split('/')) != 4:
-        raise ValueError(f'''Feature extractor name must be formatted as
+        raise ValueError('''Feature extractor name must be formatted as
               USER_OR_ORGANIZATION / REPOSITORY_NAME / MODEL_NAME / TRAINING_DATASET
             For example, use "mlfoundations/open_clip/ViT-B-16-SigLIP-256/webli" for extracting features using ViT
             model trained on the Web Language Image (WebLI) dataset.
             ''')
-    if id.startswith('mlfoundations/open_clip/'):
-        return MlfoundationOpenClip(id)
-    elif id.startswith('microsoft/clap/'):
-        return MicrosoftClap(id)
-    elif id.startswith('transformers/owlv2/'):
-        return TransformersOWLv2(id)
-    elif id.startswith('deepinsight/insightface/'):
-        return InsightFaceFeatureExtractor(id)
-    else:
-        raise ValueError(f'Unknown feature extractor id {id}')
+    
+    cls = get_feature_extractor_class(id)
+    return cls(id, **kwargs)
