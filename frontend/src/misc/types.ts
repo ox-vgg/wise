@@ -27,7 +27,7 @@ export type ASRSegment = {
   text: string;
 }
 
-type MediaInfo = {
+export type MediaInfo = {
   id: string;
   filename: string;
   width: number;
@@ -261,14 +261,16 @@ export interface SearchResultsProps {
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
   viewModality: keyof ProcessedSearchResults;
+  featureExtractorId: string;
   submitSearch: () => void;
 };
 
 export interface ImageDetailsModalProps {
-  isHomePage: boolean;
   imageDetails: ProcessedImageVector | ProcessedVideoSegment;
   setImageDetails: (x?: ProcessedImageVector | ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
+  isHomePage: boolean;
+  featureExtractorId: string;
   handleInternalSearchButtonClick: (vector: ProcessedVectorInfo) => void;
 };
 
@@ -289,6 +291,7 @@ export interface VideoOccurrencesViewProps {
 export interface StillImageViewProps {
   imageDetails: ProcessedVectorInfo;
   isModalView: boolean;
+  featureExtractorId: string;
   // If handleInternalSearchButtonClick is missing, the "Find Similar"
   // button is omitted.
   handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;

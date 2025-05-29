@@ -540,7 +540,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
         <Popover
           content={
             <div className='wise-image-wrapper'>
-              <StillImageView imageDetails={query.value} isModalView={false} />
+              <StillImageView imageDetails={query.value} isModalView={false} featureExtractorId={featureExtractorId} />
             </div>
           }
           key={query.id}

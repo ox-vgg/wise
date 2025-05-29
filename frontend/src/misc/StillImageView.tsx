@@ -4,7 +4,7 @@ import { SearchOutlined } from "@ant-design/icons";
 import { interleaveArrayWithElement } from "./utils.ts";
 
 import "./StillImageView.scss";
-import { ProcessedImageVector, ProcessedVectorInfo, StillImageViewProps } from "./types";
+import { MediaInfo, ProcessedImageInfo, ProcessedImageVector, ProcessedVectorInfo, StillImageViewProps } from "./types";
 
 
 type ProcessedVectorInfoWithBBox = ProcessedVectorInfo & {
@@ -16,6 +16,12 @@ const isWithBBox = (
 ): vector_info is ProcessedVectorInfoWithBBox => {
   return Boolean(vector_info.bbox);
 }
+
+const isWithVectors = (
+  mediaInfo: MediaInfo
+): mediaInfo is ProcessedImageInfo => {
+  return Boolean("vectors" in mediaInfo);
+};
 
 
 const isResult = (
@@ -85,6 +91,7 @@ const BoundingBox: React.FunctionComponent<{
 const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   imageDetails,
   isModalView,
+  featureExtractorId,
   handleInternalSearchButtonClick,
 }: StillImageViewProps) => {
 
@@ -109,14 +116,38 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   // user selects the image for viewing on the modal dialog.
   const bounding_boxes = [];
   if (isWithBBox(imageDetails)) {
-    bounding_boxes.push(
-      <BoundingBox
-        vector={imageDetails}
-        bbox_text={distance_str}
-        is_primary={true}
-        handleInternalSearchButtonClick={handleInternalSearchButtonClick}
-      />
-    );
+    if (featureExtractorId.includes("insightface")) {
+      bounding_boxes.push(
+        <BoundingBox
+          vector={imageDetails}
+          bbox_text={distance_str}
+          is_primary={true}
+          handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+        />
+      );
+    } else if (
+      isWithVectors(imageDetails.mediaInfo) &&
+      imageDetails.mediaInfo.vectors.every(v => isWithBBox(v))
+    ) {
+      let vectors = [...imageDetails.mediaInfo.vectors];
+      bounding_boxes.push(
+        ...vectors.sort((vecA, vecB) => (
+          // sort boxes by area so that when a small box overlaps with a big box, the small box is always selectable
+          vecB.bbox.w * vecB.bbox.h - vecA.bbox.w * vecA.bbox.h
+        )).map(vec => (
+          <BoundingBox
+            vector={vec}
+            bbox_text={
+              isResult(vec)
+              ? `Similarity: ${vec.distance.toFixed(2)}`
+              : ""
+            }
+            is_primary={true}
+            handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+          />
+        ))
+      )
+    }
   }
 
   if (isModalView && imageDetails.related_vectors) {

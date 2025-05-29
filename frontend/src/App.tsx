@@ -146,6 +146,7 @@ export const App: React.FunctionComponent = () => {
       <SearchResults dataService={dataService} isHomePage={isHomePage} projectInfo={projectInfo}
                       setSearchText={setSearchText} multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                       viewModality={viewModality}
+                      featureExtractorId={featureExtractorId}
                       submitSearch={submitSearch} />
     </Content>
   </Layout>

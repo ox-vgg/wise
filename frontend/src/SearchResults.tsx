@@ -17,7 +17,9 @@ const FRONTEND_PAGE_SIZE = 50;
 
 const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   dataService, isHomePage, projectInfo, setSearchText,
-  multimodalQueries, setMultimodalQueries, viewModality, submitSearch
+  multimodalQueries, setMultimodalQueries,
+  viewModality, featureExtractorId,
+  submitSearch
 }: SearchResultsProps) => {
   const { searchResults, isLoadingNewSearch, searchLatency /*, totalResults */ } = dataService;
   const [viewMode, setViewMode] = useState<string | number>('Segments');
@@ -93,7 +95,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   // timestamp).
   const [imageDetails, _setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
   const setImageDetails = (d: ProcessedVideoSegment | ProcessedImageVector | undefined) => {
-    if (d && d.mediaType === "IMAGE" && ! d.related_vectors && !isNaN(parseInt(d.vector_id)))
+    if (featureExtractorId.includes('insightface') && d && d.mediaType === "IMAGE" && ! d.related_vectors && !isNaN(parseInt(d.vector_id)))
       dataService.fillRelatedVectors(d).then(x => _setImageDetails(x));
     else
       _setImageDetails(d);
@@ -105,7 +107,15 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     // Unmerged Segments / Segments view mode
     let _searchResults: ProcessedImageVector[] | ProcessedVideoSegment[] = [];
     if (viewModality == 'Image') {
-      _searchResults = searchResults.Image.vectors;
+      if (!featureExtractorId.includes('insightface')) {
+        // show unique images instead of duplicated images, when there are multiple vectors per image
+        _searchResults = Array.from(searchResults.Image.mediaInfo).map(([_, imageInfo]) => {
+          return imageInfo.vectors[0] as ProcessedImageVector;
+        });
+      } else {
+        // for insightface specifically, we show each vector (box) as an individual search result
+        _searchResults = searchResults.Image.vectors;
+      }
     } else if (viewModality == 'Video' || viewModality == 'VideoAudio' || viewModality == 'Audio') {
       if (viewMode == 'UnmergedSegments') {
         _searchResults = searchResults[viewModality].unmerged_windows;
@@ -174,6 +184,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
               <StillImageView
                 imageDetails={searchResult}
                 isModalView={false}
+                featureExtractorId={featureExtractorId}
                 handleInternalSearchButtonClick={handleInternalSearchButtonClick}
               />
             </a>
@@ -296,10 +307,11 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     {
       imageDetails &&
       <ImageDetailsModal
-        isHomePage={isHomePage}
         imageDetails={imageDetails}
         setImageDetails={setImageDetails}
         setSelectedImageId={setSelectedImageId}
+        isHomePage={isHomePage}
+        featureExtractorId={featureExtractorId}
         handleInternalSearchButtonClick={handleInternalSearchButtonClick}
       />
     }
