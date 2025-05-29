@@ -5,7 +5,6 @@ The hardware and software requirements for installing WISE are as follows.
 - A modern computer with Ubuntu, Debian, or other similar OS
   - There may be installation issues on macOS and Windows. We recommend using a Linux environment (or WSL) for now
 - Python version 3.10 (or higher)
-- ffmpeg 4.4.2 (or higher)
 
 To install WISE, we first download the WISE source code.
 
@@ -53,7 +52,7 @@ module for installing the dependencies as shown below.
 
 ```
 python3 --version                  # must be >= 3.10
-sudo apt install ffmpeg            # ffmpeg is required to load videos
+sudo apt install ffmpeg            # ffmpeg>=4.4.2,<7.0 is required to load videos
 python3 -m venv wise-dep/          # create virtual environment
 source wise-dep/bin/activate
 python -m pip install --upgrade pip
@@ -69,7 +68,7 @@ all the functionality of the WISE software remains available.
 
 ```
 python3 --version                  # must be >= 3.10
-sudo apt install ffmpeg            # ffmpeg is required to load videos
+sudo apt install ffmpeg            # ffmpeg>=4.4.2,<7.0 is required to load videos
 python3 -m venv wise-dep/          # create virtual environment
 source wise-dep/bin/activate
 python -m pip install --upgrade pip
