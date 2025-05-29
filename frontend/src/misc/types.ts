@@ -87,6 +87,7 @@ type ImageVector = VectorResult;
 export type VideoSegment = VectorResult & {
   ts: number;
   te: number;
+  thumbnail_ts: number;
 };
 
 export type VideoAudioResults = {
@@ -134,6 +135,7 @@ export type ProcessedVideoSegment = VideoSegment & ProcessedVectorMixin & {
   mediaInfo: ProcessedVideoInfo;
 };
 export type ProcessedVideoInfo = VideoInfo & {
+  vectors: ProcessedVideoSegment[];
   shots: ProcessedVideoSegment[];
   asrSegments?: ASRSegment[];
 };

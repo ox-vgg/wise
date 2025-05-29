@@ -151,6 +151,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
     processedSearchResults.Video.unmerged_windows = processUnmergedSegments(results.video_results.unmerged_windows, processedSearchResults.Video.mediaInfo);
     processedSearchResults.Video.merged_windows = processShots(results.video_results.merged_windows, processedSearchResults.Video.mediaInfo);
     for (let [mediaId, processedVideo] of processedSearchResults.Video.mediaInfo) {
+      processedVideo.vectors = processedSearchResults.Video.unmerged_windows.filter(segment => segment.media_id === mediaId);
       processedVideo.shots = processedSearchResults.Video.merged_windows.filter(shot => shot.media_id === mediaId)
     }
 
@@ -164,6 +165,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
     processedSearchResults.VideoAudio.unmerged_windows = processUnmergedSegments(results.video_audio_results.unmerged_windows, processedSearchResults.VideoAudio.mediaInfo);
     processedSearchResults.VideoAudio.merged_windows = processShots(results.video_audio_results.merged_windows, processedSearchResults.VideoAudio.mediaInfo);
     for (let [mediaId, processedVideo] of processedSearchResults.VideoAudio.mediaInfo) {
+      processedVideo.vectors = processedSearchResults.Video.unmerged_windows.filter(segment => segment.media_id === mediaId);
       processedVideo.shots = processedSearchResults.VideoAudio.merged_windows.filter(shot => shot.media_id === mediaId)
     }
   }

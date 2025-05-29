@@ -4,7 +4,7 @@ import { SearchOutlined } from "@ant-design/icons";
 import { interleaveArrayWithElement } from "./utils.ts";
 
 import "./StillImageView.scss";
-import { MediaInfo, ProcessedImageInfo, ProcessedImageVector, ProcessedVectorInfo, StillImageViewProps } from "./types";
+import { MediaInfo, ProcessedImageInfo, ProcessedImageVector, ProcessedVectorInfo, ProcessedVideoInfo, ProcessedVideoSegment, StillImageViewProps } from "./types";
 
 
 type ProcessedVectorInfoWithBBox = ProcessedVectorInfo & {
@@ -19,10 +19,15 @@ const isWithBBox = (
 
 const isWithVectors = (
   mediaInfo: MediaInfo
-): mediaInfo is ProcessedImageInfo => {
+): mediaInfo is ProcessedImageInfo | ProcessedVideoInfo => {
   return Boolean("vectors" in mediaInfo);
 };
 
+const isVideoSegment = (
+  vector: ProcessedVectorInfo
+): vector is ProcessedVideoSegment => {
+  return Boolean("ts" in vector && "te" in vector && "thumbnail_ts" in vector);
+};
 
 const isResult = (
   vector: ProcessedVectorInfo
@@ -130,6 +135,10 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
       imageDetails.mediaInfo.vectors.every(v => isWithBBox(v))
     ) {
       let vectors = [...imageDetails.mediaInfo.vectors];
+      if (isVideoSegment(imageDetails) && vectors.every(v => isVideoSegment(v))) {
+        // Only show the bounding boxes from the same video frame
+        vectors = vectors.filter(v => v.thumbnail_ts === imageDetails.thumbnail_ts)
+      }
       bounding_boxes.push(
         ...vectors.sort((vecA, vecB) => (
           // sort boxes by area so that when a small box overlaps with a big box, the small box is always selectable

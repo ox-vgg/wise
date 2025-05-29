@@ -119,6 +119,18 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     } else if (viewModality == 'Video' || viewModality == 'VideoAudio' || viewModality == 'Audio') {
       if (viewMode == 'UnmergedSegments') {
         _searchResults = searchResults[viewModality].unmerged_windows;
+        
+        if (!featureExtractorId.includes('insightface')) {
+          // show unique frames instead of duplicated frames, when there are multiple vectors/boxes per frame
+          const uniqueFrames = new Map<string, ProcessedVideoSegment>();
+          _searchResults.forEach((segment: ProcessedVideoSegment) => {
+            const frameId = `${segment.media_id}_${segment.thumbnail_ts}`;
+            if (!uniqueFrames.has(frameId)) {
+              uniqueFrames.set(frameId, segment);
+            }
+          });
+          _searchResults = Array.from(uniqueFrames.values());
+        }
       } else {
         _searchResults = searchResults[viewModality].merged_windows;
       }
