@@ -32,6 +32,7 @@ from PIL import Image
 import sqlalchemy as sa
 
 from .feature_extractor import BBoxXYWH, FeatureExtMetadata, FeatureExtractor, Features, get_torch_device
+from ..db import project_metadata_obj
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,26 @@ class TransformersOWLv2(FeatureExtractor):
     preprocess_audio = None
     extract_audio_features = None
 
+    _vector_metadata_table = sa.Table(
+        "vector_metadata_owlv2",
+        project_metadata_obj,
+        sa.Column(
+            "vector_id",
+            sa.Integer,
+            sa.ForeignKey("vectors.id", ondelete="cascade"),
+            nullable=False,
+            index=True,
+        ),
+        sa.Column("objectness_score", sa.Float, nullable=False),
+        ## we store normalized (x0, y0, w, h) coordinates
+        ## because that's what the frontend uses.
+        sa.Column("bbox_x", sa.Float, nullable=False),  # [0.0-1.0]
+        sa.Column("bbox_y", sa.Float, nullable=False),  # [0.0-1.0]
+        sa.Column("bbox_w", sa.Float, nullable=False),  # [0.0-1.0]
+        sa.Column("bbox_h", sa.Float, nullable=False),  # [0.0-1.0]
+        keep_existing=True,
+    )
+
     def __init__(
         self,
         id: str,
@@ -212,45 +233,28 @@ class TransformersOWLv2(FeatureExtractor):
     def processor(self):
         return Owlv2Processor.from_pretrained(self.model_name)
 
-    def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
-        db_metadata_obj = sa.MetaData()
-        db_metadata_obj.reflect(db_engine)
-        self._vector_metadata_table = sa.Table(
-            "vector_metadata_owlv2",
-            db_metadata_obj,
-            sa.Column(
-                "vector_id",
-                sa.ForeignKey("vectors.id", ondelete="cascade"),
-                nullable=False,
-                index=True,
-            ),
-            sa.Column("objectness_score", sa.Float, nullable=False),
-            ## we store normalized (x0, y0, w, h) coordinates
-            ## because that's what the frontend uses.
-            sa.Column("bbox_x", sa.Float, nullable=False),  # [0.0-1.0]
-            sa.Column("bbox_y", sa.Float, nullable=False),  # [0.0-1.0]
-            sa.Column("bbox_w", sa.Float, nullable=False),  # [0.0-1.0]
-            sa.Column("bbox_h", sa.Float, nullable=False),  # [0.0-1.0]
-            keep_existing=True,
-        )
-        db_metadata_obj.create_all(db_engine)
+    @classmethod
+    def create_vector_metadata_table(cls, db_engine: sa.Engine) -> None:
+        cls._vector_metadata_table.create(bind=db_engine, checkfirst=True)
 
+    @classmethod
     def add_to_vector_metadata_table(
-        self, conn:sa.Connection, vid: list[int], metadata: list[OWLv2FeatureMetadata]
+        cls, conn:sa.Connection, vid: list[int], metadata: list[OWLv2FeatureMetadata]
     ) -> None:
         ## This condition is needed because insert with an empty list
         ## does an insert with NULLs instead of "nothing".  See
         ## https://github.com/sqlalchemy/sqlalchemy/discussions/9645
         if len(metadata) > 0:
             conn.execute(
-                sa.insert(self._vector_metadata_table),
+                sa.insert(cls._vector_metadata_table),
                 [x.to_sql_values(vid) for vid, x in zip(vid, metadata)],
             )
 
+    @classmethod
     def get_vector_metadata(
-        self, conn: sa.Connection, vid: list[int]
+        cls, conn: sa.Connection, vid: list[int]
     ) -> list[FeatureExtMetadata]:
-        c = self._vector_metadata_table.c
+        c = cls._vector_metadata_table.c
         res = conn.execute(
             sa.select(c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
             .where(c.vector_id.in_(vid))

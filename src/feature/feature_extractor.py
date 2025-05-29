@@ -71,17 +71,20 @@ class FeatureExtractor:
     `None` (see :py:exc:`NotImplementedError`).
 
     """
+    _vector_metadata_table: sa.Table | None = None
 
     def __init__(self):
         raise NotImplementedError
 
-    def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
+    @classmethod
+    def create_vector_metadata_table(cls, db_engine: sa.Engine) -> None:
         """Create if needed a table for these features metadata.
         """
         pass  # default to no-op
 
+    @classmethod
     def add_to_vector_metadata_table(
-        self, conn: sa.Connection, vid: list[int], metadata: Any
+        cls, conn: sa.Connection, vid: list[int], metadata: Any
     ) -> None:
         """Add vector metadata to the database.
 
@@ -98,9 +101,10 @@ class FeatureExtractor:
 
         """
         pass  # default to no-op
-
+    
+    @classmethod
     def get_vector_metadata(
-        self, conn: sa.Connection, vid: list[int]
+        cls, conn: sa.Connection, vid: list[int]
     ) -> list[FeatureExtMetadata]:
         """Get Ext vector metadata from the database.
 
