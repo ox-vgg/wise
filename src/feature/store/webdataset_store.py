@@ -91,7 +91,6 @@ class WebdatasetStore(FeatureStore):
     def wds_src_url(self):
         if len(self.tar_filenames) == 0:
             raise ValueError(f'No webdataset tar files matching {self._wds_tar_prefix}*.tar found!')
-
         # Load the feature dimension
         tar_index = [sys.maxsize, -1]
         tar_index_str = ['', '']
@@ -154,7 +153,6 @@ class WebdatasetStore(FeatureStore):
             assert key.endswith('features.pyd'), f"Unexpected key: {key}"
             assert isinstance(value, bytes), f"Unexpected type: {type(value)}"
             return np.load(io.BytesIO(value), allow_pickle=True)
-
         return (
             wds.WebDataset(
                 self.wds_src_url,
