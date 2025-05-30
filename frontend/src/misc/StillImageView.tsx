@@ -1,3 +1,4 @@
+import React, { useMemo } from "react";
 import { Button, Popover } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 
@@ -111,6 +112,24 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   // otherwise it is for the bounding box.
   const img_title = imageDetails.bbox ? "" : distance_str;
 
+  const boundingBoxVectors = useMemo(() => {
+    // Bounding box vectors filtered (if applicable) and sorted by size
+    if (
+      isWithVectors(imageDetails.mediaInfo) &&
+      imageDetails.mediaInfo.vectors.every(v => isWithBBox(v))
+    ) {
+      let vectors = [...imageDetails.mediaInfo.vectors];
+      if (isVideoSegment(imageDetails) && vectors.every(v => isVideoSegment(v))) {
+        // Only show the bounding boxes from the same video frame
+        vectors = vectors.filter(v => v.thumbnail_ts === imageDetails.thumbnail_ts);
+      }
+      return vectors.sort((vecA, vecB) => (
+        vecB.bbox.w * vecB.bbox.h - vecA.bbox.w * vecA.bbox.h
+      ));
+    }
+    return [];
+  }, [imageDetails]);
+
   // An image may have any number of bounding boxes.  If there is a
   // bbox in imageDetails then that bbox is the result of a search and
   // is the "primary" bbox.  The primary bbox is shown in the search
@@ -130,20 +149,9 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
           handleInternalSearchButtonClick={handleInternalSearchButtonClick}
         />
       );
-    } else if (
-      isWithVectors(imageDetails.mediaInfo) &&
-      imageDetails.mediaInfo.vectors.every(v => isWithBBox(v))
-    ) {
-      let vectors = [...imageDetails.mediaInfo.vectors];
-      if (isVideoSegment(imageDetails) && vectors.every(v => isVideoSegment(v))) {
-        // Only show the bounding boxes from the same video frame
-        vectors = vectors.filter(v => v.thumbnail_ts === imageDetails.thumbnail_ts)
-      }
+    } else if (boundingBoxVectors.length > 0) {
       bounding_boxes.push(
-        ...vectors.sort((vecA, vecB) => (
-          // sort boxes by area so that when a small box overlaps with a big box, the small box is always selectable
-          vecB.bbox.w * vecB.bbox.h - vecA.bbox.w * vecA.bbox.h
-        )).map(vec => (
+        ...boundingBoxVectors.map(vec => (
           <BoundingBox
             vector={vec}
             bbox_text={
@@ -155,7 +163,7 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
             handleInternalSearchButtonClick={handleInternalSearchButtonClick}
           />
         ))
-      )
+      );
     }
   }
 
