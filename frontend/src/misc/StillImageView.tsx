@@ -26,7 +26,7 @@ const isWithVectors = (
 const isVideoSegment = (
   vector: ProcessedVectorInfo
 ): vector is ProcessedVideoSegment => {
-  return Boolean("ts" in vector && "te" in vector && "thumbnail_ts" in vector);
+  return Boolean(vector.mediaType === "VIDEO");
 };
 
 const isResult = (

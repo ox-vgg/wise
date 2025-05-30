@@ -407,7 +407,7 @@ export const useDataService = (): DataServiceOutput => {
     // compatible with the compact/justified image grid in the search
     // results.
     imageDetails.related_vectors = vectors.map(
-      v => {return {...v, mediaInfo: imageDetails.mediaInfo}}
+      v => {return {...v, mediaType: imageDetails.mediaType, mediaInfo: imageDetails.mediaInfo}}
     );
     return imageDetails;
   };

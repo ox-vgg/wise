@@ -70,6 +70,7 @@ export type VectorInfo = {
 // inspecting the vector in the Image details modal dialog (a second
 // "processing" step).
 type ProcessedVectorMixin = {
+  mediaType: 'IMAGE' | 'VIDEO';
   mediaInfo: MediaInfo;
   related_vectors?: ProcessedVectorInfo[];
 };
