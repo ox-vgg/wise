@@ -51,10 +51,22 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
             return self.model.model_validate(row)
         return None
 
-    def list(self, conn: sa.Connection):
-        result = conn.execute(sa.select(self._table))
-        for row in result.mappings():
-            yield self.model.model_validate(row)
+    # see https://docs.sqlalchemy.org/en/20/_modules/examples/performance/large_resultsets.html
+    def list(self, conn: sa.Connection, batch_size: int | None = None, limit: int | None = None, offset: int | None = None):
+        _conn = conn
+        if batch_size is not None:
+            _conn = conn.execution_options(stream_results=True)
+
+        result = _conn.execute(sa.select(self._table).limit(limit).offset(offset))
+        if batch_size is None:
+            yield from map(self.model.model_validate, result.mappings())
+
+        else:
+            while True:
+                chunk = result.mappings().fetchmany(batch_size)
+                if not chunk:
+                    break
+                yield from map(self.model.model_validate, chunk)
 
     def get_row_by_column_match(self, conn: sa.Connection, column_name_to_match, column_value):
         """
