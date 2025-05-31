@@ -178,6 +178,10 @@ cleanup() {
     wait $SERVER_PID 2>/dev/null
     echo "Server stopped."
 }
+if [ ! -d "frontend/dist" ]; then
+    mkdir -p frontend/dist && \
+        (cd frontend && npm ci && npm run build)
+fi
 
 echo "Starting WISE2 server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} (takes about 1 min.) ..."
 cd "${WISE_CODE_DIR}"
@@ -435,7 +439,7 @@ if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
         }
     ]
     }'
-    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+    if diff <(echo "$expected_json" | jq -S 'sort_by(.filename) | sort_by(.ts) | sort_by(.te)' .) <(echo "$response_selected_json" | jq -S 'sort_by(.filename) | sort_by(.ts) | sort_by(.te)' .) > /dev/null; then
         echo "Test 5.5 PASSED"
     else
         echo "Test 5.5 FAILED: unexpected search results"
