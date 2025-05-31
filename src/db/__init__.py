@@ -1,4 +1,5 @@
-from sqlalchemy import create_engine, Engine, MetaData
+from sqlite3 import Connection as SQLite3Connection
+from sqlalchemy import create_engine, Engine, MetaData, event
 from .base import thumbs_metadata_obj, project_metadata_obj
 from .tables import (
     source_collections_table,
@@ -12,6 +13,15 @@ from .tables import (
 _WISE_FTS_TABLE = 'metadata_fts'
 _WISE_ASR_TABLE = 'metadata-asr'
 __wise_tables = [_WISE_FTS_TABLE, _WISE_ASR_TABLE]
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, SQLite3Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
 
 def _init(dburi: str, metadata_obj: MetaData, **kwargs) -> Engine:
     engine = create_engine(dburi, **kwargs)
