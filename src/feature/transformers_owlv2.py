@@ -205,6 +205,7 @@ class TransformersOWLv2(FeatureExtractor):
                 "vector_id",
                 sa.ForeignKey("vectors.id", ondelete="cascade"),
                 nullable=False,
+                index=True,
             ),
             sa.Column("objectness_score", sa.Float, nullable=False),
             ## we store normalized (x0, y0, w, h) coordinates

@@ -21,7 +21,7 @@ media_table = sa.Table(
         nullable=False,
     ),
     sa.Column("path", sa.Unicode(1024), nullable=False),
-    sa.Column("checksum", sa.LargeBinary(128), nullable=True),
+    sa.Column("checksum", sa.LargeBinary(128), index=True, nullable=True),
     sa.Column("size_in_bytes", sa.Integer, nullable=True),
     sa.Column("date_modified", sa.DateTime(True), nullable=True),
     sa.Column("media_type", sa.Enum(MediaType), nullable=False),
@@ -36,16 +36,17 @@ vectors_table = sa.Table(
     "vectors",
     project_metadata_obj,
     sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
-    sa.Column("modality", sa.Enum(ModalityType), nullable=False),
-    sa.Column("feature_extractor_id", sa.Unicode(255), nullable=False),
+    sa.Column("modality", sa.Enum(ModalityType), index=True, nullable=False),
+    sa.Column("feature_extractor_id", sa.Unicode(255), index=True, nullable=False),
     sa.Column(
         "media_id",
         sa.Integer,
         sa.ForeignKey("media.id", ondelete="CASCADE"),
         nullable=False,
+        index=True
     ),
-    sa.Column("timestamp", sa.Float(), nullable=True),
-    sa.Column("end_timestamp", sa.Float(), nullable=True),
+    sa.Column("timestamp", sa.Float(), index=True, nullable=True),
+    sa.Column("end_timestamp", sa.Float(), index=True, nullable=True),
 )
 
 imported_metadata_table = sa.Table(

@@ -211,6 +211,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
                 "vector_id",
                 sa.ForeignKey("vectors.id", ondelete="cascade"),
                 nullable=False,
+                index=True
             ),
             sa.Column("detection_score", sa.Float, nullable=False),
             ## InsightFace returns (x0, y0, x1, y1) in absolute
