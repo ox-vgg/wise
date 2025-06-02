@@ -63,3 +63,31 @@ inserted 30 rows into table metadata-Kinetics-6c
 ## Segment Metadata
 
 **TODO**: Show an example based on the Automatic Speech Recognition (ASR) model applied to audio channel of videos.
+
+# Importing Metadata Stored in VISE
+The metadata stored in a project created using the VGG Image Search Engine
+([https://www.robots.ox.ac.uk/~vgg/software/vise/](VISE)) software can be
+imported into a WISE project as follows.
+
+```
+# VISE project folder: /data/vise/1516ci/
+# WISE project folder: /data/wise/projects/1516ci/
+
+python3 scripts/metadata/export-vise-metadata-as-csv.py\
+  --vise-metadata-db /data/vise/1516ci/metadata_db.sqlite\
+  --vise-join-colname filename\
+  --project-dir /data/wise/projects/1516ci/\
+  --out-csv-file /data/wise/dataset/1516ci/metadata_db.csv
+
+  exported 15822 rows to /data/wise/dataset/1516ci/metadata_db.csv
+
+# we manually rename column names "file_id" to "vise_file_id" and "filename"
+# to "vise_filename" in the exported csv file so that these entries can be
+# identified in the frontend
+
+python3 media-metadata.py import \
+  --metadata-id "1516ci-2024-11-25" \
+  --from-csv /data/wise/dataset/1516ci/metadata_db.csv \
+  --metadata-type "media" \
+  --project-dir /data/wise/projects/1516ci/
+```
