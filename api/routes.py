@@ -1005,6 +1005,18 @@ def _get_search_router(config: APIConfig):
         search_indices[MediaType.AUDIO]['wise/metadata'] = fts_search_index
         active_search_targets[MediaType.AUDIO].append('wise/metadata')  
 
+    # sort active search targets based on user defined order in config.search_target_order
+    search_target_order = ["open_clip", "insightface", "owlv2", "clap", "wise/metadata"]
+    if hasattr(config, "search_target_order") and config.search_target_order:
+        search_target_order = config.search_target_order
+    for media_type in active_search_targets:
+        def sort_key(x):
+            for i, partial in enumerate(search_target_order):
+                if partial in x:
+                    return i
+            return len(search_target_order)
+        active_search_targets[media_type].sort(key=sort_key)
+
     logger.info("Loaded the following search indices:\n%s", json.dumps(active_search_targets, indent=4))
 
     # Get counts

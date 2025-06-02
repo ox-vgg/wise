@@ -33,3 +33,7 @@ class APIConfig(BaseSettings):
     # flag to configure if shots must be used
     # if the flag is set to True, wise will look for shots table and use it, and raise an error if it is not found
     use_shots: bool = False
+
+    # define the order in which search targets (or feature_extractor_id) are listed
+    # this order is used by the frontend to display the search targets in the UI
+    search_target_order: list[str] = ["open_clip", "insightface", "owlv2", "clap", "wise/metadata"]
