@@ -423,6 +423,15 @@ const VIEW_MODALITY_OPTIONS_EXTRA = {
     value: 'video:wise/metadata',
   }
 }
+
+const PREFERRED_SEARCH_TARGETS_NAME = {
+  "open_clip": "Visual Search",
+  "insightface": "Face Search",
+  "metadata": "Metadata Search",
+  "owlv2": "Object Search",
+  "clap": "Audio Search"
+}
+
 type ViewModalityKey = keyof typeof VIEW_MODALITY_OPTIONS;
 
 
@@ -580,7 +589,9 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                           title: media_type.charAt(0).toUpperCase() + media_type.slice(1),
                           options: (projectInfo.search_targets?.[key] || []).map((feature_extractor_id: string) => {
                             const extra_key = `${media_type}:${feature_extractor_id}` as keyof typeof VIEW_MODALITY_OPTIONS_EXTRA;
-                            const default_label = feature_extractor_id.split('/')[1];
+                            const default_label = Object.entries(PREFERRED_SEARCH_TARGETS_NAME).find(
+                              ([key]) => feature_extractor_id.includes(key)
+                            )?.[1] ?? (feature_extractor_id.split('/')[1] || feature_extractor_id);
                             return {
                               ...VIEW_MODALITY_OPTIONS[key],
                               label: (
