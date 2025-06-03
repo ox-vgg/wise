@@ -98,9 +98,9 @@ export const App: React.FunctionComponent = () => {
     }
   }, [viewModality, featureExtractorId]);
 
-  const _submitSearch = (queries: Query[]) => {
+  const _submitSearch = (queries: Query[], _viewModality: ViewModality, _featureExtractorId: string) => {
     setIsHomePage(false); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
-    dataService.performNewSearch(queries, viewModality, featureExtractorId, shotScaleFilter).then(_ => {
+    dataService.performNewSearch(queries, _viewModality, _featureExtractorId, shotScaleFilter).then(_ => {
     }).catch((err) => {
       Modal.error({
         icon: (err.status === 403) ? <StopTwoTone twoToneColor="#ff4d4f" /> : <CloseCircleFilled />,
@@ -128,23 +128,19 @@ export const App: React.FunctionComponent = () => {
       return;
     }
 
-    _submitSearch(_queries);
+    _submitSearch(_queries, viewModality, featureExtractorId);
   }
 
   const handleExampleQueryClick = (exampleQuery: string, _viewModality?: ViewModality, _featureExtractorId?: string) => {
-    if (_viewModality) {
-      setViewModality(_viewModality);
-    }
-    if (_featureExtractorId) {
-      setFeatureExtractorId(_featureExtractorId);
-    }
+    setViewModality(_viewModality || viewModality);
+    setFeatureExtractorId(_featureExtractorId || featureExtractorId);
     setMultimodalQueries([]);
     setSearchText(exampleQuery);
     _submitSearch([{
       id: nanoid(),
       type: "TEXT",
       value: exampleQuery
-    }]);
+    }], _viewModality || viewModality, _featureExtractorId || featureExtractorId);
   }
 
   return <Layout>
