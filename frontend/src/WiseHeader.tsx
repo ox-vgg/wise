@@ -22,7 +22,41 @@ const QUERY_COLORS = {
   'METADATA': 'purple',
 }
 
-const TextSearchForm: React.FunctionComponent<React.PropsWithChildren<TextSearchFormProps>> = ({
+const VIEW_MODALITY_OPTIONS = {
+  image: {
+    icon: <PictureTwoTone />,
+    label: 'Image',
+    longLabel: 'Image',
+    value: 'Image',
+  },
+  video: {
+    icon: <VideoCameraTwoTone />,
+    label: 'Video',
+    longLabel: 'Video (visual track)',
+    value: 'Video',
+  },
+  audio: {
+    icon: <SoundTwoTone />,
+    label: 'Audio',
+    longLabel: 'Audio track of video',
+    value: 'VideoAudio',
+  },
+} as const;
+
+
+const VIEW_MODALITY_OPTIONS_EXTRA = {
+  "video:wise/metadata": {
+    icon: <FileTextTwoTone />,
+    label: 'Metadata',
+    longLabel: 'Media Metadata',
+    value: 'video:wise/metadata',
+  }
+}
+
+type ViewModalityKey = keyof typeof VIEW_MODALITY_OPTIONS;
+
+
+const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
   multimodalQueries, setMultimodalQueries,
   searchText = '',
   submitSearch,
@@ -205,21 +239,33 @@ const MediaSearchForm: React.FunctionComponent<MediaSearchFormProps> = ({
 };
 
 const SearchExamples: React.FunctionComponent<SearchExamplesProps> = ({
-  setMultimodalQueries, setSearchText, submitSearch
+  setMultimodalQueries, setSearchText, submitSearch, viewModality, featureExtractorId,
 }) => {
   const formRef = useRef<FormInstance>(null);
   const onFormSubmit = () => {
     submitSearch();
   }
 
-  const handleExampleMultimodalQueryClick = (example: any) => {
+  const [_, _featureExtractorId] = featureExtractorId.split('/', 2);
+  const multimodalQueries = config.MULTIMODAL_EXAMPLE_QUERIES[`${viewModality}:${_featureExtractorId}`] || [];
+  const is_audio = ((viewModality as string) === 'Audio' || viewModality === 'VideoAudio');
+  if (multimodalQueries.length === 0) {
+    return <></>
+  }
+  const handleExampleMultimodalQueryClick = (example: { url?: string, text?: string, displayText?: string }) => {
     // Copied/modified from addImageURLQuery() and addTextQuery()
-    let urlTextTrimmed = example.url.trim();
-    let searchTextTrimmed = example.text.trim();
-    setMultimodalQueries([
-      { id: nanoid(), type: 'IMAGE_URL', displayText: urlTextTrimmed, value: urlTextTrimmed },
-      { id: nanoid(), type: 'TEXT', displayText: searchTextTrimmed, value: searchTextTrimmed }
-    ]);
+    const _searchqueries: Query[] = [];
+    if (example.url) {
+      const urlTextTrimmed = example.url?.trim();
+      _searchqueries.push({
+        id: nanoid(), type: (is_audio ? 'AUDIO_URL' : 'IMAGE_URL'), displayText: example.displayText || urlTextTrimmed, value: urlTextTrimmed
+      })
+    }
+    if (example.text) {
+      let searchTextTrimmed = example.text?.trim();
+      _searchqueries.push({ id: nanoid(), type: 'TEXT', displayText: searchTextTrimmed, value: searchTextTrimmed })
+    }
+    setMultimodalQueries(_searchqueries);
     setSearchText('');
     formRef.current?.submit();
   }
@@ -230,14 +276,14 @@ const SearchExamples: React.FunctionComponent<SearchExamplesProps> = ({
     onFinish={onFormSubmit}
   >
     {
-      config.MULTIMODAL_EXAMPLE_QUERIES.map(example =>
+      multimodalQueries.map(example => 
         <div className="wise-multimodal-example-query"
           onClick={() => handleExampleMultimodalQueryClick(example)}
           key={example.url}
         >
-          <img src={example.url} />
-          <span className="wise-multimodal-example-query-plus-sign">+</span>
-          <Tag color='geekblue'>{example.text}</Tag>
+          {example.url && (is_audio ? <Tag color={QUERY_COLORS['AUDIO_URL']} icon={<SoundOutlined />}> {example.displayText || `Audio sample ${example.url}`}</Tag> : <img src={example.url} />)}
+          {example.url && example.text && <span className="wise-multimodal-example-query-plus-sign">+</span>}
+          {example.text && <Tag color='geekblue'>{example.text}</Tag>}
         </div>
       )
     }
@@ -281,7 +327,8 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   multimodalQueries, setMultimodalQueries,
   searchText, setSearchText,
   handleTextInputChange,
-  viewModality, featureExtractorId,
+  viewModality,
+  featureExtractorId,
   submitSearch, clearSearchBar,
   shotScaleFilter, setShotScaleFilter,
   tourVariables,
@@ -376,7 +423,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
     {
       key: 'examples',
       label: 'Examples',
-      children: <SearchExamples setMultimodalQueries={setMultimodalQueries} setSearchText={setSearchText} submitSearch={_submitSearch} />,
+      children: <SearchExamples setMultimodalQueries={setMultimodalQueries} setSearchText={setSearchText} submitSearch={_submitSearch} viewModality={viewModality} featureExtractorId={featureExtractorId} />,
     }
   ];
   const [activeKeys, setActiveKeys] = useState<string[]>(['examples']);
@@ -398,7 +445,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   } else if (viewModality == 'VideoAudio') {
     _modalities = _modalities.filter(modality => modality.id != 'image');
   }
-
+  const [_, _featureExtractorId] = featureExtractorId.split('/', 2);
   return (
     <div style={dropdownStyle}>
       <p style={{ marginTop: 0, color: token.colorTextDescription }}>
@@ -559,7 +606,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
         </>
       )}
       {
-        config.MULTIMODAL_EXAMPLE_QUERIES &&
+        config.MULTIMODAL_EXAMPLE_QUERIES[`${viewModality}:${_featureExtractorId}`] && config.MULTIMODAL_EXAMPLE_QUERIES[`${viewModality}:${_featureExtractorId}`].length > 0 &&
         <>
           <div style={{ borderTop: '1px solid #e3e3e3', marginTop: 20 }} />
           <Collapse items={collapseItems}
@@ -587,50 +634,6 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   )
 });
 
-const VIEW_MODALITY_OPTIONS = {
-  image: {
-    icon: <PictureTwoTone />,
-    label: 'Image',
-    longLabel: 'Image',
-    value: 'Image',
-  },
-  video: {
-    icon: <VideoCameraTwoTone />,
-    label: 'Video',
-    longLabel: 'Video (visual track)',
-    value: 'Video',
-  },
-  audio: {
-    icon: <SoundTwoTone />,
-    label: 'Audio',
-    longLabel: 'Audio track of video',
-    value: 'VideoAudio',
-  },
-} as const;
-const VIEW_MODALITY_OPTIONS_EXTRA = {
-  "image:wise/metadata": {
-    icon: <FileTextTwoTone />,
-    label: 'Metadata',
-    longLabel: 'Media Metadata',
-    value: 'image:wise/metadata',
-  },
-  "video:wise/metadata": {
-    icon: <FileTextTwoTone />,
-    label: 'Metadata',
-    longLabel: 'Media Metadata',
-    value: 'video:wise/metadata',
-  }
-}
-
-const PREFERRED_SEARCH_TARGETS_NAME = {
-  "open_clip": "Visual",
-  "insightface": "Faces",
-  "metadata": "Metadata",
-  "owlv2": "Objects",
-  "clap": "Audio"
-}
-
-type ViewModalityKey = keyof typeof VIEW_MODALITY_OPTIONS;
 
 
 const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
@@ -835,9 +838,9 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                 multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                 searchText={searchText} setSearchText={setSearchText}
                 handleTextInputChange={setSearchText}
-                viewModality={viewModality} featureExtractorId={featureExtractorId}
-                submitSearch={_submitSearch}
-                clearSearchBar={clearSearchBar}
+                viewModality={viewModality}
+                featureExtractorId={featureExtractorId}
+                submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
                 shotScaleFilter={shotScaleFilter} setShotScaleFilter={setShotScaleFilter}
                 isHomePage={isHomePage}
                 tourVariables={tourVariables} ref={searchDropdownRef}

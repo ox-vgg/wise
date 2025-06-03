@@ -41,16 +41,28 @@ const productionConfig = {
     // 'Cubist painting of a violin'
   ],
   // Multimodal example queries shown in search dropdown
-  MULTIMODAL_EXAMPLE_QUERIES: [
-    {
-      url: 'https://images.unsplash.com/photo-1559562328-bc48b8b32e2b?fm=jpg&w=640&fit=crop&q=80',
-      text: 'in snow'
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?auto=format&fit=crop&w=640&q=80',
-      text: 'at night'
-    },
-  ],
+  MULTIMODAL_EXAMPLE_QUERIES: {
+    'Video:open_clip': [
+      {
+        url: 'https://images.unsplash.com/photo-1559562328-bc48b8b32e2b?fm=jpg&w=640&fit=crop&q=80',
+        text: 'in snow'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?auto=format&fit=crop&w=640&q=80',
+        text: 'at night'
+      },
+    ],
+    'Image:open_clip': [
+      {
+        url: 'https://images.unsplash.com/photo-1559562328-bc48b8b32e2b?fm=jpg&w=640&fit=crop&q=80',
+        text: 'in snow'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?auto=format&fit=crop&w=640&q=80',
+        text: 'at night'
+      },
+    ],
+  },
   ENABLE_REPORT_MEDIA: true, // shows a "Report media" button in the image details page
   SHOT_SCALE_FILTER_LABEL: {
     0: "Extreme close-up",
@@ -63,11 +75,11 @@ const productionConfig = {
   METADATA_FILTER_PLACEHOLDER: "",
   METADATA_FILTER_HELP: "Use AND/OR to combine filters, Ctrl + Space key to show metadata columns.",
   PREFERRED_SEARCH_TARGETS_NAME: {
-    "open_clip": "Visual Search",
-    "insightface": "Face Search",
-    "metadata": "Metadata Search",
-    "owlv2": "Object Search",
-    "clap": "Audio Search"
+    "open_clip": "Visual",
+    "insightface": "Faces",
+    "metadata": "Metadata",
+    "owlv2": "Objects",
+    "clap": "Audio"
   }
 };
 

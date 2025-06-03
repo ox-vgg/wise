@@ -243,6 +243,8 @@ export interface SearchExamplesProps {
   setMultimodalQueries: React.Dispatch<React.SetStateAction<Query[]>>
   setSearchText: React.Dispatch<React.SetStateAction<string>>;
   submitSearch: (q?: Query[]) => void;
+  viewModality: ViewModality;
+  featureExtractorId: string;
 };
 export interface SearchDropdownProps {
   multimodalQueries: Query[];

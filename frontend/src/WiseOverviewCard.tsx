@@ -127,7 +127,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
           featureExtractorId = ''
         }
 
-        let keyName = config.PREFERRED_SEARCH_TARGETS_NAME[featureExtractorId] || (_viewModality === 'VideoAudio' ? 'Audio' : _viewModality)
+        let keyName = config.PREFERRED_SEARCH_TARGETS_NAME[_featureExtractorId] || (_viewModality === 'VideoAudio' ? 'Audio' : _viewModality)
         return (
           <p key={key} className="wise-example-queries">
             Sample {keyName} queries: &nbsp;
