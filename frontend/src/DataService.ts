@@ -12,7 +12,9 @@ import {
   ProcessedImageInfo,
   ProcessedImageVector,
   VectorInfo,
-  ASRSegment } from './misc/types.ts';
+  ASRSegment,
+  ViewModality, 
+} from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
 
@@ -163,7 +165,7 @@ const viewModalityToSearchInType = {
 };
 
 const fetchFeaturedImages = (
-  viewModality: keyof ProcessedSearchResults,
+  viewModality: ViewModality,
   featureExtractorId: string,
   pageStart: number,
   pageEnd: number
@@ -245,7 +247,7 @@ const fetchRelatedVectors = (vector_id: string): Promise<VectorInfo[]> => {
 }
 
 
-const fetchSearchResults = (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
+const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
@@ -326,7 +328,7 @@ export const useDataService = (): DataServiceOutput => {
 
   // Get featured images to display on home page
   const fetchFeaturedImagesAndSetState = (
-    viewModality: keyof ProcessedSearchResults, featureExtractorId: string
+    viewModality: ViewModality, featureExtractorId: string
   ) => {
     return fetchFeaturedImages(
       viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST
@@ -393,7 +395,7 @@ export const useDataService = (): DataServiceOutput => {
 
 
   // Get results for a new search query
-  const performNewSearch = async (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => {
+  const performNewSearch = async (queries: Query[], viewModality: ViewModality, featureExtractorId: string) => {
     setSearchingState((_searchingState) => ({
       ..._searchingState,
       isLoadingNewSearch: true
