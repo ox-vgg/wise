@@ -13,6 +13,8 @@ import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 import { secondsToMinSecPadded } from "./utils.ts";
 
+import config from '../config.ts';
+
 interface ExternalMetadataProps {
   all_metadata: Record<string, string> | { asr_segments?: ASRSegment[] };
 }
@@ -184,28 +186,30 @@ const ImageDetailsModal = ({
       destroyOnClose={true}
       footer={
         <>
-          <Dropdown
-            menu={{
+            {config.ENABLE_REPORT_MEDIA && (
+            <Dropdown
+              menu={{
               items: [
                 {
-                  label: "Report image",
-                  key: imageDetails.mediaInfo.filename || '',
+                label: "Report media", // TODO: send timestamp if a audio/video is being reported
+                key: imageDetails.mediaInfo.filename || '',
                 },
               ],
               onClick: ({ key }) => {
                 setSelectedImageId(key);
               },
-            }}
-            placement="topLeft"
-            trigger={["click"]}
-            arrow
-          >
-            <Button
+              }}
+              placement="topLeft"
+              trigger={["click"]}
+              arrow
+            >
+              <Button
               shape="circle"
               icon={<MoreOutlined />}
               style={{ float: "left" }}
-            />
-          </Dropdown>
+              />
+            </Dropdown>
+            )}
           <Button type="primary" onClick={() => setIsModalOpen(false)}>
             Close
           </Button>

@@ -49,6 +49,7 @@ const productionConfig = {
       text: 'at night'
     },
   ],
+  ENABLE_REPORT_MEDIA: true, // shows a "Report media" button in the image details page
 };
 
 // Config for development mode

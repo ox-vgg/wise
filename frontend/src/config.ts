@@ -17,6 +17,7 @@ type ConfigType = {
     url: string;
     text: string;
   }[];
+  ENABLE_REPORT_MEDIA: boolean;
 };
 
 declare global {
