@@ -278,7 +278,7 @@ export interface WiseHeaderProps {
   isLoadingNewSearch?: boolean;
 };
 export interface WiseOverviewCardProps {
-  handleExampleQueryClick: (exampleQuery: string) => void;
+  handleExampleQueryClick: (exampleQuery: string, viewModality?: ViewModality, featureExtractorId?: string) => void;
   projectInfo: ProjectInfo;
   tourVariables: TourVariables;
 };

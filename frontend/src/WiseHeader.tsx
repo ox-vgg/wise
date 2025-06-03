@@ -802,7 +802,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                             title: media_type.charAt(0).toUpperCase() + media_type.slice(1),
                             options: (projectInfo.search_targets?.[key] || []).map((feature_extractor_id: string) => {
                               const extra_key = `${media_type}:${feature_extractor_id}` as keyof typeof VIEW_MODALITY_OPTIONS_EXTRA;
-                              const default_label = Object.entries(PREFERRED_SEARCH_TARGETS_NAME).find(
+                              const default_label = Object.entries(config.PREFERRED_SEARCH_TARGETS_NAME).find(
                                 ([key]) => feature_extractor_id.includes(key)
                               )?.[1] ?? (feature_extractor_id.split('/')[1] || feature_extractor_id);
                               const optionTestId = `wise-search-target-select-option-${media_type}:${feature_extractor_id}`;

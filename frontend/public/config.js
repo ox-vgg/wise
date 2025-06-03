@@ -57,7 +57,14 @@ const productionConfig = {
   },
   METADATA_TABLE_COLUMNS: [],
   METADATA_FILTER_PLACEHOLDER: "",
-  METADATA_FILTER_HELP: "Use AND/OR to combine filters, Ctrl + Space key to show metadata columns."
+  METADATA_FILTER_HELP: "Use AND/OR to combine filters, Ctrl + Space key to show metadata columns.",
+  PREFERRED_SEARCH_TARGETS_NAME: {
+    "open_clip": "Visual Search",
+    "insightface": "Face Search",
+    "metadata": "Metadata Search",
+    "owlv2": "Object Search",
+    "clap": "Audio Search"
+  }
 };
 
 // Config for development mode

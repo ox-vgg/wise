@@ -11,7 +11,7 @@ type ConfigType = {
     ABOUT: string;
     DISCLAIMER: string;
   };
-  EXAMPLE_QUERIES: string[];
+  EXAMPLE_QUERIES: string[] | Record<string, string[]>;
   MULTIMODAL_EXAMPLE_QUERIES: {
     url: string;
     text: string;
@@ -21,6 +21,7 @@ type ConfigType = {
   METADATA_TABLE_COLUMNS?: string[];
   METADATA_FILTER_PLACEHOLDER?: string;
   METADATA_FILTER_HELP?: string;
+  PREFERRED_SEARCH_TARGETS_NAME: Record<string, string>;
 };
 
 declare global {

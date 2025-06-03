@@ -4,14 +4,26 @@ import sanitizeHtml from 'sanitize-html';
 
 import './WiseOverviewCard.scss';
 import config from './config';
-import { WiseOverviewCardProps } from './misc/types';
+import { ViewModality, WiseOverviewCardProps } from './misc/types';
 
-let exampleQueries = config.EXAMPLE_QUERIES;
-exampleQueries = exampleQueries.map(value => ({ value, sort: Math.random() }))
-                              .sort((a, b) => a.sort - b.sort)
-                              .map(({ value }) => value); // Shuffle array
-exampleQueries = exampleQueries.slice(0,5);
+// TODO: Is the type right?
+const process_example_queries = (exampleQueries: string[] | Record<string, string[]>) => {
+  if (Array.isArray(exampleQueries)) {
+    return process_example_queries({ ':': exampleQueries });
+  }
+  const _shuffle = (arr: string[]) => {
+    return arr.map(value => ({ value, sort: Math.random() }))
+      .sort((a, b) => a.sort - b.sort)
+      .map(({ value }) => value); // Shuffle array
+  }
+  return Object.fromEntries(
+    Object.entries(exampleQueries).map(([key, value]) => {
+      return [key, _shuffle(value).slice(0, 5)];
+    })
+  ) as Record<string, string[]>;
+}
 
+const exampleQueries = process_example_queries(config.EXAMPLE_QUERIES);
 const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handleExampleQueryClick, projectInfo, tourVariables}) => {
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
   
@@ -20,7 +32,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
       title: 'Enter your search query here',
       description: <>
         You can enter a detailed description such as 
-        <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick('Person riding a horse jumping')}>Person riding a horse jumping</Button>
+        <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick('hand holding a cup')}>Hand holding a cup</Button>
         <br />
         WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. WISE then tries to find images whose visual contents match what you are trying to look for.
       </>,
@@ -82,16 +94,53 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
     setIsTourOpen(false);
     handleTourChange();
   }
+  let exampleQueriesHTML = <></>
+  if (projectInfo.search_targets && Object.keys(projectInfo.search_targets).length > 0) {
+    const media_types = Object.keys(projectInfo.search_targets) as Array<keyof typeof projectInfo.search_targets>;
 
-  let exampleQueriesHTML = <></>;
-  if (exampleQueries.length > 0) {
-    exampleQueriesHTML = (
-      <p className="wise-example-queries">
-        Example queries: {exampleQueries.map((x, i) => 
-          <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick(x)} key={i}>{x}</Button>
-        )}
-      </p>
-    );
+    exampleQueriesHTML = <>{
+      Object.entries(exampleQueries).map(([key, value]) => {
+        // No examples provided
+        if (value.length == 0) {
+          return <></>
+        }
+        // key is of type ViewModality:FeatureExtractor
+        const [_viewModality, _featureExtractorId] = key.split(':', 2);
+        let viewModality = (_viewModality === '') ? undefined : (_viewModality as ViewModality);
+        let featureExtractorId = _featureExtractorId;
+        if (viewModality) {
+          let _media_type = viewModality.toLowerCase();
+          _media_type = (_media_type === 'videoaudio') ? 'audio' : _media_type
+          let media_type = (_media_type as keyof Required<NonNullable<typeof projectInfo.search_targets>>);
+          if (!(media_types.includes(media_type))) {
+            // View modality doesn't exist on project, but example was given in config
+            return <></>
+          }
+          const featureIDS = projectInfo.search_targets?.[media_type] || [];
+          const validFeatureId = featureIDS.find((fid) => fid.includes(featureExtractorId));
+          if (!validFeatureId) {
+            return <></>
+          }
+          featureExtractorId = validFeatureId;
+
+        } else {
+          featureExtractorId = ''
+        }
+
+        let keyName = config.PREFERRED_SEARCH_TARGETS_NAME[featureExtractorId] || (_viewModality === 'VideoAudio' ? 'Audio' : _viewModality)
+        return (
+          <p key={key} className="wise-example-queries">
+            Sample {keyName} queries: &nbsp;
+            {value.map((x, i) => {
+              return <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick(x, viewModality, featureExtractorId)} key={`${key}-${i}`}>{x}</Button>
+            }
+            )}
+            <br />
+          </p>
+
+        );
+      })
+    }</>
   }
 
   const aboutWiseTabContent: Record<string, React.ReactNode> = {
