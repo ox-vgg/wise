@@ -1317,6 +1317,13 @@ def _get_search_router(config: APIConfig):
             return len(search_target_order)
         active_search_targets[media_type].sort(key=sort_key)
 
+    preferred_order = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO]
+    active_search_targets = {
+        x: active_search_targets[x]
+        for x in sorted(
+            active_search_targets.keys(), key=lambda x: preferred_order.index(x)
+        )
+    }
     logger.info("Loaded the following search indices:\n%s", json.dumps(active_search_targets, indent=4))
 
     # Get counts

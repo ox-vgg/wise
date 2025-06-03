@@ -8,16 +8,20 @@ const productionConfig = {
   REPO_URL: "https://gitlab.com/vgg/wise/wise",
   WISE_OVERVIEW_CARD: {
     ABOUT: `
-      <p>
-        WISE Search Engine (WISE) is an open-source multi-modal AI-powered image search engine.
-        Recent advances in machine learning and vision-language models have enabled search based on image content using natural language.
-        With the expressive power of natural language, users can flexibly describe what they are looking for.
-        Furthermore, WISE uses a vision model to understand what's being depicted in an image – search results are retrieved based on image content rather than metadata such as keywords, tags, or descriptions, so the images do not need to be manually tagged or labelled with text captions.
+     <p>
+      WISE Search Engine (WISE) is an open source software that enables search of
+      large collections of images, audio and video using natural language. The search is
+      based solely on audiovisual content.
       </p>
-      <p><a href="https://gitlab.com/vgg/wise/wise#how-it-works" target='_blank'>How WISE works</a></p>
-      <p><a href="https://gitlab.com/vgg/wise/wise" target='_blank'>Code repository</a></p>
-      <p><a href="https://www.robots.ox.ac.uk/~vgg/software/wise/" target='_blank'>Project webpage</a></p>
-      <p>WISE is developed at the Visual Geometry Group, University of Oxford.</p>
+      For example, the search query "hand holding a cup" can be used to
+      immediately retrieve images or video clips showing relevant results,
+      where the search results are obtained solely by analysis of the visual content.
+      Similarly, sounds, faces and particular objects can also be searched for using the respective modes.
+    </p>
+     <p>
+      WISE is developed and maintained by the Visual Geometry Group (<a href="https://www.robots.ox.ac.uk/~vgg/">VGG</a>)
+      of Department of Engineering Science at University of Oxford. </p>
+      <p>More details about WISE can be found in the <a href="https://gitlab.com/vgg/wise/wise/-/tree/wise2/">code repository</a> and from the <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">project page</a>.</p>
     `,
     DISCLAIMER: `
       <ul>

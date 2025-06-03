@@ -156,8 +156,14 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
         <Button type="primary" onClick={() => { setIsTourOpen(true) }}>Show me how to use WISE</Button>
       </div>
     ),
-    'About WISE': <div dangerouslySetInnerHTML={{__html: sanitizeHtml(config.WISE_OVERVIEW_CARD.ABOUT)}}></div>,
-    'Disclaimer': <div dangerouslySetInnerHTML={{__html: sanitizeHtml(config.WISE_OVERVIEW_CARD.DISCLAIMER)}}></div>
+    'About WISE': <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(config.WISE_OVERVIEW_CARD.ABOUT) }}></div>,
+    'Disclaimer': <div dangerouslySetInnerHTML={{
+      __html: sanitizeHtml(config.WISE_OVERVIEW_CARD.DISCLAIMER, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
+        allowedAttributes: { 'img': ['src', 'width', 'height'], 'a': ['href', 'target', 'rel'] },
+        allowedSchemes: ['data', 'http', 'https']
+      })
+    }}></div>
   };
   const aboutWiseTabList = Object.keys(aboutWiseTabContent).map(x => ({key: x, tab: x}));
   const [aboutWiseActiveTabKey, setAboutWiseActiveTabKey] = useState('Overview');
