@@ -27,7 +27,7 @@ export type ASRSegment = {
   text: string;
 }
 
-type MediaInfo = {
+export type MediaInfo = {
   id: string;
   filename: string;
   width: number;
@@ -70,6 +70,7 @@ export type VectorInfo = {
 // inspecting the vector in the Image details modal dialog (a second
 // "processing" step).
 type ProcessedVectorMixin = {
+  mediaType: 'IMAGE' | 'VIDEO';
   mediaInfo: MediaInfo;
   related_vectors?: ProcessedVectorInfo[];
 };
@@ -87,6 +88,7 @@ type ImageVector = VectorResult;
 export type VideoSegment = VectorResult & {
   ts: number;
   te: number;
+  thumbnail_ts: number;
 };
 
 export type VideoAudioResults = {
@@ -134,6 +136,7 @@ export type ProcessedVideoSegment = VideoSegment & ProcessedVectorMixin & {
   mediaInfo: ProcessedVideoInfo;
 };
 export type ProcessedVideoInfo = VideoInfo & {
+  vectors: ProcessedVideoSegment[];
   shots: ProcessedVideoSegment[];
   asrSegments?: ASRSegment[];
 };
@@ -261,14 +264,16 @@ export interface SearchResultsProps {
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
   viewModality: keyof ProcessedSearchResults;
+  featureExtractorId: string;
   submitSearch: () => void;
 };
 
 export interface ImageDetailsModalProps {
-  isHomePage: boolean;
   imageDetails: ProcessedImageVector | ProcessedVideoSegment;
   setImageDetails: (x?: ProcessedImageVector | ProcessedVideoSegment) => void;
   setSelectedImageId: (imageId?: string) => void;
+  isHomePage: boolean;
+  featureExtractorId: string;
   handleInternalSearchButtonClick: (vector: ProcessedVectorInfo) => void;
 };
 
@@ -289,6 +294,7 @@ export interface VideoOccurrencesViewProps {
 export interface StillImageViewProps {
   imageDetails: ProcessedVectorInfo;
   isModalView: boolean;
+  featureExtractorId: string;
   // If handleInternalSearchButtonClick is missing, the "Find Similar"
   // button is omitted.
   handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;

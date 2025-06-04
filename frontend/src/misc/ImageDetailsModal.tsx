@@ -47,6 +47,7 @@ const ImageDetailsModal = ({
   setImageDetails,
   setSelectedImageId,
   isHomePage,
+  featureExtractorId,
   handleInternalSearchButtonClick,
 }: ImageDetailsModalProps) => {
   const [isModalOpen, setIsModalOpen] = useState(true);
@@ -173,6 +174,7 @@ const ImageDetailsModal = ({
     image_viewer = <StillImageView
       imageDetails={imageDetails}
       isModalView={true}
+      featureExtractorId={featureExtractorId}
       handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
     />;
   }

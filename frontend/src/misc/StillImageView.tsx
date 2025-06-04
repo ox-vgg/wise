@@ -1,10 +1,11 @@
+import React, { useMemo } from "react";
 import { Button, Popover } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 
 import { interleaveArrayWithElement } from "./utils.ts";
 
 import "./StillImageView.scss";
-import { ProcessedImageVector, ProcessedVectorInfo, StillImageViewProps } from "./types";
+import { MediaInfo, ProcessedImageInfo, ProcessedImageVector, ProcessedVectorInfo, ProcessedVideoInfo, ProcessedVideoSegment, StillImageViewProps } from "./types";
 
 
 type ProcessedVectorInfoWithBBox = ProcessedVectorInfo & {
@@ -17,6 +18,17 @@ const isWithBBox = (
   return Boolean(vector_info.bbox);
 }
 
+const isWithVectors = (
+  mediaInfo: MediaInfo
+): mediaInfo is ProcessedImageInfo | ProcessedVideoInfo => {
+  return Boolean("vectors" in mediaInfo);
+};
+
+const isVideoSegment = (
+  vector: ProcessedVectorInfo
+): vector is ProcessedVideoSegment => {
+  return Boolean(vector.mediaType === "VIDEO");
+};
 
 const isResult = (
   vector: ProcessedVectorInfo
@@ -85,6 +97,7 @@ const BoundingBox: React.FunctionComponent<{
 const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   imageDetails,
   isModalView,
+  featureExtractorId,
   handleInternalSearchButtonClick,
 }: StillImageViewProps) => {
 
@@ -99,6 +112,24 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   // otherwise it is for the bounding box.
   const img_title = imageDetails.bbox ? "" : distance_str;
 
+  const boundingBoxVectors = useMemo(() => {
+    // Bounding box vectors filtered (if applicable) and sorted by size
+    if (
+      isWithVectors(imageDetails.mediaInfo) &&
+      imageDetails.mediaInfo.vectors.every(v => isWithBBox(v))
+    ) {
+      let vectors = [...imageDetails.mediaInfo.vectors];
+      if (isVideoSegment(imageDetails) && vectors.every(v => isVideoSegment(v))) {
+        // Only show the bounding boxes from the same video frame
+        vectors = vectors.filter(v => v.thumbnail_ts === imageDetails.thumbnail_ts);
+      }
+      return vectors.sort((vecA, vecB) => (
+        vecB.bbox.w * vecB.bbox.h - vecA.bbox.w * vecA.bbox.h
+      ));
+    }
+    return [];
+  }, [imageDetails]);
+
   // An image may have any number of bounding boxes.  If there is a
   // bbox in imageDetails then that bbox is the result of a search and
   // is the "primary" bbox.  The primary bbox is shown in the search
@@ -109,14 +140,31 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
   // user selects the image for viewing on the modal dialog.
   const bounding_boxes = [];
   if (isWithBBox(imageDetails)) {
-    bounding_boxes.push(
-      <BoundingBox
-        vector={imageDetails}
-        bbox_text={distance_str}
-        is_primary={true}
-        handleInternalSearchButtonClick={handleInternalSearchButtonClick}
-      />
-    );
+    if (featureExtractorId.includes("insightface")) {
+      bounding_boxes.push(
+        <BoundingBox
+          vector={imageDetails}
+          bbox_text={distance_str}
+          is_primary={true}
+          handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+        />
+      );
+    } else if (boundingBoxVectors.length > 0) {
+      bounding_boxes.push(
+        ...boundingBoxVectors.map(vec => (
+          <BoundingBox
+            vector={vec}
+            bbox_text={
+              isResult(vec)
+              ? `Similarity: ${vec.distance.toFixed(2)}`
+              : ""
+            }
+            is_primary={true}
+            handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+          />
+        ))
+      );
+    }
   }
 
   if (isModalView && imageDetails.related_vectors) {
