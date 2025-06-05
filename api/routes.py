@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+import datetime
 import time
 from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Tuple, Union, BinaryIO
 import io
@@ -33,6 +34,7 @@ import csv
 import json
 import os
 import sqlalchemy as sa
+from webvtt import Caption, WebVTT
 
 from config import APIConfig
 from src.index.search_index_factory import SearchIndexFactory
@@ -63,6 +65,161 @@ logger = logging.getLogger(__name__)
 
 def raise_(ex):
     raise ex
+
+# TODO config
+NUM_THUMBNAILS_PER_PARTITION = 300
+
+
+def timedelta_to_vtt_timestamp(dt: datetime.timedelta):
+    """
+    Convert the timedelta python object to a HH:MM:SS.sss string
+    Required by the VTT Captions
+    """
+    _seconds = dt.seconds
+
+    hours = (dt.days * 24) + (_seconds // 3600)
+    _seconds = _seconds % 3600
+
+    minutes = _seconds // 60
+    seconds = _seconds % 60
+
+    milliseconds = dt.microseconds // 1000
+
+    return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
+
+
+def get_thumbnail_count_for_media_id(thumbs_conn: sa.Connection, _video_media_id: int):
+    _thumbs_table = db.thumbnails_table
+    num_thumbs = thumbs_conn.execute(
+        sa.select(sa.func.count(_thumbs_table.c.id)).where(
+            _thumbs_table.c.media_id == _video_media_id
+        )
+    ).scalar_one()
+
+    if num_thumbs == 0:
+        raise ValueError(f"no thumbnails for media id {_video_media_id}")
+
+    return num_thumbs
+
+
+def get_thumbnail_size(thumbs_conn: sa.Connection, _video_media_id: int):
+    # Assumes all thumbnails have the same size
+    _thumbs_table = db.thumbnails_table
+    one_thumb = thumbs_conn.execute(
+        sa.select(_thumbs_table.c.content)
+        .where(_thumbs_table.c.media_id == _video_media_id)
+        .limit(1)
+    ).scalar_one()
+
+    with Image.open(io.BytesIO(one_thumb)) as im:
+        w, h = im.size
+
+    return w, h
+
+
+def get_thumbnails(
+    thumbs_conn: sa.Connection,
+    _video_media_id: int,
+    num_seconds_per_image: int,
+    partition_id: int | None = None,
+):
+    _thumbs_table = db.thumbnails_table
+    # # For videos longer than 30 minutes, reduce the frequency of thumbnails to 1 every 4 seconds
+    # num_seconds_per_image = 2 if num_thumbs < (2 * 30 * 60) else 4
+    num_images_per_partition = (
+        NUM_THUMBNAILS_PER_PARTITION if partition_id is not None else None
+    )
+    offset = partition_id * num_images_per_partition if partition_id is not None else 0
+    cols = [
+        _thumbs_table.c.id,
+        _thumbs_table.c.timestamp,
+    ]
+    if partition_id is not None:
+        # add thumbnail data as well
+        cols.append(_thumbs_table.c.content)
+
+    stmt = (
+        sa.select(*cols)
+        .where(
+            sa.and_(
+                _thumbs_table.c.media_id == _video_media_id,
+                (10 * _thumbs_table.c.timestamp) % (10 * num_seconds_per_image) == 0,
+            )
+        )
+        .order_by(_thumbs_table.c.timestamp)
+        .offset(offset)
+        .limit(num_images_per_partition)
+    )
+    return thumbs_conn.execute(stmt).all()
+
+
+def get_thumbnail_spritesheet(
+    thumbs_conn: sa.Connection,
+    _video_media_id: int,
+    num_seconds_per_image: int,
+    partition_id: int,
+):
+    all_thumbs = list(
+        get_thumbnails(
+            thumbs_conn, _video_media_id, num_seconds_per_image, partition_id
+        )
+    )
+    num_thumbs = len(all_thumbs)
+    if num_thumbs == 0:
+        raise ValueError(
+            f"No thumbnails found for media {_video_media_id} and parition {partition_id}"
+        )
+    # Get thumbnails
+    with Image.open(io.BytesIO(all_thumbs[0].content)) as im:
+        w, h = im.size  # Assumes all thumbnails have the same size
+
+    # Create storyboard
+    num_columns = 10
+    num_rows = math.ceil(num_thumbs / num_columns)
+    storyboard = Image.new("RGB", (w * num_columns, h * num_rows))
+    for idx, thumb in enumerate(all_thumbs):
+        x = (idx % num_columns) * w
+        y = (idx // num_columns) * h
+        with Image.open(io.BytesIO(thumb.content)) as _thumb:
+            storyboard.paste(_thumb, (x, y))
+
+    return storyboard
+
+
+def get_webvtt_spritesheet(
+    thumbs_conn: sa.Connection, _video_media_id: int, num_seconds_per_image: int = 2
+):
+    all_thumbs = list(
+        get_thumbnails(thumbs_conn, _video_media_id, num_seconds_per_image)
+    )
+    num_thumbs = len(all_thumbs)
+    if num_thumbs == 0:
+        raise ValueError(f"No thumbnails found for media {_video_media_id}!")
+
+    w, h = get_thumbnail_size(thumbs_conn, _video_media_id)
+    # Create storyboard
+    num_columns = 10
+    vtt = WebVTT()
+    next_timestamp = datetime.timedelta(seconds=0)
+    for thumb_idx, thumb in enumerate(all_thumbs):
+        partition_id = thumb_idx // NUM_THUMBNAILS_PER_PARTITION
+        idx = thumb_idx % NUM_THUMBNAILS_PER_PARTITION
+        x = (idx % num_columns) * w
+        y = (idx // num_columns) * h
+
+        current_timestamp = datetime.timedelta(seconds=thumb.timestamp)
+        next_timestamp = current_timestamp + datetime.timedelta(
+            seconds=num_seconds_per_image
+        )
+        vtt.captions.append(
+            Caption(
+                timedelta_to_vtt_timestamp(current_timestamp),
+                timedelta_to_vtt_timestamp(next_timestamp),
+                f"storyboard/{_video_media_id}/{partition_id}.jpg#xywh={x},{y},{w},{h}",
+            )
+        )
+
+    return vtt.content
 
 
 class WiseFrontendUserException(Exception):
@@ -159,6 +316,14 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
             "redirect_media_url_num_components must be greater than 0 when redirect_media_url_by_path is True"
         )
 
+    # Pre-compute project info
+    with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
+        num_vectors = VectorRepo.get_count(conn)
+        num_media_files = MediaRepo.get_count(conn)
+        media_file_counts = get_media_counts_by_media_type(conn)
+        num_thumbs = ThumbnailRepo.get_count(thumbs_conn)
+        total_duration = get_project_total_duration(conn)
+
     @router.api_route(
         "/media/{media_id}",
         response_class=Union[FileResponse, StreamingResponse],
@@ -236,7 +401,7 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
                 # Handle case where we read the media file from disk, but it may not be there
 
                 location = Path(source_collection.location)
-                
+
                 if source_collection.type == SourceCollectionType.DIR:
                     # metadata.source_uri will be None, so we have to search for it on disk
                     file_path = location / metadata.path
@@ -282,11 +447,47 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
                 media_type="image/jpeg",
                 status_code=200,
             )
-    
+
     @router.get(
-        "/storyboard/{_video_media_id}",
+        "/storyboard/{_video_media_id}/{_partition}.jpg",
+        response_class=Response,
+        responses={
+            200: {"content": "image/jpeg"},
+            404: {"content": "application/json"},
+        },
+    )
+    def get_storyboard_image(_video_media_id: int, _partition: int):
+        # TODO config
+        # For videos longer than 30 minutes, reduce the frequency of thumbnails to 1 every 4 seconds
+        num_seconds_per_image = 2 if num_thumbs < (2 * 30 * 60) else 4
+        try:
+            with thumbs_engine.connect() as thumbs_conn:
+                storyboard = get_thumbnail_spritesheet(
+                    thumbs_conn, _video_media_id, num_seconds_per_image, _partition
+                )
+                buffered = io.BytesIO()
+                storyboard.save(buffered, format="JPEG", quality=70)
+                return Response(
+                    content=buffered.getvalue(),
+                    media_type="image/jpeg",
+                    status_code=200,
+                    headers={
+                        "Cache-Control": "public, max-age=86400",
+                    },
+                )
+        except ValueError:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Thumbnails not found for media_id={_video_media_id} partition: {_partition}!",
+            )
+
+    @router.get(
+        "/storyboard/{_video_media_id}.vtt",
         response_class=JSONResponse,
-        responses={200: {"content": "application/json"}, 404: {"content": "application/json"}},
+        responses={
+            200: {"content": "text/vtt"},
+            404: {"content": "application/json"},
+        },
     )
     def get_storyboard(_video_media_id: int):
         """
@@ -295,54 +496,26 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
         is generated based on the existing thumbnails of the video, and is included in the response.
         This is used for the preview thumbnails in the frontend UI when hovering over the timeline in the video player.
         """
-        with thumbs_engine.connect() as thumbs_conn:
-            thumbnail_rows = ThumbnailRepo.list_by_column_match(
-                thumbs_conn,
-                column_to_match="media_id",
-                value_to_match=_video_media_id,
-                select_columns=("id", "timestamp", "content"),
-                order_by_column="timestamp"
+        # For videos longer than 30 minutes, reduce the frequency of thumbnails to 1 every 4 seconds
+        num_seconds_per_image = 2 if num_thumbs < (2 * 30 * 60) else 4
+        try:
+            with thumbs_engine.connect() as thumbs_conn:
+                vtt_content = get_webvtt_spritesheet(
+                    thumbs_conn, _video_media_id, num_seconds_per_image
+                )
+                return Response(
+                    content=vtt_content,
+                    status_code=200,
+                    media_type="text/vtt",
+                    headers={
+                        "Cache-Control": "public, max-age=86400",
+                    },
+                )
+        except ValueError:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Thumbnails not found for media_id={_video_media_id}!",
             )
-            thumbnail_rows = list(thumbnail_rows)
-            if len(thumbnail_rows) == 0:
-                raise HTTPException(status_code=404, detail=f"Thumbnails not found for media_id={_video_media_id}!")
-
-            thumbnail_rows = thumbnail_rows[::4] # Get every 4th item in the list
-                                            # (i.e. 1 thumbnail per 2 seconds of video if the sampling rate was 2fps)
-                                            # TODO make this change based on sampling rate
-            if len(thumbnail_rows) > 30*60//4:
-                # For videos longer than 30 minutes, reduce the frequency of thumbnails to 1 every 4 seconds
-                thumbnail_rows = thumbnail_rows[::2]
-
-            # Get thumbnails
-            ids = [thumbnail_row['id'] for thumbnail_row in thumbnail_rows]
-            thumbs = [Image.open(io.BytesIO(thumbnail_row['content'])) for thumbnail_row in thumbnail_rows]
-            w, h = thumbs[0].size # Assumes all thumbnails have the same size
-
-            # Create storyboard
-            num_columns = 10
-            num_rows = math.ceil(len(thumbs) / num_columns)
-            storyboard = Image.new('RGB', (w*num_columns, h*num_rows))
-            tiles = []
-            for idx, (thumb, thumbnail_row) in enumerate(zip(thumbs, thumbnail_rows)):
-                x = (idx % num_columns) * w
-                y = (idx // num_columns) * h
-                storyboard.paste(thumbs[idx], (x, y))
-                tiles.append({
-                    "startTime": thumbnail_row['timestamp'],
-                    "x": x,
-                    "y": y
-                })
-            buffered = io.BytesIO()
-            storyboard.save(buffered, format='JPEG')
-
-            response = {
-                "url": convert_uint8array_to_base64(buffered.getvalue()),
-                "tileWidth": w,
-                "tileHeight": h,
-                "tiles": tiles
-            }
-            return JSONResponse(status_code=200, content=response)
 
     @router.get(
         "/metadata/{_id}",
@@ -356,13 +529,7 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
             if metadata is None:
                 raise HTTPException(status_code=404, detail=f"Metadata not found!")
             return metadata
-    
-    # Pre-compute project info
-    with project_engine.connect() as conn:
-        num_vectors = VectorRepo.get_count(conn)
-        num_media_files = MediaRepo.get_count(conn)
-        media_file_counts = get_media_counts_by_media_type(conn)
-        total_duration = get_project_total_duration(conn)
+
     models = {
         media_type: [
             feature_extractor_id for feature_extractor_id in project_assets[media_type]
@@ -538,17 +705,17 @@ def _get_search_router(config: APIConfig):
     project_engine = db.init_project(project.dburi)
     thumbs_engine = db.init_thumbs(project.thumbs_uri)
     external_metadata_tables = db.reflect_external_metadata(project_engine)
-    
+
     shots_table = db.shots_table
 
     if config.use_shots:
-        
+
         with project_engine.connect() as conn:
             shots_count = conn.execute(sa.select(sa.func.count(shots_table.c.id))).scalar()
 
         if shots_count == 0:
             logger.warning('use_shots is set to True, but shots table is empty! Please make sure to populate the shots table before using this feature.')
-    
+
     def merge_close_segments(_keyframes: List[VideoSegment]):
         """
         Takes a list of segments of a media file and merges them if they are close - within 4 seconds of each other
@@ -661,7 +828,7 @@ def _get_search_router(config: APIConfig):
                 )
                 for x in _keyframes
             )
-    
+
     def get_shots_from_keyframes(_keyframes: List[VideoSegment]):
         """
         Get unique shots from list of keyframes belonging to a single video
@@ -696,7 +863,6 @@ def _get_search_router(config: APIConfig):
                 )
             )
         return shots_list
-    
 
     def construct_video_search_response(
         search_in: MediaType,
@@ -725,8 +891,8 @@ def _get_search_router(config: APIConfig):
                     media_type=_metadata.media_type,
                     format=_metadata.format,
                     duration=_metadata.duration,
-                    timeline_hover_thumbnails=f"storyboard/{video_id}",
-                    external_metadata=_metadata.external_metadata
+                    timeline_hover_thumbnails=f"storyboard/{video_id}.vtt",
+                    external_metadata=_metadata.external_metadata,
                 )
             ts = _metadata.timestamp
             te = _metadata.end_timestamp
@@ -797,7 +963,7 @@ def _get_search_router(config: APIConfig):
                     duration=_metadata.duration,
                     external_metadata=_metadata.external_metadata,
                 )
-            
+
             image_vector = ImageVector(
                 vector_id=str(_metadata.id),
                 media_id=image_id,
@@ -950,7 +1116,7 @@ def _get_search_router(config: APIConfig):
         average_features = average(feature_vectors, axis=0, weights=weights)
         average_features /= norm(average_features, axis=-1, keepdims=True)
         return average_features
-  
+
     """
     Load all available search indices by default
     `search_indices` is a dictionary of SearchIndex objects, where the key is the
@@ -966,7 +1132,7 @@ def _get_search_router(config: APIConfig):
         fts_search_index = FTSSearch(project, db.project_metadata_obj)
         # search_indices[MediaType.VIDEO] = {'wise/metadata': fts_search_index}
         # active_search_targets[MediaType.VIDEO] = ['wise/metadata']
-    
+
     for media_type in project_assets:
         if media_type not in {MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO}:
             # Added to ensure projects created with older versions
@@ -1004,7 +1170,7 @@ def _get_search_router(config: APIConfig):
         if fts_search_index is not None and media_type in {MediaType.IMAGE, MediaType.VIDEO}:
             search_indices[media_type]['wise/metadata'] = fts_search_index
             active_search_targets[media_type].append('wise/metadata')  
-    
+
     is_audio_only_project =  MediaType.VIDEO not in search_indices and MediaType.AUDIO in search_indices and active_search_targets[MediaType.AUDIO] > 0
     if fts_search_index is not None and is_audio_only_project:
         search_indices[MediaType.AUDIO]['wise/metadata'] = fts_search_index
@@ -1216,7 +1382,7 @@ def _get_search_router(config: APIConfig):
                         f"Could not retrieve feature vector for image {image_id} from h5 dataset. Attempting to re-compute features from original image"
                     )
                     pass
-                
+
                 # Fallback: read the original image from disk and re-compute the features
                 # Get metadata from media and source_collections table to locate the file
                 metadata = MediaRepo.get(conn, image_id)
@@ -1257,7 +1423,7 @@ def _get_search_router(config: APIConfig):
                             f"Error extracting image {image_id} from WebDataset tar file"
                         )
         return internal_images_loaded
-    
+
     def add_response_time(func: Callable[..., Awaitable[SearchResponse]]):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -1343,7 +1509,6 @@ def _get_search_router(config: APIConfig):
 
         return response
 
-
     @router.get(
         "/related-vectors/{_vector_id}",
         response_model=list[VectorInfo],
@@ -1377,7 +1542,6 @@ def _get_search_router(config: APIConfig):
                 )
             )
         return vectors_info
-
 
     @router.post("/search", response_model=SearchResponse)
     @add_response_time
@@ -1519,19 +1683,18 @@ def _get_search_router(config: APIConfig):
             raise HTTPException(400, {"message": "Missing search query"})
         elif len(q) > 5:
             raise HTTPException(400, {"message": "Too many query items"})
-        
+
         if feature_extractor_id == 'wise/metadata':
             # ASR search
             if start > end:
                 raise HTTPException(
                     400, {"message": "'start' cannot be greater than 'end'"}
                 )
-            
+
             # TODO escape special characters
             text = " ".join(text_queries)
             q = WISEFTSQuery.model_validate({"$match": text})
             return asr_search(q, search_index, search_in, start, end)
-        
 
         if search_in == MediaType.IMAGE:
             if len([query for query in q if query['modality'] == 'audio']) > 0:
@@ -1622,7 +1785,7 @@ def _get_search_router(config: APIConfig):
         thumbnails_to_send: int = 0,
     ):
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
-            
+
             all_metadata = search_index.search(conn, q, start, end)
             n_results = len(all_metadata)
             dist = list([-x for x in range(1, n_results + 1)])
