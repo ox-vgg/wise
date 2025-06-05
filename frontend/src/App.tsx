@@ -9,7 +9,6 @@ import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
 import { ProcessedSearchResults, ProjectInfo, Query } from './misc/types.ts';
-import config from './config.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
 
@@ -33,7 +32,7 @@ export const App: React.FunctionComponent = () => {
 
   useEffect(() => {
     // Fetch project info
-    fetchWithTimeout(config.API_BASE_URL+"info", 30000, { method: 'GET' })
+    fetchWithTimeout("info", 30000, { method: 'GET' })
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Failed to fetch project info. ${response.status} - ${response.statusText}`);

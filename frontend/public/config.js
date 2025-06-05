@@ -1,7 +1,5 @@
 // Config for production mode
 const productionConfig = {
-  // Note: API_BASE_URL must contain a trailing slash in order for the frontend code to work
-  API_BASE_URL: "./", // "./" is relative to the <base href> defined in index.html
   MAX_SEARCH_RESULTS: 1000, // Maximum number of search rsults
   PAGE_SIZE: 500, // Number of images in each page when displaying search results
   NUM_PAGES_PER_REQUEST: 1, // Number of pages (each with having size PAGE_SIZE) to fetch in each API call
@@ -55,7 +53,6 @@ const productionConfig = {
 // Config for development mode
 const devConfig = {
   ...productionConfig,
-  API_BASE_URL: "http://localhost:9680/project-name/", // Note: API_BASE_URL must contain a trailing slash in order for the frontend code to work
   PAGE_SIZE: 500,
   NUM_PAGES_PER_REQUEST: 1,
   FETCH_THUMBS: 1,

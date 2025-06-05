@@ -25,9 +25,6 @@ const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[])
   return new Map(
     Object.entries(videos).map(([mediaId, videoInfo]) => {
       // const title = videoInfo.filename;
-      if (!videoInfo.timeline_hover_thumbnails.startsWith('http')) {
-        videoInfo.timeline_hover_thumbnails = config.API_BASE_URL + videoInfo.timeline_hover_thumbnails; // Fixes URLs for dev mode
-      }
       const { external_metadata } = videoInfo;
       let asr_segments: ASRSegment[] = [];
       if (external_metadata.asr_segments) {
@@ -56,12 +53,6 @@ const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[])
 const processUnmergedSegments = (unmergedSegments: VideoSegment[], processedVideos: Map<string, ProcessedVideoInfo>): ProcessedVideoSegment[] => {
   // Populate video info
   return unmergedSegments.map(segment => {
-    if (segment.link && !segment.link.startsWith('http')) {
-      segment.link = config.API_BASE_URL + segment.link; // Fixes video URLs for dev mode
-    }
-    if (!segment.thumbnail.startsWith('http') && !segment.thumbnail.startsWith('data:')) {
-      segment.thumbnail = config.API_BASE_URL + segment.thumbnail; // Fixes URLs for dev mode
-    }
     return {
       ...segment,
       mediaType: 'VIDEO',
@@ -73,12 +64,6 @@ const processUnmergedSegments = (unmergedSegments: VideoSegment[], processedVide
 const processShots = (shots: VideoSegment[], processedVideos: Map<string, ProcessedVideoInfo>): ProcessedVideoSegment[] => {
   // Populate video info
   return shots.map(shot => {
-    if (shot.link && !shot.link.startsWith('http')) {
-      shot.link = config.API_BASE_URL + shot.link; // Fixes video URLs for dev mode
-    }
-    if (!shot.thumbnail.startsWith('http') && !shot.thumbnail.startsWith('data:')) {
-      shot.thumbnail = config.API_BASE_URL + shot.thumbnail; // Fixes URLs for dev mode
-    }
 
     return {
       ...shot,
@@ -130,12 +115,6 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
         })
     );
     processedSearchResults.Image.vectors = results.image_results.vectors.map(vector => {
-      if (vector.link && !vector.link.startsWith('http')) {
-        vector.link = config.API_BASE_URL + vector.link; // Fixes image URLs for dev mode
-      }
-      if (!vector.thumbnail.startsWith('http') && !vector.thumbnail.startsWith('data:')) {
-        vector.thumbnail = config.API_BASE_URL + vector.thumbnail; // Fixes URLs for dev mode
-      }
       return {
         ...vector,
         mediaType: 'IMAGE',
@@ -201,7 +180,7 @@ const fetchFeaturedImages = (
     ['random_seed', FEATURED_IMAGES_RANDOM_SEED.toString()]
   ]);
 
-  return fetchWithTimeout(config.API_BASE_URL + `featured?${urlParams.toString()}`, config.FETCH_TIMEOUT, {
+  return fetchWithTimeout(`featured?${urlParams.toString()}`, config.FETCH_TIMEOUT, {
     method: 'GET'
   }).then(async (response) => {
     if (!response.ok) {
@@ -257,7 +236,7 @@ const convertQueriesToFormData = (queries: Query[]) => {
 
 const fetchRelatedVectors = (vector_id: string): Promise<VectorInfo[]> => {
   return fetchWithTimeout(
-    config.API_BASE_URL + "related-vectors/" + vector_id,
+    "related-vectors/" + vector_id,
     config.FETCH_TIMEOUT,
     {method: "GET"},
   ).then(
@@ -289,7 +268,7 @@ const fetchSearchResults = (queries: Query[], viewModality: keyof ProcessedSearc
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
   ]);
   
-  const endpoint = config.API_BASE_URL + `search?${urlParams.toString()}`;
+  const endpoint = `search?${urlParams.toString()}`;
   
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {
     method: 'POST',
@@ -455,7 +434,7 @@ export const useDataService = (): DataServiceOutput => {
     for (let reason of reasons) {
       formData.append('reasons', reason);
     }
-    return fetchWithTimeout(config.API_BASE_URL+'report', 40000, {
+    return fetchWithTimeout('report', 40000, {
       method: 'POST',
       body: formData
     }).then((response) => {
