@@ -48,6 +48,7 @@ from .feature_extractor import (
     FeatureExtMetadata,
     Features,
 )
+from ..db import project_metadata_obj
 
 
 _logger = logging.getLogger(__name__)
@@ -120,6 +121,31 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
     extract_text_features = None
     preprocess_audio = None
     extract_audio_features = None
+
+    _vector_metadata_table = sa.Table(
+        "vector_metadata_insightface",
+        project_metadata_obj,
+        sa.Column(
+            "vector_id",
+            sa.Integer,
+            sa.ForeignKey("vectors.id", ondelete="cascade"),
+            nullable=False,
+            index=True,
+        ),
+        sa.Column("detection_score", sa.Float, nullable=False),
+        ## InsightFace returns (x0, y0, x1, y1) in absolute
+        ## coordinates and we convert to (x, y, w, h) in relative
+        ## coordinates because that's what frontend uses.
+        sa.Column("bbox_x", sa.Float, nullable=False),  # [0.0-1.0]
+        sa.Column("bbox_y", sa.Float, nullable=False),  # [0.0-1.0]
+        sa.Column("bbox_w", sa.Float, nullable=False),  # [0.0-1.0]
+        sa.Column("bbox_h", sa.Float, nullable=False),  # [0.0-1.0]
+        sa.Column("age", sa.Integer, nullable=False),
+        ## InsightFace returns gender/sex with two options only,
+        ## so we use is_male so we can use boolean type.
+        sa.Column("is_male", sa.Boolean, nullable=False),
+        keep_existing=True,
+    )
 
     def __init__(self, feature_id: str, warmup: bool = False):
         _logger.info("initialising feature extractor for %s", feature_id)
@@ -218,50 +244,28 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
         return recognition_outputs.shape[-1]
 
-    def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
-        db_metadata_obj = sa.MetaData()
-        db_metadata_obj.reflect(db_engine)
-        self._vector_metadata_table = sa.Table(
-            "vector_metadata_insightface",
-            db_metadata_obj,
-            sa.Column(
-                "vector_id",
-                sa.ForeignKey("vectors.id", ondelete="cascade"),
-                nullable=False,
-                index=True
-            ),
-            sa.Column("detection_score", sa.Float, nullable=False),
-            ## InsightFace returns (x0, y0, x1, y1) in absolute
-            ## coordinates and we convert to (x, y, w, h) in relative
-            ## coordinates because that's what frontend uses.
-            sa.Column("bbox_x", sa.Float, nullable=False),  # [0.0-1.0]
-            sa.Column("bbox_y", sa.Float, nullable=False),  # [0.0-1.0]
-            sa.Column("bbox_w", sa.Float, nullable=False),  # [0.0-1.0]
-            sa.Column("bbox_h", sa.Float, nullable=False),  # [0.0-1.0]
-            sa.Column("age", sa.Integer, nullable=False),
-            ## InsightFace returns gender/sex with two options only,
-            ## so we use is_male so we can use boolean type.
-            sa.Column("is_male", sa.Boolean, nullable=False),
-            keep_existing=True,
-        )
-        db_metadata_obj.create_all(db_engine)
+    @classmethod
+    def create_vector_metadata_table(cls, db_engine: sa.Engine) -> None:
+        cls._vector_metadata_table.create(db_engine, checkfirst=True)
 
+    @classmethod
     def add_to_vector_metadata_table(
-        self, conn:sa.Connection, vid: list[int], metadata: list[FaceFeatureMetadata]
+        cls, conn:sa.Connection, vid: list[int], metadata: list[FaceFeatureMetadata]
     ) -> None:
         ## This condition is needed because insert with an empty list
         ## does an insert with NULLs instead of "nothing".  See
         ## https://github.com/sqlalchemy/sqlalchemy/discussions/9645
         if len(metadata) > 0:
             conn.execute(
-                sa.insert(self._vector_metadata_table),
+                sa.insert(cls._vector_metadata_table),
                 [x.to_sql_values(vid) for vid, x in zip(vid, metadata)],
             )
 
+    @classmethod
     def get_vector_metadata(
-        self, conn: sa.Connection, vid: list[int]
+        cls, conn: sa.Connection, vid: list[int]
     ) -> list[FeatureExtMetadata]:
-        c = self._vector_metadata_table.c
+        c = cls._vector_metadata_table.c
         res = conn.execute(
             sa.select(c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
             .where(c.vector_id.in_(vid))
