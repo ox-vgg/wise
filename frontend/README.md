@@ -26,7 +26,7 @@ If you need to modify/customise the frontend, read the section below.
 
 ### Frontend development server
 1. Make sure you have completed the prerequisite steps above, and `cd`'ed into this directory if you haven't already done so
-2. Start the development server using `API_BASE_URL="http://localhost:9680/PROJECT_NAME/" npm run dev`. Once the server is running, open `localhost:5173` in your browser to access the development version of the frontend
+2. Start the development server using `API_BASE_URL="http://localhost:9670/PROJECT_NAME/" npm run dev`. Once the server is running, open `localhost:5173` in your browser to access the development version of the frontend
 
 Note: You will need to separately run the API server using `MODE="development" python3 serve.py --project-dir {your_project_dir}` from the root directory of this repository (or run `python3 serve.py --project-dir {your_project_dir}` with `mode` set to `"development"` in `config.py`).
 
