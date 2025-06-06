@@ -1,7 +1,6 @@
 // Load config from public/config.js
 
 type ConfigType = {
-  API_BASE_URL: string;
   MAX_SEARCH_RESULTS: number;
   PAGE_SIZE: number;
   NUM_PAGES_PER_REQUEST: number;
