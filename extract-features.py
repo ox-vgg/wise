@@ -288,9 +288,9 @@ if __name__ == "__main__":
         raise ValueError(f'project_dir {args.project_dir} already exists')
 
     # TODO: allow adding new files to an existing project
-    project = WiseProject(args.project_dir, create_project=True)
-    db_engine = db.init_project(project.dburi, echo=False)
-    thumbs_engine = db.init_thumbs(project.thumbs_uri, echo=False)
+    project = WiseProject(args.project_dir, create_project=True, db_kwargs={'echo': False}, thumbsdb_kwargs={'echo': False})
+    db_engine = project.db_engine
+    thumbs_engine = project.thumbsdb_engine
 
     start_time = time.time()
 

@@ -22,7 +22,7 @@ class TestFeatureExtractor(unittest.TestCase):
 
     def test_image_feature(self):
         featureExtractor = FeatureExtractorFactory('mlfoundations/open_clip/ViT-L-14/openai')
-        input_image_size = featureExtractor.get_input_image_size()
+        input_image_size = featureExtractor.input_image_size
         self.assertEqual(input_image_size, (224,224))
 
         TEST_DATA_COUNT = 8

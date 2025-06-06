@@ -1,10 +1,14 @@
+from functools import cached_property
+import logging
 from msclap import CLAP
 import torch
 import numpy as np
 from typing import List
 from collections.abc import Iterable
 
-from .feature_extractor import FeatureExtractor
+from .feature_extractor import FeatureExtractor, get_torch_device
+
+logger = logging.getLogger(__name__)
 
 class MicrosoftClap(FeatureExtractor):
     """
@@ -21,7 +25,9 @@ class MicrosoftClap(FeatureExtractor):
     preprocess_image = None
     extract_image_features = None
 
-    def __init__(self, id):
+    def __init__(
+        self, id, device: str | torch.device | None = None, warmup: bool = False
+    ):
         if not id.startswith(self.ID_PREFIX):
             raise ValueError(f'feature id cannot start with {id} and must start with {self.ID_PREFIX}')
         id_tokens = id.split('/')
@@ -30,9 +36,16 @@ class MicrosoftClap(FeatureExtractor):
         if id_tokens[2] not in CLAP.model_name:
             raise ValueError(f'Model version {id_tokens[2]} is not available. Available models are {CLAP.model_name.keys()}')
         self.version = id_tokens[2]
-        self.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+        self.DEVICE = get_torch_device(device)
 
-        self.model = CLAP(version=self.version, use_cuda=self.DEVICE)
+        if warmup:
+            self.warmup()
+
+    @cached_property
+    def model(self):
+        use_cuda = self.DEVICE.type == 'cuda'
+        logger.info(f'Initialising model {self.ID_PREFIX} ({self.version}, use_cuda={use_cuda})')
+        return CLAP(version=self.version, use_cuda=use_cuda)
 
     def preprocess_audio(self, audio: torch.Tensor) -> torch.Tensor:
         # CLAP accepts (1xN_samples)
@@ -60,3 +73,12 @@ class MicrosoftClap(FeatureExtractor):
         text_embeddings = self.model.clap.caption_encoder(preprocessed_text)
         text_embeddings = text_embeddings/torch.norm(text_embeddings, dim=-1, keepdim=True)
         return text_embeddings.cpu().numpy()
+
+    def warmup(self):
+        logger.info("Warming up model")
+        random_audio = torch.rand((1, 192_000))
+        preprocessed_audio = self.preprocess_audio(random_audio)
+        audio_embedding = self.extract_audio_features(preprocessed_audio)
+        text_embedding = self.extract_text_features(["some random text"])
+        assert audio_embedding.shape[1] == text_embedding.shape[1]
+        return

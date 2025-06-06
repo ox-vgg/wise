@@ -110,12 +110,12 @@ def main():
 ##
 
 def import_metadata(args):
-    project = WiseProject(args.project_dir, create_project=False)
+    project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
     project_assets = project.discover_assets()
     if len(project_assets) == 0:
         print(f'failed to load assets from {args.project_dir}')
         sys.exit(1)
-    db_engine = db.init_project(project.dburi, echo=False)
+    db_engine = project.db_engine
 
     metadata_db, metadata_table = project.metadata_db_table(args.metadata_id)
     if metadata_exist(metadata_db, metadata_table):

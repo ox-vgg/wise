@@ -22,18 +22,18 @@ import sqlalchemy as sa
 def import_metadata_from_vise(vise_metadata_db, vise_join_colname, project_dir, csv_filename):
     if not sqlite_table_exists(vise_metadata_db, 'file_metadata'):
         raise ValueError(f'file_metadata table does not exist in {vise_metadata_db}')
-    
+
     project = WiseProject(project_dir, create_project=False)
     project_assets = project.discover_assets()
     if len(project_assets) == 0:
         print(f'failed to load assets from {project_dir}')
         sys.exit(1)
-    db_engine = db.init_project(project.dburi, echo=False)
+    db_engine = project.db_engine
     db_inspector = sa.inspect(db_engine)
 
     metadata, colnames = load_metadata_from_sqlite(vise_metadata_db)
     print(f'loaded {len(metadata)} rows from {vise_metadata_db} file_metadata table')
-    
+
     # add 'media_id' corresponding to each metadata row
     resolve_media_path(db_engine, metadata, vise_join_colname)
     colnames.insert(0, 'media_id')

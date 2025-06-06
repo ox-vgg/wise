@@ -3,6 +3,7 @@
 ## Copyright (C) 2025 University of Oxford
 
 import contextlib
+from functools import cached_property
 import logging
 import os
 from dataclasses import dataclass
@@ -120,7 +121,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
     preprocess_audio = None
     extract_audio_features = None
 
-    def __init__(self, feature_id: str):
+    def __init__(self, feature_id: str, warmup: bool = False):
         _logger.info("initialising feature extractor for %s", feature_id)
         feature_id_parts = feature_id.split("/")
         assert (
@@ -129,7 +130,15 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             and feature_id_parts[1] == "insightface",
             f"Invalid feature-id: {feature_id}, an example of a valid feature-id is 'deepinsight/insightface/buffalo_l/_unknown'"
         )
-        model_name = feature_id_parts[2]
+        self.model_name = feature_id_parts[2]
+
+        self._embedding_dtype = np.float32
+
+        if warmup:
+            self.warmup()
+
+    @cached_property
+    def _app(self):
         ## XXX: investigate allowed_modules arg to FaceAnalysis
 
         ## InsightFace and GPU
@@ -158,13 +167,17 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
         ## FaceAnalysis() and FaceAnalysis.prepare() print to stdout
         ## which mess up our own stdout so we throw it away.
+
+        _logger.info(f'Initialising model {self.model_name}')
+        # TODO - based on device, pass the current provider and provider options as kwargs
+
         with open(os.devnull, "w") as devnull:
             with contextlib.redirect_stdout(devnull):
-                self._app = insightface.app.FaceAnalysis(
-                    model_name,
+                _app = insightface.app.FaceAnalysis(
+                    self.model_name,
                     allowed_modules=["detection", "recognition", "genderage"],
                 )
-                self._app.prepare(
+                _app.prepare(
                     ctx_id=0,
                     det_thresh=0.5,
                     det_size=(640, 640),
@@ -172,7 +185,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
         ## Check if all models have the CUDA execution model available
         ## to them.
-        for task_name, model in self._app.models.items():
+        for task_name, model in _app.models.items():
             task_providers = model.session.get_providers()
             _logger.debug(
                 "InsightFace '%s' task has '%s' execution providers available",
@@ -184,6 +197,10 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
                     "CUDA provider not available for '%s' task", task_name
                 )
 
+        return _app
+
+    @cached_property
+    def _embedding_size(self):
         recognition_outputs = self._app.models[
             "recognition"
         ].session.get_outputs()[0]
@@ -192,14 +209,14 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             len(recognition_outputs.shape) == 2
             and recognition_outputs.shape[0] == 1
         )
-        self._embedding_size = recognition_outputs.shape[-1]
 
         ## It should be possible to get the numpy type from the
         ## onxxruntime NodeArg type but I couldn't figure it out.  So
         ## just hardcode float which seems to be the case for all
         ## models anyway.
         assert recognition_outputs.type == "tensor(float)"
-        self._embedding_dtype = np.float32
+
+        return recognition_outputs.shape[-1]
 
     def create_vector_metadata_table(self, db_engine: sa.Engine) -> None:
         db_metadata_obj = sa.MetaData()
@@ -307,3 +324,9 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             )
 
         return features
+
+    def warmup(self):
+        random_image = torch.rand((1, 3, 768, 1024))
+        features = self.extract_image_features(self.preprocess_image(random_image))
+        assert features[0].vectors.shape[1] == 512
+        return
