@@ -9,7 +9,7 @@ const productionConfig = {
   WISE_OVERVIEW_CARD: {
     ABOUT: `
       <p>
-        WISE Image Search Engine (WISE) is an open-source multi-modal AI-powered image search engine.
+        WISE Search Engine (WISE) is an open-source multi-modal AI-powered image search engine.
         Recent advances in machine learning and vision-language models have enabled search based on image content using natural language.
         With the expressive power of natural language, users can flexibly describe what they are looking for.
         Furthermore, WISE uses a vision model to understand what's being depicted in an image – search results are retrieved based on image content rather than metadata such as keywords, tags, or descriptions, so the images do not need to be manually tagged or labelled with text captions.
