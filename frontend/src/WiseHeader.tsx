@@ -558,99 +558,110 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   return (
     <Header className="wise-header">
       <div className="wise-header-primary-row" style={isHomePage ? { height: '90px' } : {}}>
-        <a href="./" id="wise-logo">
-          <WiseLogo />
-        </a>
-        {
-          projectInfo.search_targets && (
-            Object.keys(projectInfo.search_targets).length > 1 ||
-            Object.values(projectInfo.search_targets).some(arr => Array.isArray(arr) && arr.length > 1)
-          ) && (
-            <Tooltip title="Choose the media track / media type to search on">
-              <Select
-                size="large"
-                variant="borderless"
-                className="wise-view-modality-select"
-                value={{ 'Image': 'image', 'Video': 'video', 'Audio': 'audio', 'VideoAudio': 'audio' }[viewModality] + ':' + featureExtractorId}
-                onChange={handleSearchTargetChange}
-                options={
-                  projectInfo.search_targets
-                    ? ['image', 'video', 'audio']
-                      .filter((media_type) => projectInfo.search_targets && Object.keys(projectInfo.search_targets).includes(media_type))
-                      .map((media_type) => {
-                        const key = media_type as ViewModalityKey;
-                        return ({
-                          label: (
-                            <Space>
-                              {VIEW_MODALITY_OPTIONS[key]?.icon}
-                              {VIEW_MODALITY_OPTIONS[key].longLabel}
-                            </Space>
-                          ),
-                          title: media_type.charAt(0).toUpperCase() + media_type.slice(1),
-                          options: (projectInfo.search_targets?.[key] || []).map((feature_extractor_id: string) => {
-                            const extra_key = `${media_type}:${feature_extractor_id}` as keyof typeof VIEW_MODALITY_OPTIONS_EXTRA;
-                            const default_label = Object.entries(PREFERRED_SEARCH_TARGETS_NAME).find(
-                              ([key]) => feature_extractor_id.includes(key)
-                            )?.[1] ?? (feature_extractor_id.split('/')[1] || feature_extractor_id);
-                            return {
-                              ...VIEW_MODALITY_OPTIONS[key],
-                              label: (
-                                <Space>
-                                  {VIEW_MODALITY_OPTIONS_EXTRA[extra_key]?.icon || VIEW_MODALITY_OPTIONS[key]?.icon}
-                                  {VIEW_MODALITY_OPTIONS_EXTRA[extra_key]?.label || default_label}
-                                </Space>
-                              ),
-                              value: extra_key,
-                            }
-                          }),
+        {/* First row: Logo */}
+        <div className="wise-header-row wise-header-row-logo">
+          <a href="./" id="wise-logo">
+            <WiseLogo />
+          </a>
+        </div>
+        {/* Second row: Dropdown */}
+        <div className="wise-header-row wise-header-row-dropdown">
+          {
+            projectInfo.search_targets && (
+              Object.keys(projectInfo.search_targets).length > 1 ||
+              Object.values(projectInfo.search_targets).some(arr => Array.isArray(arr) && arr.length > 1)
+            ) && (
+              <Tooltip title="Choose the media track / media type to search on">
+                <Select
+                  size="large"
+                  variant="borderless"
+                  className="wise-view-modality-select"
+                  value={{ 'Image': 'image', 'Video': 'video', 'Audio': 'audio', 'VideoAudio': 'audio' }[viewModality] + ':' + featureExtractorId}
+                  data-testid="wise-search-target-select"
+                  onChange={handleSearchTargetChange}
+                  options={
+                    projectInfo.search_targets
+                      ? ['image', 'video', 'audio']
+                        .filter((media_type) => projectInfo.search_targets && Object.keys(projectInfo.search_targets).includes(media_type))
+                        .map((media_type) => {
+                          const key = media_type as ViewModalityKey;
+                          return ({
+                            label: (
+                              <Space>
+                                {VIEW_MODALITY_OPTIONS[key]?.icon}
+                                {VIEW_MODALITY_OPTIONS[key].longLabel}
+                              </Space>
+                            ),
+                            title: media_type.charAt(0).toUpperCase() + media_type.slice(1),
+                            options: (projectInfo.search_targets?.[key] || []).map((feature_extractor_id: string) => {
+                              const extra_key = `${media_type}:${feature_extractor_id}` as keyof typeof VIEW_MODALITY_OPTIONS_EXTRA;
+                              const default_label = Object.entries(PREFERRED_SEARCH_TARGETS_NAME).find(
+                                ([key]) => feature_extractor_id.includes(key)
+                              )?.[1] ?? (feature_extractor_id.split('/')[1] || feature_extractor_id);
+                              const optionTestId = `wise-search-target-select-option-${media_type}:${feature_extractor_id}`;
+                              return {
+                                ...VIEW_MODALITY_OPTIONS[key],
+                                label: (
+                                  <Space data-testid={optionTestId}>
+                                    {VIEW_MODALITY_OPTIONS_EXTRA[extra_key]?.icon || VIEW_MODALITY_OPTIONS[key]?.icon}
+                                    {VIEW_MODALITY_OPTIONS_EXTRA[extra_key]?.label || default_label}
+                                  </Space>
+                                ),
+                                value: extra_key,
+                              }
+                            }),
+                          })
                         })
-                      })
-                    : []
-                }
-                popupMatchSelectWidth={false}
-              />
-            </Tooltip>
-        )}
-        <Dropdown
-          overlayClassName="wise-search-dropdown"
-          dropdownRender={_ => 
-            <SearchDropdown multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
-                            searchText={searchText} setSearchText={setSearchText}
-                            handleTextInputChange={handleTextInputChange}
-                            viewModality={viewModality}
-                            submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
-                            isHomePage={isHomePage}
-                            ref={searchDropdownRef} />
-          }
-          open={isSearchDropdownTriggered || isSearchInputFocused}
-          onOpenChange={(open) => setIsSearchDropdownTriggered(open)}
-        >
-          <Form onFinish={_submitSearch} id="search-input-form">
-            <Input
-              id="search-input"
-              autoComplete="off"
-              size={isHomePage ? 'large' : 'middle'}
-              placeholder={multimodalQueries.length === 0 ? 'Search' : ''}
-              value={searchText}
-              onChange={handleTextInputChange}
-              prefix={multimodalQueryTags}
-              suffix={
-                <>
-                  {
-                    (multimodalQueries.length > 0 || searchText) && 
-                    <Tooltip title="Clear">
-                      <Button type="text" shape="circle" size="large" icon={<CloseOutlined />} onClick={clearSearchBar} />
-                    </Tooltip>
+                      : []
                   }
-                  <Button type="text" shape="circle" size="large" loading={isLoadingNewSearch} htmlType="submit" icon={<SearchOutlined />} />
-                </>
-              }
-              ref={refsForTour.searchBar}
-              onFocus={() => setIsSearchInputFocused(true)}
-              onBlur={() => setIsSearchInputFocused(false)}
-            />
-          </Form>
-        </Dropdown>
+                  popupMatchSelectWidth={false}
+                />
+              </Tooltip>
+          )}
+        </div>
+        {/* Third row: Search input */}
+        <div className="wise-header-row wise-header-row-search">
+          <Dropdown
+            overlayClassName="wise-search-dropdown"
+            dropdownRender={_ =>
+              <SearchDropdown multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
+                              searchText={searchText} setSearchText={setSearchText}
+                              handleTextInputChange={handleTextInputChange}
+                              viewModality={viewModality}
+                              submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
+                              isHomePage={isHomePage}
+                              ref={searchDropdownRef} />
+            }
+            open={isSearchDropdownTriggered || isSearchInputFocused}
+            onOpenChange={(open) => setIsSearchDropdownTriggered(open)}
+          >
+            <Form onFinish={_submitSearch} id="search-input-form">
+              <Input
+                id="search-input"
+                autoComplete="off"
+                size={isHomePage ? 'large' : 'middle'}
+                placeholder={multimodalQueries.length === 0 ? 'Search' : ''}
+                value={searchText}
+                onChange={handleTextInputChange}
+                prefix={multimodalQueryTags}
+                suffix={
+                  <>
+                    {
+                      (multimodalQueries.length > 0 || searchText) &&
+                      <Tooltip title="Clear">
+                        <Button type="text" shape="circle" size="large" icon={<CloseOutlined />} onClick={clearSearchBar} />
+                      </Tooltip>
+                    }
+                    <Button type="text" shape="circle" size="large" loading={isLoadingNewSearch} htmlType="submit" icon={<SearchOutlined />} />
+                  </>
+                }
+                ref={refsForTour.searchBar}
+                onFocus={() => setIsSearchInputFocused(true)}
+                onBlur={() => setIsSearchInputFocused(false)}
+              />
+            </Form>
+          </Dropdown>
+        </div>
         <span className="wise-spacer"></span>
       </div>
     </Header>

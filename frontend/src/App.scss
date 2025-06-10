@@ -7,4 +7,14 @@
   .wise-content {
     padding-bottom: 50px;
   }
+
+  // Responsive adjustments for mobile devices
+  @media (max-width: 600px) {
+    .wise-content, .wise-header {
+      padding: 0 2vw;
+    }
+    .wise-content {
+      padding-bottom: 20px;
+    }
+  }
 }
