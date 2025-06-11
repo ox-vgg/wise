@@ -29,6 +29,8 @@ dependencies:
     # Install msclap separately till we pip freeze
     - torchlibrosa # Not available on conda
     - PyYAML>=6.0.1
+    - filetype>=1.2.0,<2
+    - webvtt-py
     # pip install --no-deps msclap==1.3.3
 
 variables:
