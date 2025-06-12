@@ -72,7 +72,8 @@ const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
 const MediaSearchForm: React.FunctionComponent<MediaSearchFormProps> = ({
   multimodalQueries, setMultimodalQueries,
   submitSearch,
-  modality
+  modality,
+  featureExtractorId,
 }) => {
   const formRef = useRef<FormInstance>(null);
   const [urlText, setUrlText] = useState('');
@@ -135,6 +136,14 @@ const MediaSearchForm: React.FunctionComponent<MediaSearchFormProps> = ({
       ref={formRef}
       onFinish={onFormSubmit}
     >
+      {
+        // Show warning message for object search
+        featureExtractorId.includes("owlv2") &&
+        <Alert
+          message="Please choose an image with only one prominent object. Searching with an image containing multiple objects might not work as expected"
+          type="info" showIcon style={{marginBottom: 16}}
+        />
+      }
       <Form.Item name="dragger" noStyle>
         <Upload.Dragger name="files" accept={modality + "/*"} beforeUpload={beforeUpload}
                         fileList={getFileList(multimodalQueries)} showUploadList={false} customRequest={handleFileSubmit}>
@@ -247,7 +256,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   multimodalQueries, setMultimodalQueries,
   searchText, setSearchText,
   handleTextInputChange,
-  viewModality,
+  viewModality, featureExtractorId,
   submitSearch, clearSearchBar,
   isHomePage
 }, ref) => {
@@ -336,7 +345,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
                             searchText={searchText} setSearchText={setSearchText}
                             handleTextInputChange={handleTextInputChange} submitSearch={_submitSearch} />
           : <MediaSearchForm multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
-                              submitSearch={_submitSearch} modality={selectedModality} />
+                              submitSearch={_submitSearch} modality={selectedModality} featureExtractorId={featureExtractorId} />
         }
         {/* TODO remove this <br /> */}
         <br />
@@ -627,7 +636,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
               <SearchDropdown multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                               searchText={searchText} setSearchText={setSearchText}
                               handleTextInputChange={handleTextInputChange}
-                              viewModality={viewModality}
+                              viewModality={viewModality} featureExtractorId={featureExtractorId}
                               submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
                               isHomePage={isHomePage}
                               ref={searchDropdownRef} />

@@ -219,6 +219,7 @@ export interface MediaSearchFormProps {
   setMultimodalQueries: (x: Query[]) => void;
   submitSearch: () => void;
   modality: string;
+  featureExtractorId: string;
 };
 export interface SearchExamplesProps {
   setMultimodalQueries: (x: Query[]) => void;
@@ -232,6 +233,7 @@ export interface SearchDropdownProps {
   setSearchText: (x: string) => void;
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
   viewModality: keyof ProcessedSearchResults;
+  featureExtractorId: string;
   submitSearch: () => void;
   clearSearchBar: () => void;
   isHomePage?: boolean;
