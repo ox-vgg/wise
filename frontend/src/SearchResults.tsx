@@ -273,6 +273,29 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     loadingMessage = <p className="wise-loading-message">Searching on {numMediaFilesString} <LoadingOutlined /></p>;
   } else if (!isHomePage && !isLoadingNewSearch) {
     loadingMessage = <p className="wise-loading-message">Search completed in {searchLatency.toFixed(2)} seconds on {numMediaFilesString}</p>;
+  } else if (isHomePage) {
+    // Show a note about the 'featured images' for object search and face search
+    let resultTypeName: 'image' | 'frame' | 'segment' | undefined;
+    if (viewModality == 'Image') {
+      resultTypeName = 'image';
+    } else if (viewModality == 'Video') {
+      if (viewMode == 'UnmergedSegments') {
+        resultTypeName = 'frame';
+      } else if (viewMode == 'Segments') {
+        resultTypeName = 'segment';
+      }
+    }
+    if (resultTypeName) {
+      if (featureExtractorId.includes('owlv2')) {
+        loadingMessage = <p className="wise-loading-message">Note: a random selection of objects in each {resultTypeName} is shown below</p>;
+      } else if (featureExtractorId.includes('insightface')) {
+        if (resultTypeName !== "segment") {
+          loadingMessage = <p className="wise-loading-message">Note: a random selection of faces are shown below. Only one face is shown per {resultTypeName}; {resultTypeName}s containing multiple faces may be repeated.</p>;
+        } else {
+          loadingMessage = <p className="wise-loading-message">Note: a random selection of faces are shown below. Only one face is shown per {resultTypeName}.</p>
+        }
+      }
+    }
   }
 
   const isLoadingFeaturedImages = (isHomePage && searchResultsHTML.length === 0);
