@@ -434,11 +434,11 @@ const VIEW_MODALITY_OPTIONS_EXTRA = {
 }
 
 const PREFERRED_SEARCH_TARGETS_NAME = {
-  "open_clip": "Visual Search",
-  "insightface": "Face Search",
-  "metadata": "Metadata Search",
-  "owlv2": "Object Search",
-  "clap": "Audio Search"
+  "open_clip": "Visual",
+  "insightface": "Faces",
+  "metadata": "Metadata",
+  "owlv2": "Objects",
+  "clap": "Audio"
 }
 
 type ViewModalityKey = keyof typeof VIEW_MODALITY_OPTIONS;
