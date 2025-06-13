@@ -97,10 +97,12 @@ class FeatureSearchIndex(SearchIndex):
             print(f'  use create-index.py script to create an index')
             return False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
-        self.feature_extractor = FeatureExtractorFactory(self.feature_extractor_id)
+        self.feature_extractor = FeatureExtractorFactory(
+            self.feature_extractor_id, warmup=True
+        )
         self.feature_extractor.create_vector_metadata_table(db_engine)
         return True
-    
+
     @property
     def is_internal_search_supported(self):
         """
