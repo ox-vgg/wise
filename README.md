@@ -6,6 +6,12 @@
     <br>
     WISE is a search engine for images, videos, and audio powered by multimodal AI, allowing you to quickly and easily search through large collections of audiovisual media. You can search using natural language, an uploaded image/audio file, or a combination of these modalities. Use WISE locally on your own collections of images/videos.
   </p>
+  <p>
+    For more details, visit 
+    <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/" target="_blank">
+      https://www.robots.ox.ac.uk/~vgg/software/wise/
+    </a>
+  </p>
 </div>
 
 ## Key Features
@@ -64,6 +70,9 @@
 We are planning on implementing the following features soon. Stay tuned!
 
 <ul>
+  <li>
+    Object search, face search, ASR (speech transcript) search, and metadata search will be available in the next stable release. (These features have been implemented in the current branch but are not stable yet.)
+  </li>
   <li>
   Cross platform easy installation
   <br>
