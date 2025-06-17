@@ -38,6 +38,15 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
       target: () => tourVariables.multimodalSearchArea.current,
     },
     {
+      title: 'Select model and media type',
+      description: <>
+        WISE supports searching across multiple media types (images, videos, etc.) using different models.
+        <br />
+        Using this dropdown menu, you can select the media type and model you want to use for your search.
+      </>,
+      target: () => document.querySelector(".wise-view-modality-select"),
+    },
+    {
       title: 'Pagination',
       description: 'Navigate to another page in the search results',
       target: () => document.querySelector("#search-results > .ant-pagination"),
@@ -62,7 +71,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
 
   const handleTourChange = (current?: number) => {
     // Make the 'three dots' icon (for reporting images) visible
-    if (current === 4) {
+    if (current === 5) {
       document.querySelector("#wise-image-grid > .wise-image-wrapper:nth-of-type(2)")?.classList.add('wise-image-dropdown-open');
     } else {
       document.querySelector("#wise-image-grid > .wise-image-wrapper:nth-of-type(2)")?.classList.remove('wise-image-dropdown-open');
