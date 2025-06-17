@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card, Tour, TourProps } from 'antd';
 import sanitizeHtml from 'sanitize-html';
 
@@ -12,7 +12,7 @@ exampleQueries = exampleQueries.map(value => ({ value, sort: Math.random() }))
                               .map(({ value }) => value); // Shuffle array
 exampleQueries = exampleQueries.slice(0,5);
 
-const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handleExampleQueryClick, projectInfo, refsForTour}) => {
+const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handleExampleQueryClick, projectInfo, tourVariables}) => {
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
   
   const tourSteps: TourProps['steps'] = [
@@ -25,17 +25,17 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
         WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. WISE then tries to find images whose visual contents match what you are trying to look for.
       </>,
       // cover: <img />
-      target: () => refsForTour.searchBar.current.input.parentElement,
+      target: () => tourVariables.searchBar.current.input.parentElement,
     },
     {
-      title: 'Visual search',
-      description: 'Upload an image or paste an image link to find similar images',
-      target: () => refsForTour.visualSearchButton.current,
+      title: 'Visual similarity search',
+      description: 'Click on this button and then upload an image or paste an image link to find similar images',
+      target: () => tourVariables.imageUploadButton.current,
     },
     {
       title: 'Compound multi-modal search',
-      description: 'Combine images and text in your query. For example, if you upload a picture of a golden retriever and enter the text "in snow", WISE will find images of golden retrievers in snow.',
-      target: () => refsForTour.multimodalSearchButton.current,
+      description: 'Search with a combination of images and text. For example, if you upload a picture of a golden retriever and then enter the text "in snow", WISE will find images of golden retrievers in snow.',
+      target: () => tourVariables.multimodalSearchArea.current,
     },
     {
       title: 'Pagination',
@@ -50,6 +50,15 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
       target: () => document.querySelector("#wise-image-grid > .wise-image-wrapper:nth-of-type(2)"),
     },
   ];
+
+  useEffect(() => {
+    // Open the search dropdown for the tour (needed for the "Visual similarity search" and "Compound multi-modal search" to display correctly)
+    if (isTourOpen) {
+      tourVariables.setIsSearchDropdownOpenForTour(true);
+    } else {
+      tourVariables.setIsSearchDropdownOpenForTour(false);
+    }
+  }, [isTourOpen])
 
   const handleTourChange = (current?: number) => {
     // Make the 'three dots' icon (for reporting images) visible

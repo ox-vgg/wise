@@ -8,7 +8,7 @@ import './App.scss';
 import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
-import { ProcessedSearchResults, ProjectInfo, Query } from './misc/types.ts';
+import { ProcessedSearchResults, ProjectInfo, Query, TourVariables } from './misc/types.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
 
@@ -22,10 +22,13 @@ export const App: React.FunctionComponent = () => {
   const [isHomePage, setIsHomePage] = useState(true);
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({});
 
-  const refsForTour = {
+  const [isSearchDropdownOpenForTour, setIsSearchDropdownOpenForTour] = useState(false);
+  const tourVariables: TourVariables = {
     searchBar: useRef(null),
-    visualSearchButton: useRef(null),
-    multimodalSearchButton: useRef(null),
+    isSearchDropdownOpenForTour,
+    setIsSearchDropdownOpenForTour,
+    imageUploadButton: useRef(null),
+    multimodalSearchArea: useRef(null),
     paginationControls: useRef(null),
     reportImageButton: useRef(null)
   }
@@ -135,12 +138,12 @@ export const App: React.FunctionComponent = () => {
                 viewModality={viewModality} setViewModality={setViewModality}
                 featureExtractorId={featureExtractorId} setFeatureExtractorId={setFeatureExtractorId}
                 submitSearch={submitSearch}
-                refsForTour={refsForTour}
+                tourVariables={tourVariables}
                 projectInfo={projectInfo}
                 isHomePage={isHomePage} isLoadingNewSearch={dataService.isLoadingNewSearch}></WiseHeader>
     <Content className="wise-content">
       {isHomePage && // Only show if isHomePage is true
-        <WiseOverviewCard handleExampleQueryClick={handleExampleQueryClick} projectInfo={projectInfo} refsForTour={refsForTour} />
+        <WiseOverviewCard handleExampleQueryClick={handleExampleQueryClick} projectInfo={projectInfo} tourVariables={tourVariables} />
       }
       <SearchResults dataService={dataService} isHomePage={isHomePage} projectInfo={projectInfo}
                       setSearchText={setSearchText} multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}

@@ -196,10 +196,12 @@ export interface ProjectInfo {
   total_duration?: number;
 };
 
-interface RefsForTour {
+export interface TourVariables {
+  isSearchDropdownOpenForTour: boolean;
+  setIsSearchDropdownOpenForTour: (x: boolean) => void;
   searchBar: MutableRefObject<any>;
-  visualSearchButton: MutableRefObject<any>;
-  multimodalSearchButton: MutableRefObject<any>;
+  imageUploadButton: MutableRefObject<any>;
+  multimodalSearchArea: MutableRefObject<any>;
   paginationControls: MutableRefObject<any>;
   reportImageButton: MutableRefObject<any>;
 };
@@ -236,6 +238,7 @@ export interface SearchDropdownProps {
   featureExtractorId: string;
   submitSearch: () => void;
   clearSearchBar: () => void;
+  tourVariables: TourVariables;
   isHomePage?: boolean;
 };
 export interface WiseHeaderProps {
@@ -248,7 +251,7 @@ export interface WiseHeaderProps {
   featureExtractorId: string;
   setFeatureExtractorId: (x: string) => void;
   submitSearch: () => void;
-  refsForTour: RefsForTour;
+  tourVariables: TourVariables;
   projectInfo: ProjectInfo;
   isHomePage?: boolean;
   isLoadingNewSearch?: boolean;
@@ -256,7 +259,7 @@ export interface WiseHeaderProps {
 export interface WiseOverviewCardProps {
   handleExampleQueryClick: (exampleQuery: string) => void;
   projectInfo: ProjectInfo;
-  refsForTour: RefsForTour;
+  tourVariables: TourVariables;
 };
 export interface SearchResultsProps {
   dataService: DataServiceOutput;

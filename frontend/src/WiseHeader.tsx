@@ -10,9 +10,6 @@ import config from './config.ts';
 import StillImageView from './misc/StillImageView.tsx';
 import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query, ProcessedSearchResults } from './misc/types.ts';
 
-// TODO
-// Update Tour feature, remove refsForTour.visualSearchButton and refsForTour.multimodalSearchButton
-
 const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
   multimodalQueries, setMultimodalQueries,
   searchText, setSearchText,
@@ -258,6 +255,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   handleTextInputChange,
   viewModality, featureExtractorId,
   submitSearch, clearSearchBar,
+  tourVariables,
   isHomePage
 }, ref) => {
   const { token } = useToken();
@@ -326,13 +324,20 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
           "Search using any of the modalities below, or a combination of modalities:"
         }
       </p>
-      <Space style={{marginBottom: 15}}>
+      <Space style={{marginBottom: 15}} ref={tourVariables.multimodalSearchArea}>
         {
           _modalities.map(modality => (
             <Button type="text" size="large" id={`wise-header-${modality.id}-modality-button`}
               key={modality.id}
               className={(isModalitySelected && selectedModality === modality.id) ? 'selected' : isModalitySelected ? 'inactive' : undefined}
-              onClick={() => toggleModality(modality.id)}>
+              onClick={() => toggleModality(modality.id)}
+              ref={(el) => {
+                // Set ref to the 'Image' button for the tour
+                if (modality.id === 'image') {
+                  tourVariables.imageUploadButton.current = el;
+                }
+              }}
+            >
               {modality.icon} {modality.label}
             </Button>
           ))
@@ -448,7 +453,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   multimodalQueries, setMultimodalQueries, searchText, setSearchText,
   viewModality, setViewModality,
   featureExtractorId, setFeatureExtractorId,
-  submitSearch, refsForTour, projectInfo,
+  submitSearch, tourVariables, projectInfo,
   isHomePage = false, isLoadingNewSearch = false
 }: WiseHeaderProps) => {
   // This state is set to true when the dropdown is triggered (by hovering over the search bar), and false when the mouse moves outside the search bar
@@ -491,7 +496,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   const _submitSearch = () => {
     // remove focus from search bar input element, to close the search dropdown
     setIsSearchDropdownTriggered(false);
-    refsForTour.searchBar.current.blur();
+    tourVariables.searchBar.current.blur();
     submitSearch()
   }
 
@@ -499,7 +504,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   const searchDropdownRef = useRef<SearchDropdownRefAttributes>(null);
   const handleDragEnter = (e: DragEvent) => {
     if (e.dataTransfer?.types.includes('Files')) {
-      refsForTour.searchBar.current.focus();
+      tourVariables.searchBar.current.focus();
       // TODO automatically select modality based on file/mime type?
       searchDropdownRef.current?.selectModality('image')
     }
@@ -639,9 +644,10 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                               viewModality={viewModality} featureExtractorId={featureExtractorId}
                               submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
                               isHomePage={isHomePage}
-                              ref={searchDropdownRef} />
+                              tourVariables={tourVariables} ref={searchDropdownRef}
+              />
             }
-            open={isSearchDropdownTriggered || isSearchInputFocused}
+            open={isSearchDropdownTriggered || isSearchInputFocused || tourVariables.isSearchDropdownOpenForTour}
             onOpenChange={(open) => setIsSearchDropdownTriggered(open)}
           >
             <Form onFinish={_submitSearch} id="search-input-form">
@@ -664,7 +670,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                     <Button type="text" shape="circle" size="large" loading={isLoadingNewSearch} htmlType="submit" icon={<SearchOutlined />} />
                   </>
                 }
-                ref={refsForTour.searchBar}
+                ref={tourVariables.searchBar}
                 onFocus={() => setIsSearchInputFocused(true)}
                 onBlur={() => setIsSearchInputFocused(false)}
               />
