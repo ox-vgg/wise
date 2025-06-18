@@ -313,7 +313,9 @@
   // Mobile override: make dropdown fit screen width
   @media (max-width: 600px) {
     > div {
-      width: 100vw !important;
+      // on mobile, there is 2vw space on the left and right of the search bar,
+      // so the width of the dropdown should be 96vw to match the search bar width
+      width: 96vw !important;
       padding: 12px !important;
       box-sizing: border-box;
     }
