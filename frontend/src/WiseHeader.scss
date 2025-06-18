@@ -84,22 +84,7 @@
       }
     }
 
-    .wise-header-row-search {
-      form {
-        .ant-input-affix-wrapper {
-          width: var(--wise-search-width);
-          max-width: 100%;
-          min-width: 250px;
-          transition: width 0.3s;
-        }
-      }
-    }
-
-    .wise-view-modality-select {
-      margin-left: -20px;
-    }
-
-    & > form {
+    .wise-header-row-search > form {
       margin-left: 5px;
       & > .ant-input-affix-wrapper {
         width: var(--wise-search-width);
@@ -136,6 +121,10 @@
       &:active {
         background-color: #e0e0e0;
       }
+    }
+
+    .wise-view-modality-select {
+      margin-left: -20px;
     }
   }
 
