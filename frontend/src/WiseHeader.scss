@@ -160,7 +160,7 @@
         form {
           width: 100%;
           .ant-input-affix-wrapper {
-            width: 100% !important; // Full width on mobile
+            width: 100%; // Full width on mobile
             min-width: 0;
           }
         }
@@ -299,8 +299,8 @@
     > div {
       // on mobile, there is 2vw space on the left and right of the search bar,
       // so the width of the dropdown should be 96vw to match the search bar width
-      width: 96vw !important;
-      padding: 12px !important;
+      width: 96vw;
+      padding: 12px;
       box-sizing: border-box;
     }
   }
