@@ -145,6 +145,10 @@
         width: 100%;
         margin-top: 0px;
         margin-bottom: 10px;
+
+        #wise-logo {
+          margin-right: unset;
+        }
       }
       .wise-header-row-dropdown {
         display: flex;
@@ -159,6 +163,7 @@
         justify-content: center;
         form {
           width: 100%;
+          margin-left: unset;
           .ant-input-affix-wrapper {
             width: 100%; // Full width on mobile
             min-width: 0;
