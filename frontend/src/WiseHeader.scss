@@ -1,3 +1,8 @@
+// CSS variable definitions
+:root {
+  --wise-search-width: 600px; // search input and dropdown panel width
+}
+
 .ant-tag {
   display: flex;
   align-items: center;
@@ -86,7 +91,7 @@
       form {
         width: 100%;
         .ant-input-affix-wrapper {
-          width: 500px; // Wider search bar for desktop
+          width: var(--wise-search-width);
           max-width: 100%;
           min-width: 250px;
           transition: width 0.3s;
@@ -101,7 +106,7 @@
     & > form {
       margin-left: 5px;
       & > .ant-input-affix-wrapper {
-        width: 600px; // Wider search bar for desktop
+        width: var(--wise-search-width);
         max-width: 100%;
         min-width: 250px;
         transition: width 0.3s;
@@ -199,7 +204,8 @@
   z-index: 1000;
   > div {
     padding: 20px;
-    width: 600px;
+    width: var(--wise-search-width);
+    max-width: 100%;
     box-sizing: border-box;
     margin-top: -4px;
     
