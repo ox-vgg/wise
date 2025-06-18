@@ -1171,7 +1171,11 @@ def _get_search_router(config: APIConfig):
             search_indices[media_type]['wise/metadata'] = fts_search_index
             active_search_targets[media_type].append('wise/metadata')  
 
-    is_audio_only_project =  MediaType.VIDEO not in search_indices and MediaType.AUDIO in search_indices and active_search_targets[MediaType.AUDIO] > 0
+    is_audio_only_project = (
+        MediaType.VIDEO not in search_indices
+        and MediaType.AUDIO in search_indices
+        and len(active_search_targets[MediaType.AUDIO]) > 0
+    )
     if fts_search_index is not None and is_audio_only_project:
         search_indices[MediaType.AUDIO]['wise/metadata'] = fts_search_index
         active_search_targets[MediaType.AUDIO].append('wise/metadata')  
