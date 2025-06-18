@@ -85,11 +85,7 @@
     }
 
     .wise-header-row-search {
-      width: 100%;
-      display: flex;
-      justify-content: center;
       form {
-        width: 100%;
         .ant-input-affix-wrapper {
           width: var(--wise-search-width);
           max-width: 100%;
