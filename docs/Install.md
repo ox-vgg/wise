@@ -39,7 +39,6 @@ Using the conda tool, the WISE software dependencies can be installed as follows
 ```
 conda env create -f environment.yml
 conda activate wise
-pip install --no-deps msclap==1.3.3  # avoids installing conflicting version of torch
 ```
 
 (For mamba, replace conda in the above command accordingly)
@@ -57,7 +56,6 @@ python3 -m venv wise-dep/          # create virtual environment
 source wise-dep/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-pip install --no-deps msclap==1.3.3
 pip install -r torch-faiss-requirements.txt
 ```
 
@@ -77,7 +75,5 @@ python -m pip install --upgrade pip
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 pip install -r requirements.txt
-pip install --no-deps msclap==1.3.3
-
 pip install faiss-cpu
 ```
