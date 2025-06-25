@@ -458,7 +458,10 @@ if __name__ == "__main__":
             # Update progress bar
             _media = chunks.get('video') or chunks.get('audio') or chunks.get('image')
             if _media is not None:
-                a_feature_extractor = next( iter(_media.values()), None)
+                if isinstance(_media, dict):
+                    a_feature_extractor = next( iter(_media.values()), None)
+                else:
+                    a_feature_extractor = _media
                 if a_feature_extractor is not None:
                     pbar.update(a_feature_extractor.tensor.shape[0])
 
