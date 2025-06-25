@@ -247,13 +247,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Set default for {image,audio,video}_feature_id_map only if the argument was not provided
-    if args.video_feature_id_map is None:
+    # If no feature extractor ids are provided, use the default feature extractor ids
+    if args.video_feature_id_map is None and args.image_feature_id_map is None and args.audio_feature_id_map is None:
         args.video_feature_id_map = ["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"]
-    if args.image_feature_id_map is None:
         args.image_feature_id_map = ["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"]
-    if args.audio_feature_id_map is None:
         args.audio_feature_id_map = ["microsoft/clap/2023/four-datasets"]
+    else:
+        # If any feature extractor ids are provided, do not use the default values for the missing ones
+        if args.video_feature_id_map is None:
+            args.video_feature_id_map = []
+        if args.image_feature_id_map is None:
+            args.image_feature_id_map = []
+        if args.audio_feature_id_map is None:
+            args.audio_feature_id_map = []
 
     logging.basicConfig(
         level=logging.INFO,
