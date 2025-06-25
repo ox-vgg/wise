@@ -102,30 +102,34 @@ def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] 
     dataset_payload: list[DatasetPayload] = []
     logger.info(f"Writing metadata to database...")
     with tqdm(total=len(metadata)) as pbar, db_engine.begin() as conn:
-        # Add each folder to source collection table
-        data = SourceCollection(location=str(media_dir), type=SourceCollectionType.DIR)
-        media_source_collection = SourceCollectionRepo.create(conn, data=data)
+        media_source_collection = SourceCollectionRepo.get_row_by_column_match(conn, "location", str(media_dir))
+        if media_source_collection is None:
+            # Add the folder to source collection table
+            data = SourceCollection(location=str(media_dir), type=SourceCollectionType.DIR)
+            media_source_collection = SourceCollectionRepo.create(conn, data=data)
 
         for media_metadata in metadata:
-            # Get metadata for each file and add it to media table
-            # Get media_path relative to
             media_path = media_metadata.path
-            _metadata = MediaRepo.create(
-                conn,
-                data=MediaMetadata(
-                    source_collection_id=media_source_collection.id,
-                    path=os.path.relpath(media_path, media_source_collection.location),
-                    media_type=media_metadata.media_type,
-                    checksum=media_metadata.md5sum,
-                    size_in_bytes=os.path.getsize(media_path),
-                    date_modified=os.path.getmtime(media_path),
-                    format=media_metadata.format,
-                    width=media_metadata.width,
-                    height=media_metadata.height,
-                    num_frames=media_metadata.num_frames,
-                    duration=media_metadata.duration or 0,
-                ),
-            )
+            rel_media_path = os.path.relpath(media_path, media_source_collection.location)
+            # Check if media already exists in the database
+            _metadata = MediaRepo.get_row_by_column_match(conn, "path", rel_media_path)
+            if _metadata is None:
+                _metadata = MediaRepo.create(
+                    conn,
+                    data=MediaMetadata(
+                        source_collection_id=media_source_collection.id,
+                        path=rel_media_path,
+                        media_type=media_metadata.media_type,
+                        checksum=media_metadata.md5sum,
+                        size_in_bytes=os.path.getsize(media_path),
+                        date_modified=os.path.getmtime(media_path),
+                        format=media_metadata.format,
+                        width=media_metadata.width,
+                        height=media_metadata.height,
+                        num_frames=media_metadata.num_frames,
+                        duration=media_metadata.duration or 0,
+                    ),
+                )
             # extra_metadata = ExtraMediaMetadata(
             #     media_id=_metadata.id,
             #     metadata={
@@ -291,7 +295,7 @@ if __name__ == "__main__":
 
     # we need a non-existing folder to initialise a new WISE project
     if Path(args.project_dir).exists():
-        raise ValueError(f'project_dir {args.project_dir} already exists')
+        print(f'Updating existing project {args.project_dir} ...')
 
     # TODO: allow adding new files to an existing project
     project = WiseProject(args.project_dir, create_project=True, db_kwargs={'echo': False}, thumbsdb_kwargs={'echo': False})
