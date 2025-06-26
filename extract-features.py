@@ -147,6 +147,32 @@ def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] 
     # return metadata and datasets to be chained
     return dataset_payload
 
+def retrieve_project_dataset_payload(project: WiseProject, db_engine: sa.Engine) -> list[DatasetPayload]:
+    dataset_payload = []
+    with db_engine.connect() as conn:
+        media_table = MediaRepo._table
+        source_collections_table = SourceCollectionRepo._table
+        stmt = (
+            sa.select(
+                media_table.c.id,
+                (source_collections_table.c.location + '/' + media_table.c.path).label('media_path'),
+                media_table.c.media_type
+            )
+            .select_from(
+                media_table.join(
+                    source_collections_table,
+                    media_table.c.source_collection_id == source_collections_table.c.id
+                )
+            )
+        )
+        rows = conn.execute(stmt)
+        for row in rows:
+            print(row)
+            dataset_payload.append(
+                DatasetPayload(row.id, row.media_path, row.media_type)
+            )
+    return dataset_payload
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="extract-features",
@@ -155,8 +181,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "media_dir_list",
-        nargs='+',
-        help="process images and video from this folder",
+        nargs='*',
+        help="process images and video from this folder (an existing WISE project will be updated if this is not provided)",
+        default=[],
     )
 
     parser.add_argument(
@@ -245,6 +272,13 @@ if __name__ == "__main__":
         type=str,
         help="folder where all project assets are stored",
     )
+
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="Automatically answer yes to all prompts"
+    )
+
     parser.add_argument(
         "--thumbnails", default=True, action=argparse.BooleanOptionalAction
     )
@@ -293,11 +327,24 @@ if __name__ == "__main__":
     setattr(args, 'image_feature_id_map', unique_image_feature_ids)
     setattr(args, 'audio_feature_id_map', unique_audio_feature_ids)
 
-    # we need a non-existing folder to initialise a new WISE project
+    # Check if an update of an existing project is requested
+    is_project_being_updated = False
     if Path(args.project_dir).exists():
+        print(f'Project directory {args.project_dir} already exists.')
+        if len(args.media_dir_list) == 0:
+            if not args.yes:
+                answer = input(f'Do you want to update it? [y/N]: ')
+                if answer.lower() != 'y':
+                    print('Aborting...')
+                    exit(1)
+            is_project_being_updated = True
+        else:
+            raise ValueError(
+                "To update an existing project, run extract-features.py without the media_dir_list argument."
+                "The update process operates on the media files referenced in the WISE project."
+            )
         print(f'Updating existing project {args.project_dir} ...')
 
-    # TODO: allow adding new files to an existing project
     project = WiseProject(args.project_dir, create_project=True, db_kwargs={'echo': False}, thumbsdb_kwargs={'echo': False})
     db_engine = project.db_engine
     thumbs_engine = project.thumbsdb_engine
@@ -307,14 +354,18 @@ if __name__ == "__main__":
     ## 1. Initialise internal metadata database with valid files
     print('Initialising internal metadata database')
     all_metadata: list[DatasetPayload] = []
-    for media_dir in args.media_dir_list:
-        metadata = process_media_dir(Path(media_dir), db_engine, args.media_include_list)
+    if is_project_being_updated:
+        metadata = retrieve_project_dataset_payload(project, db_engine)
         all_metadata.extend(metadata)
+    else:
+        for media_dir in args.media_dir_list:
+            metadata = process_media_dir(Path(media_dir), db_engine, args.media_include_list)
+            all_metadata.extend(metadata)
 
     # Get the set of media types present in the input media files
     media_types_present: set[SourceMediaType] = set(x.media_type for x in all_metadata)
 
-    ## 5. extract video and audio features
+    ## Prepare a list of requested feature extractors
     feature_extractor_ids: dict[ModalityType, list] = {}
     if SourceMediaType.VIDEO in media_types_present or SourceMediaType.AV in media_types_present:
         if args.video_feature_id_map:
@@ -326,6 +377,18 @@ if __name__ == "__main__":
         # TODO: temporary disable - if not args.skip_audio_feature_extraction:
         if args.audio_feature_id_map:
             feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id_map
+
+    ## Ensure that the requested features are not already present in the project
+    if is_project_being_updated:
+        project_assets = project.discover_assets()
+        for modality_type, feature_extractor_id_list in feature_extractor_ids.items():
+            for feature_extractor_id in feature_extractor_id_list:
+                if project_assets.get(modality_type) is None:
+                    continue
+                if feature_extractor_id in project_assets[modality_type]:
+                    raise ValueError(
+                        f"Feature extractor {feature_extractor_id} for {modality_type} already exists in the project."
+                    )
 
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
