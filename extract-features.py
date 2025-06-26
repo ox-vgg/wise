@@ -317,12 +317,15 @@ if __name__ == "__main__":
     ## 5. extract video and audio features
     feature_extractor_ids: dict[ModalityType, list] = {}
     if SourceMediaType.VIDEO in media_types_present or SourceMediaType.AV in media_types_present:
-        feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id_map
+        if args.video_feature_id_map:
+            feature_extractor_ids[ModalityType.VIDEO] = args.video_feature_id_map
     if SourceMediaType.IMAGE in media_types_present:
-        feature_extractor_ids[ModalityType.IMAGE] = args.image_feature_id_map
+        if args.image_feature_id_map:
+            feature_extractor_ids[ModalityType.IMAGE] = args.image_feature_id_map
     if SourceMediaType.AUDIO in media_types_present or SourceMediaType.AV in media_types_present:
         # TODO: temporary disable - if not args.skip_audio_feature_extraction:
-        feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id_map
+        if args.audio_feature_id_map:
+            feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id_map
 
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
