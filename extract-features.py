@@ -167,7 +167,6 @@ def retrieve_project_dataset_payload(project: WiseProject, db_engine: sa.Engine)
         )
         rows = conn.execute(stmt)
         for row in rows:
-            print(row)
             dataset_payload.append(
                 DatasetPayload(row.id, row.media_path, row.media_type)
             )
