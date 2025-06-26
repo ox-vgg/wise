@@ -20,6 +20,9 @@ bash test-wikimedia-commons-25.sh  $HOME/temp/
 
 # 4. Run tests based on images
 bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
+
+# 5. Run tests based on edited videos with shots
+bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
 ```
 
 Here is a sample output obtained by executing the test based on videos.
@@ -65,6 +68,19 @@ Test 5.1 PASSED
 Test 5.2 PASSED
 Test 5.3 PASSED
 *** All tests for wikimedia-commons-images-25 completed in 46 sec. ***
+```
+
+Here is a sample output obtained by executing the test based on edited videos (with shots).
+```
+Starting tests for wikimedia-commons-edited-videos ...
+...
+Test 7.1 PASSED
+Test 7.2 PASSED
+Test 8.1 PASSED
+Test 8.2 PASSED
+Test 8.3 PASSED
+
+*** All tests for wikimedia-commons-edited-videos completed in 60 sec. ***
 ```
 
 # Unit Tests
