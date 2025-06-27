@@ -102,34 +102,30 @@ def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] 
     dataset_payload: list[DatasetPayload] = []
     logger.info(f"Writing metadata to database...")
     with tqdm(total=len(metadata)) as pbar, db_engine.begin() as conn:
-        media_source_collection = SourceCollectionRepo.get_row_by_column_match(conn, "location", str(media_dir))
-        if media_source_collection is None:
-            # Add the folder to source collection table
-            data = SourceCollection(location=str(media_dir), type=SourceCollectionType.DIR)
-            media_source_collection = SourceCollectionRepo.create(conn, data=data)
+        # Add each folder to source collection table
+        data = SourceCollection(location=str(media_dir), type=SourceCollectionType.DIR)
+        media_source_collection = SourceCollectionRepo.create(conn, data=data)
 
         for media_metadata in metadata:
+            # Get metadata for each file and add it to media table
+            # Get media_path relative to
             media_path = media_metadata.path
-            rel_media_path = os.path.relpath(media_path, media_source_collection.location)
-            # Check if media already exists in the database
-            _metadata = MediaRepo.get_row_by_column_match(conn, "path", rel_media_path)
-            if _metadata is None:
-                _metadata = MediaRepo.create(
-                    conn,
-                    data=MediaMetadata(
-                        source_collection_id=media_source_collection.id,
-                        path=rel_media_path,
-                        media_type=media_metadata.media_type,
-                        checksum=media_metadata.md5sum,
-                        size_in_bytes=os.path.getsize(media_path),
-                        date_modified=os.path.getmtime(media_path),
-                        format=media_metadata.format,
-                        width=media_metadata.width,
-                        height=media_metadata.height,
-                        num_frames=media_metadata.num_frames,
-                        duration=media_metadata.duration or 0,
-                    ),
-                )
+            _metadata = MediaRepo.create(
+                conn,
+                data=MediaMetadata(
+                    source_collection_id=media_source_collection.id,
+                    path=os.path.relpath(media_path, media_source_collection.location),
+                    media_type=media_metadata.media_type,
+                    checksum=media_metadata.md5sum,
+                    size_in_bytes=os.path.getsize(media_path),
+                    date_modified=os.path.getmtime(media_path),
+                    format=media_metadata.format,
+                    width=media_metadata.width,
+                    height=media_metadata.height,
+                    num_frames=media_metadata.num_frames,
+                    duration=media_metadata.duration or 0,
+                ),
+            )
             # extra_metadata = ExtraMediaMetadata(
             #     media_id=_metadata.id,
             #     metadata={
@@ -145,31 +141,6 @@ def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] 
 
 
     # return metadata and datasets to be chained
-    return dataset_payload
-
-def retrieve_project_dataset_payload(project: WiseProject, db_engine: sa.Engine) -> list[DatasetPayload]:
-    dataset_payload = []
-    with db_engine.connect() as conn:
-        media_table = MediaRepo._table
-        source_collections_table = SourceCollectionRepo._table
-        stmt = (
-            sa.select(
-                media_table.c.id,
-                (source_collections_table.c.location + '/' + media_table.c.path).label('media_path'),
-                media_table.c.media_type
-            )
-            .select_from(
-                media_table.join(
-                    source_collections_table,
-                    media_table.c.source_collection_id == source_collections_table.c.id
-                )
-            )
-        )
-        rows = conn.execute(stmt)
-        for row in rows:
-            dataset_payload.append(
-                DatasetPayload(row.id, row.media_path, row.media_type)
-            )
     return dataset_payload
 
 if __name__ == "__main__":
@@ -329,12 +300,12 @@ if __name__ == "__main__":
     # Check if an update of an existing project is requested
     is_project_being_updated = False
     if Path(args.project_dir).exists():
-        print(f'Project directory {args.project_dir} already exists.')
+        logger.info(f'Project directory {args.project_dir} already exists.')
         if len(args.media_dir_list) == 0:
             if not args.yes:
                 answer = input(f'Do you want to update it? [y/N]: ')
                 if answer.lower() != 'y':
-                    print('Aborting...')
+                    logger.info('Aborting...')
                     exit(1)
             is_project_being_updated = True
         else:
@@ -342,7 +313,7 @@ if __name__ == "__main__":
                 "To update an existing project, run extract-features.py without the media_dir_list argument."
                 "The update process operates on the media files referenced in the WISE project."
             )
-        print(f'Updating existing project {args.project_dir} ...')
+        logger.info(f'Updating existing project {args.project_dir} ...')
 
     project = WiseProject(args.project_dir, create_project=True, db_kwargs={'echo': False}, thumbsdb_kwargs={'echo': False})
     db_engine = project.db_engine
@@ -354,7 +325,7 @@ if __name__ == "__main__":
     print('Initialising internal metadata database')
     all_metadata: list[DatasetPayload] = []
     if is_project_being_updated:
-        metadata = retrieve_project_dataset_payload(project, db_engine)
+        metadata = project.dataset_payload()
         all_metadata.extend(metadata)
     else:
         for media_dir in args.media_dir_list:
@@ -380,14 +351,25 @@ if __name__ == "__main__":
     ## Ensure that the requested features are not already present in the project
     if is_project_being_updated:
         project_assets = project.discover_assets()
-        for modality_type, feature_extractor_id_list in feature_extractor_ids.items():
+        feature_extractor_ids_copy = feature_extractor_ids.copy()
+        # Iterate over the feature extractor ids and remove those that are already present in the project
+        for modality_type, feature_extractor_id_list in list(feature_extractor_ids_copy.items()):
             for feature_extractor_id in feature_extractor_id_list:
                 if project_assets.get(modality_type) is None:
                     continue
                 if feature_extractor_id in project_assets[modality_type]:
-                    raise ValueError(
-                        f"Feature extractor {feature_extractor_id} for {modality_type} already exists in the project."
+                    logger.info(
+                        f"Feature extractor {feature_extractor_id} for {modality_type} already exists in the project. Skipping."
                     )
+                    feature_extractor_ids[modality_type].remove(feature_extractor_id)
+            if len(feature_extractor_ids[modality_type]) == 0:
+                del feature_extractor_ids[modality_type]
+
+    if len(feature_extractor_ids) == 0:
+        logger.info(
+            "No feature extractors specified or all requested feature extractors already exist in the project."
+        )
+        exit(0)
 
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
