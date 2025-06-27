@@ -59,6 +59,7 @@ from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtMetadata
 from src.search.fts import FTSSearch, WISEFTSQuery
+from src.dataloader import AVDataset
 
 logger = logging.getLogger(__name__)
 
@@ -434,18 +435,93 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
         response_class=Response,
         responses={200: {"content": "image/jpeg"}, 404: {"content": "text/plain"}},
     )
-    def get_thumbnail(media_id: int, timestamp: float):
+    def get_thumbnail(media_id: int, timestamp: float, high_res: bool = False):
         # Get a thumbnail given a thumbnail id
-        with thumbs_engine.connect() as thumbs_conn:
-            thumbnail = get_thumbnail_by_timestamp(
-                thumbs_conn, media_id=media_id, timestamp=timestamp
+        if not high_res:
+            with thumbs_engine.connect() as thumbs_conn:
+                thumbnail = get_thumbnail_by_timestamp(
+                    thumbs_conn, media_id=media_id, timestamp=timestamp
+                )
+                if thumbnail is None:
+                    raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
+                return Response(
+                    content=thumbnail,
+                    media_type="image/jpeg",
+                    status_code=200,
+                )
+
+        # seek the original video
+        with project_engine.connect() as conn:
+            metadata = MediaRepo.get(conn, media_id)
+            if metadata is None:
+                return PlainTextResponse(
+                    status_code=404, content=f"{media_id} not found!"
+                )
+            # TODO (WISE 2) get source URI from imported_metadata table
+            # # Send the source_uri if present, or try to read from source
+            # # we read from
+            # # Maybe do a HEAD request to check existence before redirect
+            # # so that we can try to serve the file from disk if present?
+            # if metadata.source_uri and is_valid_uri(metadata.source_uri):
+            #     return RedirectResponse(metadata.source_uri, status_code=302)
+
+            source_collection = SourceCollectionRepo.get(
+                conn, metadata.source_collection_id
             )
-            if thumbnail is None:
-                raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
-            return Response(
-                content=thumbnail,
-                media_type="image/jpeg",
-                status_code=200,
+            if source_collection is None:
+                return PlainTextResponse(
+                    status_code=404, content=f"{media_id} not found!"
+                )
+
+            file_path = Path(source_collection.location) / metadata.path
+
+            audio_sampling_rate = 48_000  # (48 kHz)
+            video_frame_rate = 2  # fps
+            video_frames_per_chunk = 8  # frames
+            segment_length = (
+                video_frames_per_chunk / video_frame_rate
+            )  # frames / fps = seconds
+            audio_segment_length = segment_length  # seconds
+            audio_frames_per_chunk = int(
+                round(audio_sampling_rate * audio_segment_length)
+            )
+            offset = 4 * ((timestamp) // 4)
+            ## dataset
+            stream = AVDataset(
+                [str(file_path)],
+                video_frames_per_chunk=video_frames_per_chunk,
+                video_frame_rate=video_frame_rate,
+                audio_samples_per_chunk=audio_frames_per_chunk,
+                audio_sample_rate=audio_sampling_rate,
+                offset=offset,
+                thumbnails=True,
+            )
+            for _, (mid, chunks) in enumerate(stream):
+                video = chunks["video"]
+                logger.debug(f"media_id: {mid}, pts: {video.pts}")
+                if not video:
+                    break
+
+                if video.pts != offset:
+                    continue
+
+                if video.pts > timestamp:
+                    break
+
+                n = int((timestamp - video.pts) // 0.5)
+                logger.debug(f"index: {n}, pts: {video.pts}, ts: {timestamp}")
+                arr = video.tensor[n].numpy().astype(np.uint8).transpose(1, 2, 0)
+                with Image.fromarray(arr) as im:
+                    buf = io.BytesIO()
+                    im.save(buf, format="JPEG", quality=90)
+                    return Response(
+                        content=buf.getvalue(),
+                        media_type="image/jpeg",
+                        status_code=200,
+                    )
+            raise HTTPException(
+                status_code=404,
+                detail=f"Thumbnail for media_id {media_id} and timestamp {timestamp} not found!",
             )
 
     @router.get(
