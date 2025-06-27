@@ -426,7 +426,9 @@ class FTSSearch:
 
             updated_segments = update_segment_text_with_highlights(text, segments)
             # Merge nearby segments
-            merged_segments = merge_close_segments(updated_segments)
+            # merged_segments = merge_close_segments(updated_segments)
+            # Note: dont merge segments as they can become very long. Best to display them next to each other on the table
+            merged_segments = updated_segments
             vector_media_metadata = VectorAndMediaMetadata.model_validate(
                 media_metadata.model_dump()
                 | {
