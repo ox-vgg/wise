@@ -9,6 +9,7 @@ import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/l
 
 import "./ImageDetailsModal.scss";
 import { ASRSegment, ImageDetailsModalProps, ProcessedVideoSegment, ProcessedVectorInfo, isWithBBox } from "./types";
+import BoundingBoxOverlay from "./BoundingBoxOverlay.tsx";
 import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 import { secondsToMinSecPadded } from "./utils.ts";
@@ -52,7 +53,8 @@ const ImageDetailsModal = ({
   handleInternalSearchButtonClick,
 }: ImageDetailsModalProps) => {
   const [isModalOpen, setIsModalOpen] = useState(true);
-  console.log(imageDetails)
+  const [displayOverlay, setDisplayOverlay] = useState(isWithBBox(imageDetails));
+  console.debug(imageDetails, `modal open: ${isModalOpen}, should display overlay: ${displayOverlay}`);
   const title = (
     <Button
       type="text"
@@ -92,7 +94,7 @@ const ImageDetailsModal = ({
 
   const setStartTimestamp = () => {
     // This is needed because the video player doesn't automatically play the video from the start time in the URL (e.g. #t=16.0)
-    if (imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails.ts;
+    if (imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails.thumbnail_ts;
   }
 
   const handleClickOccurrence = (videoSegment: ProcessedVideoSegment) => {
@@ -106,9 +108,11 @@ const ImageDetailsModal = ({
       else if (imageDetails.vector_id === videoSegment.vector_id) {
         // Handle click on the same vector
         if (playerRef.current) playerRef.current.currentTime = imageDetails.ts;
+        setDisplayOverlay(true);
       } else {
         // Handle click on a different vector
         setImageDetails(videoSegment);
+        setDisplayOverlay(true)
       }
     }
   }
@@ -155,20 +159,34 @@ const ImageDetailsModal = ({
         src={videoSrc}
         viewType="video"
         playsInline
-        autoPlay
+        autoPlay={!isWithBBox(imageDetails)}
+        preload="metadata"
         ref={playerRef}
         onLoadedMetadata={setStartTimestamp}
         clipEndTime={imageDetails.mediaInfo.duration} // This is needed due to a bug with the chapter markers https://github.com/vidstack/player/issues/1022
+        onSeeked={() => { playerRef.current?.currentTime !== imageDetails.thumbnail_ts && setDisplayOverlay(false) }}
+        onPlay={() => setDisplayOverlay(false)}
+
       >
-        <MediaProvider>
-          {media_provider_track}
-        </MediaProvider>
-        <DefaultVideoLayout
-          thumbnails={imageDetails.mediaInfo.timeline_hover_thumbnails}
-          icons={defaultLayoutIcons}
-          noScrubGesture={false}
-          seekStep={5}
-        />
+        <BoundingBoxOverlay
+          showImage={true}
+          displayOverlay={displayOverlay}
+          imageDetails={imageDetails}
+          isModalView={true}
+          featureExtractorId={featureExtractorId}
+          handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
+        >
+
+          <MediaProvider>
+            {media_provider_track}
+          </MediaProvider>
+          <DefaultVideoLayout
+            thumbnails={imageDetails.mediaInfo.timeline_hover_thumbnails}
+            icons={defaultLayoutIcons}
+            noScrubGesture={false}
+            seekStep={5}
+          />
+        </BoundingBoxOverlay>
       </MediaPlayer>
     );
   } else {
