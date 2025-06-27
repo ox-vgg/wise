@@ -3,9 +3,8 @@ from pathlib import Path
 import sqlite3
 
 from . import db as wise_db
-from src import db
-from src.dataloader import DatasetPayload
 import sqlalchemy as sa
+from .data_models import DatasetPayload
 
 DB_SCHEME = "sqlite+pysqlite://"
 
@@ -185,26 +184,26 @@ class WiseProject:
                         }
         return self.assets
 
-    def dataset_payload(self) -> list[DatasetPayload]:
-        print(f'Fetching dataset payload from {self.dburi} ...')
-        dataset_payload = []
+    def get_media_files(self) -> list[DatasetPayload]:
+        media_files = []
         with self.db_engine.connect() as conn:
             stmt = (
                 sa.select(
-                    db.media_table.c.id,
-                    (db.source_collections_table.c.location + '/' + db.media_table.c.path).label('media_path'),
-                    db.media_table.c.media_type
+                    wise_db.media_table.c.id,
+                    (wise_db.source_collections_table.c.location + '/' + wise_db.media_table.c.path).label('media_path'),
+                    wise_db.media_table.c.media_type
                 )
                 .select_from(
-                    db.media_table.join(
-                        db.source_collections_table,
-                        db.media_table.c.source_collection_id == db.source_collections_table.c.id
+                    wise_db.media_table.join(
+                        wise_db.source_collections_table,
+                        wise_db.media_table.c.source_collection_id == wise_db.source_collections_table.c.id
                     )
                 )
             )
             rows = conn.execute(stmt)
+
             for row in rows:
-                dataset_payload.append(
+                media_files.append(
                     DatasetPayload(row.id, row.media_path, row.media_type)
                 )
-        return dataset_payload
+        return media_files

@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 from src.dataloader.dataset import MediaChunk
 from src.dataloader import get_dataset, get_metadata_for_valid_files, DatasetPayload
-from src.dataloader.streamreader import SourceMediaType, MediaChunkType
+from src.data_models import SourceMediaType, MediaChunkType
 from src.dataloader.utils import get_files_from_directory_with_extensions
 from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtractor
@@ -325,7 +325,7 @@ if __name__ == "__main__":
     print('Initialising internal metadata database')
     all_metadata: list[DatasetPayload] = []
     if is_project_being_updated:
-        metadata = project.dataset_payload()
+        metadata = project.get_media_files()
         all_metadata.extend(metadata)
     else:
         for media_dir in args.media_dir_list:
@@ -358,7 +358,7 @@ if __name__ == "__main__":
                 if project_assets.get(modality_type) is None:
                     continue
                 if feature_extractor_id in project_assets[modality_type]:
-                    logger.info(
+                    logger.warning(
                         f"Feature extractor {feature_extractor_id} for {modality_type} already exists in the project. Skipping."
                     )
                     feature_extractor_ids[modality_type].remove(feature_extractor_id)

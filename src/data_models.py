@@ -1,5 +1,5 @@
 import enum
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, dataclasses
 from typing import Optional, Dict, Any
 import datetime
 
@@ -93,3 +93,22 @@ class VideoShot(BaseModel):
     te: float
 
     model_config = ConfigDict(from_attributes=True)
+
+class SourceMediaType(str, enum.Enum):
+    AUDIO = "audio"
+    VIDEO = "video"
+    IMAGE = "image"
+    AV = "av"
+
+class MediaChunkType(str, enum.Enum):
+    AUDIO = "audio"
+    VIDEO = "video"
+    THUMBNAILS = "thumbnails"
+    IMAGE = 'image'
+
+@dataclasses.dataclass
+class DatasetPayload(object):
+    id: Any
+    path: str
+    media_type: SourceMediaType
+
