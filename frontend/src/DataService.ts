@@ -381,7 +381,7 @@ export const useDataService = (): DataServiceOutput => {
   // }
 
 
-  const fillRelatedVectors = async (imageDetails: ProcessedImageVector) => {
+  const fillRelatedVectors = async (imageDetails: ProcessedImageVector | ProcessedVideoSegment) => {
     const vectors = await fetchRelatedVectors(imageDetails.vector_id);
     // This mediaInfo is used to get the image width/height which is
     // used in a bunch of places to draw the thumbnail in a manner

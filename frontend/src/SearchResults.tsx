@@ -95,7 +95,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   // timestamp).
   const [imageDetails, _setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
   const setImageDetails = (d: ProcessedVideoSegment | ProcessedImageVector | undefined) => {
-    if (featureExtractorId.includes('insightface') && d && d.mediaType === "IMAGE" && ! d.related_vectors && !isNaN(parseInt(d.vector_id)))
+    if (featureExtractorId.includes('insightface') && d && !d.related_vectors && !isNaN(parseInt(d.vector_id)))
       dataService.fillRelatedVectors(d).then(x => _setImageDetails(x));
     else
       _setImageDetails(d);

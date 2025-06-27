@@ -172,7 +172,7 @@ export interface DataServiceOutput {
   performNewSearch: (queries: Query[], viewModality: ViewModality, featureExtractorId: string) => Promise<void>;
   fetchFeaturedImagesAndSetState: (viewModality: ViewModality, featureExtractorId: string) => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
-  fillRelatedVectors: (imageDetails: ProcessedImageVector) => Promise<ProcessedImageVector>;
+  fillRelatedVectors: (imageDetails: ProcessedImageVector | ProcessedVideoSegment) => Promise<ProcessedImageVector | ProcessedVideoSegment>;
 };
 
 export interface ProjectInfo {
