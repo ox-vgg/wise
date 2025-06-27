@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from uuid import uuid4, UUID
 from typing import List, Dict, Callable, Optional, Union, Generator, Tuple, Any, overload, Literal
-from ..data_models import SourceMediaType, MediaChunkType
+from ..data_models import SourceMediaType, MediaChunkType, DatasetPayload
 from .streamreader import (
     StreamOutputOptions,
     BasicImageStreamOutputOptions,
