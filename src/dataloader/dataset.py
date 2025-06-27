@@ -4,9 +4,8 @@ import json
 from pathlib import Path
 from uuid import uuid4, UUID
 from typing import List, Dict, Callable, Optional, Union, Generator, Tuple, Any, overload, Literal
+from ..data_models import SourceMediaType, MediaChunkType, DatasetPayload
 from .streamreader import (
-    SourceMediaType,
-    MediaChunkType,
     StreamOutputOptions,
     BasicImageStreamOutputOptions,
     BasicAudioStreamOutputOptions,
@@ -40,12 +39,6 @@ class MediaMetadata(object):
     fps: Optional[float]
     extra: Dict
     id: UUID = dataclasses.Field(default_factory=uuid4)
-
-@dataclasses.dataclass
-class DatasetPayload(object):
-    id: Any
-    path: str
-    media_type: SourceMediaType
 
 def get_media_metadata(url: str, media_type_from_mimetype: MediaMimetype = None, mimetype: str = None):
     # TODO: Update the code to handle remote path

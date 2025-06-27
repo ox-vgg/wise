@@ -3,6 +3,8 @@ from pathlib import Path
 import sqlite3
 
 from . import db as wise_db
+import sqlalchemy as sa
+from .data_models import DatasetPayload
 
 DB_SCHEME = "sqlite+pysqlite://"
 
@@ -181,3 +183,27 @@ class WiseProject:
                             'metadata_table': table_name
                         }
         return self.assets
+
+    def get_media_files(self) -> list[DatasetPayload]:
+        media_files = []
+        with self.db_engine.connect() as conn:
+            stmt = (
+                sa.select(
+                    wise_db.media_table.c.id,
+                    (wise_db.source_collections_table.c.location + '/' + wise_db.media_table.c.path).label('media_path'),
+                    wise_db.media_table.c.media_type
+                )
+                .select_from(
+                    wise_db.media_table.join(
+                        wise_db.source_collections_table,
+                        wise_db.media_table.c.source_collection_id == wise_db.source_collections_table.c.id
+                    )
+                )
+            )
+            rows = conn.execute(stmt)
+
+            for row in rows:
+                media_files.append(
+                    DatasetPayload(row.id, row.media_path, row.media_type)
+                )
+        return media_files

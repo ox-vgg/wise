@@ -9,23 +9,9 @@ from dataclasses import asdict
 from torchaudio.io import StreamReader
 
 from .utils import MediaMimetype
+from ..data_models import SourceMediaType, MediaChunkType
 
 logger = logging.getLogger(__name__)
-
-
-class SourceMediaType(str, enum.Enum):
-    AUDIO = "audio"
-    VIDEO = "video"
-    IMAGE = "image"
-    AV = "av"
-
-
-class MediaChunkType(str, enum.Enum):
-    AUDIO = "audio"
-    VIDEO = "video"
-    THUMBNAILS = "thumbnails"
-    IMAGE = 'image'
-
 
 @dataclasses.dataclass
 class BaseStreamOutputOptions(object):
