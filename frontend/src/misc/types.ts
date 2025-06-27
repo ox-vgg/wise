@@ -47,7 +47,7 @@ export type VideoInfo = MediaInfo & {
 
 // Bounding Box in (x0, y0, w, h) format and in range [0, 1].  They
 // are relative to the size of the image.
-type BBoxXYWH = {
+export type BBoxXYWH = {
   x: number;
   y: number;
   w: number;
@@ -297,11 +297,30 @@ export interface VideoOccurrencesViewProps {
   customHeaderPlural?: string;
 };
 
-export interface StillImageViewProps {
-  imageDetails: ProcessedVectorInfo;
-  isModalView: boolean;
-  featureExtractorId: string;
-  // If handleInternalSearchButtonClick is missing, the "Find Similar"
-  // button is omitted.
-  handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;
+export type ProcessedVectorInfoWithBBox = ProcessedVectorInfo & {
+    bbox: NonNullable<ProcessedVectorInfo['bbox']>
 };
+
+export const isVideoSegment = (
+    vector: ProcessedVectorInfo
+): vector is ProcessedVideoSegment => {
+    return Boolean(vector.mediaType === "VIDEO");
+};
+
+export const isWithBBox = (
+    vector_info: ProcessedVectorInfo
+): vector_info is ProcessedVectorInfoWithBBox => {
+    return Boolean(vector_info.bbox);
+}
+
+export const isWithVectors = (
+    mediaInfo: MediaInfo
+): mediaInfo is ProcessedImageInfo | ProcessedVideoInfo => {
+    return Boolean("vectors" in mediaInfo);
+};
+
+export const isResult = (
+    vector: ProcessedVectorInfo
+): vector is ProcessedImageVector => {
+    return Boolean("distance" in vector);
+}

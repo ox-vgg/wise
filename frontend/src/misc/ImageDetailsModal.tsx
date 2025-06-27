@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button, Dropdown, Modal, Descriptions, List } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 import sanitizeHtml from "sanitize-html";
@@ -8,12 +8,13 @@ import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vi
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
 import "./ImageDetailsModal.scss";
-import { ASRSegment, ImageDetailsModalProps, ProcessedVideoSegment, ProcessedVectorInfo } from "./types";
+import { ASRSegment, ImageDetailsModalProps, ProcessedVideoSegment, ProcessedVectorInfo, isWithBBox } from "./types";
 import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 import { secondsToMinSecPadded } from "./utils.ts";
 
 import config from '../config.ts';
+import { BoundingBoxes } from "./BoundingBox.tsx";
 
 interface ExternalMetadataProps {
   all_metadata: Record<string, string> | { asr_segments?: ASRSegment[] };
@@ -112,10 +113,10 @@ const ImageDetailsModal = ({
     }
   }
 
-  const doInternalSearchAndCloseDialog = (vector: ProcessedVectorInfo) => {
+  const doInternalSearchAndCloseDialog = useCallback((vector: ProcessedVectorInfo) => {
     handleInternalSearchButtonClick(vector);
     setIsModalOpen(false);
-  }
+  }, [handleInternalSearchButtonClick]);
 
   const handleTranscriptItemClick = (item: ASRSegment) => {
     if (playerRef.current) playerRef.current.currentTime = item.start;
@@ -146,7 +147,7 @@ const ImageDetailsModal = ({
           lang="en-US"
           default
         />
-        <Track content={subtitles} label="English" kind="captions" lang="en-US" type="json" default />;
+        <Track content={subtitles} label="English" kind="captions" lang="en-US" type="json" default />
       </>
     }
     image_viewer = (
@@ -174,8 +175,14 @@ const ImageDetailsModal = ({
     image_viewer = <StillImageView
       imageDetails={imageDetails}
       isModalView={true}
-      featureExtractorId={featureExtractorId}
-      handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
+      boundingBoxes={
+        <BoundingBoxes
+          imageDetails={imageDetails}
+          isModalView={true}
+          featureExtractorId={featureExtractorId}
+          handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
+        />
+      }
     />;
   }
 

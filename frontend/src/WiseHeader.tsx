@@ -9,6 +9,7 @@ import { WiseLogo } from './misc/logo.tsx';
 import config from './config.ts';
 import StillImageView from './misc/StillImageView.tsx';
 import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query, ViewModality } from './misc/types.ts';
+import { BoundingBoxes } from './misc/BoundingBox.tsx';
 
 const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
   multimodalQueries, setMultimodalQueries,
@@ -554,7 +555,17 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
         <Popover
           content={
             <div className='wise-image-wrapper'>
-              <StillImageView imageDetails={query.value} isModalView={false} featureExtractorId={featureExtractorId} />
+              <StillImageView
+                imageDetails={query.value}
+                isModalView={false}
+                boundingBoxes={
+                  <BoundingBoxes
+                    imageDetails={query.value}
+                    isModalView={false}
+                    featureExtractorId={featureExtractorId}
+                  />
+                }
+              />
             </div>
           }
           key={query.id}
