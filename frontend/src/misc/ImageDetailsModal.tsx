@@ -237,7 +237,9 @@ const ImageDetailsModal = ({
       </div>
       {
         (!isHomePage && imageDetails.mediaType == 'VIDEO') &&
-        <VideoOccurrencesView shots={imageDetails.mediaInfo.shots}
+        <VideoOccurrencesView
+          featureExtractorId={featureExtractorId}
+          shots={imageDetails.mediaInfo.shots}
           handleClickOccurrence={handleClickOccurrence}
           customHeaderSingular='search match in this video'
           customHeaderPlural='search matches in this video'

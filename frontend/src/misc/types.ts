@@ -291,6 +291,7 @@ export interface ReportImageModalProps {
 };
 
 export interface VideoOccurrencesViewProps {
+  featureExtractorId: string;
   shots: ProcessedVideoSegment[];
   handleClickOccurrence: (videoSegment: ProcessedVideoSegment) => void;
   customHeaderSingular?: string;

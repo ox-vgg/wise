@@ -249,7 +249,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
             {/* <p>Some metadata here</p> */}
             {
               !isHomePage &&
-              <VideoOccurrencesView shots={video.shots} handleClickOccurrence={setImageDetails} />
+              <VideoOccurrencesView featureExtractorId={featureExtractorId} shots={video.shots} handleClickOccurrence={setImageDetails} />
             }
           </div>
         </div>

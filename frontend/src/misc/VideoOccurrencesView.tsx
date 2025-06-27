@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Button, Collapse } from "antd";
 import { CaretRightOutlined, LeftOutlined, RightOutlined, StarFilled } from "@ant-design/icons";
-
 import './VideoOccurrencesView.scss';
 import { VideoOccurrencesViewProps } from "./types";
 import { secondsToMinSecPadded } from "./utils";
+import StillImageView from "./StillImageView";
+import { BoundingBoxes } from "./BoundingBox";
 
 
-const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> = ({ shots, handleClickOccurrence, customHeaderSingular = 'occurrence', customHeaderPlural = 'occurrences' }) => {
+const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> = ({ featureExtractorId, shots, handleClickOccurrence, customHeaderSingular = 'occurrence', customHeaderPlural = 'occurrences' }) => {
   if (shots.length === 0) {
     return <></>;
   }
@@ -22,10 +23,19 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
     const renderKey = isVector ? searchResult.vector_id : `occurrence-${searchResult.media_id}-${index}`;
 
     return <div className="wise-occurrence" onClick={() => handleClickOccurrence(searchResult)} key={renderKey}>
-      <img
-        src={searchResult.thumbnail}
-        title={searchResult.distance ? `Distance = ${searchResult.distance.toFixed(2)}` : ''}
-      />
+      <div className="wise-occurrence-preview">
+        <StillImageView
+          imageDetails={searchResult}
+          isModalView={false}
+          boundingBoxes={
+            <BoundingBoxes
+              imageDetails={searchResult}
+              isModalView={false}
+              featureExtractorId={featureExtractorId}
+            />
+          }
+        />
+      </div>
       <span className="wise-occurrence-timestamp">{secondsToMinSecPadded(searchResult.ts)}</span>
       {(isVector && shots.length >= 2 && searchResult.vector_id === topMatch.vector_id) ? <span className="wise-top-match-label"><StarFilled /> Top match</span> : <></>}
     </div>
