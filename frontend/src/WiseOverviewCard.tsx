@@ -51,13 +51,13 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
       description: 'Navigate to another page in the search results',
       target: () => document.querySelector("#search-results > .ant-pagination"),
     },
-    {
+    ...config.ENABLE_REPORT_MEDIA ? [{
       title: 'Report image',
       description: <>
         If you want to report an image that is inappropriate, offensive, irrelevant to the search query, etc, you can hover over the image and click on the <img src="more_icon.png" height="14px" /> button on the top right corner.
       </>,
       target: () => document.querySelector("#wise-image-grid > .wise-image-wrapper:nth-of-type(2)"),
-    },
+    }] : [],
   ];
 
   useEffect(() => {
