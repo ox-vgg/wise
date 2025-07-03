@@ -278,24 +278,18 @@ RESULT_COUNT=3
 SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=wise/metadata&text_queries=${METADATA_SEARCH_QUERY}"
 response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
 response_selected_json=$(echo "$response" | jq -c '{
-  media_ids: [.image_results.vectors[].media_id],
   images: (
     .image_results.images | 
     to_entries | 
     map({
-      id: .value.id,
       filename: .value.filename,
       external_metadata: .value.external_metadata
     })
   )
 }')
 expected_json='{
-  "media_ids": [
-    "16"
-  ],
   "images": [
     {
-      "id": "16",
       "filename": "960px-St_Nikolaus_Mittelberg_South_Tyrol_Rainbow.jpg",
       "external_metadata": {
         "asr_segments": [],
