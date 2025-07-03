@@ -47,7 +47,7 @@ export type VideoInfo = MediaInfo & {
 
 // Bounding Box in (x0, y0, w, h) format and in range [0, 1].  They
 // are relative to the size of the image.
-type BBoxXYWH = {
+export type BBoxXYWH = {
   x: number;
   y: number;
   w: number;
@@ -156,6 +156,7 @@ export type ProcessedSearchResults = {
     mediaInfo: Map<string, ProcessedVideoInfo>;
   };
 };
+export type ViewModality = keyof ProcessedSearchResults;
 export type ProcessedSearchResponse = {
   processedSearchResults: ProcessedSearchResults;
   time: number;
@@ -168,10 +169,10 @@ export interface DataServiceOutput {
   totalResults: number;
   // pageNum: number;
   // changePageNum: (x: number) => void;
-  performNewSearch: (queries: Query[], viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => Promise<void>;
-  fetchFeaturedImagesAndSetState: (viewModality: keyof ProcessedSearchResults, featureExtractorId: string) => Promise<void>;
+  performNewSearch: (queries: Query[], viewModality: ViewModality, featureExtractorId: string) => Promise<void>;
+  fetchFeaturedImagesAndSetState: (viewModality: ViewModality, featureExtractorId: string) => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
-  fillRelatedVectors: (imageDetails: ProcessedImageVector) => Promise<ProcessedImageVector>;
+  fillRelatedVectors: (imageDetails: ProcessedImageVector | ProcessedVideoSegment) => Promise<ProcessedImageVector | ProcessedVideoSegment>;
 };
 
 export interface ProjectInfo {
@@ -234,7 +235,7 @@ export interface SearchDropdownProps {
   searchText: string;
   setSearchText: (x: string) => void;
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
-  viewModality: keyof ProcessedSearchResults;
+  viewModality: ViewModality;
   featureExtractorId: string;
   submitSearch: () => void;
   clearSearchBar: () => void;
@@ -246,8 +247,8 @@ export interface WiseHeaderProps {
   setMultimodalQueries: (x: Query[]) => void;
   searchText: string;
   setSearchText: (x: string) => void;
-  viewModality: keyof ProcessedSearchResults;
-  setViewModality: (x: keyof ProcessedSearchResults) => void;
+  viewModality: ViewModality;
+  setViewModality: (x: ViewModality) => void;
   featureExtractorId: string;
   setFeatureExtractorId: (x: string) => void;
   submitSearch: () => void;
@@ -268,7 +269,7 @@ export interface SearchResultsProps {
   setSearchText: (x: string) => void;
   multimodalQueries: Query[];
   setMultimodalQueries: (x: Query[]) => void;
-  viewModality: keyof ProcessedSearchResults;
+  viewModality: ViewModality;
   featureExtractorId: string;
   submitSearch: () => void;
 };
@@ -290,17 +291,37 @@ export interface ReportImageModalProps {
 };
 
 export interface VideoOccurrencesViewProps {
+  featureExtractorId: string;
   shots: ProcessedVideoSegment[];
   handleClickOccurrence: (videoSegment: ProcessedVideoSegment) => void;
   customHeaderSingular?: string;
   customHeaderPlural?: string;
 };
 
-export interface StillImageViewProps {
-  imageDetails: ProcessedVectorInfo;
-  isModalView: boolean;
-  featureExtractorId: string;
-  // If handleInternalSearchButtonClick is missing, the "Find Similar"
-  // button is omitted.
-  handleInternalSearchButtonClick?: (vector: ProcessedVectorInfo) => void;
+export type ProcessedVectorInfoWithBBox = ProcessedVectorInfo & {
+    bbox: NonNullable<ProcessedVectorInfo['bbox']>
 };
+
+export const isVideoSegment = (
+    vector: ProcessedVectorInfo
+): vector is ProcessedVideoSegment => {
+    return Boolean(vector.mediaType === "VIDEO");
+};
+
+export const isWithBBox = (
+    vector_info: ProcessedVectorInfo
+): vector_info is ProcessedVectorInfoWithBBox => {
+    return Boolean(vector_info.bbox);
+}
+
+export const isWithVectors = (
+    mediaInfo: MediaInfo
+): mediaInfo is ProcessedImageInfo | ProcessedVideoInfo => {
+    return Boolean("vectors" in mediaInfo);
+};
+
+export const isResult = (
+    vector: ProcessedVectorInfo
+): vector is ProcessedImageVector => {
+    return Boolean("distance" in vector);
+}

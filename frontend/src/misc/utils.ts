@@ -49,3 +49,8 @@ export const secondsToMinSecPadded = (time: number) => {
   const seconds = `${Math.floor(time % 60)}`.padStart(2, "0");
   return `${minutes}:${seconds}`;
 };
+
+const _clamp = (min: number, max: number) => {
+    return (x: number) => Math.min(max, Math.max(min, x));
+}
+export const clamp_bbox = _clamp(0, 1);

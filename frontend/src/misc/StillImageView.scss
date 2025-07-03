@@ -7,41 +7,13 @@
   right: 0;
   bottom: 0;
   margin: auto;
+  background: transparent;
 
   > img {
     display: block;
     width: 100%;
     height: 100%;
-  }
-
-  > .wise-bounding-boxes {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-
-    .wise-bounding-box {
-      position: absolute;
-      outline: 2px solid white;
-      box-sizing: border-box;
-      box-shadow: 0 0 5px 2px rgba(0,0,0,0.5), inset 0 0 5px rgba(0,0,0,0.5);
-      background-color: rgba(255,255,255,0.05);
-      border-radius: 4px;
-      transition: all 0.1s ease-in-out;
-      z-index: 1;
-
-      &-primary {
-        @extend .wise-bounding-box;
-        outline: 2px solid yellow;
-      }
-
-      &:hover {
-        opacity: 1 !important;
-        background-color: rgba(255,255,255,0.2);
-        transform: scale(1.05);
-      }
-    }
+    z-index: -1;
   }
 }
 

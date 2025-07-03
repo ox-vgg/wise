@@ -26,9 +26,10 @@
   > .wise-occurrence {
     display: inline-flex;
     flex-flow: row wrap;
-    flex-basis: 160px;
+    flex: 0 1 160px;
     margin-right: 15px;
     margin-bottom: 5px;
+    min-width: 160px; // make it fixed-width as flex sometimes shrinks thumbnails when there is a lot of them
     position: relative;
     padding: 3px;
     border-radius: 7px;
@@ -37,10 +38,17 @@
     &:hover, &:hover > .wise-top-match-label {
       background-color: #ccc;
     }
+    // Add a wrapper div to control height of the stillimage
+    >.wise-occurrence-preview {
+      position: relative;
+      width: 100%;
+      height: 90px;
+      background-color: black;
+    }
 
     > img {
-      width: 160px;
-      height: 90px;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
       background: black;
       border-radius: 5px;

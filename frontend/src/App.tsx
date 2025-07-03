@@ -8,14 +8,14 @@ import './App.scss';
 import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
-import { ProcessedSearchResults, ProjectInfo, Query, TourVariables } from './misc/types.ts';
+import { ViewModality, ProjectInfo, Query, TourVariables } from './misc/types.ts';
 import { fetchWithTimeout } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
 
 export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
-  const [viewModality, setViewModality] = useState<keyof ProcessedSearchResults>('Image');
+  const [viewModality, setViewModality] = useState<ViewModality>('Image');
   const [featureExtractorId, setFeatureExtractorId] = useState<string>('');
 
   const dataService = useDataService();
@@ -63,7 +63,7 @@ export const App: React.FunctionComponent = () => {
         'video': 'Video',
         'audio': 'VideoAudio'
       }[default_media_type];
-      setViewModality(_viewModality as keyof ProcessedSearchResults)
+      setViewModality(_viewModality as ViewModality)
       setFeatureExtractorId(default_feature_extractor_id ?? '');
     }
   }, [projectInfo]);

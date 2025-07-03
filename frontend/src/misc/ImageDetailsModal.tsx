@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button, Dropdown, Modal, Descriptions, List } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 import sanitizeHtml from "sanitize-html";
@@ -8,12 +8,14 @@ import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vi
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
 import "./ImageDetailsModal.scss";
-import { ASRSegment, ImageDetailsModalProps, ProcessedVideoSegment, ProcessedVectorInfo } from "./types";
+import { ASRSegment, ImageDetailsModalProps, ProcessedVideoSegment, ProcessedVectorInfo, isWithBBox } from "./types";
+import BoundingBoxOverlay from "./BoundingBoxOverlay.tsx";
 import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
 import { secondsToMinSecPadded } from "./utils.ts";
 
 import config from '../config.ts';
+import { BoundingBoxes } from "./BoundingBox.tsx";
 
 interface ExternalMetadataProps {
   all_metadata: Record<string, string> | { asr_segments?: ASRSegment[] };
@@ -51,7 +53,8 @@ const ImageDetailsModal = ({
   handleInternalSearchButtonClick,
 }: ImageDetailsModalProps) => {
   const [isModalOpen, setIsModalOpen] = useState(true);
-  console.log(imageDetails)
+  const [displayOverlay, setDisplayOverlay] = useState(isWithBBox(imageDetails));
+  console.debug(imageDetails, `modal open: ${isModalOpen}, should display overlay: ${displayOverlay}`);
   const title = (
     <Button
       type="text"
@@ -91,7 +94,7 @@ const ImageDetailsModal = ({
 
   const setStartTimestamp = () => {
     // This is needed because the video player doesn't automatically play the video from the start time in the URL (e.g. #t=16.0)
-    if (imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails.ts;
+    if (imageDetails.mediaType == 'VIDEO' && !isHomePage && playerRef.current) playerRef.current.currentTime = imageDetails.thumbnail_ts;
   }
 
   const handleClickOccurrence = (videoSegment: ProcessedVideoSegment) => {
@@ -105,17 +108,19 @@ const ImageDetailsModal = ({
       else if (imageDetails.vector_id === videoSegment.vector_id) {
         // Handle click on the same vector
         if (playerRef.current) playerRef.current.currentTime = imageDetails.ts;
+        setDisplayOverlay(true);
       } else {
         // Handle click on a different vector
         setImageDetails(videoSegment);
+        setDisplayOverlay(true)
       }
     }
   }
 
-  const doInternalSearchAndCloseDialog = (vector: ProcessedVectorInfo) => {
+  const doInternalSearchAndCloseDialog = useCallback((vector: ProcessedVectorInfo) => {
     handleInternalSearchButtonClick(vector);
     setIsModalOpen(false);
-  }
+  }, [handleInternalSearchButtonClick]);
 
   const handleTranscriptItemClick = (item: ASRSegment) => {
     if (playerRef.current) playerRef.current.currentTime = item.start;
@@ -146,7 +151,7 @@ const ImageDetailsModal = ({
           lang="en-US"
           default
         />
-        <Track content={subtitles} label="English" kind="captions" lang="en-US" type="json" default />;
+        <Track content={subtitles} label="English" kind="captions" lang="en-US" type="json" default />
       </>
     }
     image_viewer = (
@@ -154,28 +159,48 @@ const ImageDetailsModal = ({
         src={videoSrc}
         viewType="video"
         playsInline
-        autoPlay
+        autoPlay={!isWithBBox(imageDetails)}
+        preload="metadata"
         ref={playerRef}
         onLoadedMetadata={setStartTimestamp}
         clipEndTime={imageDetails.mediaInfo.duration} // This is needed due to a bug with the chapter markers https://github.com/vidstack/player/issues/1022
+        onSeeked={() => { playerRef.current?.currentTime !== imageDetails.thumbnail_ts && setDisplayOverlay(false) }}
+        onPlay={() => setDisplayOverlay(false)}
+
       >
-        <MediaProvider>
-          {media_provider_track}
-        </MediaProvider>
-        <DefaultVideoLayout
-          thumbnails={imageDetails.mediaInfo.timeline_hover_thumbnails}
-          icons={defaultLayoutIcons}
-          noScrubGesture={false}
-          seekStep={5}
-        />
+        <BoundingBoxOverlay
+          showImage={true}
+          displayOverlay={displayOverlay}
+          imageDetails={imageDetails}
+          isModalView={true}
+          featureExtractorId={featureExtractorId}
+          handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
+        >
+
+          <MediaProvider>
+            {media_provider_track}
+          </MediaProvider>
+          <DefaultVideoLayout
+            thumbnails={imageDetails.mediaInfo.timeline_hover_thumbnails}
+            icons={defaultLayoutIcons}
+            noScrubGesture={false}
+            seekStep={5}
+          />
+        </BoundingBoxOverlay>
       </MediaPlayer>
     );
   } else {
     image_viewer = <StillImageView
       imageDetails={imageDetails}
       isModalView={true}
-      featureExtractorId={featureExtractorId}
-      handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
+      boundingBoxes={
+        <BoundingBoxes
+          imageDetails={imageDetails}
+          isModalView={true}
+          featureExtractorId={featureExtractorId}
+          handleInternalSearchButtonClick={doInternalSearchAndCloseDialog}
+        />
+      }
     />;
   }
 
@@ -230,7 +255,9 @@ const ImageDetailsModal = ({
       </div>
       {
         (!isHomePage && imageDetails.mediaType == 'VIDEO') &&
-        <VideoOccurrencesView shots={imageDetails.mediaInfo.shots}
+        <VideoOccurrencesView
+          featureExtractorId={featureExtractorId}
+          shots={imageDetails.mediaInfo.shots}
           handleClickOccurrence={handleClickOccurrence}
           customHeaderSingular='search match in this video'
           customHeaderPlural='search matches in this video'

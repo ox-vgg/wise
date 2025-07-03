@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Dropdown, Pagination, Row, Segmented, Tooltip } from 'antd';
 import { AppstoreOutlined, BarsOutlined, FlagFilled, LoadingOutlined, MinusCircleFilled, PictureOutlined, PlusCircleFilled } from '@ant-design/icons';
 import { nanoid } from 'nanoid';
@@ -11,6 +11,7 @@ import ImageDetailsModal from './misc/ImageDetailsModal.tsx';
 import StillImageView from "./misc/StillImageView.tsx";
 import { excludeKey } from "./misc/utils.ts";
 import VideoOccurrencesView from './misc/VideoOccurrencesView.tsx';
+import { BoundingBoxes } from './misc/BoundingBox.tsx';
 // import config from './config.ts';
 
 const FRONTEND_PAGE_SIZE = 50;
@@ -79,7 +80,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     }
   }
 
-  const handleInternalSearchButtonClick = (vector: ProcessedVectorInfo) => {
+  const handleInternalSearchButtonClick = useCallback((vector: ProcessedVectorInfo) => {
     setSearchText('');
     // If this was a search result, vector comes with the distance
     // property.  We remove the distance property so it is no longer
@@ -87,7 +88,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     const vectorInfo = excludeKey(vector, "distance");
     setMultimodalQueries([{ id: nanoid(), type: 'INTERNAL_IMAGE', displayText: 'Internal image', value: vectorInfo }]);
     setIsSubmitSearch(true);
-  }
+  }, []);
 
   // setImageDetails is called when the user selects an image/video
   // for view on the modal dialog.  Only at that point, do we fetch
@@ -95,7 +96,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   // timestamp).
   const [imageDetails, _setImageDetails] = useState<ProcessedVideoSegment | ProcessedImageVector | undefined>();
   const setImageDetails = (d: ProcessedVideoSegment | ProcessedImageVector | undefined) => {
-    if (featureExtractorId.includes('insightface') && d && d.mediaType === "IMAGE" && ! d.related_vectors && !isNaN(parseInt(d.vector_id)))
+    if (featureExtractorId.includes('insightface') && d && !d.related_vectors && !isNaN(parseInt(d.vector_id)))
       dataService.fillRelatedVectors(d).then(x => _setImageDetails(x));
     else
       _setImageDetails(d);
@@ -196,8 +197,14 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
               <StillImageView
                 imageDetails={searchResult}
                 isModalView={false}
-                featureExtractorId={featureExtractorId}
-                handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+                boundingBoxes={
+                  <BoundingBoxes
+                    imageDetails={searchResult}
+                    isModalView={false}
+                    featureExtractorId={featureExtractorId}
+                    handleInternalSearchButtonClick={handleInternalSearchButtonClick}
+                  />
+                }
               />
             </a>
             <div className="wise-image-hover-display">{title}</div>
@@ -242,7 +249,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
             {/* <p>Some metadata here</p> */}
             {
               !isHomePage &&
-              <VideoOccurrencesView shots={video.shots} handleClickOccurrence={setImageDetails} />
+              <VideoOccurrencesView featureExtractorId={featureExtractorId} shots={video.shots} handleClickOccurrence={setImageDetails} />
             }
           </div>
         </div>
