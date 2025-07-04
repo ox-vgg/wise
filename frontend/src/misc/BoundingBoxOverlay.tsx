@@ -23,8 +23,8 @@ const BoundingBoxOverlay = ({ imageDetails, isModalView, displayOverlay = true, 
 
     return <>
         {displayOverlay && showImage && <StillImageView imageDetails={imageDetails} isModalView={isModalView} />}
-        {displayOverlay && <div className="wise-bounding-boxes" style={{ zIndex: !!children ? 1 : 'unset' }}>
-            <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+        {displayOverlay && <div className={"wise-bounding-boxes " + (isModalView && "wise-bounding-boxes-modal")} style={{ zIndex: !!children ? 1 : 'unset' }}>
+            <svg viewBox={`0 0 ${100*width/height} 100`} preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
                 <BoundingBoxes
                     featureExtractorId={featureExtractorId}
                     imageDetails={imageDetails}
@@ -34,8 +34,8 @@ const BoundingBoxOverlay = ({ imageDetails, isModalView, displayOverlay = true, 
             </svg>
         </div>}
         {children}
-        {displayOverlay && <div className="wise-bounding-boxes" style={{ zIndex: 99 }}>
-            <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+        {displayOverlay && <div className={"wise-bounding-boxes " + (isModalView && "wise-bounding-boxes-modal")} style={{ zIndex: 99 }}>
+            <svg viewBox={`0 0 ${100*width/height} 100`} preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
                 < BoundingBoxes
                     featureExtractorId={featureExtractorId}
                     imageDetails={imageDetails}

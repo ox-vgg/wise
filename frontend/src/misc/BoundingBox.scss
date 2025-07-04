@@ -21,7 +21,7 @@
         rect.wise-bounding-box {
             outline: unset;
             stroke: white;
-            stroke-width: 4px;
+            stroke-width: 1px;
             -webkit-filter: drop-shadow(0 0 3px 1px rgba(0,0,0,0.5));
             filter: drop-shadow(0 0 3px 1px rgba(0,0,0,0.5));
             fill: rgba(255,255,255,0.05);
@@ -39,6 +39,9 @@
                 transform: scale(1.05);
             }
         }
+    }
+    &-modal > svg rect.wise-bounding-box {
+        stroke-width: 0.5px; // Use a thinner stroke inside ImageDetailsModal
     }
 
     .wise-bounding-box {

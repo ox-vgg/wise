@@ -74,8 +74,8 @@ const StillImageView: React.FunctionComponent<StillImageViewProps> = ({
       }}
     >
       <img ref={imgref} src={img_src} title={img_title} />
-      {boundingBoxes && <div className="wise-bounding-boxes">
-        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      {boundingBoxes && <div className={"wise-bounding-boxes " + (isModalView && "wise-bounding-boxes-modal")}>
+        <svg viewBox={`0 0 ${100*width/height} 100`} preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
           {boundingBoxes}
         </svg>
       </div>
