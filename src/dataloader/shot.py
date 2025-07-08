@@ -75,6 +75,10 @@ class ShotStream(torch_data.IterableDataset):
         self.seen_chunk_indices = {}
         for item in iter(self.dataset):
             media_id, chunks = item
+
+            if media_id not in self.stream_hooks:
+                logger.warning("Skipping media_id={} as it does not have any shots".format(media_id))
+                continue
             if media_id not in self.seen_chunk_indices:
                 self.seen_chunk_indices[media_id] = 0
             else:
