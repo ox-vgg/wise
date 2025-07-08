@@ -79,13 +79,20 @@ def initialise_feature_extractors(
 
     return feature_extractors, feature_stores
 
-def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] = ['*']):
+def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] = ['*'], include_filenames: list[str] = None):
 
     # Get files matching extensions
     input_files = list(
         get_files_from_directory_with_extensions(media_dir, include_extensions)
     )
 
+    if include_filenames is not None:
+        # Filter files based on the provided filenames
+        original_count = len(input_files)
+        input_files = [
+            f for f in input_files if f.name in include_filenames
+        ]
+        logger.info(f"Filtered {original_count - len(input_files)} files from {media_dir}")
     logger.info(
         f"Found {len(input_files)} in {media_dir} (extensions: {include_extensions})"
     )
@@ -164,6 +171,13 @@ if __name__ == "__main__":
         default=[],
         type=str,
         help="regular expression to include certain media files",
+    )
+
+    parser.add_argument(
+        "--media-filenames-from",
+        required=False,
+        type=str,
+        help="only process the filenames contained in this text file (one filename per line).",
     )
 
     parser.add_argument(
@@ -334,8 +348,14 @@ if __name__ == "__main__":
         metadata = project.get_media_files()
         all_metadata.extend(metadata)
     else:
+        include_filenames = None
+        if args.media_filenames_from is not None:
+            logger.info(f"Reading filenames to be included from {args.media_filenames_from}")
+            include_filenames = []
+            with open(args.media_filenames_from, 'r') as f:
+                include_filenames = [line.strip() for line in f if line.strip()]
         for media_dir in args.media_dir_list:
-            metadata = process_media_dir(Path(media_dir), db_engine, args.media_include_list)
+            metadata = process_media_dir(Path(media_dir), db_engine, args.media_include_list, include_filenames)
             all_metadata.extend(metadata)
 
     # Get the set of media types present in the input media files
