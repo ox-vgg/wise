@@ -37,7 +37,7 @@ from src.repository import (
     MediaMetadataRepo,
     ThumbnailRepo,
 )
-
+from src.dataloader.shot import ShotStream
 
 def initialise_feature_extractors(
     project: WiseProject,
@@ -250,6 +250,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--use-shots",
+        action="store_true",
+        help="[EXPERIMENTAL] extract features only from middle frame of each shot in the video instead of sampling at fixed intervals (e.g. 2 fps)",
+    )
+
+    parser.add_argument(
         "--thumbnails", default=True, action=argparse.BooleanOptionalAction
     )
 
@@ -411,10 +417,29 @@ if __name__ == "__main__":
         "offset": None,
         "thumbnails": args.thumbnails
     }
-    stream = torch_data.ChainDataset(
+    uniform_stream = torch_data.ChainDataset(
         get_dataset(all_metadata, params)
     )
-    print(f"Initializing data loader with {args.num_workers} workers ...")
+    logger.info(f"Initializing data loader with {args.num_workers} workers ...")
+    if args.use_shots:
+        logger.info("Extracting features from center frame of each shot in videos")
+        shots = project.get_shots()
+        if shots is None or len(shots) == 0:
+            logger.error(
+                "No shots found in the project.\nTo perform shot-based sampling of video frames for feature extraction:\n"
+                "1. Generate a shots.csv text file (e.g. using TransNetV2) in a format like this:\n"
+                "   id,media_id,timestamp,end_timestamp\n"
+                "   1,1,0.000,1.567\n"
+                "   2,1,1.600,3.533\n"
+                "   ... (where, media_id is the ID of the video in the WISE project)\n"
+                "2. Add it to a WISE project as follows:\n"
+                "   python3 media-metadata.py import-shots ... --from-csv shots.csv"
+            )
+            exit(1)
+        stream = ShotStream(uniform_stream, shots, params)
+    else:
+        logger.info("Using fixed frame sampling for feature extraction")
+        stream = uniform_stream
     av_data_loader = torch_data.DataLoader(
         stream, batch_size=None, num_workers=args.num_workers
     )
@@ -434,10 +459,14 @@ if __name__ == "__main__":
                     segment_tensor = chunks[media_type][feature_extractor_id].tensor
                     segment_pts = chunks[media_type][feature_extractor_id].pts
 
+                    if segment_tensor is None or segment_tensor.shape[0] == 0:
+                        logger.warning(f"Skipping empty segment for media_id={mid}, media_type={media_type}, feature_extractor_id={feature_extractor_id}")
+                        continue
                     if media_type == "image" or media_type == "video":
                         segment_feature = feature_extractors[media_type][feature_extractor_id].extract_image_features(
                             segment_tensor
                         )
+                        pbar.update(segment_tensor.shape[0])
                     elif media_type == "audio":
                         if segment_tensor.shape[2] < audio_frames_per_chunk:
                             # we discard any malformed audio segments
@@ -445,13 +474,18 @@ if __name__ == "__main__":
                         segment_feature = feature_extractors[media_type][feature_extractor_id].extract_audio_features(
                             segment_tensor
                         )
+                        pbar.update(segment_tensor.shape[0])
                     else:
-                        raise ValueError("Unknown media_type {media_type}")
+                        raise ValueError(f"Unknown media_type {media_type}")
 
                     # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
                     if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
                         for frame_idx, frame_features in enumerate(segment_feature):
                             vector_ids: list[int] = []
+                            if type(segment_pts) is list and args.use_shots:
+                                frame_timestamp = segment_pts[frame_idx]
+                            else:
+                                frame_timestamp = segment_pts + frame_idx * (1 / video_frame_rate)
                             for frame_single_vector in frame_features.vectors:
                                 feature_metadata = VectorRepo.create(
                                     conn,
@@ -459,7 +493,7 @@ if __name__ == "__main__":
                                         modality=media_type,
                                         feature_extractor_id=feature_extractor_id,
                                         media_id=mid,
-                                        timestamp=segment_pts + frame_idx * (1 / video_frame_rate),
+                                        timestamp=frame_timestamp,
                                     ),
                                 )
                                 feature_stores[media_type][feature_extractor_id].add(
@@ -495,27 +529,20 @@ if __name__ == "__main__":
 
                 # Store in thumbnail store
                 # (thumbnail will be N x 3 x 192 x W)
-                for i in range(len(_thumb_jpegs)):
+                for thumb_index in range(len(_thumb_jpegs)):
+                    if type(_thumb_pts) is list and args.use_shots:
+                        thumb_timestamp = _thumb_pts[thumb_index]
+                    else:
+                        thumb_timestamp = _thumb_pts + thumb_index * (1 / video_frame_rate)
                     # convert thumb tensor to jpeg
                     thumbnail_metadata = ThumbnailRepo.create(
                         thumbs_conn,
                         data=ThumbnailMetadata(
                             media_id=mid,
-                            timestamp=_thumb_pts + i * 0.5,
-                            content=bytes(_thumb_jpegs[i].numpy().data),
+                            timestamp=thumb_timestamp,
+                            content=bytes(_thumb_jpegs[thumb_index].numpy().data),
                         ),
                     )
-
-            # Update progress bar
-            _media = chunks.get('video') or chunks.get('audio') or chunks.get('image')
-            if _media is not None:
-                if isinstance(_media, dict):
-                    a_feature_extractor = next( iter(_media.values()), None)
-                else:
-                    a_feature_extractor = _media
-                if a_feature_extractor is not None:
-                    pbar.update(a_feature_extractor.tensor.shape[0])
-
             if idx % MAX_BULK_INSERT == 0:
                 conn.commit()
                 thumbs_conn.commit()

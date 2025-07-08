@@ -11,5 +11,7 @@ from .dataset import (
     AVDataset,
     MediaDataset,
     BasicAudioStreamOutputOptions,
-    BasicVideoStreamOutputOptions,
+    BasicVideoStreamOutputOptions
 )
+
+from .shot import ShotStream

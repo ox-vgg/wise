@@ -207,3 +207,27 @@ class WiseProject:
                     DatasetPayload(row.id, row.media_path, row.media_type)
                 )
         return media_files
+
+    def get_shots(self) -> list[dict]:
+        print(f'Fetching shots from {self.dburi} ...')
+        shots = {}
+        with self.db_engine.connect() as conn:
+            stmt = sa.select(
+                wise_db.shots_table.c.media_id,
+                wise_db.shots_table.c.ts,
+                wise_db.shots_table.c.te,
+                wise_db.shots_table.c.id.label('shot_id')
+            ).order_by(
+                wise_db.shots_table.c.media_id,
+                wise_db.shots_table.c.ts
+            )
+            rows = conn.execute(stmt)
+            for row in rows:
+                if row.media_id not in shots:
+                    shots[row.media_id] = []
+                shots[row.media_id].append({
+                    'start_time': row.ts,
+                    'end_time': row.te,
+                    'shot_id': row.shot_id
+                })
+        return shots

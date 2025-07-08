@@ -34,7 +34,7 @@ AUDIO_FEATURE_ID="microsoft/clap/2023/four-datasets"
 FAISS_INDEX_TYPE="IndexFlatIP"
 HTTP_SERVER_HOST="0.0.0.0"
 HTTP_SERVER_PORT="10001"
-MAX_POLL_SERVER_COUNT=15
+MAX_POLL_SERVER_COUNT=60
 
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
@@ -216,6 +216,7 @@ if [ ! -d "${FEATURE_STORE1}" ]; then
         --num-workers 0 \
         --feature-store webdataset \
         --no-thumbnails \
+        --use-shots \
         --video-feature-id "${VIDEO_FEATURE_ID1}" \
         --project-dir "$WISE_PROJECT_DIR"
     if [ $? -ne 0 ]; then
@@ -236,6 +237,7 @@ if [ ! -d "${FEATURE_STORE2}" ]; then
         --num-workers 0 \
         --feature-store webdataset \
         --thumbnails \
+        --use-shots \
         --video-feature-id "${VIDEO_FEATURE_ID2}" \
         --project-dir "$WISE_PROJECT_DIR"
     if [ $? -ne 0 ]; then
@@ -461,24 +463,33 @@ fi
 
 # Test 8.3 : check if the server returns correct results (including metadata) for query on video
 if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
-    SEARCH_QUERY="hammer"
+    SEARCH_QUERY="a%20person%20pulling%20a%20rope" # a person pulling a rope
     RESULT_COUNT=1
     SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
     response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
-
-    response_selected_json=$(echo "$response" | jq -c ' . as $root | {
+    response_selected_json=$(echo "$response" | jq -c '
+    . as $root |
+    {
         merged_windows: [
         .video_results.merged_windows[]
         | .media_id as $id
-        | {filename: $root.video_results.videos[$id].filename, source_url: $root.video_results.videos[$id].external_metadata.source_url}
+        | {
+            filename: $root.video_results.videos[$id].filename,
+            source_url: $root.video_results.videos[$id].external_metadata.source_url,
+            ts: .ts,
+            te: .te
+            }
         ]
-    }')
+    }
+    ')
 
     expected_json='{
       "merged_windows": [
         {
-          "filename": "Créativité_de_souder_expert_au_Congo_RDC_02.mp4",
-          "source_url": "https://commons.wikimedia.org/wiki/File:Cr%C3%A9ativit%C3%A9_de_souder_expert_au_Congo_RDC_02.webm"
+          "filename": "Tasnim_News_Agency_-_Iranian_navy_personnel_talking_about_anti-piracy_missions.mp4",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Tasnim_News_Agency_-_Iranian_navy_personnel_talking_about_anti-piracy_missions.webm",
+          "ts": 2.28,
+          "te": 5.96
         }
       ]
     }'
