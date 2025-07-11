@@ -181,10 +181,10 @@
     object-fit: contain;
   }
   .wise-image-wrapper {
-     // FIXME: these hardcoded 200px on both height and width lead
+     // FIXME: these hardcoded values on both height and width lead
     //         to unecessary extra whitespace around the image.
-    height: 200px;
-    width: 200px;
+    width: 400px;
+    height: 300px;
     position: relative;
   }
 }
