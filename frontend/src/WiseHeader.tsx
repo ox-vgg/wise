@@ -431,6 +431,12 @@ const VIEW_MODALITY_OPTIONS = {
   },
 } as const;
 const VIEW_MODALITY_OPTIONS_EXTRA = {
+  "image:wise/metadata": {
+    icon: <FileTextTwoTone />,
+    label: 'Metadata',
+    longLabel: 'Media Metadata',
+    value: 'image:wise/metadata',
+  },
   "video:wise/metadata": {
     icon: <FileTextTwoTone />,
     label: 'Metadata',
