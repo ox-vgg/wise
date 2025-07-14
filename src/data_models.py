@@ -91,6 +91,7 @@ class VideoShot(BaseModel):
     media_id: int
     ts: float
     te: float
+    shot_scale: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

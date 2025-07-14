@@ -36,6 +36,7 @@ from src.repository import (
 from src import db
 import sqlalchemy as sa
 from tqdm import tqdm
+import bisect
 
 ##
 ## A. Command line interface (CLI) parser and handler
@@ -52,7 +53,7 @@ def main():
                                      files in the WISE project.''')
 
     parser.add_argument('command',
-                        choices=['import', 'import-shots'],
+                        choices=['import', 'import-shots', 'import-shot-scale'],
                         nargs='?',
                         help='various modes of operation supported by the metadata script')
 
@@ -82,6 +83,8 @@ def main():
         import_media_metadata(args)
     elif(args.command == 'import-shots'):
         import_shots(args)
+    elif(args.command == 'import-shot-scale'):
+        import_shot_scale(args)
     else:
         print(f'unknown command {args.command}')
 
@@ -285,6 +288,87 @@ def metadata_exist(metadata_db, metadata_table):
             if res == (1,):
                 return True
     return False
+
+##
+## Import Shot Scale
+## e.g. shot_scale \in { 0:'extreme close-up', 1:'close-up', 2:'medium shot', 3:'full shot', 4:'long shot'}
+##
+def import_shot_scale(args):
+    project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
+    db_engine = project.db_engine
+    thumbsdb_engine = project.thumbsdb_engine
+
+    def add_shot_scale(metadata):
+        # 1. Load the shot_scale class for each thumbnail
+        thumbnail_id_to_shot_scale = {}
+        for row in metadata:
+            thumbnail_id = int(row.get('thumbnail_id'))
+            if thumbnail_id in thumbnail_id_to_shot_scale:
+                raise ValueError(f'duplicate thumbnail_id of {thumbnail_id} found in CSV metadata')
+            thumbnail_id_to_shot_scale[thumbnail_id] = int(row.get('shot_scale'))
+        print(f'Loaded {len(thumbnail_id_to_shot_scale)} thumbnail_id to shot_scale mappings from CSV metadata')
+
+        # 2. Group thumbnails by media
+        thumbs_by_media = {}
+        with thumbsdb_engine.connect() as thumbs_conn:
+            result = thumbs_conn.execute(sa.text("SELECT id, media_id, timestamp FROM thumbnails ORDER BY media_id, timestamp"))
+            for row in result:
+                media_id = int(row.media_id)
+                thumb_id = int(row.id)
+                if media_id not in thumbs_by_media:
+                    thumbs_by_media[media_id] = []
+                thumbs_by_media[media_id].append((thumb_id, float(row.timestamp)))
+        print(f'Loaded {len(thumbs_by_media)} thumbnails grouped by media')
+
+        # 3. Compute the shot_scale for each shot
+        with db_engine.connect() as conn:
+            result = conn.execute(sa.text("SELECT id, media_id, ts, te FROM shots"))
+            shot_to_scale = []
+            for row in result:
+                shot_id = int(row.id)
+                shot_ts = float(row.ts)
+                shot_te = float(row.te)
+                media_id = int(row.media_id)
+                # for each shot, find the shot_scale for each thumbnail
+                thumbnails = thumbs_by_media.get(media_id, [])
+                shot_scales = []
+                thumb_timestamps = [ts for _, ts in thumbnails]
+                # Find left and right indices for thumbnails within [shot_ts, shot_te] using binary search
+                left = bisect.bisect_left(thumb_timestamps, shot_ts)
+                right = bisect.bisect_right(thumb_timestamps, shot_te)
+                for thumb_id, thumb_ts in thumbnails[left:right]:
+                    if thumb_id in thumbnail_id_to_shot_scale:
+                        shot_scales.append(thumbnail_id_to_shot_scale[thumb_id])
+                # find the most common shot_scale for this shot
+                if shot_scales:
+                    most_common_scale = max(set(shot_scales), key=shot_scales.count)
+                    shot_to_scale.append((media_id, shot_id, most_common_scale))
+                    #print(f"media_id={media_id}, shot_id={shot_id}, shot-window=({shot_ts} to {shot_te}), shot_scale: {most_common_scale}")
+                else:
+                    print(f'No thumbnails found for shot {shot_id} in media {media_id} within the shot window ({shot_ts} to {shot_te})')
+            # Insert/Update shot_scale for each shot in the shots table
+            if shot_to_scale:
+                # Add shot_scale column if it doesn't exist
+                shots_columns = [col['name'] for col in sa.inspect(conn).get_columns('shots')]
+                if 'shot_scale' not in shots_columns:
+                    conn.execute(sa.text("ALTER TABLE shots ADD COLUMN shot_scale INTEGER"))
+                for media_id, shot_id, shot_scale in shot_to_scale:
+                    conn.execute(
+                        sa.text("UPDATE shots SET shot_scale = :shot_scale WHERE id = :id and media_id = :media_id"),
+                        {"shot_scale": shot_scale, "id": shot_id, "media_id": media_id}
+                    )
+                conn.commit()
+                print(f"Updated shot_scale for {len(shot_to_scale)} shots.")
+
+    csv_filename = Path(args.from_csv)
+    if not csv_filename.exists():
+        raise ValueError(f'csv file does not exist: {csv_filename}')
+
+    csv_colnames = get_csv_header(csv_filename)
+    if 'thumbnail_id' not in csv_colnames and 'shot_scale' not in csv_colnames:
+        raise ValueError('thumbnail_id or shot_scale columns missing from CSV')
+    shot_scale_metadata = load_metadata_from_csv(args.from_csv, args)
+    add_shot_scale(shot_scale_metadata)
 
 if __name__ == '__main__':
     main()

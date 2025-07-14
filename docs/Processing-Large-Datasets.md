@@ -100,10 +100,16 @@ python3 classify_shot_scale.py \
     --batch-size 8 \
     --num-workers 2 \
     --resume_path checkpoints/shot_scale_ckpt.pth \
-    --out-csv thumbs-shot.csv \
+    --out-csv /data/a-wise-project/thumbs-shot-scale.csv \
     --project-dir /data/a-wise-project/
+micromamba deactivate
 
-# TODO: import shot_scale to WISE project
+cd ~/wise
+micromamba activate wise
+python3 media-metadata.py \
+    import-shot-scale \
+    --project-dir /data/a-wise-project/ \
+    --from-csv /data/a-wise-project/thumbs-shot-scale.csv
 ```
 
 ## 6. ...
