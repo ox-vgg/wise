@@ -1868,7 +1868,14 @@ def _get_search_router(config: APIConfig):
         if filter_specs is not None:
             filtered_ids = get_filtered_ids(filter_specs)
             sel = faiss.IDSelectorBatch(filtered_ids)
-            params = faiss.SearchParameters(sel=sel)
+            if search_index.index_type == 'IndexFlatIP':
+                params = faiss.SearchParameters(sel=sel)
+            elif search_index.index_type == 'IndexIVFFlat':
+                params = faiss.SearchParametersIVF(sel=sel, nprobe=search_index.index.nprobe)
+            else:
+                raise HTTPException(400, {
+                    "message": f"filter_specs does not support index type : {search_index.index_type}"
+                })
             dist, ids = search_index.index.search(features, end, params=params)
         else:
             dist, ids = search_index.index.search(features, end)
