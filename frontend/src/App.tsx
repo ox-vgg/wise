@@ -17,6 +17,7 @@ export const App: React.FunctionComponent = () => {
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
   const [viewModality, setViewModality] = useState<ViewModality>('Image');
   const [featureExtractorId, setFeatureExtractorId] = useState<string>('');
+  const [shotScaleFilter, setShotScaleFilter] = useState<number[]>([]);
 
   const dataService = useDataService();
   const [isHomePage, setIsHomePage] = useState(true);
@@ -90,7 +91,7 @@ export const App: React.FunctionComponent = () => {
   }, [viewModality, featureExtractorId]);
 
   const _submitSearch = (queries: Query[]) => {
-    dataService.performNewSearch(queries, viewModality, featureExtractorId).then(_ => {
+    dataService.performNewSearch(queries, viewModality, featureExtractorId, shotScaleFilter).then(_ => {
       setIsHomePage(false); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
     }).catch((err) => {
       Modal.error({
@@ -140,6 +141,7 @@ export const App: React.FunctionComponent = () => {
                 submitSearch={submitSearch}
                 tourVariables={tourVariables}
                 projectInfo={projectInfo}
+                shotScaleFilter={shotScaleFilter} setShotScaleFilter={setShotScaleFilter}
                 isHomePage={isHomePage} isLoadingNewSearch={dataService.isLoadingNewSearch}></WiseHeader>
     <Content className="wise-content">
       {isHomePage && // Only show if isHomePage is true

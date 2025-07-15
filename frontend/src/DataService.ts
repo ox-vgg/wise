@@ -247,7 +247,7 @@ const fetchRelatedVectors = (vector_id: string): Promise<VectorInfo[]> => {
 }
 
 
-const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
+const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featureExtractorId: string, pageStart: number, pageEnd: number, shotScaleFilter: number[]): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
@@ -260,7 +260,7 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
     formData = convertQueriesToFormData(otherQueries);
   }
 
-  const urlParams = new URLSearchParams([
+  const urlParamsArray = [
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
@@ -268,8 +268,11 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
-  ]);
-  
+  ];
+  if (shotScaleFilter.length > 0) {
+    urlParamsArray.push(['shot_scale', JSON.stringify(shotScaleFilter)]);
+  }
+  const urlParams = new URLSearchParams(urlParamsArray);
   const endpoint = `search?${urlParams.toString()}`;
   
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {
@@ -395,14 +398,14 @@ export const useDataService = (): DataServiceOutput => {
 
 
   // Get results for a new search query
-  const performNewSearch = async (queries: Query[], viewModality: ViewModality, featureExtractorId: string) => {
+  const performNewSearch = async (queries: Query[], viewModality: ViewModality, featureExtractorId: string, shotScaleFilter: number[]) => {
     setSearchingState((_searchingState) => ({
       ..._searchingState,
       isLoadingNewSearch: true
     }));
     let searchResponseJSON: ProcessedSearchResponse;
     try {
-      searchResponseJSON = await fetchSearchResults(queries, viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST);
+      searchResponseJSON = await fetchSearchResults(queries, viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST, shotScaleFilter);
     } catch (e) {
       setSearchingState((_searchingState) => ({
         ..._searchingState,

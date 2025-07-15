@@ -1,7 +1,7 @@
 from contextlib import ExitStack
 import datetime
 import time
-from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Tuple, Union, BinaryIO
+from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Tuple, Union, BinaryIO, Any
 import io
 import itertools
 import functools
@@ -60,6 +60,9 @@ from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtMetadata
 from src.search.fts import FTSSearch, WISEFTSQuery
 from src.dataloader import AVDataset
+
+import faiss
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -282,15 +285,15 @@ def get_project_router(config: APIConfig):
 
     project_name = config.project_dir.stem
     router = APIRouter(prefix=f"/{project_name}", tags=[f"{project_name}"])
-    search_router, active_search_targets = _get_search_router(config)
-    router.include_router(_get_project_data_router(config, active_search_targets))
+    search_router, search_router_info = _get_search_router(config)
+    router.include_router(_get_project_data_router(config, search_router_info))
     router.include_router(_get_report_image_router(config))
     router.include_router(search_router)
 
     return router
 
 
-def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str, List[str]]):
+def _get_project_data_router(config: APIConfig, search_router_info: Dict[str, Any]):
     """
     Returns a router with API routes for reading the project data
 
@@ -617,7 +620,8 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
         return {
             "project_name": config.project_dir.stem,
             "models": models,
-            "search_targets": active_search_targets,
+            "search_targets": search_router_info['search_targets'],
+            "shot_based_filters": search_router_info['shot_based_filters'],
             "num_vectors": num_vectors,
             "num_media_files": num_media_files, # Total number of media files
             "media_file_counts": media_file_counts, # Number of media files by media type
@@ -1274,6 +1278,23 @@ def _get_search_router(config: APIConfig):
     with project_engine.connect() as conn:
         num_vectors = VectorRepo.get_count(conn)
 
+    # Shot property (e.g. shot_scale, camera_motion, etc.) based filters
+    shot_based_filters = {}
+    if config.use_shots:
+        # check if the shots table contains a column named "shot_scale"
+        if db_inspector.has_table(db.shots_table.name):
+            # find the distinct values of this column
+            with project_engine.connect() as conn:
+                # first check if shot_scale column exists
+                shot_scales = conn.execute(sa.text("select distinct(shot_scale) from shots ORDER BY shot_scale")).fetchall()
+                shot_scales = [row[0] for row in shot_scales if row[0] is not None]
+                print(f'shot_scales={shot_scales}')
+                if shot_scales:
+                    shot_based_filters["shot_scale"] = {
+                        "name": "Shot Scale",
+                        "description": "Filter by the scale (or size) of the shot in edited videos.",
+                        "options": shot_scales
+                    }
     router_cm = ExitStack()
 
     def _thumbs_with_score(conn: sa.Connection, dist: List[float], thumbnails_to_send: int):
@@ -1652,12 +1673,20 @@ def _get_search_router(config: APIConfig):
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbnails_to_send: int = Query(0),
-    ):
+        shot_scale: str = Query(None),
+        ):
         """
         Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
         Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
         input images/text, and then using this as the query vector.
         """
+        if shot_scale is not None:
+            try:
+                shot_scale = json.loads(shot_scale)
+            except Exception:
+                raise HTTPException(400, {
+                    "message": "shot_scale must be a JSON array string"
+                })
         media_type = 'audio' if search_in == MediaType.AV else search_in
         if media_type not in search_indices:
             raise HTTPException(400, {
@@ -1798,6 +1827,16 @@ def _get_search_router(config: APIConfig):
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
 
+        filter_specs = None
+        if shot_scale is not None and len(shot_scale) > 0:
+            filter_specs = {
+                "where": {
+                    "query": {
+                        "shot_scale": { "$in": shot_scale }
+                    },
+                    "in": "metadata:shots"
+                }
+            }
         return similarity_search(
             q,
             search_in=search_in,
@@ -1809,6 +1848,7 @@ def _get_search_router(config: APIConfig):
             extract_image_features=extract_image_features,
             extract_audio_features=extract_audio_features,
             get_ext_metadata=search_index.feature_extractor.get_vector_metadata,
+            filter_specs=filter_specs,
         )
 
     def similarity_search(
@@ -1822,9 +1862,16 @@ def _get_search_router(config: APIConfig):
         extract_image_features: Callable[[List[Image.Image]], ndarray] = None,
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
         get_ext_metadata: Callable[[list[int]], list[FeatureExtMetadata]] = None,
+        filter_specs: Dict[str, Any] = None
     ):
         features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
-        dist, ids = search_index.index.search(features, end)
+        if filter_specs is not None:
+            filtered_ids = get_filtered_ids(filter_specs)
+            sel = faiss.IDSelectorBatch(filtered_ids)
+            params = faiss.SearchParameters(sel=sel)
+            dist, ids = search_index.index.search(features, end, params=params)
+        else:
+            dist, ids = search_index.index.search(features, end)
 
         # Apply hook to transform Faiss distance scores
         dist = search_index.feature_extractor.transform_faiss_distances_hook(dist)
@@ -1856,6 +1903,25 @@ def _get_search_router(config: APIConfig):
 
         return response
 
+    def get_filtered_ids(filter_specs: Dict[str, Any]) -> np.ndarray:
+        if 'where' not in filter_specs or 'query' not in filter_specs['where'] or 'shot_scale' not in filter_specs['where']['query']:
+            raise HTTPException(400, {
+                "message": "Invalid filter specifications"
+            })
+        if '$in' not in filter_specs['where']['query']['shot_scale']:
+            raise HTTPException(400, {
+                "message": "only $in operator is currently supported for 'shot_scale' filter."
+            })
+        shot_scales = filter_specs['where']['query']['shot_scale']['$in']
+        with project_engine.connect() as conn:
+            shot_scale_list = ",".join(map(str, shot_scales))
+            query = (f"SELECT v.id FROM vectors v JOIN shots s ON v.media_id = s.media_id "
+                    f"AND v.timestamp BETWEEN s.ts AND s.te WHERE modality=\"VIDEO\" AND "
+                    f"s.shot_scale IN ({shot_scale_list})"
+            )
+            result = conn.execute(sa.text(query)).fetchall()
+            return np.array([row[0] for row in result], dtype=np.int64)
+
     def asr_search(
         q: WISEFTSQuery,
         search_index: FTSSearch,
@@ -1882,4 +1948,9 @@ def _get_search_router(config: APIConfig):
                 search_in=search_in
             )
             return response
-    return router, active_search_targets
+
+    search_router_info = {
+        "search_targets": active_search_targets,
+        "shot_based_filters": shot_based_filters,
+    }
+    return router, search_router_info

@@ -1,6 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
-import { Alert, Button, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
+import { Alert, Button, Checkbox, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
 import { CaretRightOutlined, CloseOutlined, FileTextTwoTone, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone} from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
@@ -256,7 +256,9 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
   handleTextInputChange,
   viewModality, featureExtractorId,
   submitSearch, clearSearchBar,
+  shotScaleFilter, setShotScaleFilter,
   tourVariables,
+  projectInfo,
   isHomePage
 }, ref) => {
   const { token } = useToken();
@@ -286,6 +288,10 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
     setIsModalitySelected(false);
     submitSearch();
   };
+
+  const handleShotScaleFilterChange = (e: number[]) => {
+    setShotScaleFilter(e);
+  }
 
   const collapseItems = [
     {
@@ -372,6 +378,25 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
           </Space>
         </Flex> */}
       </div>
+      {projectInfo.shot_based_filters?.shot_scale?.options && (
+        <>
+          <Tooltip title="Filter results by shot scale">
+        <Divider orientation="left">Shot Scale</Divider>
+          </Tooltip>
+          <div>
+        <Checkbox.Group
+          value={shotScaleFilter}
+          onChange={handleShotScaleFilterChange}
+        >
+          {projectInfo.shot_based_filters.shot_scale.options.map((value: number) => (
+            <Checkbox key={value} value={value}>
+          {config.SHOT_SCALE_FILTER_LABEL?.[value] ?? value}
+            </Checkbox>
+          ))}
+        </Checkbox.Group>
+          </div>
+        </>
+      )}
       {
         config.MULTIMODAL_EXAMPLE_QUERIES &&
         <>
@@ -460,6 +485,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   multimodalQueries, setMultimodalQueries, searchText, setSearchText,
   viewModality, setViewModality,
   featureExtractorId, setFeatureExtractorId,
+  shotScaleFilter, setShotScaleFilter,
   submitSearch, tourVariables, projectInfo,
   isHomePage = false, isLoadingNewSearch = false
 }: WiseHeaderProps) => {
@@ -660,8 +686,10 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                               handleTextInputChange={handleTextInputChange}
                               viewModality={viewModality} featureExtractorId={featureExtractorId}
                               submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
+                              shotScaleFilter={shotScaleFilter} setShotScaleFilter={setShotScaleFilter}
                               isHomePage={isHomePage}
                               tourVariables={tourVariables} ref={searchDropdownRef}
+                              projectInfo={projectInfo}
               />
             }
             open={isSearchDropdownTriggered || isSearchInputFocused || tourVariables.isSearchDropdownOpenForTour}

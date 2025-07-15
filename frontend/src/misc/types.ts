@@ -169,7 +169,7 @@ export interface DataServiceOutput {
   totalResults: number;
   // pageNum: number;
   // changePageNum: (x: number) => void;
-  performNewSearch: (queries: Query[], viewModality: ViewModality, featureExtractorId: string) => Promise<void>;
+  performNewSearch: (queries: Query[], viewModality: ViewModality, featureExtractorId: string, shotScaleFilter: number[]) => Promise<void>;
   fetchFeaturedImagesAndSetState: (viewModality: ViewModality, featureExtractorId: string) => Promise<void>;
   reportImage: (imageId: string, reasons: string[]) => Promise<string>;
   fillRelatedVectors: (imageDetails: ProcessedImageVector | ProcessedVideoSegment) => Promise<ProcessedImageVector | ProcessedVideoSegment>;
@@ -186,6 +186,12 @@ export interface ProjectInfo {
     image?: string[],
     video?: string[],
     audio?: string[],
+  };
+  shot_based_filters?: {
+    shot_scale?: {
+      description: string;
+      options: number[];
+    };
   };
   num_vectors?: number;
   num_media_files?: number;
@@ -237,9 +243,12 @@ export interface SearchDropdownProps {
   handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
   viewModality: ViewModality;
   featureExtractorId: string;
+  shotScaleFilter: number[];
+  setShotScaleFilter: (x: number[]) => void;
   submitSearch: () => void;
   clearSearchBar: () => void;
   tourVariables: TourVariables;
+  projectInfo: ProjectInfo;
   isHomePage?: boolean;
 };
 export interface WiseHeaderProps {
@@ -251,6 +260,8 @@ export interface WiseHeaderProps {
   setViewModality: (x: ViewModality) => void;
   featureExtractorId: string;
   setFeatureExtractorId: (x: string) => void;
+  shotScaleFilter: number[];
+  setShotScaleFilter: (x: number[]) => void;
   submitSearch: () => void;
   tourVariables: TourVariables;
   projectInfo: ProjectInfo;
