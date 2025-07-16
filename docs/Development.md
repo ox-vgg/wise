@@ -17,7 +17,7 @@ pip install pyinstrument
 
 #### Usage
 
-Serve the project with the flag `MODE=developement` and `ENABLE_PROFILING=1` and Add `profile=1` to the API request as query param
+Serve the project with the flag `MODE=development` and `ENABLE_PROFILING=1` and Add `profile=1` to the API request as query param
 
 Example
 
