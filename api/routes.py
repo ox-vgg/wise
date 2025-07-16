@@ -788,6 +788,7 @@ def _get_search_router(config: APIConfig):
 
     shots_table = db.shots_table
 
+
     if config.use_shots:
 
         with project_engine.connect() as conn:
@@ -1295,6 +1296,11 @@ def _get_search_router(config: APIConfig):
                         "description": "Filter by the scale (or size) of the shot in edited videos.",
                         "options": shot_scales
                     }
+        if not db_inspector.has_table('vectors_to_shots_map'):
+            raise ValueError("vectors_to_shots_map table not found! Please run the import shots script as follows:"
+                             "Please run \"python3 media-metadata.py import-shot-scale ...\")")
+        db.project_metadata_obj.reflect(bind=project_engine, only=['vectors_to_shots_map'])
+        vectors_to_shots_map = db.project_metadata_obj.tables['vectors_to_shots_map']
     router_cm = ExitStack()
 
     def _thumbs_with_score(conn: sa.Connection, dist: List[float], thumbnails_to_send: int):
@@ -1843,12 +1849,13 @@ def _get_search_router(config: APIConfig):
             search_index=search_index,
             start=start,
             end=end,
+            feature_extractor_id=feature_extractor_id,
             thumbnails_to_send=thumbnails_to_send,
             extract_text_features=extract_text_features,
             extract_image_features=extract_image_features,
             extract_audio_features=extract_audio_features,
             get_ext_metadata=search_index.feature_extractor.get_vector_metadata,
-            filter_specs=filter_specs,
+            filter_specs=filter_specs
         )
 
     def similarity_search(
@@ -1857,16 +1864,17 @@ def _get_search_router(config: APIConfig):
         search_index: SearchIndex,
         start: int,
         end: int,
+        feature_extractor_id: str,
         thumbnails_to_send: int = 0,
         extract_text_features: Callable[[List[str]], ndarray] = None,
         extract_image_features: Callable[[List[Image.Image]], ndarray] = None,
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
         get_ext_metadata: Callable[[list[int]], list[FeatureExtMetadata]] = None,
-        filter_specs: Dict[str, Any] = None
+        filter_specs: Dict[str, Any] = None,
     ):
         features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
         if filter_specs is not None:
-            filtered_ids = get_filtered_ids(filter_specs)
+            filtered_ids = get_filtered_ids(filter_specs, feature_extractor_id)
             sel = faiss.IDSelectorBatch(filtered_ids)
             if search_index.index_type == 'IndexFlatIP':
                 params = faiss.SearchParameters(sel=sel)
@@ -1910,7 +1918,7 @@ def _get_search_router(config: APIConfig):
 
         return response
 
-    def get_filtered_ids(filter_specs: Dict[str, Any]) -> np.ndarray:
+    def get_filtered_ids(filter_specs: Dict[str, Any], feature_extractor_id: str) -> np.ndarray:
         if 'where' not in filter_specs or 'query' not in filter_specs['where'] or 'shot_scale' not in filter_specs['where']['query']:
             raise HTTPException(400, {
                 "message": "Invalid filter specifications"
@@ -1921,12 +1929,25 @@ def _get_search_router(config: APIConfig):
             })
         shot_scales = filter_specs['where']['query']['shot_scale']['$in']
         with project_engine.connect() as conn:
-            shot_scale_list = ",".join(map(str, shot_scales))
-            query = (f"SELECT v.id FROM vectors v JOIN shots s ON v.media_id = s.media_id "
-                    f"AND v.timestamp BETWEEN s.ts AND s.te WHERE modality=\"VIDEO\" AND "
-                    f"s.shot_scale IN ({shot_scale_list})"
+            stmt = sa.select(db.vectors_table.c.id).select_from(
+                db.shots_table.join(
+                    vectors_to_shots_map,
+                    sa.and_(
+                        db.shots_table.c.id == vectors_to_shots_map.c.shot_id,
+                        db.shots_table.c.media_id == vectors_to_shots_map.c.media_id,
+                    )
+                ).join(
+                    db.vectors_table,
+                    vectors_to_shots_map.c.vector_id == db.vectors_table.c.id
+                )
+            ).where(
+                sa.and_(
+                    db.vectors_table.c.modality == ModalityType.VIDEO,
+                    db.vectors_table.c.feature_extractor_id == feature_extractor_id,
+                    db.shots_table.c.shot_scale.in_(shot_scales)
+                )
             )
-            result = conn.execute(sa.text(query)).fetchall()
+            result = conn.execute(stmt).fetchall()
             return np.array([row[0] for row in result], dtype=np.int64)
 
     def asr_search(

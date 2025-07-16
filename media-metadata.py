@@ -37,6 +37,7 @@ from src import db
 import sqlalchemy as sa
 from tqdm import tqdm
 import bisect
+from collections import defaultdict
 
 ##
 ## A. Command line interface (CLI) parser and handler
@@ -115,7 +116,65 @@ def import_shots(args):
                 if (idx % 1024) == 0:
                     conn.commit()
             conn.commit()
-    
+
+            db_inspector = sa.inspect(db_engine)
+            if db_inspector.has_table('vectors_to_shots_map'):
+                # drop the table if it exists
+                print('dropping existing vectors_to_shots_map table ...')
+                db.project_metadata_obj.drop_table('vectors_to_shots_map')
+
+            print('creating vectors_to_shots_map table ...')
+            sqlalchemy_metadata = sa.MetaData()
+            sqlalchemy_metadata.reflect(bind=db_engine)
+            vectors_to_shots_map = sa.Table(
+                'vectors_to_shots_map',
+                sqlalchemy_metadata,
+                sa.Column('vector_id', sa.Integer, sa.ForeignKey('vectors.id', ondelete="CASCADE"), primary_key=True, nullable=False),
+                sa.Column('shot_id', sa.Integer, nullable=False),
+                sa.Column('media_id', sa.Integer, nullable=False),
+                sa.ForeignKeyConstraint(['shot_id', 'media_id'], ['shots.id', 'shots.media_id'], ondelete="CASCADE"),
+            )
+            sqlalchemy_metadata.create_all(db_engine)
+
+            # Count total vectors to process for progress bar
+            result = conn.execute(sa.text("SELECT COUNT(*) FROM vectors"))
+            total_vectors = result.scalar() or 0
+            print(f'Populating vectors_to_shots_map table for {total_vectors} vectors (takes a while) ...')
+
+            # Fetch all vectors and shots into memory for mapping
+            vectors = conn.execute(sa.text("SELECT id, media_id, timestamp FROM vectors")).fetchall()
+            shots = conn.execute(sa.text("SELECT id, media_id, ts, te FROM shots")).fetchall()
+
+            # Build a lookup for shots by media_id for efficient search
+            shots_by_media = defaultdict(list)
+            for shot in shots:
+                shots_by_media[shot.media_id].append(shot)
+
+            # Prepare insert statement
+            insert_stmt = sa.text("""
+                INSERT INTO vectors_to_shots_map (vector_id, shot_id, media_id)
+                VALUES (:vector_id, :shot_id, :media_id)
+            """)
+
+            # Progress bar for mapping
+            for vector in tqdm(vectors, desc="Mapping vectors to shots", unit="vector"):
+                media_id = vector.media_id
+                timestamp = vector.timestamp
+                for shot in shots_by_media.get(media_id, []):
+                    if shot.ts <= timestamp <= shot.te:
+                        conn.execute(insert_stmt, {
+                            "vector_id": vector.id,
+                            "shot_id": shot.id,
+                            "media_id": media_id
+                        })
+                        break  # Each vector maps to at most one shot
+
+            conn.commit()
+            print('Creating indices on vectors_to_shots_map ...')
+            conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_vectors_vector_id ON vectors_to_shots_map (vector_id);"))
+            conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_vectors_shot_and_media_id ON vectors_to_shots_map (shot_id, media_id);"))
+            conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_vectors_modality_feat_media ON vectors (modality, feature_extractor_id, media_id)"))
+
     csv_filename = Path(args.from_csv)
     if not csv_filename.exists():
         raise ValueError(f'csv file does not exist: {csv_filename}')
