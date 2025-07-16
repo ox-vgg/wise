@@ -18,7 +18,7 @@ class APIConfig(BaseSettings):
     thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
 
     # If you want to serve the media files from a different static file server,
-    # set redirect_media_url_by_path to True to redirect the media urls from 
+    # set redirect_media_url_by_path to True to redirect the media urls from
     # /media/{media_id} to {config.redirect_media_url_prefix}/media/{file_path}
     #
     # For example, requests to http://server:port/prefix/project-name/media/1 gets
@@ -37,3 +37,6 @@ class APIConfig(BaseSettings):
     # define the order in which search targets (or feature_extractor_id) are listed
     # this order is used by the frontend to display the search targets in the UI
     search_target_order: list[str] = ["open_clip", "insightface", "owlv2", "clap", "wise/metadata"]
+
+    # enable profiling for development mode
+    enable_profiling: bool = False

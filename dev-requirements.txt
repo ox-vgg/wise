@@ -3,3 +3,4 @@ pytest
 jupyter-console
 matplotlib
 bump-pydantic
+pyinstrument

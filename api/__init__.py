@@ -38,6 +38,21 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
             allow_headers=["*"],
         )
 
+        if config.enable_profiling:
+            from pyinstrument import Profiler
+            from pyinstrument.renderers.html import HTMLRenderer
+
+            @app.middleware("http")
+            async def profile_request(request: Request, call_next):
+                if request.query_params.get("profile", False):
+                    with Profiler(interval=0.001, async_mode="enabled") as profiler:
+                        response = await call_next(request)
+                    with open(f"profile.html", "w") as out:
+                        out.write(profiler.output(renderer=HTMLRenderer()))
+                    return response
+                else:
+                    return await call_next(request)
+
     @app.exception_handler(WiseFrontendUserException)
     async def frontend_user_exception_handler(request: Request, exc: WiseFrontendUserException):
         raise HTTPException(400, {"message": str(exc)})
