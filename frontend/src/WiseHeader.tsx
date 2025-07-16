@@ -378,7 +378,8 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
           </Space>
         </Flex> */}
       </div>
-      {projectInfo.shot_based_filters?.shot_scale?.options && (
+      {/* fixme: find a better way to disable the shot scale filter if audio is selected */}
+      {(projectInfo.shot_based_filters?.shot_scale?.options && viewModality !== 'VideoAudio' && featureExtractorId.split('/')[1] !== 'clap') && (
         <>
           <Tooltip title="Filter results by shot scale">
         <Divider orientation="left">Shot Scale</Divider>
