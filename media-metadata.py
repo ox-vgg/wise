@@ -240,13 +240,13 @@ def get_csv_header(csv_filename):
 def load_metadata_from_csv(csv_filename, args):
     print(f'Loading metadata from CSV file {csv_filename} ...')
     all_metadata = []
-    with open(csv_filename, 'r') as csv_file:
+    with open(csv_filename, 'r', newline='', encoding='utf-8') as csv_file:
         data_sample = csv_file.read(1024)
         csv_file.seek(0)
         dialect = csv.Sniffer().sniff(sample=data_sample, delimiters=',')
-
+        dialect.quotechar = '"'
+        dialect.doublequote = True  # Allow double quotes inside quoted fields
         reader = csv.DictReader(csv_file, dialect=dialect)
-
         all_metadata = [row for row in reader]
     return all_metadata
 
