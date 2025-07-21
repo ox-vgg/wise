@@ -887,7 +887,7 @@ def _get_search_router(config: APIConfig):
         start_timestamp_expr = (timestamp + 0.2) >= shots_table.c.ts
         end_timestamp_expr = timestamp < shots_table.c.te
         dataset_expr = shots_table.c.media_id == media_id
-        stmt = sa.select(shots_table).where(
+        stmt = sa.select(shots_table.c.id, shots_table.c.media_id, shots_table.c.ts, shots_table.c.te).where(
             (dataset_expr & start_timestamp_expr & end_timestamp_expr)
         )
         result = conn.execute(stmt)
@@ -1281,26 +1281,26 @@ def _get_search_router(config: APIConfig):
 
     # Shot property (e.g. shot_scale, camera_motion, etc.) based filters
     shot_based_filters = {}
-    if config.use_shots:
+    if config.use_shots and db_inspector.has_table(db.shots_table.name):
         # check if the shots table contains a column named "shot_scale"
-        if db_inspector.has_table(db.shots_table.name):
+        colnames = [col["name"] for col in db_inspector.get_columns(db.shots_table.name)]
+        if 'shot_scale' in colnames:
+            if not db_inspector.has_table('vectors_to_shots_map'):
+                raise ValueError("vectors_to_shots_map table not found! Please run the import shots script as follows:"
+                                 "Please run \"python3 media-metadata.py import-shot-scale ...\"")
             # find the distinct values of this column
-            with project_engine.connect() as conn:
-                # first check if shot_scale column exists
-                shot_scales = conn.execute(sa.text("select distinct(shot_scale) from shots ORDER BY shot_scale")).fetchall()
-                shot_scales = [row[0] for row in shot_scales if row[0] is not None]
-                print(f'shot_scales={shot_scales}')
-                if shot_scales:
-                    shot_based_filters["shot_scale"] = {
-                        "name": "Shot Scale",
-                        "description": "Filter by the scale (or size) of the shot in edited videos.",
-                        "options": shot_scales
-                    }
-        if not db_inspector.has_table('vectors_to_shots_map'):
-            raise ValueError("vectors_to_shots_map table not found! Please run the import shots script as follows:"
-                             "Please run \"python3 media-metadata.py import-shot-scale ...\")")
-        db.project_metadata_obj.reflect(bind=project_engine, only=['vectors_to_shots_map'])
-        vectors_to_shots_map = db.project_metadata_obj.tables['vectors_to_shots_map']
+            shot_scales = conn.execute(sa.text("select distinct(shot_scale) from shots ORDER BY shot_scale")).fetchall()
+            shot_scales = [row[0] for row in shot_scales if row[0] is not None]
+            if shot_scales:
+                logger.info("shot_scale filter enabled with values =%s", shot_scales)
+                shot_based_filters["shot_scale"] = {
+                    "name": "Shot Scale",
+                    "description": "Filter by the scale (or size) of the shot in edited videos.",
+                    "options": shot_scales
+                }
+
+            db.project_metadata_obj.reflect(bind=project_engine, only=['vectors_to_shots_map'])
+            vectors_to_shots_map = db.project_metadata_obj.tables['vectors_to_shots_map']
     router_cm = ExitStack()
 
     def _thumbs_with_score(conn: sa.Connection, dist: List[float], thumbnails_to_send: int):
