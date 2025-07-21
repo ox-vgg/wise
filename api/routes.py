@@ -440,19 +440,26 @@ def _get_project_data_router(config: APIConfig, search_router_info: Dict[str, An
     )
     def get_thumbnail(media_id: int, timestamp: float, high_res: bool = False):
         # Get a thumbnail given a thumbnail id
-        if not high_res:
+        if high_res:
+            return get_high_res_thumbnail(media_id, timestamp)
+        else:
             with thumbs_engine.connect() as thumbs_conn:
                 thumbnail = get_thumbnail_by_timestamp(
                     thumbs_conn, media_id=media_id, timestamp=timestamp
                 )
                 if thumbnail is None:
-                    raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
+                    if config.use_shots:
+                        # If no thumbnail found, try to get a high-res thumbnail from the original video
+                        return get_high_res_thumbnail(media_id, timestamp)
+                    else:
+                        raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
                 return Response(
                     content=thumbnail,
                     media_type="image/jpeg",
                     status_code=200,
                 )
 
+    def get_high_res_thumbnail(media_id: int, timestamp: float):
         # seek the original video
         with project_engine.connect() as conn:
             metadata = MediaRepo.get(conn, media_id)
@@ -1549,7 +1556,7 @@ def _get_search_router(config: APIConfig):
             ids[modality] = {}
             for feature_extractor_id in search_indices[modality]:
                 this_ids = get_featured_images(
-                    conn, modality, feature_extractor_id
+                    conn, modality, feature_extractor_id, config.use_shots
                 )
 
                 # Select a random subset of up to 10000 image ids (for performance reasons)
