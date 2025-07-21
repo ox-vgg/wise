@@ -144,7 +144,8 @@ def get_thumbnail_by_timestamp(conn: sa.Connection, *, media_id: int, timestamp:
     return result.scalar()
 
 def get_featured_images(
-    conn: sa.Connection, modality: ModalityType, feature_extractor_id: str
+    conn: sa.Connection, modality: ModalityType, feature_extractor_id: str,
+    use_shots: bool = False
 ) -> List[int]:
     """
     Get a set of featured images to be shown on the frontend.
@@ -172,11 +173,19 @@ def get_featured_images(
     )
     if modality != ModalityType.IMAGE:
         # Get the vector id from the 4th second of each video (non-image)
-        where_clause = sa.and_(
-            where_clause,
-            _vtable.c.timestamp >= 4,
-            _vtable.c.timestamp < 4.5,
-        )
+        if use_shots:
+            # If using shots, we need to join with the shots table
+            where_clause = sa.and_(
+                where_clause,
+                _vtable.c.timestamp >= 4,
+                _vtable.c.timestamp < 20,
+            )
+        else:
+            where_clause = sa.and_(
+                where_clause,
+                _vtable.c.timestamp >= 4,
+                _vtable.c.timestamp < 4.5,
+            )
 
     stmt = (
         sa.select(_vtable.c.id)
