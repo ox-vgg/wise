@@ -1296,7 +1296,8 @@ def _get_search_router(config: APIConfig):
                 raise ValueError("vectors_to_shots_map table not found! Please run the import shots script as follows:"
                                  "Please run \"python3 media-metadata.py import-shot-scale ...\"")
             # find the distinct values of this column
-            shot_scales = conn.execute(sa.text("select distinct(shot_scale) from shots ORDER BY shot_scale")).fetchall()
+            with project_engine.connect() as conn:
+                shot_scales = conn.execute(sa.text("select distinct(shot_scale) from shots ORDER BY shot_scale")).fetchall()
             shot_scales = [row[0] for row in shot_scales if row[0] is not None]
             if shot_scales:
                 logger.info("shot_scale filter enabled with values =%s", shot_scales)
