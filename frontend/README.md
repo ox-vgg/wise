@@ -33,3 +33,43 @@ Note: You will need to separately run the API server using `MODE="development" p
 ### Production build
 1. Make sure you have completed the prerequisite steps above, and `cd`'ed into this directory if you haven't already done so
 2. To build the project, simply run `npm run build`. This creates a production build in the `dist` folder.
+
+## Components
+
+Here is a diagram showing the key components used in the frontend and the relationship between them:
+
+```mermaid
+flowchart TD
+    A[App]
+    B[WiseHeader]
+    C[SearchResults]
+    D[WiseOverviewCard]
+    E[ImageDetailsModal]
+    F[SearchDropdown]
+    G[TextSearchForm]
+    H[MediaSearchForm]
+    I[StillImageView]
+    J[ReportImageModal]
+    K[BoundingBoxOverlay]
+    L[VideoOccurrencesView]
+    M[BoundingBoxes]
+
+    A --> B
+    A --> C
+    A --> D
+
+    B --> F
+    F --> G
+    F --> H
+
+    C --> E
+    C --> I
+    C --> J
+
+    E --> I
+    E --> L
+    E --> K
+
+    I --> M
+    K --> M
+```
