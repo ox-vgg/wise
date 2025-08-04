@@ -38,6 +38,7 @@ import sqlalchemy as sa
 from tqdm import tqdm
 import bisect
 from collections import defaultdict
+import re
 
 ##
 ## A. Command line interface (CLI) parser and handler
@@ -197,6 +198,9 @@ def import_shots(args):
 ##
 ## B. Import metadata
 ##
+def camel_to_snake(name):
+            s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 def import_media_metadata(args):
     project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
@@ -219,10 +223,20 @@ def import_media_metadata(args):
         raise ValueError(f'csv file does not exist: {csv_filename}')
 
     csv_colnames = get_csv_header(csv_filename)
-    if 'media_id' not in csv_colnames and 'media_path' not in csv_colnames:
+    # Convert camelCase column names to snake_case to avoid special handling required by sqlalchemy library
+    colname_map = {col: camel_to_snake(col) for col in csv_colnames}
+    if 'media_id' not in [colname_map.get(col, col) for col in csv_colnames] and 'media_path' not in [colname_map.get(col, col) for col in csv_colnames]:
         raise ValueError('media_id or media_path columns missing from CSV')
 
     metadata = load_metadata_from_csv(args.from_csv, args)
+    # Rename keys in metadata rows to snake_case
+    for row in metadata:
+        for orig_col, snake_col in colname_map.items():
+            if orig_col != snake_col:
+                row[snake_col] = row.pop(orig_col)
+
+    csv_colnames = [camel_to_snake(col) for col in csv_colnames]
+
     if 'media_path' in csv_colnames:
         resolve_media_path(db_engine, metadata)
 
@@ -290,11 +304,6 @@ def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metada
     for csv_colname in csv_colnames:
         if csv_colname == 'media_id' or csv_colname == 'media_path':
             continue
-        # if csv_colname contains a camelCase, convert it to camel_case
-        # because SQLAlchemy needs special handling for column names with camelCase
-        if any(c.isupper() for c in csv_colname):
-            # convert camelCase to snake_case
-            csv_colname = ''.join(['_' + c.lower() if c.isupper() else c for c in csv_colname]).lstrip('_')
         colnames.append( sa.Column(csv_colname,
                                    sa.String,
                                    nullable=True) )
