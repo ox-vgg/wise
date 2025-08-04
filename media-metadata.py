@@ -290,6 +290,11 @@ def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metada
     for csv_colname in csv_colnames:
         if csv_colname == 'media_id' or csv_colname == 'media_path':
             continue
+        # if csv_colname contains a camelCase, convert it to camel_case
+        # because SQLAlchemy needs special handling for column names with camelCase
+        if any(c.isupper() for c in csv_colname):
+            # convert camelCase to snake_case
+            csv_colname = ''.join(['_' + c.lower() if c.isupper() else c for c in csv_colname]).lstrip('_')
         colnames.append( sa.Column(csv_colname,
                                    sa.String,
                                    nullable=True) )
