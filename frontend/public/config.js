@@ -48,6 +48,13 @@ const productionConfig = {
     },
   ],
   ENABLE_REPORT_MEDIA: true, // shows a "Report media" button in the image details page
+  SHOT_SCALE_FILTER_LABEL: {
+    0: "Extreme close-up",
+    1: "Close-up",
+    2: "Medium shot",
+    3: "Full shot",
+    4: "Long shot"
+  }
 };
 
 // Config for development mode

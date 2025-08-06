@@ -91,4 +91,5 @@ shots_table = sa.Table(
     ),
     sa.Column("ts", sa.Float, nullable=False, index=True),
     sa.Column("te", sa.Float, nullable=False, index=True),
+    sa.Column("shot_scale", sa.Integer, default=None, index=True),
 )

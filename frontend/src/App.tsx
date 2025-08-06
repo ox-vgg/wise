@@ -9,14 +9,16 @@ import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
 import { ViewModality, ProjectInfo, Query, TourVariables } from './misc/types.ts';
-import { fetchWithTimeout } from './misc/utils.ts';
+import { fetchWithTimeout, is_metadata_supported } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
+
 
 export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
   const [searchText, setSearchText] = useState(''); // Stores the main text query entered in the search bar
   const [viewModality, setViewModality] = useState<ViewModality>('Image');
   const [featureExtractorId, setFeatureExtractorId] = useState<string>('');
+  const [shotScaleFilter, setShotScaleFilter] = useState<number[]>([]);
 
   const dataService = useDataService();
   const [isHomePage, setIsHomePage] = useState(true);
@@ -42,7 +44,10 @@ export const App: React.FunctionComponent = () => {
         }
         return response.json();
       })
-      .then(setProjectInfo)
+      .then((data: ProjectInfo) => {
+        data.is_metadata_supported = is_metadata_supported(data);; // Add is_metadata_supported to projectInfo
+        setProjectInfo(data);
+      })
       .catch((err) => {
         Modal.error({
           title: 'Error: unable to load project info',
@@ -76,21 +81,25 @@ export const App: React.FunctionComponent = () => {
 
     // Now that we have set the feature extractor and modality, we can
     // initialise home page with featured images
-    dataService.fetchFeaturedImagesAndSetState(
-      viewModality, featureExtractorId
-    ).then(_ => {
-      setIsHomePage(true); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
-    }).catch((err) => {
-      Modal.error({
-        title: 'Error: unable to load featured images',
-        content: 'Please try again later',
+    if (isHomePage) {
+      dataService.fetchFeaturedImagesAndSetState(
+        viewModality, featureExtractorId
+      ).then(_ => {
+        setIsHomePage(true); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
+      }).catch((err) => {
+        Modal.error({
+          title: 'Error: unable to load featured images',
+          content: 'Please try again later',
+        });
+        console.error(err);
       });
-      console.error(err);
-    });
+    } else {
+      submitSearch();
+    }
   }, [viewModality, featureExtractorId]);
 
   const _submitSearch = (queries: Query[]) => {
-    dataService.performNewSearch(queries, viewModality, featureExtractorId).then(_ => {
+    dataService.performNewSearch(queries, viewModality, featureExtractorId, shotScaleFilter).then(_ => {
       setIsHomePage(false); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
     }).catch((err) => {
       Modal.error({
@@ -102,16 +111,16 @@ export const App: React.FunctionComponent = () => {
     });
   }
 
-  const submitSearch = () => {
-    let queries: Query[] = [...multimodalQueries];
+  const submitSearch = (queries?: Query[]) => {
+    let _queries = queries?.slice() || [...multimodalQueries];
     let searchTextTrimmed = searchText.trim();
-    if (searchTextTrimmed) queries.push({
+    if (searchTextTrimmed) _queries.push({
       id: nanoid(),
       type: "TEXT",
       value: searchTextTrimmed
     });
-    if (queries.length === 0) return;
-    else if (queries.length > 5) {
+    if (_queries.length === 0) return;
+    else if (_queries.length > 5) {
       Modal.error({
         title: 'The maximum number of queries is 5 queries',
         content: 'Please delete some of the queries',
@@ -119,7 +128,7 @@ export const App: React.FunctionComponent = () => {
       return;
     }
 
-    _submitSearch(queries);
+    _submitSearch(_queries);
   }
 
   const handleExampleQueryClick = (exampleQuery: string) => {
@@ -140,6 +149,7 @@ export const App: React.FunctionComponent = () => {
                 submitSearch={submitSearch}
                 tourVariables={tourVariables}
                 projectInfo={projectInfo}
+                shotScaleFilter={shotScaleFilter} setShotScaleFilter={setShotScaleFilter}
                 isHomePage={isHomePage} isLoadingNewSearch={dataService.isLoadingNewSearch}></WiseHeader>
     <Content className="wise-content">
       {isHomePage && // Only show if isHomePage is true

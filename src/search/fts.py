@@ -122,6 +122,33 @@ def get_cte_from_ids(ids: list[tuple]):
     return cte
 
 
+# def get_cte_from_media_ids(media_ids: list[int]):
+#     """
+#     Create a CTE from a list of media_ids
+#     """
+#     sub_queries = [
+#         sa.select(
+#             sa.literal(i).label("rank"),
+#             sa.literal(m).label("media_id"),
+#         )
+#         for i, m in enumerate(media_ids)
+#     ]
+#     cte = sa.union_all(*sub_queries).cte("cte")
+#     return cte
+
+def get_cte_from_media_ids(media_ids: list[int]):
+    """
+    Create a CTE from a list of media_ids using the values expression in SQLAlchemy
+    """
+    cte = sa.values(
+        sa.column("rank", sa.Integer),
+        sa.column("media_id", sa.Integer),
+    ).data(
+        [(i, m) for i, m in enumerate(media_ids)]
+    ).cte('cte')
+
+    return cte
+
 def get_join_onclause(
     left: sa.FromClause,
     right: sa.FromClause,
@@ -323,7 +350,7 @@ class FTSSearch:
         fts_selectable = get_metadata_selectable_from_fts5_config(
             self.tables, self.fts_config
         )
-        
+
         self.fts_table = create_fts_table_from_selectable(
             self.table_name, self.db_metadata, fts_selectable
         )
@@ -336,13 +363,13 @@ class FTSSearch:
         )
         conn.execute(stmt)
 
-        
     def search(
         self,
         conn: sa.Connection,
         q: WISEFTSQuery,
         start: int | None = None,
         end: int | None = None,
+        ids_only: bool = False,
     ):
         """
         FTS search function
@@ -358,6 +385,39 @@ class FTSSearch:
             self.fts_table,
             db.media_table.c.id == sa.literal_column(f"[{self.fts_table.name}].rowid"),
         )
+        if end is None:
+            limit = None
+        elif start is None:
+            limit = end
+        else:
+            limit = end - start
+
+        # search on fts table and get all media_ids
+        stmt = (
+            sa.select(
+                db.media_table.c.id,
+            )
+            .select_from(from_clause)
+            .where(where_clause)
+            .order_by(sa.text("rank"))
+            .limit(limit)
+            .offset(start)
+        )
+
+        ids = conn.execute(stmt).scalars().all()
+        cte = get_cte_from_media_ids(ids)
+        if ids_only:
+            return cte
+
+        from_clause = cte.join(
+            db.media_table,
+            cte.c.media_id == db.media_table.c.id,
+        ).join(
+            self.fts_table,
+            db.media_table.c.id == sa.literal_column(f"[{self.fts_table.name}].rowid"),
+        )
+
+        # use the media_ids to select the matching rows and highlight the fts columns
         columns = []
         col_count = {}
         fts_cols = list(dict.fromkeys([x.name for x in self.fts_table.c]))
@@ -369,7 +429,7 @@ class FTSSearch:
             _count = 0
             for x in (c for c in m.c if c.name not in COMMON_COLUMNS):
                 fts_name = col2fts[m.name].get(x.name, x.name)
-                
+
                 column = (
                     sa.column(
                         f"highlight([{self.fts_table.name}], {fts_cols.index(fts_name)}, '<b>', '</b>')",
@@ -389,7 +449,7 @@ class FTSSearch:
             )
             .select_from(from_clause)
             .where(where_clause)
-            .order_by(sa.text("rank"))
+            .order_by(cte.c.rank)
             .limit((end - start))
             .offset(start)
         )

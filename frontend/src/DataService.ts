@@ -247,29 +247,34 @@ const fetchRelatedVectors = (vector_id: string): Promise<VectorInfo[]> => {
 }
 
 
-const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featureExtractorId: string, pageStart: number, pageEnd: number): Promise<ProcessedSearchResponse> => {
+const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featureExtractorId: string, pageStart: number, pageEnd: number, shotScaleFilter: number[]): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
 
   const textQueries = queries.filter(q => q.type === "TEXT");
   const internalImageQueries = queries.filter(q => q.type === "INTERNAL_IMAGE");
-  const otherQueries = queries.filter(q => q.type !== 'TEXT' && q.type !== 'INTERNAL_IMAGE');
+  const metadataFilterQueries = queries.filter(q => q.type === "METADATA");
+  const otherQueries = queries.filter(q => q.type !== 'TEXT' && q.type !== 'INTERNAL_IMAGE' && q.type !== 'METADATA');
   let formData = undefined;
   if (otherQueries.length > 0) {
     formData = convertQueriesToFormData(otherQueries);
   }
 
-  const urlParams = new URLSearchParams([
+  const urlParamsArray = [
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
     ['search_in', viewModalityToSearchInType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
-    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
-  ]);
-  
+    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string]),
+    ...metadataFilterQueries.map(q => ['metadata_filter', q.value as string])
+  ];
+  if (shotScaleFilter.length > 0) {
+    urlParamsArray.push(['shot_scale', JSON.stringify(shotScaleFilter)]);
+  }
+  const urlParams = new URLSearchParams(urlParamsArray);
   const endpoint = `search?${urlParams.toString()}`;
   
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {
@@ -395,14 +400,14 @@ export const useDataService = (): DataServiceOutput => {
 
 
   // Get results for a new search query
-  const performNewSearch = async (queries: Query[], viewModality: ViewModality, featureExtractorId: string) => {
+  const performNewSearch = async (queries: Query[], viewModality: ViewModality, featureExtractorId: string, shotScaleFilter: number[]) => {
     setSearchingState((_searchingState) => ({
       ..._searchingState,
       isLoadingNewSearch: true
     }));
     let searchResponseJSON: ProcessedSearchResponse;
     try {
-      searchResponseJSON = await fetchSearchResults(queries, viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST);
+      searchResponseJSON = await fetchSearchResults(queries, viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST, shotScaleFilter);
     } catch (e) {
       setSearchingState((_searchingState) => ({
         ..._searchingState,

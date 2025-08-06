@@ -1,7 +1,7 @@
 from contextlib import ExitStack
 import datetime
 import time
-from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Tuple, Union, BinaryIO
+from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Tuple, Union, BinaryIO, Any
 import io
 import itertools
 import functools
@@ -60,6 +60,9 @@ from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtMetadata
 from src.search.fts import FTSSearch, WISEFTSQuery
 from src.dataloader import AVDataset
+
+import faiss
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -282,15 +285,15 @@ def get_project_router(config: APIConfig):
 
     project_name = config.project_dir.stem
     router = APIRouter(prefix=f"/{project_name}", tags=[f"{project_name}"])
-    search_router, active_search_targets = _get_search_router(config)
-    router.include_router(_get_project_data_router(config, active_search_targets))
+    search_router, search_router_info = _get_search_router(config)
+    router.include_router(_get_project_data_router(config, search_router_info))
     router.include_router(_get_report_image_router(config))
     router.include_router(search_router)
 
     return router
 
 
-def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str, List[str]]):
+def _get_project_data_router(config: APIConfig, search_router_info: Dict[str, Any]):
     """
     Returns a router with API routes for reading the project data
 
@@ -437,19 +440,26 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
     )
     def get_thumbnail(media_id: int, timestamp: float, high_res: bool = False):
         # Get a thumbnail given a thumbnail id
-        if not high_res:
+        if high_res:
+            return get_high_res_thumbnail(media_id, timestamp)
+        else:
             with thumbs_engine.connect() as thumbs_conn:
                 thumbnail = get_thumbnail_by_timestamp(
                     thumbs_conn, media_id=media_id, timestamp=timestamp
                 )
                 if thumbnail is None:
-                    raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
+                    if config.use_shots:
+                        # If no thumbnail found, try to get a high-res thumbnail from the original video
+                        return get_high_res_thumbnail(media_id, timestamp)
+                    else:
+                        raise HTTPException(status_code=404, detail=f"Thumbnail not found!")
                 return Response(
                     content=thumbnail,
                     media_type="image/jpeg",
                     status_code=200,
                 )
 
+    def get_high_res_thumbnail(media_id: int, timestamp: float):
         # seek the original video
         with project_engine.connect() as conn:
             metadata = MediaRepo.get(conn, media_id)
@@ -617,7 +627,8 @@ def _get_project_data_router(config: APIConfig, active_search_targets: Dict[str,
         return {
             "project_name": config.project_dir.stem,
             "models": models,
-            "search_targets": active_search_targets,
+            "search_targets": search_router_info['search_targets'],
+            "shot_based_filters": search_router_info['shot_based_filters'],
             "num_vectors": num_vectors,
             "num_media_files": num_media_files, # Total number of media files
             "media_file_counts": media_file_counts, # Number of media files by media type
@@ -882,7 +893,7 @@ def _get_search_router(config: APIConfig):
         start_timestamp_expr = (timestamp + 0.2) >= shots_table.c.ts
         end_timestamp_expr = timestamp < shots_table.c.te
         dataset_expr = shots_table.c.media_id == media_id
-        stmt = sa.select(shots_table).where(
+        stmt = sa.select(shots_table.c.id, shots_table.c.media_id, shots_table.c.ts, shots_table.c.te).where(
             (dataset_expr & start_timestamp_expr & end_timestamp_expr)
         )
         result = conn.execute(stmt)
@@ -1274,6 +1285,29 @@ def _get_search_router(config: APIConfig):
     with project_engine.connect() as conn:
         num_vectors = VectorRepo.get_count(conn)
 
+    # Shot property (e.g. shot_scale, camera_motion, etc.) based filters
+    shot_based_filters = {}
+    if config.use_shots and db_inspector.has_table(db.shots_table.name):
+        # check if the shots table contains a column named "shot_scale"
+        colnames = [col["name"] for col in db_inspector.get_columns(db.shots_table.name)]
+        if 'shot_scale' in colnames:
+            if not db_inspector.has_table('vectors_to_shots_map'):
+                raise ValueError("vectors_to_shots_map table not found! Please run the import shots script as follows:"
+                                 "Please run \"python3 media-metadata.py import-shot-scale ...\"")
+            # find the distinct values of this column
+            with project_engine.connect() as conn:
+                shot_scales = conn.execute(sa.text("select distinct(shot_scale) from shots ORDER BY shot_scale")).fetchall()
+            shot_scales = [row[0] for row in shot_scales if row[0] is not None]
+            if shot_scales:
+                logger.info("shot_scale filter enabled with values =%s", shot_scales)
+                shot_based_filters["shot_scale"] = {
+                    "name": "Shot Scale",
+                    "description": "Filter by the scale (or size) of the shot in edited videos.",
+                    "options": shot_scales
+                }
+
+            db.project_metadata_obj.reflect(bind=project_engine, only=['vectors_to_shots_map'])
+            vectors_to_shots_map = db.project_metadata_obj.tables['vectors_to_shots_map']
     router_cm = ExitStack()
 
     def _thumbs_with_score(conn: sa.Connection, dist: List[float], thumbnails_to_send: int):
@@ -1522,7 +1556,7 @@ def _get_search_router(config: APIConfig):
             ids[modality] = {}
             for feature_extractor_id in search_indices[modality]:
                 this_ids = get_featured_images(
-                    conn, modality, feature_extractor_id
+                    conn, modality, feature_extractor_id, config.use_shots
                 )
 
                 # Select a random subset of up to 10000 image ids (for performance reasons)
@@ -1631,7 +1665,6 @@ def _get_search_router(config: APIConfig):
         # "audio" refers to pure audio files, and "image" refers to images
         search_in: MediaType = Query(),
         feature_extractor_id: str = Query(),
-
         # Positive queries
         text_queries: List[str] = Query(default=[]),
         image_file_queries: List[bytes] = File([]),  # user-uploaded images
@@ -1642,7 +1675,9 @@ def _get_search_router(config: APIConfig):
         # Negative queries
         negative_text_queries: List[str] = Query(default=[]),
         negative_image_file_queries: List[bytes] = File([]),  # user-uploaded images
-        negative_audio_file_queries: List[bytes] = File([]),  # user-uploaded audio files
+        negative_audio_file_queries: List[bytes] = File(
+            []
+        ),  # user-uploaded audio files
         negative_image_url_queries: List[str] = Form([]),  # URLs to online images
         negative_audio_url_queries: List[str] = Form([]),  # URLs to online audio files
         negative_internal_image_queries: List[int] = Query(
@@ -1652,12 +1687,21 @@ def _get_search_router(config: APIConfig):
         start: int = Query(0, ge=0, le=980),
         end: int = Query(20, gt=0, le=1000),
         thumbnails_to_send: int = Query(0),
+        shot_scale: str = Query(None),
+        metadata_filter: List[str] = Query(default=[]),
     ):
         """
         Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
         Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
         input images/text, and then using this as the query vector.
         """
+        if shot_scale is not None:
+            try:
+                shot_scale = json.loads(shot_scale)
+            except Exception:
+                raise HTTPException(400, {
+                    "message": "shot_scale must be a JSON array string"
+                })
         media_type = 'audio' if search_in == MediaType.AV else search_in
         if media_type not in search_indices:
             raise HTTPException(400, {
@@ -1798,17 +1842,30 @@ def _get_search_router(config: APIConfig):
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
 
+        filter_specs = None
+        if shot_scale is not None and len(shot_scale) > 0:
+            filter_specs = {"shot_scale_query": {"$in": shot_scale}}
+        if metadata_filter:
+            if filter_specs is None:
+                filter_specs = {}
+            filter_specs |= {
+                "metadata_query": WISEFTSQuery.model_validate(
+                    {"$match": " ".join(metadata_filter)}
+                )
+            }
         return similarity_search(
             q,
             search_in=search_in,
             search_index=search_index,
             start=start,
             end=end,
+            feature_extractor_id=feature_extractor_id,
             thumbnails_to_send=thumbnails_to_send,
             extract_text_features=extract_text_features,
             extract_image_features=extract_image_features,
             extract_audio_features=extract_audio_features,
             get_ext_metadata=search_index.feature_extractor.get_vector_metadata,
+            filter_specs=filter_specs
         )
 
     def similarity_search(
@@ -1817,14 +1874,29 @@ def _get_search_router(config: APIConfig):
         search_index: SearchIndex,
         start: int,
         end: int,
+        feature_extractor_id: str,
         thumbnails_to_send: int = 0,
         extract_text_features: Callable[[List[str]], ndarray] = None,
         extract_image_features: Callable[[List[Image.Image]], ndarray] = None,
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
         get_ext_metadata: Callable[[list[int]], list[FeatureExtMetadata]] = None,
+        filter_specs: Dict[str, Any] = None,
     ):
         features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
-        dist, ids = search_index.index.search(features, end)
+        if filter_specs is not None:
+            filtered_ids = get_filtered_ids(filter_specs, search_in, feature_extractor_id)
+            sel = faiss.IDSelectorBatch(filtered_ids)
+            if search_index.index_type == 'IndexFlatIP':
+                params = faiss.SearchParameters(sel=sel)
+            elif search_index.index_type == 'IndexIVFFlat':
+                params = faiss.SearchParametersIVF(sel=sel, nprobe=search_index.index.nprobe)
+            else:
+                raise HTTPException(400, {
+                    "message": f"filter_specs does not support index type : {search_index.index_type}"
+                })
+            dist, ids = search_index.index.search(features, end, params=params)
+        else:
+            dist, ids = search_index.index.search(features, end)
 
         # Apply hook to transform Faiss distance scores
         dist = search_index.feature_extractor.transform_faiss_distances_hook(dist)
@@ -1856,6 +1928,70 @@ def _get_search_router(config: APIConfig):
 
         return response
 
+    def get_filtered_ids(filter_specs: Dict[str, Any], search_in: MediaType, feature_extractor_id: str) -> np.ndarray:
+        id_constraint = None
+        media_type = 'audio' if search_in == MediaType.AV else search_in
+        metadata_query = filter_specs.get("metadata_query", None)
+        if metadata_query:
+            with project_engine.connect() as conn:
+                media_ids_cte = search_indices[media_type]["wise/metadata"].search(
+                    conn, metadata_query, ids_only=True
+                )
+                vector_ids = (
+                    conn.execute(
+                        sa.select(db.vectors_table.c.id).select_from(
+                            media_ids_cte.join(
+                                db.vectors_table,
+                                sa.and_(
+                                    db.vectors_table.c.media_id == media_ids_cte.c.media_id,
+                                    db.vectors_table.c.modality == media_type,
+                                    db.vectors_table.c.feature_extractor_id == feature_extractor_id,
+                                )
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                id_constraint = np.array(vector_ids, dtype=np.int64)
+
+        shot_scale_query = filter_specs.get("shot_scale_query", None)
+        if shot_scale_query:
+            shot_scales = shot_scale_query["$in"]
+            with project_engine.connect() as conn:
+                stmt = (
+                    sa.select(db.vectors_table.c.id)
+                    .select_from(
+                        db.shots_table.join(
+                            vectors_to_shots_map,
+                            sa.and_(
+                                db.shots_table.c.id == vectors_to_shots_map.c.shot_id,
+                                db.shots_table.c.media_id
+                                == vectors_to_shots_map.c.media_id,
+                            ),
+                        ).join(
+                            db.vectors_table,
+                            vectors_to_shots_map.c.vector_id == db.vectors_table.c.id,
+                        )
+                    )
+                    .where(
+                        sa.and_(
+                            db.vectors_table.c.modality == media_type,
+                            db.vectors_table.c.feature_extractor_id
+                            == feature_extractor_id,
+                            db.shots_table.c.shot_scale.in_(shot_scales),
+                        )
+                    )
+                )
+                result = conn.execute(stmt).scalars().all()
+                shot_scale_constraint = np.array(result, dtype=np.int64)
+                id_constraint = (
+                    shot_scale_constraint
+                    if id_constraint is None
+                    else np.intersect1d(id_constraint, shot_scale_constraint)
+                )
+        return id_constraint
+
     def asr_search(
         q: WISEFTSQuery,
         search_index: FTSSearch,
@@ -1882,4 +2018,9 @@ def _get_search_router(config: APIConfig):
                 search_in=search_in
             )
             return response
-    return router, active_search_targets
+
+    search_router_info = {
+        "search_targets": active_search_targets,
+        "shot_based_filters": shot_based_filters,
+    }
+    return router, search_router_info

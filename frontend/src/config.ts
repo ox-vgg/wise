@@ -17,6 +17,7 @@ type ConfigType = {
     text: string;
   }[];
   ENABLE_REPORT_MEDIA: boolean;
+  SHOT_SCALE_FILTER_LABEL: { [key: number]: string };
 };
 
 declare global {
