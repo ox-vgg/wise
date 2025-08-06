@@ -201,6 +201,7 @@ export interface ProjectInfo {
     audio?: number;
   };
   total_duration?: number;
+  is_metadata_supported?: boolean;
 };
 
 export interface TourVariables {

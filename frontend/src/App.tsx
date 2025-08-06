@@ -9,8 +9,9 @@ import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
 import { ViewModality, ProjectInfo, Query, TourVariables } from './misc/types.ts';
-import { fetchWithTimeout } from './misc/utils.ts';
+import { fetchWithTimeout, is_metadata_supported } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
+
 
 export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
@@ -43,7 +44,10 @@ export const App: React.FunctionComponent = () => {
         }
         return response.json();
       })
-      .then(setProjectInfo)
+      .then((data: ProjectInfo) => {
+        data.is_metadata_supported = is_metadata_supported(data);; // Add is_metadata_supported to projectInfo
+        setProjectInfo(data);
+      })
       .catch((err) => {
         Modal.error({
           title: 'Error: unable to load project info',
