@@ -217,12 +217,14 @@ export interface TourVariables {
 
 /* ------ Component props ------ */
 export interface TextSearchFormProps {
+  placeholder?: string;
+  buttonText?: string;
+  queryType?: 'TEXT' | 'METADATA';
   multimodalQueries: Query[];
-  setMultimodalQueries: (x: Query[]) => void;
-  searchText: string;
-  setSearchText: (x: string) => void;
-  handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
-  submitSearch: () => void;
+  setMultimodalQueries: React.Dispatch<React.SetStateAction<Query[]>>
+  searchText?: string;
+  handleTextInputChange?: (x: string) => void;
+  submitSearch: (q?: Query[]) => void;
 };
 export interface MediaSearchFormProps {
   multimodalQueries: Query[];

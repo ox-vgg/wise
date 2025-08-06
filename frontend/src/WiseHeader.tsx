@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
 import { Alert, Button, Checkbox, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
-import { CaretRightOutlined, CloseOutlined, FileTextTwoTone, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone} from '@ant-design/icons';
+import { CaretRightOutlined, CloseOutlined, FileTextTwoTone, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
@@ -10,19 +10,34 @@ import config from './config.ts';
 import StillImageView from './misc/StillImageView.tsx';
 import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query, ViewModality } from './misc/types.ts';
 import { BoundingBoxes } from './misc/BoundingBox.tsx';
+import { is_metadata_filter_supported } from './misc/utils.ts';
 
-const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
+const QUERY_COLORS = {
+  'TEXT': 'geekblue',
+  'IMAGE_FILE': 'green',
+  'IMAGE_URL': 'green',
+  'INTERNAL_IMAGE': 'green',
+  'AUDIO_FILE': 'orange',
+  'AUDIO_URL': 'orange',
+  'METADATA': 'purple',
+}
+
+const TextSearchForm: React.FunctionComponent<React.PropsWithChildren<TextSearchFormProps>> = ({
   multimodalQueries, setMultimodalQueries,
-  searchText, setSearchText,
-  handleTextInputChange,
+  searchText = '',
   submitSearch,
+  handleTextInputChange,
+  placeholder = 'Search using natural language',
+  queryType = 'TEXT',
+  buttonText = 'Add Text Query',
+  children,
 }) => {
   const formRef = useRef<FormInstance>(null);
-  const { token } = useToken(); // Get theme styles
 
+  const [searchTextLocal, setSearchTextLocal] = useState(searchText);
   useEffect(() => {
-    formRef.current?.setFieldsValue({'text-query': searchText});
-  }, [searchText]);
+    formRef.current?.setFieldsValue({ 'text-query': searchTextLocal });
+  }, [searchTextLocal]);
 
   const onFormSubmit = (e: any) => {
     console.log('Submit event', e);
@@ -35,15 +50,18 @@ const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
       addTextQuery();
     }
   }
+  const _handleTextInputChange = ((x: string) => { handleTextInputChange?.(x); setSearchTextLocal(x) });
 
   const addTextQuery = () => {
-    let searchTextTrimmed = searchText.trim();
+    let searchTextTrimmed = searchTextLocal.trim();
     if (!searchTextTrimmed) return;
-    setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: 'TEXT', displayText: searchTextTrimmed, value: searchTextTrimmed }]);
-    setSearchText('');
+    const _queries = [...multimodalQueries, { id: nanoid(), type: queryType, displayText: searchTextTrimmed, value: searchTextTrimmed }]
+    setMultimodalQueries(_queries);
+    handleTextInputChange?.('');
+    setSearchTextLocal('');
     // setVisualSearchErrorMessage('');
     // formRef.current?.setFieldsValue({'text-query': ''});
-    submitSearch();
+    formRef.current?.submit();
   }
 
   return (
@@ -53,13 +71,18 @@ const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
       ref={formRef}
       onFinish={onFormSubmit}
     >
-      <p style={{marginTop: 0, color: token.colorTextDescription}}>Enter some text in the search bar above or the text box below. You can flexibly describe what you want to look for using natural language.</p>
+      {children}
       <Space.Compact>
         <Form.Item name="text-query">
-          <Input placeholder="Search using natural language" onChange={handleTextInputChange} onKeyDown={handleTextInputKeydown} />
+          <Input
+            placeholder={placeholder}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => _handleTextInputChange(e.target.value)}
+            onKeyDown={handleTextInputKeydown}
+            autoComplete='off'
+          />
         </Form.Item>
         <Form.Item>
-          <Button type="primary" onClick={addTextQuery}>Add text query</Button>
+          <Button type={queryType === "TEXT" ? "primary" : undefined} onClick={addTextQuery}>{buttonText}</Button>
         </Form.Item>
       </Space.Compact>
     </Form>
@@ -120,60 +143,60 @@ const MediaSearchForm: React.FunctionComponent<MediaSearchFormProps> = ({
     setMultimodalQueries([...multimodalQueries, { id: nanoid(), type: (modality == 'audio') ? 'AUDIO_URL' : 'IMAGE_URL', displayText: urlTextTrimmed, value: urlTextTrimmed }]);
     setUrlText('');
     setVisualSearchErrorMessage('');
-    formRef.current?.setFieldsValue({'image-url': ''});
+    formRef.current?.setFieldsValue({ 'image-url': '' });
     formRef.current?.submit();
   }
 
   return (
     (modality) === 'video' ?
-    <div>Searching with video has not been implemented yet. This functionality will be added later on.</div>
-    :
-    <Form
-      name="wise-visual-search-form"
-      className="wise-modality-form"
-      ref={formRef}
-      onFinish={onFormSubmit}
-    >
-      {
-        // Show warning message for object search
-        featureExtractorId.includes("owlv2") &&
-        <Alert
-          message="Please choose an image with only one prominent object. Searching with an image containing multiple objects might not work as expected"
-          type="info" showIcon style={{marginBottom: 16}}
-        />
-      }
-      <Form.Item name="dragger" noStyle>
-        <Upload.Dragger name="files" accept={modality + "/*"} beforeUpload={beforeUpload}
-                        fileList={getFileList(multimodalQueries)} showUploadList={false} customRequest={handleFileSubmit}>
-          <p className="ant-upload-drag-icon">
-            <UploadOutlined />
-          </p>
-          <p className="ant-upload-text">Drag {modality === 'video' ? 'a' : 'an'} {modality} file or click here to upload</p>
-        </Upload.Dragger>
-      </Form.Item>
-      <Divider>OR</Divider>
-      <Space.Compact>
-        <Form.Item name="image-url">
-          <Input onChange={(e) => {setUrlText(e.target.value)}} onKeyDown={handleImageUrlInputKeydown} placeholder={`Paste ${modality} link`} />
+      <div>Searching with video has not been implemented yet. This functionality will be added later on.</div>
+      :
+      <Form
+        name="wise-visual-search-form"
+        className="wise-modality-form"
+        ref={formRef}
+        onFinish={onFormSubmit}
+      >
+        {
+          // Show warning message for object search
+          featureExtractorId.includes("owlv2") &&
+          <Alert
+            message="Please choose an image with only one prominent object. Searching with an image containing multiple objects might not work as expected"
+            type="info" showIcon style={{ marginBottom: 16 }}
+          />
+        }
+        <Form.Item name="dragger" noStyle>
+          <Upload.Dragger name="files" accept={modality + "/*"} beforeUpload={beforeUpload}
+            fileList={getFileList(multimodalQueries)} showUploadList={false} customRequest={handleFileSubmit}>
+            <p className="ant-upload-drag-icon">
+              <UploadOutlined />
+            </p>
+            <p className="ant-upload-text">Drag {modality === 'video' ? 'a' : 'an'} {modality} file or click here to upload</p>
+          </Upload.Dragger>
         </Form.Item>
-        <Form.Item>
-          <Button type="primary" onClick={() => addImageURLQuery()}>Add {modality}</Button>
-        </Form.Item>
-      </Space.Compact>
-      {
-        // modality === 'audio' &&
-        // <>
-        //   <Divider>OR</Divider>
-        //   <Space>
-        //     <Button type="primary" shape="circle" icon={<AudioFilled />} size="large" />
-        //     <span>Record audio</span>
-        //   </Space>
-        // </>
-      }
-      {
-        visualSearchErrorMessage && <Alert message={visualSearchErrorMessage} type="error" showIcon />
-      }
-    </Form>
+        <Divider>OR</Divider>
+        <Space.Compact>
+          <Form.Item name="image-url">
+            <Input onChange={(e) => { setUrlText(e.target.value) }} onKeyDown={handleImageUrlInputKeydown} placeholder={`Paste ${modality} link`} />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" onClick={() => addImageURLQuery()}>Add {modality}</Button>
+          </Form.Item>
+        </Space.Compact>
+        {
+          // modality === 'audio' &&
+          // <>
+          //   <Divider>OR</Divider>
+          //   <Space>
+          //     <Button type="primary" shape="circle" icon={<AudioFilled />} size="large" />
+          //     <span>Record audio</span>
+          //   </Space>
+          // </>
+        }
+        {
+          visualSearchErrorMessage && <Alert message={visualSearchErrorMessage} type="error" showIcon />
+        }
+      </Form>
   );
 };
 
@@ -203,10 +226,10 @@ const SearchExamples: React.FunctionComponent<SearchExamplesProps> = ({
     onFinish={onFormSubmit}
   >
     {
-      config.MULTIMODAL_EXAMPLE_QUERIES.map(example => 
+      config.MULTIMODAL_EXAMPLE_QUERIES.map(example =>
         <div className="wise-multimodal-example-query"
-            onClick={() => handleExampleMultimodalQueryClick(example)}
-            key={example.url}
+          onClick={() => handleExampleMultimodalQueryClick(example)}
+          key={example.url}
         >
           <img src={example.url} />
           <span className="wise-multimodal-example-query-plus-sign">+</span>
@@ -322,16 +345,16 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
 
   return (
     <div style={dropdownStyle}>
-      <p style={{marginTop: 0, color: token.colorTextDescription}}>
+      <p style={{ marginTop: 0, color: token.colorTextDescription }}>
         {
           // TODO improve this
           !isHomePage && (multimodalQueries.length > 0 || searchText) ?
-          <><PlusOutlined /> Add another modality to your search:</>
-          :
-          "Search using any of the modalities below, or a combination of modalities:"
+            <><PlusOutlined /> Add another modality to your search:</>
+            :
+            "Search using any of the modalities below, or a combination of modalities:"
         }
       </p>
-      <Space style={{marginBottom: 15}} ref={tourVariables.multimodalSearchArea}>
+      <Space style={{ marginBottom: 15 }} ref={tourVariables.multimodalSearchArea}>
         {
           _modalities.map(modality => (
             <Button type="text" size="large" id={`wise-header-${modality.id}-modality-button`}
@@ -350,9 +373,9 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
           ))
         }
       </Space>
-      <div id="wise-header-modality-collapsible" style={{maxHeight: isModalitySelected ? undefined : '0'}}>
+      <div id="wise-header-modality-collapsible" style={{ maxHeight: isModalitySelected ? undefined : '0' }}>
         {
-          selectedModality === 'text' ? 
+          selectedModality === 'text' ?
             <TextSearchForm multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
                             searchText={searchText} setSearchText={setSearchText}
                             handleTextInputChange={handleTextInputChange} submitSearch={_submitSearch} />
@@ -382,30 +405,30 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
       {(projectInfo.shot_based_filters?.shot_scale?.options && viewModality !== 'VideoAudio' && featureExtractorId.split('/')[1] !== 'clap') && (
         <>
           <Tooltip title="Filter results by shot scale">
-        <Divider orientation="left">Shot Scale</Divider>
+            <Divider orientation="left">Shot Scale</Divider>
           </Tooltip>
           <div>
-        <Checkbox.Group
-          value={shotScaleFilter}
-          onChange={handleShotScaleFilterChange}
-        >
-          {projectInfo.shot_based_filters.shot_scale.options.map((value: number) => (
-            <Checkbox key={value} value={value}>
-          {config.SHOT_SCALE_FILTER_LABEL?.[value] ?? value}
-            </Checkbox>
-          ))}
-        </Checkbox.Group>
+            <Checkbox.Group
+              value={shotScaleFilter}
+              onChange={handleShotScaleFilterChange}
+            >
+              {projectInfo.shot_based_filters.shot_scale.options.map((value: number) => (
+                <Checkbox key={value} value={value}>
+                  {config.SHOT_SCALE_FILTER_LABEL?.[value] ?? value}
+                </Checkbox>
+              ))}
+            </Checkbox.Group>
           </div>
         </>
       )}
       {
         config.MULTIMODAL_EXAMPLE_QUERIES &&
         <>
-          <div style={{borderTop: '1px solid #e3e3e3', marginTop: 20}} />
+          <div style={{ borderTop: '1px solid #e3e3e3', marginTop: 20 }} />
           <Collapse items={collapseItems}
             bordered={false} expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} />}
             activeKey={activeKeys} onChange={_setActiveKeys}
-            style={{background: 'unset'}}
+            style={{ background: 'unset' }}
           />
         </>
       }
@@ -417,8 +440,8 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
         //   {examplesJSX}
         // </div>
       }
-      <Flex style={{marginTop: 15}}>
-        {(multimodalQueries.length > 0 || searchText) ? 
+      <Flex style={{ marginTop: 15 }}>
+        {(multimodalQueries.length > 0 || searchText) ?
           <Button onClick={clearSearchBar}>Clear search</Button>
           : <></>
         }
@@ -426,15 +449,6 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
     </div>
   )
 });
-
-const QUERY_COLORS = {
-  'TEXT': 'geekblue',
-  'IMAGE_FILE': 'green',
-  'IMAGE_URL': 'green',
-  'INTERNAL_IMAGE': 'green',
-  'AUDIO_FILE': 'orange',
-  'AUDIO_URL': 'orange'
-}
 
 const VIEW_MODALITY_OPTIONS = {
   image: {
@@ -503,10 +517,10 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     const [media_type, feature_extractor_id] = value.split(':');
 
     const _viewModality = {
-        'image': 'Image',
-        'video': 'Video',
-        'audio': 'VideoAudio'
-      }[media_type];
+      'image': 'Image',
+      'video': 'Video',
+      'audio': 'VideoAudio'
+    }[media_type];
     if (typeof _viewModality !== 'string') {
       console.error('Invalid view modality', media_type);
       return;
