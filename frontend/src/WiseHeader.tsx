@@ -377,10 +377,16 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
         {
           selectedModality === 'text' ?
             <TextSearchForm multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
-                            searchText={searchText} setSearchText={setSearchText}
-                            handleTextInputChange={handleTextInputChange} submitSearch={_submitSearch} />
-          : <MediaSearchForm multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
-                              submitSearch={_submitSearch} modality={selectedModality} featureExtractorId={featureExtractorId} />
+              searchText={searchText}
+              submitSearch={_submitSearch}
+              handleTextInputChange={handleTextInputChange}>
+              <p style={{ marginTop: 0, color: token.colorTextDescription }}>
+                Enter some text in the search bar above or the text box below. You can flexibly describe what you want to look for using natural language.
+              </p>
+            </TextSearchForm>
+            : <MediaSearchForm multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
+              submitSearch={_submitSearch}
+              modality={selectedModality} featureExtractorId={featureExtractorId} />
         }
         {/* TODO remove this <br /> */}
         <br />
@@ -509,10 +515,6 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
   // This state is set to true when the search input field is focused, and false when the input is blurred
   const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
 
-  const handleTextInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchText(e.target.value);
-  }
-
   const handleSearchTargetChange = (value: string) => {
     const [media_type, feature_extractor_id] = value.split(':');
 
@@ -541,11 +543,11 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     setMultimodalQueries(newMultimodalQueries);
   }
 
-  const _submitSearch = () => {
+  const _submitSearch = (_q?: Query[]) => {
     // remove focus from search bar input element, to close the search dropdown
     setIsSearchDropdownTriggered(false);
     tourVariables.searchBar.current.blur();
-    submitSearch()
+    submitSearch(_q);
   }
 
   // Automatically open the search dropdown when the user is dragging a file into the browser window
@@ -565,10 +567,10 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     }
   }, [handleDragEnter]);
 
-  useEffect(() => {
-    // Trigger a search if viewModality was changed
-    submitSearch();
-  }, [viewModality]);
+  // useEffect(() => {
+  //   // Trigger a search if viewModality was changed
+  //   submitSearch();
+  // }, [viewModality]);
 
   const multimodalQueryTags = multimodalQueries.map((query, index) => {
     let icon = <></>;
@@ -689,35 +691,37 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                   popupMatchSelectWidth={false}
                 />
               </Tooltip>
-          )}
+            )}
         </div>
         {/* Third row: Search input */}
         <div className="wise-header-row wise-header-row-search">
           <Dropdown
             overlayClassName="wise-search-dropdown"
             dropdownRender={_ =>
-              <SearchDropdown multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
-                              searchText={searchText} setSearchText={setSearchText}
-                              handleTextInputChange={handleTextInputChange}
-                              viewModality={viewModality} featureExtractorId={featureExtractorId}
-                              submitSearch={_submitSearch} clearSearchBar={clearSearchBar}
-                              shotScaleFilter={shotScaleFilter} setShotScaleFilter={setShotScaleFilter}
-                              isHomePage={isHomePage}
-                              tourVariables={tourVariables} ref={searchDropdownRef}
-                              projectInfo={projectInfo}
+              <SearchDropdown
+                multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
+                searchText={searchText} setSearchText={setSearchText}
+                handleTextInputChange={setSearchText}
+                viewModality={viewModality} featureExtractorId={featureExtractorId}
+                submitSearch={_submitSearch}
+                clearSearchBar={clearSearchBar}
+                shotScaleFilter={shotScaleFilter} setShotScaleFilter={setShotScaleFilter}
+                isHomePage={isHomePage}
+                tourVariables={tourVariables} ref={searchDropdownRef}
+                projectInfo={projectInfo}
               />
             }
             open={isSearchDropdownTriggered || isSearchInputFocused || tourVariables.isSearchDropdownOpenForTour}
             onOpenChange={(open) => setIsSearchDropdownTriggered(open)}
           >
-            <Form onFinish={_submitSearch} id="search-input-form">
+            <Form onFinish={() => _submitSearch()} id="search-input-form">
               <Input
                 id="search-input"
                 autoComplete="off"
                 size={isHomePage ? 'large' : 'middle'}
                 placeholder={multimodalQueries.length === 0 ? 'Search' : ''}
                 value={searchText}
-                onChange={handleTextInputChange}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchText(e.target.value)}
                 prefix={multimodalQueryTags}
                 suffix={
                   <>

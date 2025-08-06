@@ -228,27 +228,27 @@ export interface TextSearchFormProps {
 };
 export interface MediaSearchFormProps {
   multimodalQueries: Query[];
-  setMultimodalQueries: (x: Query[]) => void;
-  submitSearch: () => void;
+  setMultimodalQueries: React.Dispatch<React.SetStateAction<Query[]>>
+  submitSearch: (q?: Query[]) => void;
   modality: string;
   featureExtractorId: string;
 };
 export interface SearchExamplesProps {
-  setMultimodalQueries: (x: Query[]) => void;
-  setSearchText: (x: string) => void;
-  submitSearch: () => void;
+  setMultimodalQueries: React.Dispatch<React.SetStateAction<Query[]>>
+  setSearchText: React.Dispatch<React.SetStateAction<string>>;
+  submitSearch: (q?: Query[]) => void;
 };
 export interface SearchDropdownProps {
   multimodalQueries: Query[];
-  setMultimodalQueries: (x: Query[]) => void;
+  setMultimodalQueries: React.Dispatch<React.SetStateAction<Query[]>>
   searchText: string;
-  setSearchText: (x: string) => void;
-  handleTextInputChange?: (x: React.ChangeEvent<HTMLInputElement>) => void;
+  setSearchText: React.Dispatch<React.SetStateAction<string>>;
+  handleTextInputChange?: (x: string) => void;
   viewModality: ViewModality;
   featureExtractorId: string;
   shotScaleFilter: number[];
   setShotScaleFilter: (x: number[]) => void;
-  submitSearch: () => void;
+  submitSearch: (q?: Query[]) => void;
   clearSearchBar: () => void;
   tourVariables: TourVariables;
   projectInfo: ProjectInfo;
@@ -256,16 +256,16 @@ export interface SearchDropdownProps {
 };
 export interface WiseHeaderProps {
   multimodalQueries: Query[];
-  setMultimodalQueries: (x: Query[]) => void;
+  setMultimodalQueries: React.Dispatch<React.SetStateAction<Query[]>>
   searchText: string;
-  setSearchText: (x: string) => void;
+  setSearchText: React.Dispatch<React.SetStateAction<string>>;
   viewModality: ViewModality;
-  setViewModality: (x: ViewModality) => void;
+  setViewModality: React.Dispatch<React.SetStateAction<ViewModality>>;
   featureExtractorId: string;
   setFeatureExtractorId: (x: string) => void;
   shotScaleFilter: number[];
   setShotScaleFilter: (x: number[]) => void;
-  submitSearch: () => void;
+  submitSearch: (q?: Query[]) => void;
   tourVariables: TourVariables;
   projectInfo: ProjectInfo;
   isHomePage?: boolean;
@@ -280,12 +280,12 @@ export interface SearchResultsProps {
   dataService: DataServiceOutput;
   isHomePage: boolean;
   projectInfo: ProjectInfo;
-  setSearchText: (x: string) => void;
+  setSearchText: React.Dispatch<React.SetStateAction<string>>;
   multimodalQueries: Query[];
-  setMultimodalQueries: (x: Query[]) => void;
+  setMultimodalQueries: React.Dispatch<React.SetStateAction<Query[]>>
   viewModality: ViewModality;
   featureExtractorId: string;
-  submitSearch: () => void;
+  submitSearch: (q?: Query[]) => void;
 };
 
 export interface ImageDetailsModalProps {

@@ -81,17 +81,21 @@ export const App: React.FunctionComponent = () => {
 
     // Now that we have set the feature extractor and modality, we can
     // initialise home page with featured images
-    dataService.fetchFeaturedImagesAndSetState(
-      viewModality, featureExtractorId
-    ).then(_ => {
-      setIsHomePage(true); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
-    }).catch((err) => {
-      Modal.error({
-        title: 'Error: unable to load featured images',
-        content: 'Please try again later',
+    if (isHomePage) {
+      dataService.fetchFeaturedImagesAndSetState(
+        viewModality, featureExtractorId
+      ).then(_ => {
+        setIsHomePage(true); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
+      }).catch((err) => {
+        Modal.error({
+          title: 'Error: unable to load featured images',
+          content: 'Please try again later',
+        });
+        console.error(err);
       });
-      console.error(err);
-    });
+    } else {
+      submitSearch();
+    }
   }, [viewModality, featureExtractorId]);
 
   const _submitSearch = (queries: Query[]) => {
@@ -107,16 +111,16 @@ export const App: React.FunctionComponent = () => {
     });
   }
 
-  const submitSearch = () => {
-    let queries: Query[] = [...multimodalQueries];
+  const submitSearch = (queries?: Query[]) => {
+    let _queries = queries?.slice() || [...multimodalQueries];
     let searchTextTrimmed = searchText.trim();
-    if (searchTextTrimmed) queries.push({
+    if (searchTextTrimmed) _queries.push({
       id: nanoid(),
       type: "TEXT",
       value: searchTextTrimmed
     });
-    if (queries.length === 0) return;
-    else if (queries.length > 5) {
+    if (_queries.length === 0) return;
+    else if (_queries.length > 5) {
       Modal.error({
         title: 'The maximum number of queries is 5 queries',
         content: 'Please delete some of the queries',
@@ -124,7 +128,7 @@ export const App: React.FunctionComponent = () => {
       return;
     }
 
-    _submitSearch(queries);
+    _submitSearch(_queries);
   }
 
   const handleExampleQueryClick = (exampleQuery: string) => {
