@@ -1,4 +1,4 @@
-import { ProjectInfo } from "./types";
+import { ProjectInfo, ViewModality } from "./types";
 
 // Adapted from https://stackoverflow.com/a/57888548
 export const fetchWithTimeout = (url: string, ms: number, { signal, ...options }: { signal?: AbortSignal } | RequestInit = {}) => {
@@ -67,4 +67,11 @@ export const is_metadata_supported = (projectInfo: ProjectInfo): boolean => {
     const _targets = search_targets[_key] as NonNullable<NonNullSearchTargets[SearchTargets]>;
     return _targets.includes('wise/metadata');
   });
+}
+
+export const is_metadata_filter_supported = (projectInfo: ProjectInfo, viewModality: ViewModality): boolean => {
+  const search_targets = projectInfo.search_targets;
+  if (!search_targets || Object.keys(search_targets).length === 0) return false;
+  const media_type = (viewModality === 'VideoAudio' ? 'audio' : viewModality.toLowerCase() as SearchTargets);
+  return search_targets[media_type]?.includes('wise/metadata') ?? false;
 }

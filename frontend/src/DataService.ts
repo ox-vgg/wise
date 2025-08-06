@@ -254,7 +254,8 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
 
   const textQueries = queries.filter(q => q.type === "TEXT");
   const internalImageQueries = queries.filter(q => q.type === "INTERNAL_IMAGE");
-  const otherQueries = queries.filter(q => q.type !== 'TEXT' && q.type !== 'INTERNAL_IMAGE');
+  const metadataFilterQueries = queries.filter(q => q.type === "METADATA");
+  const otherQueries = queries.filter(q => q.type !== 'TEXT' && q.type !== 'INTERNAL_IMAGE' && q.type !== 'METADATA');
   let formData = undefined;
   if (otherQueries.length > 0) {
     formData = convertQueriesToFormData(otherQueries);
@@ -267,7 +268,8 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
     ['search_in', viewModalityToSearchInType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
-    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string])
+    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string]),
+    ...metadataFilterQueries.map(q => ['metadata_filter', q.value as string])
   ];
   if (shotScaleFilter.length > 0) {
     urlParamsArray.push(['shot_scale', JSON.stringify(shotScaleFilter)]);

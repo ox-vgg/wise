@@ -19,6 +19,12 @@ export type Query = {
   displayText: string;
   value: ProcessedVectorInfo;
   isNegative?: boolean;
+} | {
+  id: string;
+  type: 'METADATA';
+  displayText?: string;
+  value: string;
+  isNegative?: false;
 };
 
 export type ASRSegment = {

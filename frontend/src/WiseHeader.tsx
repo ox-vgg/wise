@@ -427,6 +427,21 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
           </div>
         </>
       )}
+      {projectInfo.is_metadata_supported && is_metadata_filter_supported(projectInfo, viewModality) && (
+        <>
+          <Divider orientation="left">Filter by Metadata</Divider>
+          <TextSearchForm multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
+            placeholder='Enter filter query'
+            queryType='METADATA'
+            submitSearch={submitSearch}
+            buttonText='Add Filter'
+          >
+            <p style={{ marginTop: 0, color: token.colorTextDescription }}>
+              Add a metadata filter to restrict the search only to media files that match the metadata query.
+            </p>
+          </TextSearchForm>
+        </>
+      )}
       {
         config.MULTIMODAL_EXAMPLE_QUERIES &&
         <>
@@ -581,15 +596,15 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
     else if (query.type === 'INTERNAL_IMAGE') icon = <img src={query.value.thumbnail} />;
 
     const tag = <Tag closable
-                  key={query.id}
-                  className={(query.type === 'IMAGE_FILE' || query.type === 'IMAGE_URL' || query.type === 'INTERNAL_IMAGE') ? 'wise-search-tag-image' : undefined}
-                  color={QUERY_COLORS[query.type]}
-                  icon={icon}
-                  onClose={(e) => handleTagClose(e, index)}
-                >
-                  {(query.isNegative ? '(Negative) ' : '') + query.displayText}
-                </Tag>
-    
+      key={query.id}
+      className={(query.type === 'IMAGE_FILE' || query.type === 'IMAGE_URL' || query.type === 'INTERNAL_IMAGE') ? 'wise-search-tag-image' : undefined}
+      color={QUERY_COLORS[query.type]}
+      icon={icon}
+      onClose={(e) => handleTagClose(e, index)}
+    >
+      {(query.isNegative ? '(Negative) ' : '') + query.displayText}
+    </Tag>
+
     if (query.type === 'IMAGE_FILE') {
       return <Popover content={icon} key={query.id} title="Uploaded image" overlayClassName="wise-search-image-preview">{tag}</Popover>
     } else if (query.type === 'IMAGE_URL') {
@@ -626,6 +641,8 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
       );
     } else if (query.type === 'TEXT') {
       return <Tooltip title="Text query">{tag}</Tooltip>
+    } else if (query.type === 'METADATA') {
+      return <Tooltip title="Metadata Filter">{tag}</Tooltip>
     }
   });
 
