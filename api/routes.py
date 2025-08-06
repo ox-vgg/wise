@@ -795,7 +795,6 @@ def _get_search_router(config: APIConfig):
 
     shots_table = db.shots_table
 
-
     if config.use_shots:
 
         with project_engine.connect() as conn:
@@ -1666,7 +1665,6 @@ def _get_search_router(config: APIConfig):
         # "audio" refers to pure audio files, and "image" refers to images
         search_in: MediaType = Query(),
         feature_extractor_id: str = Query(),
-
         # Positive queries
         text_queries: List[str] = Query(default=[]),
         image_file_queries: List[bytes] = File([]),  # user-uploaded images
@@ -1677,7 +1675,9 @@ def _get_search_router(config: APIConfig):
         # Negative queries
         negative_text_queries: List[str] = Query(default=[]),
         negative_image_file_queries: List[bytes] = File([]),  # user-uploaded images
-        negative_audio_file_queries: List[bytes] = File([]),  # user-uploaded audio files
+        negative_audio_file_queries: List[bytes] = File(
+            []
+        ),  # user-uploaded audio files
         negative_image_url_queries: List[str] = Form([]),  # URLs to online images
         negative_audio_url_queries: List[str] = Form([]),  # URLs to online audio files
         negative_internal_image_queries: List[int] = Query(
@@ -1688,7 +1688,8 @@ def _get_search_router(config: APIConfig):
         end: int = Query(20, gt=0, le=1000),
         thumbnails_to_send: int = Query(0),
         shot_scale: str = Query(None),
-        ):
+        metadata_filter: List[str] = Query(default=[]),
+    ):
         """
         Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
         Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
@@ -1843,13 +1844,14 @@ def _get_search_router(config: APIConfig):
 
         filter_specs = None
         if shot_scale is not None and len(shot_scale) > 0:
-            filter_specs = {
-                "where": {
-                    "query": {
-                        "shot_scale": { "$in": shot_scale }
-                    },
-                    "in": "metadata:shots"
-                }
+            filter_specs = {"shot_scale_query": {"$in": shot_scale}}
+        if metadata_filter:
+            if filter_specs is None:
+                filter_specs = {}
+            filter_specs |= {
+                "metadata_query": WISEFTSQuery.model_validate(
+                    {"$match": " ".join(metadata_filter)}
+                )
             }
         return similarity_search(
             q,
@@ -1882,7 +1884,7 @@ def _get_search_router(config: APIConfig):
     ):
         features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
         if filter_specs is not None:
-            filtered_ids = get_filtered_ids(filter_specs, feature_extractor_id)
+            filtered_ids = get_filtered_ids(filter_specs, search_in, feature_extractor_id)
             sel = faiss.IDSelectorBatch(filtered_ids)
             if search_index.index_type == 'IndexFlatIP':
                 params = faiss.SearchParameters(sel=sel)
@@ -1926,37 +1928,69 @@ def _get_search_router(config: APIConfig):
 
         return response
 
-    def get_filtered_ids(filter_specs: Dict[str, Any], feature_extractor_id: str) -> np.ndarray:
-        if 'where' not in filter_specs or 'query' not in filter_specs['where'] or 'shot_scale' not in filter_specs['where']['query']:
-            raise HTTPException(400, {
-                "message": "Invalid filter specifications"
-            })
-        if '$in' not in filter_specs['where']['query']['shot_scale']:
-            raise HTTPException(400, {
-                "message": "only $in operator is currently supported for 'shot_scale' filter."
-            })
-        shot_scales = filter_specs['where']['query']['shot_scale']['$in']
-        with project_engine.connect() as conn:
-            stmt = sa.select(db.vectors_table.c.id).select_from(
-                db.shots_table.join(
-                    vectors_to_shots_map,
-                    sa.and_(
-                        db.shots_table.c.id == vectors_to_shots_map.c.shot_id,
-                        db.shots_table.c.media_id == vectors_to_shots_map.c.media_id,
+    def get_filtered_ids(filter_specs: Dict[str, Any], search_in: MediaType, feature_extractor_id: str) -> np.ndarray:
+        id_constraint = None
+        media_type = 'audio' if search_in == MediaType.AV else search_in
+        metadata_query = filter_specs.get("metadata_query", None)
+        if metadata_query:
+            with project_engine.connect() as conn:
+                media_ids_cte = search_indices[media_type]["wise/metadata"].search(
+                    conn, metadata_query, ids_only=True
+                )
+                vector_ids = (
+                    conn.execute(
+                        sa.select(db.vectors_table.c.id).select_from(
+                            media_ids_cte.join(
+                                db.vectors_table,
+                                sa.and_(
+                                    db.vectors_table.c.media_id == media_ids_cte.c.media_id,
+                                    db.vectors_table.c.modality == media_type,
+                                    db.vectors_table.c.feature_extractor_id == feature_extractor_id,
+                                )
+                            )
+                        )
                     )
-                ).join(
-                    db.vectors_table,
-                    vectors_to_shots_map.c.vector_id == db.vectors_table.c.id
+                    .scalars()
+                    .all()
                 )
-            ).where(
-                sa.and_(
-                    db.vectors_table.c.modality == ModalityType.VIDEO,
-                    db.vectors_table.c.feature_extractor_id == feature_extractor_id,
-                    db.shots_table.c.shot_scale.in_(shot_scales)
+                id_constraint = np.array(vector_ids, dtype=np.int64)
+
+        shot_scale_query = filter_specs.get("shot_scale_query", None)
+        if shot_scale_query:
+            shot_scales = shot_scale_query["$in"]
+            with project_engine.connect() as conn:
+                stmt = (
+                    sa.select(db.vectors_table.c.id)
+                    .select_from(
+                        db.shots_table.join(
+                            vectors_to_shots_map,
+                            sa.and_(
+                                db.shots_table.c.id == vectors_to_shots_map.c.shot_id,
+                                db.shots_table.c.media_id
+                                == vectors_to_shots_map.c.media_id,
+                            ),
+                        ).join(
+                            db.vectors_table,
+                            vectors_to_shots_map.c.vector_id == db.vectors_table.c.id,
+                        )
+                    )
+                    .where(
+                        sa.and_(
+                            db.vectors_table.c.modality == media_type,
+                            db.vectors_table.c.feature_extractor_id
+                            == feature_extractor_id,
+                            db.shots_table.c.shot_scale.in_(shot_scales),
+                        )
+                    )
                 )
-            )
-            result = conn.execute(stmt).fetchall()
-            return np.array([row[0] for row in result], dtype=np.int64)
+                result = conn.execute(stmt).scalars().all()
+                shot_scale_constraint = np.array(result, dtype=np.int64)
+                id_constraint = (
+                    shot_scale_constraint
+                    if id_constraint is None
+                    else np.intersect1d(id_constraint, shot_scale_constraint)
+                )
+        return id_constraint
 
     def asr_search(
         q: WISEFTSQuery,

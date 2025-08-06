@@ -9,7 +9,7 @@ h5py==3.11.0
 httpx[http2]~=0.27.0
 imageio~=2.34.0
 open_clip_torch~=2.31
-sqlalchemy~=2.0.29
+sqlalchemy~=2.0.42
 tqdm~=4.66.2
 transformers~=4.51.3
 typer~=0.12.3
