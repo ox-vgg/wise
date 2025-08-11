@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dropdown, Pagination, Row, Segmented, Tooltip } from 'antd';
-import { AppstoreOutlined, BarsOutlined, FlagFilled, LoadingOutlined, MinusCircleFilled, PictureOutlined, PlusCircleFilled } from '@ant-design/icons';
+import { Button, Divider, Dropdown, Pagination, Row, Segmented, Tooltip } from 'antd';
+import { AppstoreOutlined, BarsOutlined, DownloadOutlined, FlagFilled, LoadingOutlined, MinusCircleFilled, PictureOutlined, PlusCircleFilled } from '@ant-design/icons';
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
@@ -257,6 +257,80 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     });  
   }
 
+  const exportToJSON = () => {
+    let resultsToExport: (ProcessedImageVector | ProcessedVideoSegment)[] = [];
+    if (viewModality === 'Image' || viewMode === 'UnmergedSegments' || viewMode === 'Segments') {
+      if (viewModality === 'Image') {
+        if (!featureExtractorId.includes('insightface')) {
+          resultsToExport = Array.from(searchResults.Image.mediaInfo).map(([, imageInfo]) => {
+            return imageInfo.vectors[0] as ProcessedImageVector;
+          });
+        } else {
+          resultsToExport = searchResults.Image.vectors;
+        }
+      } else if (viewModality === 'Video' || viewModality === 'VideoAudio' || viewModality === 'Audio') {
+        if (viewMode === 'UnmergedSegments') {
+          const unmergedWindows = searchResults[viewModality].unmerged_windows;
+          if (!featureExtractorId.includes('insightface')) {
+            const uniqueFrames = new Map<string, ProcessedVideoSegment>();
+            unmergedWindows.forEach((segment: ProcessedVideoSegment) => {
+              const frameId = `${segment.media_id}_${segment.thumbnail_ts}`;
+              if (!uniqueFrames.has(frameId)) {
+                uniqueFrames.set(frameId, segment);
+              }
+            });
+            resultsToExport = Array.from(uniqueFrames.values());
+          } else {
+            resultsToExport = unmergedWindows;
+          }
+        } else {
+          resultsToExport = searchResults[viewModality].merged_windows;
+        }
+      }
+    } else {
+      // For 'Videos' view mode, we need to extract the top match from each video.
+      const videos = searchResults[viewModality].mediaInfo;
+      resultsToExport = Array.from(videos).map(([, video]) => {
+        return video.shots.reduce((maxScoreOccurrence, currentOccurrence) => {
+          return (maxScoreOccurrence.distance > currentOccurrence.distance) ? maxScoreOccurrence : currentOccurrence;
+        });
+      });
+    }
+
+    const cleanedResults = resultsToExport.map(result => {
+      const cleanResult: any = {
+        vector_id: result.vector_id,
+        media_id: result.media_id,
+        distance: (result as ProcessedImageVector).distance,
+        bbox: result.bbox,
+        filename: result.mediaInfo.filename,
+        media_type: result.mediaInfo.media_type,
+      };
+
+      if ('ts' in result) {
+        cleanResult.start_time = (result as ProcessedVideoSegment).ts;
+      }
+      if ('te' in result) {
+        cleanResult.end_time = (result as ProcessedVideoSegment).te;
+      }
+
+      return cleanResult;
+    });
+
+    const jsonContent = JSON.stringify(cleanedResults, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.href) {
+      URL.revokeObjectURL(link.href);
+    }
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute('download', 'search-results.json');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   let showTotal;
   if (isHomePage) {
     showTotal = (total: number, [rangeStart, rangeEnd]: number[]) =>
@@ -321,19 +395,26 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   return <>
     <Row justify="center">{loadingMessage}</Row>
 
-    {
-      (viewModality != 'Image') &&
-      <Row justify="end">
-        <Segmented
-          options={[
-            { label: 'Frames', value: 'UnmergedSegments', icon: <PictureOutlined /> },
-            { label: 'Segments', value: 'Segments', icon: <AppstoreOutlined /> },
-            { label: 'Videos', value: 'Videos', icon: <BarsOutlined /> },
-          ]}
-          value={viewMode} onChange={setViewMode}
-        />
-      </Row>
-    }
+    <Row justify="end" align="bottom" style={{ marginBottom: '1rem' }}>
+      {
+        (viewModality !== 'Image') &&
+        <>
+          <Segmented
+            options={[
+              { label: 'Frames', value: 'UnmergedSegments', icon: <PictureOutlined /> },
+              { label: 'Segments', value: 'Segments', icon: <AppstoreOutlined /> },
+              { label: 'Videos', value: 'Videos', icon: <BarsOutlined /> },
+            ]}
+            value={viewMode} onChange={setViewMode}
+          />
+          <Divider type="vertical" style={{ margin: '0 12px', height: '24px', backgroundColor: '#d9d9d9' }} />
+        </>
+      }
+      {
+        (totalResultsCount > 0) &&
+        <Button onClick={exportToJSON} title="Export results in JSON format" icon={<DownloadOutlined />} />
+      }
+    </Row>
 
     <section id="search-results">
       {(searchResultsHTML.length === 0) ? 
