@@ -284,7 +284,9 @@ class MediaDataset(torch_data.IterableDataset):
 
                 for c in reader.stream():
                     # Might contain 1 or many output streams. Apply the corresponding transform
-                    media_chunks: Dict[MediaChunkType,  Dict[str, MediaChunk | None]] = {}
+                    media_chunks: Dict[
+                        MediaChunkType, Dict[str, MediaChunk | None] | MediaChunk | None
+                    ] = {}
                     for (stream_chunk, stream_transform, media_chunk_type) in zip(
                             c, stream_transforms, media_chunk_types
                         ):
@@ -292,9 +294,14 @@ class MediaDataset(torch_data.IterableDataset):
                         if isinstance(stream_transform, dict):
                             # audiovisual features
                             for feature_extractor_id in stream_transform:
+                                _stream_transform = stream_transform[
+                                    feature_extractor_id
+                                ]
                                 media_chunks[media_chunk_type][feature_extractor_id] = (
                                     MediaChunk(
-                                        tensor=stream_transform[feature_extractor_id](torch.Tensor(stream_chunk)),
+                                        tensor=_stream_transform(
+                                            torch.Tensor(stream_chunk)
+                                        ),
                                         pts=stream_chunk.pts,
                                     )
                                     if stream_chunk is not None

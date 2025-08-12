@@ -19,7 +19,10 @@ from src.data_models import SourceMediaType, MediaChunkType
 from src.dataloader.utils import get_files_from_directory_with_extensions
 from src.wise_project import WiseProject
 from src.feature.feature_extractor import FeatureExtractor
-from src.feature.feature_extractor_factory import FeatureExtractorFactory
+from src.feature.feature_extractor_factory import (
+    FeatureExtractorFactory,
+    get_canonical_feature_extractor_id,
+)
 from src.feature.store.feature_store import FeatureStore
 from src.feature.store.feature_store_factory import FeatureStoreFactory
 from src import db
@@ -42,14 +45,18 @@ from src.repository import (
 )
 from src.dataloader.shot import ShotStream
 
+
 def initialise_feature_extractors(
     project: WiseProject,
     feature_extractor_ids: dict[ModalityType, list],
-    feature_store_type: Literal['webdataset', 'numpy'],
+    feature_store_type: Literal["webdataset", "numpy"],
     shard_max_count: int,
     shard_max_size: int,
     db_engine: sa.Engine,
-) -> tuple[dict[ModalityType, FeatureExtractor], dict[ModalityType, FeatureStore]]:
+) -> tuple[
+    dict[ModalityType, dict[str, FeatureExtractor]],
+    dict[ModalityType, dict[str, FeatureStore]],
+]:
     ## 3. Prepare for feature extraction and storage
     logger.info(f"Initialising feature extractor")
 
@@ -61,14 +68,25 @@ def initialise_feature_extractors(
         feature_stores[modality_type] = {}
         for feature_extractor_id in feature_extractor_id_map:
             ## 3.1 Initialise feature extractor
-            feature_extractors[modality_type][feature_extractor_id] = (
-                FeatureExtractorFactory(
-                    feature_extractor_id,
-                    warmup=True, # needed for using workers in dataloader
-                )
+            logger.info(f"Initialising {feature_extractor_id} for {modality_type}")
+
+            # Check if we already have an instance of this feature extractor (could be local / triton)
+            canonical_feature_extractor_id = get_canonical_feature_extractor_id(
+                feature_extractor_id
             )
-            feature_extractors[modality_type][feature_extractor_id].create_vector_metadata_table(db_engine)
-            print(f"Using {feature_extractor_id} for {modality_type}")
+            if canonical_feature_extractor_id in feature_extractors[modality_type]:
+                logger.warning(
+                    f"Feature extractor {feature_extractor_id} for {modality_type} already exists, re-using previous instance."
+                )
+                continue
+
+            instance = FeatureExtractorFactory(feature_extractor_id, warmup=True)  # needed for using workers in dataloader
+            feature_extractor_id = canonical_feature_extractor_id
+
+            feature_extractors[modality_type][feature_extractor_id] = instance
+            feature_extractors[modality_type][
+                feature_extractor_id
+            ].create_vector_metadata_table(db_engine)
 
             ## 3.2 Create folders to store features, metadata and search index
             project.create_features_dir(feature_extractor_id)
@@ -84,6 +102,7 @@ def initialise_feature_extractors(
             )
 
     return feature_extractors, feature_stores
+
 
 def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] = ['*'], include_filenames: list[str] = None):
 
@@ -397,13 +416,22 @@ if __name__ == "__main__":
         project_assets = project.discover_assets()
         feature_extractor_ids_copy = feature_extractor_ids.copy()
         # Iterate over the feature extractor ids and remove those that are already present in the project
-        for modality_type, feature_extractor_id_list in list(feature_extractor_ids_copy.items()):
+        for (
+            modality_type,
+            feature_extractor_id_list,
+        ) in feature_extractor_ids_copy.items():
+            if modality_type not in project_assets:
+                # project does not have any feature extractors for this modality type
+                continue
+
             for feature_extractor_id in feature_extractor_id_list:
-                if project_assets.get(modality_type) is None:
-                    continue
-                if feature_extractor_id in project_assets[modality_type]:
+                _feature_extractor_id = get_canonical_feature_extractor_id(
+                    feature_extractor_id
+                )
+
+                if _feature_extractor_id in project_assets[modality_type]:
                     logger.warning(
-                        f"Feature extractor {feature_extractor_id} for {modality_type} already exists in the project. Skipping."
+                        f"Feature extractor {_feature_extractor_id} for {modality_type} already exists in the project. Skipping."
                     )
                     feature_extractor_ids[modality_type].remove(feature_extractor_id)
             if len(feature_extractor_ids[modality_type]) == 0:
