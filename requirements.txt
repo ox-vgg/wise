@@ -23,3 +23,5 @@ python-magic~=0.4.27
 filetype~=1.2.0
 webvtt-py
 msclap~=1.3.4
+tritonclient[all]
+accelerate
