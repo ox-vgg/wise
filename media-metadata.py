@@ -122,7 +122,9 @@ def import_shots(args):
             if db_inspector.has_table('vectors_to_shots_map'):
                 # drop the table if it exists
                 print('dropping existing vectors_to_shots_map table ...')
-                db.project_metadata_obj.drop_table('vectors_to_shots_map')
+                db.project_metadata_obj.reflect(db_engine, only=['vectors_to_shots_map'])
+                vectors_to_shots_map = db.project_metadata_obj.tables['vectors_to_shots_map']
+                vectors_to_shots_map.drop(db_engine)
 
             print('creating vectors_to_shots_map table ...')
             sqlalchemy_metadata = sa.MetaData()
