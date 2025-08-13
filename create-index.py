@@ -4,6 +4,7 @@ import logging
 
 from pathlib import Path
 
+from config import APIConfig
 
 # from src.dataloader import AVDataset
 # from src.search_index import SearchIndex
@@ -55,6 +56,8 @@ if __name__ == '__main__':
     parser.add_argument('--fts-config', help='json file representing the config for building the FTS5 index')
     args = parser.parse_args()
 
+    config = APIConfig(project_dir=args.project_dir, command='create_index')
+
     project = WiseProject(args.project_dir)
     project_assets = project.discover_assets()
     media_type_list = list(project_assets.keys())
@@ -101,7 +104,7 @@ if __name__ == '__main__':
                 asset = project_assets[media_type][feature_extractor_id]
                 feature_extractor = FeatureExtractorFactory(
                     feature_extractor_id,
-                    warmup=True,
+                    config.feature_extractor_config
                 )
                 search_index = SearchIndexFactory(
                     media_type, feature_extractor_id, asset, feature_extractor

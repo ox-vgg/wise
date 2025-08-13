@@ -668,6 +668,8 @@ def parse_user_input(cmd, args):
     return args_copy
 
 if __name__ == '__main__':
+    from config import APIConfig
+
     parser = argparse.ArgumentParser(prog='search',
                                      description='Search images and videos using natural language.',
                                      epilog='For more details about WISE, visit https://www.robots.ox.ac.uk/~vgg/software/wise/')
@@ -765,7 +767,7 @@ if __name__ == '__main__':
                         help='folder where all project assets are stored')
 
     args = parser.parse_args()
-
+    config = APIConfig(project_dir=args.project_dir, command='search')
     project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
     project_assets = project.discover_assets()
     if len(project_assets) == 0:
@@ -837,8 +839,7 @@ if __name__ == '__main__':
         asset_id = asset_id_list[asset_index]
         asset = project_assets[media_type][asset_id]
         feature_extractor = FeatureExtractorFactory(
-            asset_id,
-            warmup=True,
+            asset_id, config.feature_extractor_config
         )
         search_index_list[media_type] = SearchIndexFactory(
             media_type, asset_id, asset, feature_extractor

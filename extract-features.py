@@ -45,10 +45,13 @@ from src.repository import (
 )
 from src.dataloader.shot import ShotStream
 
+from config import APIConfig
+
 
 def initialise_feature_extractors(
     project: WiseProject,
     feature_extractor_ids: dict[ModalityType, list],
+    feature_extractor_config: dict[str, dict],
     feature_store_type: Literal["webdataset", "numpy"],
     shard_max_count: int,
     shard_max_size: int,
@@ -80,7 +83,9 @@ def initialise_feature_extractors(
                 )
                 continue
 
-            instance = FeatureExtractorFactory(feature_extractor_id, warmup=True)  # needed for using workers in dataloader
+            instance = FeatureExtractorFactory(
+                feature_extractor_id, feature_extractor_config
+            )
             feature_extractor_id = canonical_feature_extractor_id
 
             feature_extractors[modality_type][feature_extractor_id] = instance
@@ -306,6 +311,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    config = APIConfig(project_dir=Path(args.project_dir), command='extract_features')
+
+    feature_extractor_config = config.feature_extractor_config
 
     if args.num_workers <= 0:
         args.num_workers = 0
@@ -446,6 +454,7 @@ if __name__ == "__main__":
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
         feature_extractor_ids,
+        feature_extractor_config,
         args.feature_store_type,
         args.shard_maxcount,
         args.shard_maxsize,

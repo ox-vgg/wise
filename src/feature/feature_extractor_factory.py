@@ -14,6 +14,8 @@ except:
     )
     pass
 
+# TODO move this to pydantic settings and inject it
+default_triton_url = os.environ.get("WISE_TRITON_URL", "localhost:8001")
 
 def _get_triton_url_and_model_id(_id: str) -> tuple[str | None, str]:
     """
@@ -79,7 +81,7 @@ def get_feature_extractor_class(_id: str):
     raise ValueError(f"Unknown feature extractor id {_id}")
 
 
-def FeatureExtractorFactory(id, **kwargs):
+def FeatureExtractorFactory(id, config: dict[str, dict] = {}):
     """
     Extract features (e.g. a vector of length 256) from images, videos and audio.
 
@@ -112,6 +114,11 @@ def FeatureExtractorFactory(id, **kwargs):
             (e.g. microsoft/clap/2023/four-datasets/)
     """
     url, model_id = _get_triton_url_and_model_id(id)
+    model_config = config.get(model_id, config.get("default", {}))
+
+    # If url is None, search for it in the model config
+    # else if it is empty string, use the default Triton URL
+    url = model_config.get("url", None) if url is None else url
     is_triton = url is not None
 
     if len(model_id.split("/")) != 4:
@@ -124,12 +131,12 @@ def FeatureExtractorFactory(id, **kwargs):
     cls = get_feature_extractor_class(model_id)
     if is_triton:
         from .triton_runner import make_triton_feature_extractor
+        url = url or default_triton_url
+        cls = make_triton_feature_extractor(cls)
+        model_config["url"] = url
 
-        # TODO move this to pydantic settings and inject it
-        url = url or os.environ.get("WISE_TRITON_URL", "localhost:8001")
-        logger.info(
-            f"Creating Triton-enabled feature extractor for {model_id} at {url}"
-        )
-        cls = make_triton_feature_extractor(cls, url=url)
-
-    return cls(model_id, **kwargs)
+    logger.info(
+        f"Creating{is_triton and ' Triton-enabled ' or ' '}feature extractor "
+        f"for {model_id} with config: {model_config}"
+    )
+    return cls.from_config(model_id, config=model_config)
