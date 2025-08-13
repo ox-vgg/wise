@@ -1,5 +1,6 @@
 from functools import cached_property
 import logging
+from typing import Any
 from .feature_extractor import FeatureExtractor, get_torch_device, Features
 import torch
 import numpy as np
@@ -17,7 +18,19 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
     ID_PREFIX = 'hf/'
     DESCRIPTION = 'Hugging Face feature extractor'
 
-    def __init__(self, id, device: str | torch.device | None = None, warmup: bool = False, **kwargs):
+    class Config(FeatureExtractor.Config):
+        preprocessor_kwargs: dict[str, Any] = {}
+        model_kwargs: dict[str, Any] = {}
+
+    def __init__(
+        self,
+        id,
+        *,
+        device: str | torch.device | None = None,
+        warmup: bool = False,
+        config: Config = Config(),
+        **kwargs,
+    ):
         if not id.startswith(self.ID_PREFIX):
             raise ValueError(f'Feature ID must start with {self.ID_PREFIX}, got {id}')
 
@@ -27,12 +40,14 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         model_name, _dataset = id[len(self.ID_PREFIX):].rsplit('/', 1)
         self.DEVICE = get_torch_device(device)
 
-        self.preprocessor_kwargs = kwargs.get('preprocessor_kwargs', {})
-        self.model_kwargs = kwargs.get('model_kwargs', {})
+        self._config = config
+        self.preprocessor_kwargs = config.preprocessor_kwargs
+        self.model_kwargs = config.model_kwargs
+
         self.model_config = AutoConfig.from_pretrained(model_name)
         self.processor = AutoProcessor.from_pretrained(model_name, use_fast=True)
         model = AutoModel.from_config(self.model_config, **self.model_kwargs)
-        
+
         if not hasattr(model, 'get_image_features'):
             self.extract_image_features = None
 
@@ -56,13 +71,13 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
 
     def preprocess_image(self, images):
         return images
-    
+
     def preprocess_audio(self, audio):
         return audio
-    
+
     def preprocess_text(self, text):
         return text
-    
+
     @torch.inference_mode()
     def extract_image_features(self, images: torch.Tensor) -> list[Features]:
 
@@ -84,7 +99,7 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         outputs = outputs.cpu().numpy()
         feature_vectors = list(np.expand_dims(outputs, axis=1))
         return [Features(vectors=x, metadata=None) for x in feature_vectors]
-    
+
     @torch.inference_mode()
     def extract_text_features(self, text_query: list[str]) -> list[Features]:
         """Extracts features from text.
@@ -105,7 +120,7 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         outputs = outputs.cpu().numpy()
         feature_vectors = list(np.expand_dims(outputs, axis=1))
         return [Features(vectors=x, metadata=None) for x in feature_vectors]
-    
+
     @torch.inference_mode()
     def extract_audio_features(self, audio: torch.Tensor) -> list[Features]:
         """Extracts features from text.
@@ -133,7 +148,6 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
 
         self.extract_image_features(torch.rand((1, 3, 224, 224)))
         self.extract_text_features(['dummy text'])
-
 
 
 if __name__ == "__main__":

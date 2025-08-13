@@ -200,7 +200,7 @@ class TrtitonModel(object):
         return self._get_features("audio", kwargs)
 
 
-def make_triton_feature_extractor(cls: Type[FeatureExtractor], url: str):
+def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
     """A class factory that creates a Triton-enabled feature extractor.
 
     This function takes a `FeatureExtractor` subclass and dynamically
@@ -217,21 +217,25 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor], url: str):
 
     class TritonFeatureExtractor(cls):
         """A Triton-enabled feature extractor class."""
+        class Config(cls.Config):
+            """Configuration for the Triton feature extractor."""
 
-        def __init__(
-            self, model_id, debug: bool = False, **kwargs
-        ):
+            url: str
+            debug: bool = False
+
+        def __init__(self, model_id, config: Config, **kwargs):
             """Initializes the Triton feature extractor with the given ID and configuration."""
 
-            super().__init__(model_id, **kwargs)
+            super().__init__(model_id, config=config, **kwargs)
             self.__model_name = model_id.replace('/', '--')
 
-            self.url = url
-            self.debug = debug
+            self.config = config
 
         @cached_property
         def model(self):
             """Returns the Triton model client."""
-            return TrtitonModel(self.__model_name, self.url, debug=self.debug)
+            return TrtitonModel(
+                self.__model_name, self.config.url, debug=self.config.debug
+            )
 
     return TritonFeatureExtractor

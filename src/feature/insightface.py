@@ -147,7 +147,14 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
         keep_existing=True,
     )
 
-    def __init__(self, feature_id: str, warmup: bool = False):
+    def __init__(
+        self,
+        feature_id: str,
+        *,
+        warmup: bool = False,
+        device: str | torch.device | None = None,
+        **kwargs,
+    ):
         _logger.info("initialising feature extractor for %s", feature_id)
         feature_id_parts = feature_id.split("/")
         assert (

@@ -1,10 +1,41 @@
+from __future__ import annotations
+import inspect
 from dataclasses import dataclass
-from typing import Any, List, NamedTuple, Optional, Union
-
+from typing import Any, List, NamedTuple, Optional, Union, Type
+from pydantic import BaseModel, ConfigDict
 from PIL import Image
 import torch
 import numpy as np
 import sqlalchemy as sa
+
+
+class FeatureExtractorConfig(BaseModel):
+    """Configuration for a feature extractor.
+    Feature extractor implementations can extend this class to add
+    additional configuration parameters and validation.
+
+    The base feature extractor class will use this configuration to configure
+    the feature extractor instance.
+
+    This class is expected to be defined within the feature extractor implementation as class attribute `Config`
+
+    Attributes
+    ----------
+    device : str | torch.device | None
+        The device to use for the feature extractor. If None, it defaults to 'cuda'
+        if available, otherwise 'cpu'. It can also be a string representing a specific
+        device (e.g., 'cuda:0', 'cpu', etc.).
+
+    warmup : bool
+        Whether to warm up the feature extractor. This is useful for models that are lazy loaded
+        and if someone wants to eagerly load them and allocate memory beforehand.
+
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    device: str | None = None
+    warmup: bool = False
 
 
 @dataclass
@@ -63,6 +94,18 @@ class FeatureExtMetadata:
     bbox: Optional[BBoxXYWH] = None
 
 
+def check_config_in_init_args(cls: Type["FeatureExtractor"]) -> bool:
+    """Check if the class constructor accepts a config argument."""
+    parameters = inspect.signature(cls.__init__).parameters
+    if "config" not in parameters:
+        return False
+    param = parameters["config"]
+    return issubclass(param.annotation, FeatureExtractorConfig) and param.kind in (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY,
+    )
+
+
 class FeatureExtractor:
     """ABC for extractor of feature vectors from audio, image, and text.
 
@@ -72,8 +115,35 @@ class FeatureExtractor:
 
     """
     _vector_metadata_table: sa.Table | None = None
+    class Config(FeatureExtractorConfig):
+        """Configuration for the feature extractor."""
 
-    def __init__(self):
+        pass
+
+    @classmethod
+    def from_config(
+        cls,
+        model_id: str,
+        config: dict[str, Any] = {},
+    ) -> FeatureExtractor:
+        """Create a feature extractor instance from the given configuration."""
+        _config = cls.Config.model_validate(config)
+
+        return cls(
+            model_id,
+            device=get_torch_device(_config.device),
+            warmup=_config.warmup,
+            config=_config,
+        )
+
+    def __init__(
+        self,
+        model_id: str,
+        *,
+        device: str | torch.device | None = None,
+        warmup: bool = False,
+        **kwargs,
+    ):
         raise NotImplementedError
 
     @classmethod
@@ -101,7 +171,7 @@ class FeatureExtractor:
 
         """
         pass  # default to no-op
-    
+
     @classmethod
     def get_vector_metadata(
         cls, conn: sa.Connection, vid: list[int]

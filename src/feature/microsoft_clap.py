@@ -84,7 +84,12 @@ class MicrosoftClap(FeatureExtractor):
     extract_image_features = None
 
     def __init__(
-        self, id, device: str | torch.device | None = None, warmup: bool = False
+        self,
+        id,
+        *,
+        device: str | torch.device | None = None,
+        warmup: bool = False,
+        **kwargs,
     ):
         if not id.startswith(self.ID_PREFIX):
             raise ValueError(f'feature id cannot start with {id} and must start with {self.ID_PREFIX}')

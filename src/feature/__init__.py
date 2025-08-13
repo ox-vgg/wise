@@ -1,5 +1,6 @@
 from .feature_extractor import (
     FeatureExtractor as FeatureExtractor,
+    FeatureExtractorConfig as FeatureExtractorConfig,
     Features as Features,
     BBoxXYWH as BBoxXYWH,
     FeatureExtMetadata as FeatureExtMetadata,
