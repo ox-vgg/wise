@@ -1,0 +1,18 @@
+services:
+  wise:
+    build:
+      context: ../../
+      dockerfile: scripts/cinephile/Dockerfile
+      args:
+        - BASE_IMAGE=python:3.10-slim
+    image: wise-cinephile:latest
+    # Keep the container running in the background
+    tty: true
+    environment:
+      # Set to "true" to force the setup.sh script to delete and recreate the conda environment.
+      # e.g., CINEPHILE_RECREATE_ENV=true docker compose up
+      - CINEPHILE_RECREATE_ENV
+    volumes:
+      # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
+      # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
+      - ${CINEPHILE_DATA_DIR}:/data/cinephile/
