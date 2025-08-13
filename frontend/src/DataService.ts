@@ -77,7 +77,6 @@ const processShots = (shots: VideoSegment[], processedVideos: Map<string, Proces
 
 const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean = false): ProcessedSearchResponse => {
   console.log('Search response', results);
-  if (!(results.image_results || results.video_results || results.video_audio_results)) throw new Error("Cannot process search results");
   
   let processedSearchResults = {
     Image: {
@@ -95,6 +94,14 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
       mediaInfo: new Map(),
     },
   } as ProcessedSearchResults;
+
+  if (!(results.image_results || results.video_results || results.video_audio_results)) {
+    return {
+      processedSearchResults,
+      time: results.time,
+    } as ProcessedSearchResponse;
+  }
+
   if (results.image_results) {
     processedSearchResults.Image.mediaInfo = new Map(
       Object.entries(results.image_results.images)

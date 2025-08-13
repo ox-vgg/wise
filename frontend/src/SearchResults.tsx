@@ -418,7 +418,10 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
 
     <section id="search-results">
       {(searchResultsHTML.length === 0) ? 
-        <div className="wise-large-loading-screen"><LoadingOutlined /></div> : <></>
+        ((isLoadingNewSearch || isLoadingFeaturedImages) ?
+          <div className="wise-large-loading-screen"><LoadingOutlined /></div>
+          : <div className="wise-large-loading-screen"><p>No results found!</p></div>
+        ) : <></>
       }
       <div id="wise-image-grid" className="wise-image-grid">
         {searchResultsHTML}

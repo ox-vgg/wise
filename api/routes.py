@@ -1908,6 +1908,13 @@ def _get_search_router(config: APIConfig):
         valid_ids = [int(top_ids[x]) for x in valid_indices]
         valid_dist = [float(top_dist[x]) for x in valid_indices]
 
+        if len(valid_ids) == 0:
+            return SearchResponse(
+                time=0.0,
+                video_audio_results=None,
+                video_results=None,
+                image_results=None,
+            )
         # supports shots
         is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
         with project_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn:
