@@ -277,7 +277,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--enable-autocast",
         action="store_true",
-        help="enable automatic mixed precision (AMP) for faster training (disabled by default)",
+        help="enable automatic mixed precision (AMP) for faster feature extraction (disabled by default as some feature extractors like MS CLAP are not compatible)",
     )
 
     args = parser.parse_args()
