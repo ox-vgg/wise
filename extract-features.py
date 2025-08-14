@@ -3,6 +3,7 @@ import os
 import time
 from pathlib import Path
 from typing import Dict, Literal
+import torch
 import torch.utils.data as torch_data
 from tqdm import tqdm
 import numpy as np
@@ -273,6 +274,12 @@ if __name__ == "__main__":
         "--thumbnails", default=True, action=argparse.BooleanOptionalAction
     )
 
+    parser.add_argument(
+        "--enable-autocast",
+        action="store_true",
+        help="enable automatic mixed precision (AMP) for faster training (disabled by default)",
+    )
+
     args = parser.parse_args()
 
     # If no feature extractor ids are provided, use the default feature extractor ids
@@ -464,7 +471,13 @@ if __name__ == "__main__":
         stream, batch_size=None, num_workers=args.num_workers
     )
     MAX_BULK_INSERT = 8192
-    with db_engine.connect() as conn, thumbs_engine.connect() as thumbs_conn, tqdm(desc="Feature extraction") as pbar:
+    with (
+        db_engine.connect() as conn,
+        thumbs_engine.connect() as thumbs_conn,
+        tqdm(desc="Feature extraction") as pbar,
+        torch.autocast("cuda" if torch.cuda.is_available() else "cpu", enabled=args.enable_autocast)
+    ):
+
         mid: str | int # type annotation
         chunks: Dict[MediaChunkType, MediaChunk | None] # type annotation
         for idx, (mid, chunks) in enumerate(av_data_loader):

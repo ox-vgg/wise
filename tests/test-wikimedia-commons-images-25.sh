@@ -108,6 +108,7 @@ if [ ! -d "${WISE_PROJECT_DIR}" ]; then
            --image-feature-id "${IMAGE_FEATURE_ID1}" \
            --image-feature-id "${IMAGE_FEATURE_ID2}" \
            --image-feature-id "${IMAGE_FEATURE_ID3}" \
+           --enable-autocast \
            --project-dir "$WISE_PROJECT_DIR"
 fi
 
