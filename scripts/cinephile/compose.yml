@@ -3,15 +3,51 @@ services:
     build:
       context: ../../
       dockerfile: scripts/cinephile/Dockerfile
+      target: wise
       args:
-        - BASE_IMAGE=python:3.10-slim
-    image: wise-cinephile:latest
+        - HOST_UID=${HOST_UID:-1000}
+        - HOST_GID=${HOST_GID:-1000}
+    image: wise:latest
     # Keep the container running in the background
     tty: true
     environment:
-      # Set to "true" to force the setup.sh script to delete and recreate the conda environment.
-      # e.g., CINEPHILE_RECREATE_ENV=true docker compose up
-      - CINEPHILE_RECREATE_ENV
+      - ENV_NAME=wise-env # default micromamba environment
+    volumes:
+      # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
+      # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
+      - ${CINEPHILE_DATA_DIR}:/data/cinephile/
+
+  shot-detection:
+    build:
+      context: ../../
+      dockerfile: scripts/cinephile/Dockerfile
+      target: shot-detection-env
+      args:
+        - HOST_UID=${HOST_UID:-1000}
+        - HOST_GID=${HOST_GID:-1000}
+    image: wise-shot-detection:latest
+    # Keep the container running in the background
+    tty: true
+    environment:
+      - ENV_NAME=shot-detection-env # default micromamba environment
+    volumes:
+      # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
+      # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
+      - ${CINEPHILE_DATA_DIR}:/data/cinephile/
+
+  shot-scale-classifier:
+    build:
+      context: ../../
+      dockerfile: scripts/cinephile/Dockerfile
+      target: shot-scale-classifier-env
+      args:
+        - HOST_UID=${HOST_UID:-1000}
+        - HOST_GID=${HOST_GID:-1000}
+    image: wise-shot-scale-classifier:latest
+    # Keep the container running in the background
+    tty: true
+    environment:
+      - ENV_NAME=shot-scale-classifier-env # default micromamba environment
     volumes:
       # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
       # For example: export CINEPHILE_DATA_DIR=/path/to/my/data

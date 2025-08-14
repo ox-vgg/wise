@@ -77,3 +77,52 @@ fi
 
 echo "Step 2 complete."
 echo
+
+#------------------------------------------------------------------------------
+# Step 3: Extract audio and visual features from the video files.
+#------------------------------------------------------------------------------
+echo "--- Step 3: Extracting audio and visual features ---"
+
+PROJECT_DIR="${CINEPHILE_DATA_DIR}/wise-project/cinephile"
+STATE_DIR="${CINEPHILE_DATA_DIR}/state/wise-project/cinephile"
+FEATURE_SET1_EXTRACTION_SUCCESS_FILE="${STATE_DIR}/feature-set1-extraction.success"
+
+# Create the state directory if it doesn't exist
+mkdir -p "${STATE_DIR}"
+
+# Check if the process has already completed successfully.
+if [ -f "${FEATURE_SET1_EXTRACTION_SUCCESS_FILE}" ]; then
+    echo "Feature extraction has already completed successfully. Skipping."
+else
+    # If the success file is missing, check if the project directory exists.
+    # Its existence implies a previously failed or interrupted run.
+    if [ -d "${PROJECT_DIR}" ]; then
+        echo "Incomplete project directory found. Deleting it to restart feature extraction."
+        rm -rf "${PROJECT_DIR}"
+    fi
+
+    echo "Extracting features..."
+    python3 /wise/extract-features.py \
+        "/data/cinephile/videos/" \
+        --media-include "*.mp4" \
+        --shard-maxcount 4096 \
+        --shard-maxsize 20971520 \
+        --num-workers 0 \
+        --feature-store webdataset \
+        --audio-feature-id "microsoft/clap/2023/four-datasets" \
+        --video-feature-id "mlfoundations/open_clip/ViT-L-16-SigLIP2-512/webli" \
+        --video-feature-id "deepinsight/insightface/buffalo_l/_unknown" \
+        --project-dir "${PROJECT_DIR}"
+
+    # If the python script completes successfully, create the success file.
+    if [ $? -eq 0 ]; then
+        echo "Feature extraction completed successfully."
+        touch "${FEATURE_SET1_EXTRACTION_SUCCESS_FILE}"
+    else
+        echo "Feature extraction failed."
+        # The script will exit here because of `set -e`
+    fi
+fi
+
+echo "Step 3 complete."
+echo
