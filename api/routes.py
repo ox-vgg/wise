@@ -2011,6 +2011,13 @@ def _get_search_router(config: APIConfig):
 
             all_metadata = search_index.search(conn, q, start, end)
             n_results = len(all_metadata)
+            if n_results == 0:
+                return SearchResponse(
+                    time=0.0,
+                    video_audio_results=None,
+                    video_results=None,
+                    image_results=None,
+                )
             dist = list([-x for x in range(1, n_results + 1)])
             get_thumbs = thumbs_reader(thumbs_conn, iter(dist), thumbnails_to_send)
             _get_metadata_fn = lambda _: all_metadata

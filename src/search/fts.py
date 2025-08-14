@@ -408,6 +408,8 @@ class FTSSearch:
         cte = get_cte_from_media_ids(ids)
         if ids_only:
             return cte
+        if not ids:
+            return []
 
         from_clause = cte.join(
             db.media_table,
