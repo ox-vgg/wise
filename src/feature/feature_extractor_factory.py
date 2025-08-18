@@ -114,7 +114,7 @@ def FeatureExtractorFactory(id, config: dict[str, dict] = {}):
             (e.g. microsoft/clap/2023/four-datasets/)
     """
     url, model_id = _get_triton_url_and_model_id(id)
-    model_config = config.get(model_id, config.get("default", {}))
+    model_config = {} | config.get(model_id, config.get("default", {}))
 
     # If url is None, search for it in the model config
     # else if it is empty string, use the default Triton URL
