@@ -190,6 +190,7 @@ class TransformersOWLv2(FeatureExtractor):
         objectness_threshold=0.02,
         device: str | torch.device | None = None,
         warmup: bool = False,
+        **kwargs
     ):
         """
         Parameters
