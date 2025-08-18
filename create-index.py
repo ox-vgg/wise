@@ -5,9 +5,10 @@ import logging
 from pathlib import Path
 
 
-#from src.dataloader import AVDataset
-#from src.search_index import SearchIndex
+# from src.dataloader import AVDataset
+# from src.search_index import SearchIndex
 from src.wise_project import WiseProject
+from src.feature import FeatureExtractorFactory
 from src.index.search_index_factory import SearchIndexFactory
 from src.search.fts import FTSSearch
 from src import db
@@ -59,11 +60,11 @@ if __name__ == '__main__':
         if media_type == 'metadata':
             if not args.fts_config:
                 raise ValueError('--fts-config must be a valid json file to index metadata')
-            
+
             fts_config = Path(args.fts_config)
             if not fts_config.exists():
                 raise ValueError('--fts-config must be a valid json file to index metadata')
-            
+
             if not args.overwrite and project.fts_config_file.exists():
                 logger.info('not overwriting existing metadata index')
                 continue
@@ -87,5 +88,11 @@ if __name__ == '__main__':
         else:
             for asset_id in project_assets[media_type]:
                 asset = project_assets[media_type][asset_id]
-                search_index = SearchIndexFactory(media_type, asset_id, asset)
+                feature_extractor = FeatureExtractorFactory(
+                    asset_id,
+                    warmup=True,
+                )
+                search_index = SearchIndexFactory(
+                    media_type, asset_id, asset, feature_extractor
+                )
                 search_index.create_index(args.index_type, args.overwrite)

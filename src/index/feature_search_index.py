@@ -6,14 +6,18 @@ import math
 import itertools
 
 from .search_index import SearchIndex
-from ..feature.feature_extractor_factory import FeatureExtractorFactory
+from ..feature import FeatureExtractor
 from ..feature.store.feature_store_factory import FeatureStoreFactory
 from ..feature.store.webdataset_store import WebdatasetStore
 
 class FeatureSearchIndex(SearchIndex):
-    def __init__(self, media_type, asset_id, asset):
+
+    def __init__(
+        self, media_type, asset_id, asset, feature_extractor: FeatureExtractor
+    ):
         self.media_type = media_type
         self.feature_extractor_id = asset_id
+        self.feature_extractor = feature_extractor
 
         assert 'features_dir' in asset, "features_dir missing in assets"
         self.features_dir = Path(asset['features_dir'])
@@ -97,9 +101,6 @@ class FeatureSearchIndex(SearchIndex):
             print(f'  use create-index.py script to create an index')
             return False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
-        self.feature_extractor = FeatureExtractorFactory(
-            self.feature_extractor_id, warmup=True
-        )
         self.feature_extractor.create_vector_metadata_table(db_engine)
         return True
 
@@ -113,7 +114,7 @@ class FeatureSearchIndex(SearchIndex):
         """
         if self.index_type == 'IndexFlatIP':
             # In previous versions of our code, we were using faiss.IndexIDMap,
-            # which doesn't support internal search. Therefore we need to check 
+            # which doesn't support internal search. Therefore we need to check
             # if faiss.IndexIDMap2 (rather than faiss.IndexIDMap) is being used
             return isinstance(self.index, faiss.IndexIDMap2)
         elif self.index_type == 'IndexIVFFlat':
