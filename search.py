@@ -26,7 +26,7 @@ from rich.table import Table
 from src.dataloader import AVDataset
 from src.wise_project import WiseProject
 from src.index.search_index_factory import SearchIndexFactory
-
+from src.feature import FeatureExtractorFactory
 from src import db
 from src.data_models import (
     MediaMetadata,
@@ -732,7 +732,6 @@ if __name__ == '__main__':
                         default=8,
                         help='tolerance (in seconds) for merging audio based search results')
 
-
     parser.add_argument('--merge-tolerance-metadata',
                         required=False,
                         type=int,
@@ -837,7 +836,13 @@ if __name__ == '__main__':
             asset_index = selected_asset_index
         asset_id = asset_id_list[asset_index]
         asset = project_assets[media_type][asset_id]
-        search_index_list[media_type] = SearchIndexFactory(media_type, asset_id, asset)
+        feature_extractor = FeatureExtractorFactory(
+            asset_id,
+            warmup=True,
+        )
+        search_index_list[media_type] = SearchIndexFactory(
+            media_type, asset_id, asset, feature_extractor
+        )
         if not search_index_list[media_type].load_index(args.index_type):
             print(f'failed to load {media_type} index: {asset_id}')
             del search_index_list[media_type]

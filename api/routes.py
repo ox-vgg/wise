@@ -57,6 +57,7 @@ from src.data_models import MediaMetadata, MediaType, ModalityType, SourceCollec
 from src.enums import IndexType
 from src.utils import convert_uint8array_to_base64
 from src.wise_project import WiseProject
+from src.feature import FeatureExtractorFactory
 from src.feature.feature_extractor import FeatureExtMetadata
 from src.search.fts import FTSSearch, WISEFTSQuery
 from src.dataloader import AVDataset
@@ -1220,6 +1221,7 @@ def _get_search_router(config: APIConfig):
         # search_indices[MediaType.VIDEO] = {'wise/metadata': fts_search_index}
         # active_search_targets[MediaType.VIDEO] = ['wise/metadata']
 
+    feature_extractors = {}
     for media_type in project_assets:
         if media_type not in {MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO}:
             # Added to ensure projects created with older versions
@@ -1233,8 +1235,17 @@ def _get_search_router(config: APIConfig):
             if media_type not in search_indices:
                 search_indices[media_type] = {}
                 active_search_targets[media_type] = []
+
+            if feature_extractor_id not in feature_extractors:
+                feature_extractors[feature_extractor_id] = FeatureExtractorFactory(
+                    feature_extractor_id,
+                    warmup=config.mode != 'development',
+                )
             search_indices[media_type][feature_extractor_id] = SearchIndexFactory(
-                media_type, feature_extractor_id, project_assets[media_type][feature_extractor_id]
+                media_type,
+                feature_extractor_id,
+                project_assets[media_type][feature_extractor_id],
+                feature_extractors[feature_extractor_id],
             )
             logger.info(f"Loading faiss index from {search_indices[media_type][feature_extractor_id].get_index_filename(config.index_type)}")
             if not search_indices[media_type][feature_extractor_id].load_index(config.index_type, project_engine):
