@@ -23,6 +23,8 @@
 from dataclasses import dataclass
 from functools import cached_property
 import logging
+from pathlib import Path
+from typing import Any
 from transformers import Owlv2Processor, Owlv2ForObjectDetection
 import torch
 from torchvision.transforms.functional import pil_to_tensor
@@ -31,7 +33,14 @@ from typing import Union
 from PIL import Image
 import sqlalchemy as sa
 
-from .feature_extractor import BBoxXYWH, FeatureExtMetadata, FeatureExtractor, Features, get_torch_device
+from .feature_extractor import (
+    BBoxXYWH,
+    FeatureExtMetadata,
+    FeatureExtractor,
+    Features,
+    get_torch_device,
+    MultiModalModel,
+)
 from ..db import project_metadata_obj
 
 logger = logging.getLogger(__name__)
@@ -94,6 +103,76 @@ def owlv2_bbox_to_xywh(
     return np.array([x0, y0, width, height])
 
 
+def get_object_features(model: Owlv2ForObjectDetection, images: torch.Tensor):
+
+    # --- Code below is adapted from Owlv2ForObjectDetection.forward() source code ---
+    batch_feature_map, _ = model.image_embedder(
+        images
+    )  # shape of batch_feature_map: (B, 60, 60, 768)
+    batch_image_feats = flatten_patch_features(
+        batch_feature_map
+    )  # shape: (B, 3600, 768)
+
+    _, batch_image_class_embeds = model.class_predictor(batch_image_feats)
+    # Normalize image features
+    # shape of batch_image_class_embeds: (B, 3600, 512)
+    batch_image_class_embeds = batch_image_class_embeds / (
+        torch.linalg.norm(batch_image_class_embeds, dim=-1, keepdim=True) + 1e-6
+    )
+
+    # Apply a learnable shift and scale to logits
+    batch_logit_shift = model.class_head.logit_shift(
+        batch_image_feats
+    )  # shape: (B, 3600, 1)
+    batch_logit_scale = model.class_head.logit_scale(batch_image_feats)
+    batch_logit_scale = (
+        model.class_head.elu(batch_logit_scale) + 1
+    )  # shape: (B, 3600, 1)
+
+    # Augment image embeddings
+    batch_image_class_embeds = (
+        torch.concat([batch_image_class_embeds, batch_logit_shift], axis=-1)
+        * batch_logit_scale
+    )  # shape: (B, 3600, 513)
+
+    # Predict objectness
+    batch_objectness_logits = model.objectness_predictor(batch_image_feats)
+    batch_objectness_scores = torch.sigmoid(batch_objectness_logits)  # shape: (B, 3600)
+
+    # Predict object boxes
+    batch_pred_boxes = model.box_predictor(
+        batch_image_feats, batch_feature_map
+    )  # shape: (B, 3600, 4)
+
+    return (
+        batch_objectness_scores,
+        batch_image_class_embeds,
+        batch_pred_boxes,
+    )
+
+
+def get_text_embeddings(
+    model: Owlv2ForObjectDetection, input_ids, attention_mask
+) -> torch.Tensor:
+    # --- Code below is based on Owlv2Model.forward() source code ---
+    text_outputs = model.owlv2.text_model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+    )
+    text_embeds = text_outputs[1]  # shape: (N, 512)
+    text_embeds = model.owlv2.text_projection(text_embeds)  # shape: (N, 512)
+    # normalized features
+    text_embeds = text_embeds / (
+        torch.linalg.norm(text_embeds, ord=2, dim=-1, keepdim=True) + 1e-6
+    )
+
+    text_embeds = torch.concat(
+        [text_embeds, torch.ones_like(text_embeds[..., :1])], axis=-1
+    )  # shape: (N, 513)
+
+    return text_embeds
+
+
 @dataclass
 class OWLv2FeatureMetadata:
     objectness_score: float
@@ -148,7 +227,146 @@ class OWLv2FeatureMetadata:
         }
 
 
-class TransformersOWLv2(FeatureExtractor):
+class TransformersOWLv2Model(MultiModalModel):
+    """
+    A MultiModalModel wrapper for the OWLv2 model from HuggingFace Transformers.
+    This class is used to load the OWLv2 model and perform inference on it.
+    """ 
+    @cached_property
+    def model(self) -> Owlv2ForObjectDetection:
+        """
+        Returns the OWLv2ForObjectDetection model instance.
+        """
+        logger.info(f"Initialising OWLv2 model {self.model_id} on device {self.DEVICE}")
+        _model = Owlv2ForObjectDetection.from_pretrained(
+            self.model_id, **self.model_kwargs
+        ).to(self.DEVICE)
+        _model.eval()
+        if self.compile:
+            available_backends = torch._dynamo.list_backends()
+            backend = "inductor"
+            if "tensorrt" in available_backends:
+                backend = "tensorrt"
+            logger.info(f"Compiling model with backend {backend}")
+            _model.compile(mode="reduce-overhead", backend=backend)
+        return _model
+
+    def get_image_features(self, **kwargs):
+        images = kwargs.get("images", None)
+        if not isinstance(images, torch.Tensor):
+            raise ValueError(
+                "Images tensor input is required for image feature extraction."
+            )
+
+        return get_object_features(self.model, images.to(self.DEVICE))
+
+    def get_text_features(self, **kwargs) -> torch.Tensor:
+        """
+        Extract text features from the OWLv2 model.
+        """
+        input_ids = kwargs.get("input_ids", None)
+        attention_mask = kwargs.get("attention_mask", None)
+        if input_ids is None or attention_mask is None:
+            raise ValueError(
+                "Input IDs and attention mask are required for text feature extraction."
+            )
+        return get_text_embeddings(
+            self.model,
+            input_ids=input_ids.to(self.DEVICE),
+            attention_mask=attention_mask.to(self.DEVICE),
+        ).float()
+
+    get_audio_features = None  # OWLv2 does not support audio features
+
+    def export_to_onnx(
+        self, save_path: str, visual_inputs: tuple, text_inputs: tuple, **kwargs
+    ):
+        """
+        Export the OWLv2 model to ONNX format.
+        This method is not implemented for OWLv2 as it is not straightforward.
+        """
+
+        model = self.model
+        model.eval()
+
+        logger.info(f"Exporting vision model...")
+        output_path = Path(f"{save_path}--image")
+        output_path.mkdir(parents=True, exist_ok=True)
+        output_path = output_path / "model.onnx"
+
+        class CustomOWLv2VisionModel(torch.nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.model = model
+
+            def forward(self, images):
+                return get_object_features(self.model, images)
+
+        custom_model = CustomOWLv2VisionModel(model)
+        custom_model.eval()
+        # custom_model(*visual_inputs)
+
+        # Dynamo export has some issues - cannot set batch size to dynamic
+        # see https://github.com/pytorch/pytorch/issues/122321
+        batch_size = torch.export.Dim("batch_size")
+        dynamic_shapes = {
+            "images": {0: batch_size},
+        }
+
+        torch.onnx.export(
+            custom_model,
+            visual_inputs,
+            output_path,
+            input_names=["images"],
+            output_names=["scores", "embeddings", "boxes"],
+            dynamic_shapes=dynamic_shapes,
+            dynamo=True,
+            verify=True,
+            do_constant_folding=True,
+            opset_version=20,
+            report=True,
+        )
+
+        logger.info(f"Successfully exported vision model to {output_path}")
+
+        class CustomOWLv2TextModel(torch.nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.model = model
+
+            def forward(self, input_ids, attention_mask):
+                return get_text_embeddings(model, input_ids, attention_mask)
+
+        custom_text_model = CustomOWLv2TextModel(model)
+        custom_text_model.eval()
+        # custom_text_model(*text_inputs)
+
+        logger.info(f"Exporting text model")
+        output_path = Path(f"{save_path}--text")
+        output_path.mkdir(parents=True, exist_ok=True)
+        output_path = output_path / "model.onnx"
+
+        batch_size = torch.export.Dim("batch_size")
+        dynamic_shapes = {
+            "input_ids": {0: batch_size},
+            "attention_mask": {0: batch_size},
+        }
+        torch.onnx.export(
+            custom_text_model,
+            text_inputs,
+            output_path,
+            input_names=["input_ids", "attention_mask"],
+            output_names=["embeddings"],
+            dynamic_shapes=dynamic_shapes,
+            do_constant_folding=True,
+            opset_version=20,
+            dynamo=True,
+            verify=True,
+        )
+        logger.info(f"Successfully exported text model to {output_path}")
+
+
+class TransformersOWLv2FeatureExtractor(FeatureExtractor):
     """
     Feature extractor based on the HuggingFace Transformers implementation of
     OWLv2 (from Google) for open-vocabulary object detection
@@ -184,13 +402,19 @@ class TransformersOWLv2(FeatureExtractor):
         keep_existing=True,
     )
 
+    class Config(FeatureExtractor.Config):
+        objectness_threshold: float = 0.02
+        preprocessor_kwargs: dict[str, Any] = {}
+        model_kwargs: dict[str, Any] = {}
+
     def __init__(
         self,
         id: str,
-        objectness_threshold=0.02,
+        *,
         device: str | torch.device | None = None,
         warmup: bool = False,
-        **kwargs
+        config: Config = Config(),
+        **kwargs,
     ):
         """
         Parameters
@@ -218,23 +442,22 @@ class TransformersOWLv2(FeatureExtractor):
         self.model_name = id[len(self.ID_PREFIX):] # remove ID_PREFIX from id string
 
         self.DEVICE = get_torch_device(device)
-        self.objectness_threshold = objectness_threshold
+        self.objectness_threshold = config.objectness_threshold
+        self.model_kwargs = config.model_kwargs
+        self.compile = config.compile
 
         if warmup:
             self.warmup()
 
-    @cached_property
-    def model(self) -> Owlv2ForObjectDetection:
-        logger.info(f'Initialising model {self.ID_PREFIX} - {self.model_name} (device={self.DEVICE})')
-        _model = Owlv2ForObjectDetection.from_pretrained(self.model_name).to(self.DEVICE)
-        _model.eval()
-        available_backends = torch._dynamo.list_backends()
-        backend = "inductor"
-        if "tensorrt" in available_backends:
-            backend = "tensorrt"
-        logger.info(f"Compiling model with backend {backend}")
-        _model.compile(mode="reduce-overhead", backend=backend)
-        return _model
+    def model(self):
+        model = TransformersOWLv2Model(
+            model_id=self.model_name,
+            device=self.DEVICE,
+            pretraining_dataset=None,  # OWLv2 does not use pretraining dataset
+            compile=self.compile
+            **self.model_kwargs,
+        )
+        return model
 
     @cached_property
     def processor(self):
@@ -289,7 +512,6 @@ class TransformersOWLv2(FeatureExtractor):
     def extract_image_features(
         self,
         images: torch.Tensor,
-        return_augmented_features: bool = True
     ) -> list[Features]:
         """
         Extract features/embeddings, objectness scores, and box coordinates for each patch in
@@ -337,35 +559,13 @@ class TransformersOWLv2(FeatureExtractor):
         # Save original image sizes in a list before they get resized
         orig_sizes = [(image.shape[2], image.shape[1]) for image in images] # list of (width, height) tuples
         # Preprocess image (including resizing)
-        images = self.processor(images=images, return_tensors="pt")['pixel_values'].to(self.DEVICE) # shape: (B, C, 960, 960)
+        images = self.processor(images=images, return_tensors="pt")[
+            "pixel_values"
+        ]  # shape: (B, C, 960, 960)
 
-        # --- Code below is adapted from Owlv2ForObjectDetection.forward() source code ---
-        batch_feature_map, _ = self.model.image_embedder(images) # shape of batch_feature_map: (B, 60, 60, 768)
-        batch_image_feats = flatten_patch_features(batch_feature_map) # shape: (B, 3600, 768)
-
-        _, batch_image_class_embeds = self.model.class_predictor(batch_image_feats)
-        # Normalize image features
-        # shape of batch_image_class_embeds: (B, 3600, 512)
-        batch_image_class_embeds = batch_image_class_embeds / (torch.linalg.norm(batch_image_class_embeds, dim=-1, keepdim=True) + 1e-6)
-
-        if return_augmented_features:
-            # Apply a learnable shift and scale to logits
-            batch_logit_shift = self.model.class_head.logit_shift(batch_image_feats) # shape: (B, 3600, 1)
-            batch_logit_scale = self.model.class_head.logit_scale(batch_image_feats)
-            batch_logit_scale = self.model.class_head.elu(batch_logit_scale) + 1 # shape: (B, 3600, 1)
-
-            # Augment image embeddings
-            batch_image_class_embeds = (
-                torch.concat([batch_image_class_embeds, batch_logit_shift], axis=-1) * batch_logit_scale
-            ) # shape: (B, 3600, 513)
-
-        # Predict objectness
-        batch_objectness_logits = self.model.objectness_predictor(batch_image_feats)
-        batch_objectness_scores = torch.sigmoid(batch_objectness_logits) # shape: (B, 3600)
-
-        # Predict object boxes
-        batch_pred_boxes = self.model.box_predictor(batch_image_feats, batch_feature_map) # shape: (B, 3600, 4)
-
+        batch_objectness_scores, batch_image_class_embeds, batch_pred_boxes = (
+            self.model.get_image_features(images=images)
+        )
         # Having the feature for the "most object" first is important for
         # searching with images since only the first feature is used.
         batch_objectness_scores, batch_image_class_embeds, batch_pred_boxes = (
@@ -381,6 +581,20 @@ class TransformersOWLv2(FeatureExtractor):
         batch_objectness_scores = batch_objectness_scores.cpu().numpy()
         batch_pred_boxes = batch_pred_boxes.cpu().numpy()
 
+        return self.construct_features(
+            batch_image_class_embeds,
+            batch_objectness_scores,
+            batch_pred_boxes,
+            orig_sizes,
+        )
+
+    def construct_features(
+        self,
+        batch_image_class_embeds: np.ndarray,
+        batch_objectness_scores: np.ndarray,
+        batch_pred_boxes: np.ndarray,
+        orig_sizes: list[tuple[int, int]],
+    ) -> list[Features]:
         features: list[Features] = []
         for (
             patchwise_image_class_embeds,
@@ -402,6 +616,22 @@ class TransformersOWLv2(FeatureExtractor):
                 Features(vectors=patchwise_image_class_embeds, metadata=feature_metadata)
             )
         return features
+
+    def preprocess_text(self, text_query: list[str]) -> dict:
+        """
+        Preprocess text queries for the OWLv2 model.
+
+        Parameters
+        ----------
+        text_query : list of str
+            A list of text queries to preprocess
+
+        Returns
+        -------
+        dict
+            A dictionary containing the preprocessed text inputs ready for the model.
+        """
+        return self.processor(text=text_query, return_tensors="pt")
 
     @torch.inference_mode()
     def extract_text_features(
@@ -440,25 +670,8 @@ class TransformersOWLv2(FeatureExtractor):
             the embedding dimension (default 513). If
             `return_augmented_features = False` then the last dimension is 512.
         """
-        inputs = self.processor(text=text_query, return_tensors="pt").to(self.DEVICE)
-        input_ids = inputs['input_ids']
-        attention_mask = inputs['attention_mask']
-
-        # --- Code below is based on Owlv2Model.forward() source code ---
-        text_outputs = self.model.owlv2.text_model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-        )
-        text_embeds = text_outputs[1] # shape: (N, 512)
-        text_embeds = self.model.owlv2.text_projection(text_embeds) # shape: (N, 512)
-        # normalized features
-        text_embeds = text_embeds / (torch.linalg.norm(text_embeds, ord=2, dim=-1, keepdim=True) + 1e-6)
-
-        if return_augmented_features:
-            text_embeds = torch.concat(
-                [text_embeds, torch.ones_like(text_embeds[..., :1])], axis=-1
-            ) # shape: (N, 513)
-
+        inputs = self.preprocess_text(text_query)
+        text_embeds = self.model.get_text_features(**inputs)
         return text_embeds.cpu().numpy() # shape: (N, 513)
 
     def transform_internal_image_queries_hook(self, vec: np.ndarray) -> np.ndarray:

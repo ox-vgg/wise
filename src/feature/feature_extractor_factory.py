@@ -64,9 +64,9 @@ def get_feature_extractor_class(_id: str):
         return MicrosoftClapFeatureExtractor
 
     if _id.startswith("transformers/owlv2/"):
-        from .transformers_owlv2 import TransformersOWLv2
+        from .transformers_owlv2 import TransformersOWLv2FeatureExtractor
 
-        return TransformersOWLv2
+        return TransformersOWLv2FeatureExtractor
 
     if _id.startswith("deepinsight/insightface/"):
         from .insightface import InsightFaceFeatureExtractor
