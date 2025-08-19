@@ -42,7 +42,7 @@ def get_config_and_metadata(client, model_name: str):
     return max_batch_size, inputs, outputs
 
 
-class TrtitonModel(object):
+class TritonModel(object):
     def __init__(self, model: str, url: str, debug: bool = False):
         """Initializes the Triton feature extractor and sets up the client."""
 
@@ -234,7 +234,7 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
         @cached_property
         def model(self):
             """Returns the Triton model client."""
-            return TrtitonModel(
+            return TritonModel(
                 self.__model_name, self.config.url, debug=self.config.debug
             )
 
