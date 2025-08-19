@@ -1,5 +1,6 @@
 from __future__ import annotations
 import inspect
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, List, NamedTuple, Optional, Union, Type
 from pydantic import BaseModel, ConfigDict
@@ -106,6 +107,49 @@ def check_config_in_init_args(cls: Type["FeatureExtractor"]) -> bool:
     )
 
 
+class MultiModalModel(ABC):
+    """Base class for multi-modal models.
+
+    This class is used to define the interface for multi-modal models that can
+    extract features from images, text, and audio. Subclasses should implement
+    the methods to extract features for each modality.
+
+    """
+
+    def __init__(
+        self,
+        model_id: str,
+        pretraining_dataset: str | None = None,
+        device: str | torch.device | None = None,
+        **kwargs,
+    ):
+        self.model_id = model_id
+        self.pretraining_dataset = pretraining_dataset
+        self.DEVICE = get_torch_device(device)
+        self.model_kwargs = kwargs
+
+    @abstractmethod
+    def get_image_features(self, **kwargs):
+        """Extracts image features."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def get_text_features(self, **kwargs):
+        """Extracts text features."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def get_audio_features(self, **kwargs):
+        """Extracts audio features."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def export_to_onnx(self, output_path: str):
+        """Export the model to ONNX format."""
+        raise NotImplementedError(
+            "No implementation for ONNX export found for this model"
+        )
+
+
 class FeatureExtractor:
     """ABC for extractor of feature vectors from audio, image, and text.
 
@@ -114,6 +158,7 @@ class FeatureExtractor:
     `None` (see :py:exc:`NotImplementedError`).
 
     """
+    ID_PREFIX = None
     _vector_metadata_table: sa.Table | None = None
     class Config(FeatureExtractorConfig):
         """Configuration for the feature extractor."""
@@ -141,10 +186,17 @@ class FeatureExtractor:
         model_id: str,
         *,
         device: str | torch.device | None = None,
-        warmup: bool = False,
-        **kwargs,
     ):
-        raise NotImplementedError
+        if self.ID_PREFIX is None:
+            raise ValueError(
+                "FeatureExtractor.ID_PREFIX must be set to a non-empty string by the subclass"
+            )
+
+        if not model_id.startswith(self.ID_PREFIX):
+            raise ValueError(
+                f"feature id cannot start with {model_id} and must start with {self.ID_PREFIX}"
+            )
+        self.DEVICE = get_torch_device(device)
 
     @classmethod
     def create_vector_metadata_table(cls, db_engine: sa.Engine) -> None:

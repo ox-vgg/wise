@@ -3,7 +3,7 @@ import itertools
 import logging
 from typing import Type, Literal
 
-from .feature_extractor import FeatureExtractor
+from .feature_extractor import FeatureExtractor, MultiModalModel
 import torch
 import numpy as np
 import tritonclient.grpc as grpcclient
@@ -42,10 +42,10 @@ def get_config_and_metadata(client, model_name: str):
     return max_batch_size, inputs, outputs
 
 
-class TritonModel(object):
-    def __init__(self, model: str, url: str, debug: bool = False):
+class TritonModel(MultiModalModel):
+    def __init__(self, model_id: str, url: str, debug: bool = False, **kwargs):
         """Initializes the Triton feature extractor and sets up the client."""
-
+        super().__init__(model_id, **kwargs)
         self._client = grpcclient.InferenceServerClient(
             url=url,
             verbose=debug,  # Set to True for debugging
@@ -63,7 +63,7 @@ class TritonModel(object):
 
         logger.debug(f"Connected to Triton server at {url}")
 
-        self._model = model
+        self._model = model_id
         self._triton_configs = {}
 
     def _get_features(
