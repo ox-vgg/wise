@@ -558,90 +558,117 @@ if __name__ == "__main__":
         prefetch_factor=prefetch_factor,
     )
 
-    MAX_BULK_INSERT = 8192
+    MAX_BULK_INSERT = 1024
     with (
         db_engine.connect() as conn,
         thumbs_engine.connect() as thumbs_conn,
         tqdm(desc="Feature extraction") as pbar,
         torch.autocast("cuda" if torch.cuda.is_available() else "cpu", enabled=args.enable_autocast)
     ):
-
         mid: str | int # type annotation
-        chunks: Dict[MediaChunkType, MediaChunk | None] # type annotation
-        for idx, (mid, chunks) in enumerate(av_data_loader):
-            for media_type in feature_extractor_ids:
-                for feature_extractor_id in feature_extractor_ids[media_type]:
-                    if media_type not in chunks or chunks[media_type] is None:
-                        continue
+        chunks: Dict[
+            MediaChunkType, Dict[str, MediaChunk | None] | MediaChunk | None
+        ]  # type annotation
 
-                    if feature_extractor_id not in chunks[media_type] or chunks[media_type][feature_extractor_id] is None:
-                        continue
+        def handle_chunk(
+            chunk: MediaChunk, media_type: MediaChunkType, feature_extractor_id: str
+        ):
+            segment_tensor = chunk.tensor
+            segment_pts = chunk.pts
 
-                    segment_tensor = chunks[media_type][feature_extractor_id].tensor
-                    segment_pts = chunks[media_type][feature_extractor_id].pts
+            if segment_tensor is None or segment_tensor.shape[0] == 0:
+                logger.warning(
+                    f"Skipping empty segment for media_id={mid}, media_type={media_type}, feature_extractor_id={feature_extractor_id}"
+                )
+                return
 
-                    if segment_tensor is None or segment_tensor.shape[0] == 0:
-                        logger.warning(f"Skipping empty segment for media_id={mid}, media_type={media_type}, feature_extractor_id={feature_extractor_id}")
-                        continue
-                    if media_type == "image" or media_type == "video":
-                        segment_feature = feature_extractors[media_type][feature_extractor_id].extract_image_features(
-                            segment_tensor
-                        )
-                        pbar.update(segment_tensor.shape[0])
-                    elif media_type == "audio":
-                        if segment_tensor.shape[2] < audio_frames_per_chunk:
-                            # we discard any malformed audio segments
-                            continue
-                        segment_feature = feature_extractors[media_type][feature_extractor_id].extract_audio_features(
-                            segment_tensor
-                        )
-                        pbar.update(segment_tensor.shape[0])
+            feature_extractor = feature_extractors[media_type][feature_extractor_id]
+            feature_store = feature_stores[media_type][feature_extractor_id]
+
+            if media_type == "image" or media_type == "video":
+                segment_feature = feature_extractor.extract_image_features(
+                    segment_tensor
+                )
+                pbar.update(segment_tensor.shape[0])
+
+            elif media_type == "audio":
+                if segment_tensor.shape[2] < audio_frames_per_chunk:
+                    # we discard any malformed audio segments
+                    return
+                segment_feature = feature_extractor.extract_audio_features(
+                    segment_tensor
+                )
+                pbar.update(segment_tensor.shape[0])
+            else:
+                raise ValueError(f"Unknown media_type {media_type}")
+
+            # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
+            if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
+                for frame_idx, frame_features in enumerate(segment_feature):
+                    vector_ids: list[int] = []
+                    if type(segment_pts) is list and args.use_shots:
+                        frame_timestamp = segment_pts[frame_idx]
                     else:
-                        raise ValueError(f"Unknown media_type {media_type}")
+                        frame_timestamp = segment_pts + frame_idx * (
+                            1 / video_frame_rate
+                        )
 
-                    # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
-                    if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
-                        for frame_idx, frame_features in enumerate(segment_feature):
-                            vector_ids: list[int] = []
-                            if type(segment_pts) is list and args.use_shots:
-                                frame_timestamp = segment_pts[frame_idx]
-                            else:
-                                frame_timestamp = segment_pts + frame_idx * (1 / video_frame_rate)
-                            for frame_single_vector in frame_features.vectors:
-                                feature_metadata = VectorRepo.create(
-                                    conn,
-                                    data=VectorMetadata(
-                                        modality=media_type,
-                                        feature_extractor_id=feature_extractor_id,
-                                        media_id=mid,
-                                        timestamp=frame_timestamp,
-                                    ),
-                                )
-                                feature_stores[media_type][feature_extractor_id].add(
-                                    feature_metadata.id,
-                                    np.expand_dims(frame_single_vector, axis=0),
-                                )
-                                vector_ids.append(feature_metadata.id)
-                            feature_extractors[media_type][feature_extractor_id].add_to_vector_metadata_table(
-                                conn, vector_ids, frame_features.metadata
-                            )
-                    else:
-                        # Add whole segment
-                        _start_time = segment_pts
-                        _end_time = segment_pts + audio_segment_length
+                    for frame_single_vector in frame_features.vectors:
                         feature_metadata = VectorRepo.create(
                             conn,
                             data=VectorMetadata(
                                 modality=media_type,
                                 feature_extractor_id=feature_extractor_id,
                                 media_id=mid,
-                                timestamp=_start_time,
-                                end_timestamp=_end_time,
+                                timestamp=frame_timestamp,
                             ),
                         )
-                        feature_stores[media_type][feature_extractor_id].add(
-                            feature_metadata.id, segment_feature
+                        feature_store.add(
+                            feature_metadata.id,
+                            np.expand_dims(frame_single_vector, axis=0),
                         )
+                        vector_ids.append(feature_metadata.id)
+                    feature_extractor.add_to_vector_metadata_table(
+                        conn, vector_ids, frame_features.metadata
+                    )
+            else:
+                # Add whole segment
+                _start_time = segment_pts
+                _end_time = segment_pts + audio_segment_length
+                feature_metadata = VectorRepo.create(
+                    conn,
+                    data=VectorMetadata(
+                        modality=media_type,
+                        feature_extractor_id=feature_extractor_id,
+                        media_id=mid,
+                        timestamp=_start_time,
+                        end_timestamp=_end_time,
+                    ),
+                )
+                feature_store.add(feature_metadata.id, segment_feature)
+
+        for idx, (mid, chunks) in enumerate(av_data_loader):
+            for media_type in chunks:
+                if media_type not in feature_extractors or chunks[media_type] is None:
+                    # This is a single chunk, not a dictionary of chunks
+                    logger.debug(
+                        f"Skipping empty / irrelevant chunk for media_id={mid}, media_type={media_type}"
+                    )
+                    continue
+                if isinstance(chunks[media_type], MediaChunk):
+                    # We are somehow reading a chunk without any feature extractor ids - must be thumbnails or reading audio / video while only requesting video / audio features
+                    continue
+                for feature_extractor_id in chunks[media_type]:
+                    _chunk = chunks[media_type][feature_extractor_id]
+                    if (
+                        _chunk is None
+                        or feature_extractor_id not in feature_extractors[media_type]
+                    ):
+                        logger.debug(
+                            f"Skipping empty / irrelevant chunk for media_id={mid}, media_type={media_type}, feature_extractor_id={feature_extractor_id}"
+                        )
+                        continue
+                    handle_chunk(_chunk, media_type, feature_extractor_id)
 
             if 'thumbnails' in chunks and chunks['thumbnails'] is not None:
                 # Handle thumbnails
