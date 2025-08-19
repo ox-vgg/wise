@@ -54,9 +54,9 @@ def get_triton_url_from_id(_id: str) -> str | None:
 def get_feature_extractor_class(_id: str):
 
     if _id.startswith("mlfoundations/open_clip/"):
-        from .mlfoundation_openclip import MlfoundationOpenClip
+        from .mlfoundation_openclip import MlfoundationOpenClipFeatureExtractor
 
-        return MlfoundationOpenClip
+        return MlfoundationOpenClipFeatureExtractor
 
     if _id.startswith("microsoft/clap/"):
         from .microsoft_clap import MicrosoftClap

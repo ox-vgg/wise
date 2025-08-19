@@ -31,12 +31,17 @@ class FeatureExtractorConfig(BaseModel):
         Whether to warm up the feature extractor. This is useful for models that are lazy loaded
         and if someone wants to eagerly load them and allocate memory beforehand.
 
+    compile : bool
+        Whether to compile the model using `torch.compile()`. This can improve performance
+        for some models, but may not be supported for all models or devices.
+
     """
 
     model_config = ConfigDict(from_attributes=True)
 
     device: str | None = None
     warmup: bool = False
+    compile: bool = True  # whether to compile the model using torch.compile()
 
 
 @dataclass
@@ -121,11 +126,13 @@ class MultiModalModel(ABC):
         model_id: str,
         pretraining_dataset: str | None = None,
         device: str | torch.device | None = None,
+        compile: bool = True,
         **kwargs,
     ):
         self.model_id = model_id
         self.pretraining_dataset = pretraining_dataset
         self.DEVICE = get_torch_device(device)
+        self.compile = compile
         self.model_kwargs = kwargs
 
     @abstractmethod
