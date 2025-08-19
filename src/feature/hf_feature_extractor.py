@@ -101,7 +101,7 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         return [Features(vectors=x, metadata=None) for x in feature_vectors]
 
     @torch.inference_mode()
-    def extract_text_features(self, text_query: list[str]) -> list[Features]:
+    def extract_text_features(self, text_query: list[str]) -> np.ndarray:
         """Extracts features from text.
 
         Parameters
@@ -111,18 +111,19 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
 
         Returns
         -------
-        list of Features
-            A list of `Features` objects, one for each text string in the input list.
+        np.ndarray
+            A 2D numpy array of shape (n, d) where n is the number of text queries
+            and d is the feature dimension.
         """
         inputs = self.processor(text=text_query, return_tensors='pt', **self.preprocessor_kwargs).to(self.DEVICE)
         outputs = self.model.get_text_features(**inputs)
         outputs = outputs / torch.linalg.norm(outputs, dim=-1, keepdim=True)  # Normalize features
         outputs = outputs.cpu().numpy()
-        feature_vectors = list(np.expand_dims(outputs, axis=1))
-        return [Features(vectors=x, metadata=None) for x in feature_vectors]
+
+        return outputs
 
     @torch.inference_mode()
-    def extract_audio_features(self, audio: torch.Tensor) -> list[Features]:
+    def extract_audio_features(self, audio: torch.Tensor) -> np.ndarray:
         """Extracts features from text.
 
         Parameters
