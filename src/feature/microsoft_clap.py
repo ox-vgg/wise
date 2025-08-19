@@ -2,13 +2,13 @@ import collections
 from functools import cached_property
 import logging
 import re
+from pathlib import Path
+from typing import List
 from msclap import CLAP
 import torch
 import numpy as np
-from typing import List
-from collections.abc import Iterable
 
-from .feature_extractor import FeatureExtractor, get_torch_device
+from .feature_extractor import FeatureExtractor, get_torch_device, MultiModalModel
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,146 @@ def default_collate(batch):
     raise TypeError(default_collate_err_msg_format.format(elem_type))
 
 
-class MicrosoftClap(FeatureExtractor):
+class MicrosoftClapModel(MultiModalModel):
+
+    @cached_property
+    def _clap_wrapper(self):
+        use_cuda = self.DEVICE.type == 'cuda'
+        logger.info(f'Initialising model {self.ID_PREFIX} ({self.version}, use_cuda={use_cuda})')
+        instance = CLAP(version=self.version, use_cuda=use_cuda)
+        # TODO get it from config along with options?
+        if self.compile:
+            available_backends = torch._dynamo.list_backends()
+            backend = "inductor"
+            if "tensorrt" in available_backends:
+                backend = "tensorrt"
+            logger.info(f"Compiling model with backend {backend}")
+            instance.clap.compile(mode="reduce-overhead", backend=backend)
+        return instance
+
+    @property
+    def model(self):
+        return self._clap_wrapper.clap
+
+    def get_audio_features(self, **kwargs) -> torch.Tensor:
+        """Extract image features from the model."""
+        audio = kwargs.get("audio", None)
+        if not isinstance(audio, torch.Tensor):
+            raise ValueError(
+                "Audio tensor input is required for audio feature extraction."
+            )
+        return self.model.audio_encoder(audio.to(self.DEVICE))[0].float()
+
+    def get_text_features(self, **kwargs) -> torch.Tensor:
+        """Extract text features from the model."""
+        input_ids = kwargs.get("input_ids", None)
+        attention_mask = kwargs.get("attention_mask", None)
+        if input_ids is None or attention_mask is None:
+            raise ValueError(
+                "Input IDs and attention mask are required for text feature extraction."
+            )
+        x = {
+            "input_ids": input_ids.to(self.DEVICE),
+            "attention_mask": attention_mask.to(self.DEVICE),
+        }
+
+        return self.model.caption_encoder(x).float()
+
+    get_image_features = None  # CLAP does not support image features
+
+    def export_to_onnx(
+        self, save_path: Path, audio_inputs: tuple, text_inputs: tuple, **kwargs
+    ):
+        """Export the model to ONNX format."""
+        model = self.model
+        model.eval()
+
+        logger.info(f"Exporting audio model")
+        output_path = Path(f"{save_path}--audio")
+        output_path.mkdir(parents=True, exist_ok=True)
+        output_path = output_path / "model.onnx"
+
+        class CustomAudioEncoder(torch.nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.audio_encoder = model.audio_encoder
+
+            def forward(self, audio):
+                x = self.audio_encoder(audio)
+                return x[0]
+
+        audio_encoder = CustomAudioEncoder(model)
+        audio_encoder.eval()
+
+        dynamic_axes = {
+            'audio': {
+                0: 'batch_size',
+                1: 'sequence_length',
+            },
+            'embeddings': {
+                0: 'batch_size',
+            }
+        }
+
+        with torch.inference_mode():
+            torch.onnx.export(
+                audio_encoder,
+                audio_inputs,
+                output_path,
+                input_names=["audio"],
+                output_names=[
+                    "embeddings",
+                ],
+                dynamic_axes=dynamic_axes,
+                opset_version=17,
+                do_constant_folding=True,
+            )
+        logger.info(f"Successfully exported audio model to {output_path}")
+
+        class CustomTextEncoder(torch.nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.caption_encoder = model.caption_encoder
+
+            def forward(self, input_ids, attention_mask):
+                x = {
+                    "input_ids": input_ids,
+                    "attention_mask": attention_mask,
+                }
+                return self.caption_encoder(x)
+
+        logger.info(f"Exporting text model")
+        output_path = Path(f"{save_path}--text")
+        output_path.mkdir(parents=True, exist_ok=True)
+        output_path = output_path / "model.onnx"
+
+        dynamic_axes = {
+            'input_ids': {
+                0: 'batch_size',
+            },
+            'attention_mask': {
+                0: 'batch_size',
+            },
+            'embeddings': {
+                0: 'batch_size',
+            }
+        }
+        text_encoder = CustomTextEncoder(model)
+        torch.onnx.export(
+            text_encoder,
+            text_inputs,
+            output_path,
+            input_names=["input_ids", "attention_mask"],
+            output_names=[
+                "embeddings",
+            ],
+            dynamic_axes=dynamic_axes,
+            opset_version=17,
+            do_constant_folding=True,
+        )
+        logger.info(f"Successfully exported text model to {output_path}")
+
+class MicrosoftClapFeatureExtractor(FeatureExtractor):
     """
     Audio feature extractors created by Microsoft's CLAP project
     see https://github.com/microsoft/CLAP/
@@ -83,40 +222,47 @@ class MicrosoftClap(FeatureExtractor):
     preprocess_image = None
     extract_image_features = None
 
+    class Config(FeatureExtractor.Config):
+        pass
+
     def __init__(
         self,
         id,
         *,
         device: str | torch.device | None = None,
         warmup: bool = False,
+        config: Config = Config(),
         **kwargs,
     ):
-        if not id.startswith(self.ID_PREFIX):
-            raise ValueError(f'feature id cannot start with {id} and must start with {self.ID_PREFIX}')
+        super().__init__(id, device=device)
         id_tokens = id.split('/')
 
         assert len(id_tokens) == 4
-        if id_tokens[2] not in CLAP.model_name:
-            raise ValueError(f'Model version {id_tokens[2]} is not available. Available models are {CLAP.model_name.keys()}')
-        self.version = id_tokens[2]
+        if id_tokens[2] not in CLAP.model_name or "clapcap" in id_tokens[2]:
+            raise ValueError(
+                f'Model version {id_tokens[2]} is not available. Available models are {[x for x in CLAP.model_name.keys() if "clapcap" not in x]}'
+            )
+
+        self.model_id = id_tokens[2]
         self.DEVICE = get_torch_device(device)
+        self.compile = config.compile
+
+        # we instantiate the mode, but we do not keep the CLAP model, as we load it lazily on the requested device
+        # later
+        self.processor = CLAP(version=self.model_id, use_cuda=False)
+        self.processor.clap = None
+        del self.processor.clap
 
         if warmup:
             self.warmup()
 
     @cached_property
     def model(self):
-        use_cuda = self.DEVICE.type == 'cuda'
-        logger.info(f'Initialising model {self.ID_PREFIX} ({self.version}, use_cuda={use_cuda})')
-        instance = CLAP(version=self.version, use_cuda=use_cuda)
-        # TODO get it from config along with options?
-        available_backends = torch._dynamo.list_backends()
-        backend = "inductor"
-        if "tensorrt" in available_backends:
-            backend = "tensorrt"
-        logger.info(f"Compiling model with backend {backend}")
-        instance.clap.compile(mode="reduce-overhead", backend=backend)
-        return instance
+        return MicrosoftClapModel(
+            model_id=self.model_id,
+            device=self.DEVICE,
+            compile=self.compile
+        )
 
     @staticmethod
     def preprocess_audio(audio: torch.Tensor) -> torch.Tensor:
@@ -129,20 +275,21 @@ class MicrosoftClap(FeatureExtractor):
         return default_collate([audio])
 
     def preprocess_text(self, text: str) -> str:
-        return self.model.preprocess_text(text)
+        return self.processor.preprocess_text(text)
 
     @torch.inference_mode()
     def extract_audio_features(self, preprocessed_audio: torch.Tensor) -> np.ndarray:
         preprocessed_audio = preprocessed_audio.reshape(
-            preprocessed_audio.shape[0], preprocessed_audio.shape[2]).to(device=self.DEVICE)
-        audio_embeddings = self.model.clap.audio_encoder(preprocessed_audio)[0]
+            preprocessed_audio.shape[0], preprocessed_audio.shape[2]
+        )
+        audio_embeddings = self.model.get_audio_features(audio=preprocessed_audio)
         audio_embeddings = audio_embeddings/torch.norm(audio_embeddings, dim=-1, keepdim=True)
         return audio_embeddings.cpu().numpy()
 
     @torch.inference_mode()
     def extract_text_features(self, text: List[str]) -> np.ndarray:
-        preprocessed_text = self.model.preprocess_text(text)
-        text_embeddings = self.model.clap.caption_encoder(preprocessed_text)
+        preprocessed_text = self.preprocess_text(text)
+        text_embeddings = self.model.get_text_features(**preprocessed_text)
         text_embeddings = text_embeddings/torch.norm(text_embeddings, dim=-1, keepdim=True)
         return text_embeddings.cpu().numpy()
 

@@ -59,9 +59,9 @@ def get_feature_extractor_class(_id: str):
         return MlfoundationOpenClipFeatureExtractor
 
     if _id.startswith("microsoft/clap/"):
-        from .microsoft_clap import MicrosoftClap
+        from .microsoft_clap import MicrosoftClapFeatureExtractor
 
-        return MicrosoftClap
+        return MicrosoftClapFeatureExtractor
 
     if _id.startswith("transformers/owlv2/"):
         from .transformers_owlv2 import TransformersOWLv2
