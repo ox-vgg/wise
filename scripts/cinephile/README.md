@@ -19,11 +19,38 @@ HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
 # Run wise container in background
 HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose -f scripts/cinephile/compose.yml up -d wise
 
-# Create WISE project containing audiovisual features (requires ?, takes ? hours)
-docker compose -f scripts/cinephile/compose.yml \
-  exec -e CINEPHILE_DATA_DIR=/data/cinephile \
-  wise \
+# Create WISE project containing audiovisual features (requires 8GB, takes 13.6 hours)
+HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
+  -f scripts/cinephile/compose.yml exec \
+  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
   /wise/scripts/cinephile/create-wise-project.sh
+```
+
+At this stage, the `CINEPHILE_DATA_DIR/wise-project/cinephile` folder
+contains a WISE project that can be used to search audio, video, face
+and metadata corresponding to all the 787 videos in the Cinephile dataset.
+A WISE search engine based on this project can be made available to users
+as follows:
+
+```
+HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
+  -f scripts/cinephile/compose.yml exec \
+  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
+  bash -c '
+    LISTEN_ADDRESS="0.0.0.0" \
+    PORT="10001" \
+    /wise/serve.py \
+      --index-type IndexFlatIP \
+      --project-dir /data/cinephile/projects/cinephile/
+  '
+...
+2025-08-19 13:04:11,422 (MainThread): api - INFO - Loading html user interface from frontend/dist
+2025-08-19 13:04:11,422 (MainThread): api - INFO - Open http://0.0.0.0:10001/cinephile/ in your browser
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:10001 (Press CTRL+C to quit)
+...
+```
+Now the search engine can be accessed by visiting [http://0.0.0.0:10001/cinephile/](http://0.0.0.0:10001/cinephile/) using a web browser. We recommand using the Google Chrome (or Chromium) browser as they have better handling for web pages containing a large number of videos.
 
 # Find shot boundaries for visual content (requires ?, takes ? hours)
 ...
@@ -41,7 +68,12 @@ docker compose -f scripts/cinephile/compose.yml \
 ...
 
 # Serve search engine over web
-...
+HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
+  -f scripts/cinephile/compose.yml exec \
+  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
+  LISTEN_ADDRESS="0.0.0.0" PORT="10001" /wise/serve.py \
+  --index-type IndexFlatIP\
+  --project-dir /home/tlm/data/wise/projects/cinephile/
 ```
 
 ## Time and Storage Requirements

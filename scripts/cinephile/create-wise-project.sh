@@ -12,13 +12,27 @@
 
 set -euo pipefail
 
+eval "$(micromamba shell hook -s bash)"
+micromamba activate wise-env
+
 #------------------------------------------------------------------------------
-# Step 0: Sanity checks
+# Sanity checks
 #------------------------------------------------------------------------------
+# Check if the environment is activated
+if [[ -z "${CONDA_PREFIX}" || ! "${CONDA_PREFIX}" == *"/wise-env" ]]; then
+    echo "Micromamba environment 'wise-env' could not be activated. Exiting."
+    exit 1
+fi
+
 if [ -z "${CINEPHILE_DATA_DIR}" ]; then
     echo "CINEPHILE_DATA_DIR is not set. Exiting."
     exit 1
 fi
+
+#------------------------------------------------------------------------------
+# Set cache directories
+#------------------------------------------------------------------------------
+
 
 #------------------------------------------------------------------------------
 # Step 1: Download the ZIP file containing videos and metadata
@@ -27,7 +41,8 @@ echo "--- Step 1: Downloading video archives ---"
 
 URL1="https://hessenbox.uni-marburg.de/dl/fiP3skhbYUzNcsnsQoS8ND/DFF.dir"
 URL2="https://hessenbox.uni-marburg.de/dl/fiDW4TuWzSmqmeLPsNYgGf/NIBG.dir"
-TARGET_DIR="${CINEPHILE_DATA_DIR}/temp/videos_zip"
+TEMP_DIR="${CINEPHILE_DATA_DIR}/temp"
+TARGET_DIR="${TEMP_DIR}/videos_zip"
 FILE1="${TARGET_DIR}/DFF.zip"
 FILE2="${TARGET_DIR}/NIBG.zip"
 
@@ -62,7 +77,7 @@ EXTRACT_SCRIPT="/wise/scripts/cinephile/extract_matched_video_json_pairs.py"
 if [ ! -d "${UNZIP_DEST_DFF}" ] || [ -z "$(ls -A "${UNZIP_DEST_DFF}")" ]; then
   echo "Extracting DFF.zip to ${UNZIP_DEST_DFF}..."
   mkdir -p "${UNZIP_DEST_DFF}"
-  python3 "${EXTRACT_SCRIPT}" "${FILE1}" "${UNZIP_DEST_DFF}"
+  python "${EXTRACT_SCRIPT}" "${FILE1}" "${UNZIP_DEST_DFF}"
 else
   echo "DFF directory already exists and is not empty. Skipping extraction."
 fi
@@ -70,7 +85,7 @@ fi
 if [ ! -d "${UNZIP_DEST_NIBG}" ] || [ -z "$(ls -A "${UNZIP_DEST_NIBG}")" ]; then
   echo "Extracting NIBG.zip to ${UNZIP_DEST_NIBG}..."
   mkdir -p "${UNZIP_DEST_NIBG}"
-  python3 "${EXTRACT_SCRIPT}" "${FILE2}" "${UNZIP_DEST_NIBG}"
+  python "${EXTRACT_SCRIPT}" "${FILE2}" "${UNZIP_DEST_NIBG}"
 else
   echo "NIBG directory already exists and is not empty. Skipping extraction."
 fi
@@ -86,6 +101,10 @@ echo "--- Step 3: Extracting audio and visual features ---"
 PROJECT_DIR="${CINEPHILE_DATA_DIR}/wise-project/cinephile"
 STATE_DIR="${CINEPHILE_DATA_DIR}/state/wise-project/cinephile"
 FEATURE_SET1_EXTRACTION_SUCCESS_FILE="${STATE_DIR}/feature-set1-extraction.success"
+VIDEO_FEATURE_ID1="mlfoundations/open_clip/ViT-L-16-SigLIP2-512/webli"
+VIDEO_FEATURE_ID2="deepinsight/insightface/buffalo_l/_unknown"
+AUDIO_FEATURE_ID="microsoft/clap/2023/four-datasets"
+FAISS_INDEX_TYPE="IndexFlatIP"
 
 # Create the state directory if it doesn't exist
 mkdir -p "${STATE_DIR}"
@@ -97,21 +116,30 @@ else
     # If the success file is missing, check if the project directory exists.
     # Its existence implies a previously failed or interrupted run.
     if [ -d "${PROJECT_DIR}" ]; then
-        echo "Incomplete project directory found. Deleting it to restart feature extraction."
-        rm -rf "${PROJECT_DIR}"
+        echo "An incomplete project directory was found at ${PROJECT_DIR}."
+        echo "This typically happens if a previous feature extraction run was interrupted or failed."
+        echo "To restart feature extraction, this directory needs to be deleted."
+        read -p "Do you want to delete the existing project directory and restart feature extraction? (y/N): " -n 1 -r
+        echo
+        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+            echo "Aborting feature extraction. Please manually clean up ${PROJECT_DIR} if you wish to restart."
+            exit 1
+        fi
+        echo "Deleting existing project directory: ${PROJECT_DIR}"
+        rm -rf "${PROJECT_DIR}" || { echo "Failed to delete ${PROJECT_DIR}. Please check permissions."; exit 1; }
     fi
 
-    echo "Extracting features..."
-    python3 /wise/extract-features.py \
+    echo "Extracting features ... (takes ~14 hours)"
+    python /wise/extract-features.py \
         "/data/cinephile/videos/" \
         --media-include "*.mp4" \
         --shard-maxcount 4096 \
         --shard-maxsize 20971520 \
         --num-workers 0 \
         --feature-store webdataset \
-        --audio-feature-id "microsoft/clap/2023/four-datasets" \
-        --video-feature-id "mlfoundations/open_clip/ViT-L-16-SigLIP2-512/webli" \
-        --video-feature-id "deepinsight/insightface/buffalo_l/_unknown" \
+        --audio-feature-id "${AUDIO_FEATURE_ID}" \
+        --video-feature-id "${VIDEO_FEATURE_ID1}" \
+        --video-feature-id "${VIDEO_FEATURE_ID2}" \
         --project-dir "${PROJECT_DIR}"
 
     # If the python script completes successfully, create the success file.
@@ -125,4 +153,99 @@ else
 fi
 
 echo "Step 3 complete."
+echo
+
+#------------------------------------------------------------------------------
+# Step 4: Import media metadata
+#------------------------------------------------------------------------------
+echo "--- Step 4: Import media metadata ---"
+METADATA_DIR="${CINEPHILE_DATA_DIR}/videos/" # mp4 videos and metadata json files are in same folder
+
+METADATA_DB_FILE="${PROJECT_DIR}/metadata/internal.db"
+METADATA_ID="cinephile"
+METADATA_TABLE_NAME="metadata-${METADATA_ID}"
+
+RESULT=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
+if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
+    echo "Importing metadata from JSON files contained in ${METADATA_DIR}/ (takes few seconds) ..."
+    if [ -f "${TEMP_DIR}/${METADATA_TABLE_NAME}.csv" ]; then
+        echo "Deleting existing CSV file: ${TEMP_DIR}/${METADATA_TABLE_NAME}.csv"
+        rm -f "${TEMP_DIR}/${METADATA_TABLE_NAME}.csv"
+    fi
+    python3 scripts/cinephile/export-cinephile-metadata-as-csv.py \
+        --json-dir "${METADATA_DIR}" \
+        --project-dir "${PROJECT_DIR}" \
+        --out-csv-file "${TEMP_DIR}/${METADATA_TABLE_NAME}.csv"
+
+    if [ ! -f "${TEMP_DIR}/${METADATA_TABLE_NAME}.csv" ]; then
+        echo "Metadata export to CSV failed."
+        exit 1
+    fi
+
+    python3 media-metadata.py \
+      import \
+      --metadata-id "${METADATA_ID}" \
+      --from-csv "${TEMP_DIR}/${METADATA_TABLE_NAME}.csv" \
+      --metadata-type "media" \
+      --project-dir "${PROJECT_DIR}"
+
+    # check if the sqlite table was created
+    RESULT=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
+    if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
+        echo "Failed to create SQLite table: $METADATA_TABLE_NAME"
+        exit 1
+    fi
+fi
+
+echo "Step 4 complete."
+echo
+
+#------------------------------------------------------------------------------
+# Step 5: Create search index
+#------------------------------------------------------------------------------
+echo "--- Step 5: Create search index ---"
+FTS_CONFIG_FILENAME="${TEMP_DIR}/fts_config.json" # config for full text search on metadata
+cat > "${FTS_CONFIG_FILENAME}" <<EOF
+{
+  "${METADATA_TABLE_NAME}": [
+    "provider",
+    "title",
+    "type",
+    "year",
+    "country",
+    "language",
+    "data_provider",
+    "dc_contributor",
+    "dc_description",
+    "edm_timespan_label",
+    "edm_preview",
+    "edm_place_latitude",
+    "edm_place_longitude",
+    "edm_place_label",
+    "edm_place_alt_label",
+    "edm_dataset_name",
+    "edm_concept_label"
+  ]
+}
+EOF
+
+FAISS_INDEX_TYPE="IndexFlatIP"
+VIDEO_INDEX_FILENAME1="${PROJECT_DIR}/store/${VIDEO_FEATURE_ID1}/index/video-${FAISS_INDEX_TYPE}.faiss"
+VIDEO_INDEX_FILENAME2="${PROJECT_DIR}/store/${VIDEO_FEATURE_ID2}/index/video-${FAISS_INDEX_TYPE}.faiss"
+AUDIO_INDEX_FILENAME="${PROJECT_DIR}/store/${AUDIO_FEATURE_ID}/index/audio-${FAISS_INDEX_TYPE}.faiss"
+if [ ! -f "${VIDEO_INDEX_FILENAME1}" ] || [ ! -f "${VIDEO_INDEX_FILENAME2}" ] || [ ! -f "${AUDIO_INDEX_FILENAME}" ]; then
+    echo "Creating index (takes about 5 min.) ..."
+    python /wise/create-index.py \
+           --index-type "${FAISS_INDEX_TYPE}" \
+           --fts-config "${FTS_CONFIG_FILENAME}" \
+           --project-dir "$PROJECT_DIR"
+    if [ $? -eq 0 ]; then
+        echo "Search index creation completed successfully."
+    else
+        echo "Failed to create search index."
+        exit 1
+    fi
+fi
+
+echo "Step 5 complete."
 echo

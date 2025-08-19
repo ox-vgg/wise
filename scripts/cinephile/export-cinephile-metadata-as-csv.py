@@ -19,6 +19,7 @@ from src import db
 from src.repository import MediaRepo
 
 import sqlalchemy as sa
+from tqdm import tqdm
 
 def import_metadata_from_json_files(json_dir, project_dir, csv_filename):
     project = WiseProject(project_dir, create_project=False)
@@ -100,12 +101,10 @@ def export_media_metadata(db_engine, colnames, metadata, csv_filename):
             lineterminator='\n'
         )
         writer.writeheader()
-        for media_path in metadata:
-            print(f'Processing metadata for media path: {media_path}')
+        for media_path in tqdm(metadata, desc="Exporting metadata"):
             row = {}
             for colname in colnames:
                 if colname not in metadata[media_path]:
-                    print(f'Warning: Column {colname} not found in metadata for {media_path}')
                     row[colname] = ''
                     continue
                 value = metadata[media_path][colname]
