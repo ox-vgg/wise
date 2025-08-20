@@ -89,6 +89,7 @@ class MicrosoftClapModel(MultiModalModel):
     def model(self):
         return self._clap_wrapper.clap
 
+    @torch.inference_mode()
     def get_audio_features(self, **kwargs) -> torch.Tensor:
         """Extract image features from the model."""
         audio = kwargs.get("audio", None)
@@ -98,6 +99,7 @@ class MicrosoftClapModel(MultiModalModel):
             )
         return self.model.audio_encoder(audio.to(self.DEVICE))[0].float()
 
+    @torch.inference_mode()
     def get_text_features(self, **kwargs) -> torch.Tensor:
         """Extract text features from the model."""
         input_ids = kwargs.get("input_ids", None)
@@ -115,6 +117,7 @@ class MicrosoftClapModel(MultiModalModel):
 
     get_image_features = None  # CLAP does not support image features
 
+    @torch.inference_mode()
     def export_to_onnx(
         self, save_path: Path, audio_inputs: tuple, text_inputs: tuple, **kwargs
     ):
@@ -139,29 +142,20 @@ class MicrosoftClapModel(MultiModalModel):
         audio_encoder = CustomAudioEncoder(model)
         audio_encoder.eval()
 
-        dynamic_axes = {
-            'audio': {
-                0: 'batch_size',
-                1: 'sequence_length',
-            },
-            'embeddings': {
-                0: 'batch_size',
-            }
-        }
-
-        with torch.inference_mode():
-            torch.onnx.export(
-                audio_encoder,
-                audio_inputs,
-                output_path,
-                input_names=["audio"],
-                output_names=[
-                    "embeddings",
-                ],
-                dynamic_axes=dynamic_axes,
-                opset_version=17,
-                do_constant_folding=True,
-            )
+        torch.onnx.export(
+            audio_encoder,
+            audio_inputs,
+            output_path,
+            input_names=["audio"],
+            output_names=[
+                "embeddings",
+            ],
+            dynamo=True,
+            verify=True,
+            do_constant_folding=True,
+            opset_version=20,
+            report=True,
+        )
         logger.info(f"Successfully exported audio model to {output_path}")
 
         class CustomTextEncoder(torch.nn.Module):
@@ -181,17 +175,6 @@ class MicrosoftClapModel(MultiModalModel):
         output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "model.onnx"
 
-        dynamic_axes = {
-            'input_ids': {
-                0: 'batch_size',
-            },
-            'attention_mask': {
-                0: 'batch_size',
-            },
-            'embeddings': {
-                0: 'batch_size',
-            }
-        }
         text_encoder = CustomTextEncoder(model)
         torch.onnx.export(
             text_encoder,
@@ -201,9 +184,10 @@ class MicrosoftClapModel(MultiModalModel):
             output_names=[
                 "embeddings",
             ],
-            dynamic_axes=dynamic_axes,
-            opset_version=17,
             do_constant_folding=True,
+            opset_version=20,
+            dynamo=True,
+            verify=True,
         )
         logger.info(f"Successfully exported text model to {output_path}")
 
@@ -250,6 +234,9 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
         # we instantiate the mode, but we do not keep the CLAP model, as we load it lazily on the requested device
         # later
         self.processor = CLAP(version=self.model_id, use_cuda=False)
+        with torch.no_grad():
+            self.logit_scale = self.processor.clap.logit_scale.detach().clone()
+
         self.processor.clap = None
         del self.processor.clap
 
@@ -290,7 +277,9 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
     def extract_text_features(self, text: List[str]) -> np.ndarray:
         preprocessed_text = self.preprocess_text(text)
         text_embeddings = self.model.get_text_features(**preprocessed_text)
-        text_embeddings = text_embeddings/torch.norm(text_embeddings, dim=-1, keepdim=True)
+        text_embeddings = text_embeddings / torch.norm(
+            text_embeddings, dim=-1, keepdim=True
+        )
         return text_embeddings.cpu().numpy()
 
     def warmup(self):
@@ -301,3 +290,9 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
         text_embedding = self.extract_text_features(["some random text"])
         assert audio_embedding.shape[1] == text_embedding.shape[1]
         return
+
+    def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
+        with torch.no_grad():
+            dist_tensor = torch.from_numpy(dist)
+            dist_tensor = dist_tensor * self.logit_scale.exp()
+            return dist_tensor.detach().numpy()
