@@ -57,19 +57,29 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
 
 # Setup micromamba environment for shot-detection
 FROM wise-base AS shot-detection-env
+WORKDIR /tmp
 RUN git clone https://gitlab.com/vgg/wise/shot-detection.git && \
     cd shot-detection && \
     git submodule update --init --recursive && \
     micromamba create --always-copy --yes -n shot-detection-env -f "environment.yml"
+USER root
+RUN chown -R nonroot:nonroot /tmp/shot-detection
+WORKDIR /tmp/shot-detection
+USER nonroot
 
 # Setup micromamba environment for shot-scale-classifier
 FROM wise-base AS shot-scale-classifier-env
+WORKDIR /tmp
 RUN git clone https://gitlab.com/vgg/wise/shot-scale-classifier.git && \
     cd shot-scale-classifier && \
     git submodule update --init --recursive && \
     micromamba create --always-copy --yes -c conda-forge -n shot-scale-classifier-env python=3.10 && \
     ${MAMBA_ROOT_PREFIX}/envs/shot-scale-classifier-env/bin/python3 -m pip install -r requirements.txt && \
     ${MAMBA_ROOT_PREFIX}/envs/shot-scale-classifier-env/bin/python3 -m pip install torch torchvision torchaudio pandas tqdm omegaconf torchmetrics decord
+USER root
+RUN chown -R nonroot:nonroot /tmp/shot-scale-classifier
+WORKDIR /tmp/shot-scale-classifier
+USER nonroot
 
 # Setup dependencies for WISE frontend
 FROM ${NODE_IMAGE} AS wise-frontend
