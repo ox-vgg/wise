@@ -216,8 +216,20 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
             device="cpu",
             **self.model_kwargs,
         )
-        del _model  # we only needed it to get the preprocess function
 
+        self.tokenizer = open_clip.get_tokenizer(self.pretrained_model_name)
+        with torch.inference_mode():
+            self.logit_scale = (
+                _model.logit_scale.detach()
+                if hasattr(_model, "logit_scale")
+                else torch.tensor(0.0)
+            )
+            self.logit_bias = (
+                _model.logit_bias.detach()
+                if hasattr(_model, "logit_bias")
+                else torch.tensor(0.0)
+            )
+        del _model  # we only needed it to get the preprocess function
         if warmup:
             self.warmup()
 
@@ -298,3 +310,10 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         # calculating the output dim does the warmup anyway
         _ = self.output_dim
         return
+
+    def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
+        with torch.no_grad():
+            dist_tensor = torch.from_numpy(dist)
+            dist_tensor = dist_tensor * self.logit_scale.exp() + self.logit_bias
+
+            return dist_tensor.detach().numpy()
