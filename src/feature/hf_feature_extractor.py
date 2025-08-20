@@ -48,6 +48,9 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         self.processor = AutoProcessor.from_pretrained(model_name, use_fast=True)
         model = AutoModel.from_config(self.model_config, **self.model_kwargs)
 
+        self.logit_scale = getattr(model, "logit_scale", torch.tensor(0.0))
+        self.logit_bias = getattr(model, "logit_bias", torch.tensor(0.0))
+
         if not hasattr(model, 'get_image_features'):
             self.extract_image_features = None
 
@@ -149,6 +152,12 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
 
         self.extract_image_features(torch.rand((1, 3, 224, 224)))
         self.extract_text_features(['dummy text'])
+
+    def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
+        with torch.no_grad():
+            dist_tensor = torch.from_numpy(dist)
+            dist_tensor = dist_tensor * self.logit_scale.exp() + self.logit_bias
+            return dist_tensor.detach().numpy()
 
 
 if __name__ == "__main__":
