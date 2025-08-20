@@ -258,7 +258,15 @@ class TransformersOWLv2Model(MultiModalModel):
                 "Images tensor input is required for image feature extraction."
             )
 
-        return get_object_features(self.model, images.to(self.DEVICE))
+        scores, embeddings, boxes = get_object_features(
+            self.model, images.to(self.DEVICE)
+        )
+
+        return {
+            "scores": scores.float(),
+            "embeddings": embeddings.float(),
+            "boxes": boxes.float(),
+        }
 
     def get_text_features(self, **kwargs) -> torch.Tensor:
         """
@@ -563,9 +571,11 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
             "pixel_values"
         ]  # shape: (B, C, 960, 960)
 
-        batch_objectness_scores, batch_image_class_embeds, batch_pred_boxes = (
-            self.model.get_image_features(images=images)
-        )
+        outputs = self.model.get_image_features(images=images)
+        batch_objectness_scores = outputs["scores"]
+        batch_image_class_embeds = outputs["embeddings"]
+        batch_pred_boxes = outputs["boxes"]
+
         # Having the feature for the "most object" first is important for
         # searching with images since only the first feature is used.
         batch_objectness_scores, batch_image_class_embeds, batch_pred_boxes = (
