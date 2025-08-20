@@ -2,6 +2,7 @@ import argparse
 import json
 import requests
 import os
+import time
 
 def evaluate_performance(wise_url, queries, strategy_func, verbose=False):
     """
@@ -113,8 +114,11 @@ def main():
     # 3. Evaluate each strategy silently
     print("\nEvaluating strategies...")
     for desc, func in strategies.items():
-        print(f"  - Running strategy: \"{desc}\"")
+        start_time = time.time()
         recall = evaluate_performance(args.wise_url, queries, func, verbose=False)
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"  - Running strategy: \"{desc}\" (Recall: {recall:.2f}, took {duration:.2f}s)")
         results.append({"top-k": 1000, "description": desc, "recall": recall, "func": func})
 
     # 4. Sort results to find the best one
@@ -127,7 +131,7 @@ def main():
         evaluate_performance(args.wise_url, queries, best_strategy['func'], verbose=True)
 
     # 6. Print the final summary table
-    print("\n|-------+-------------------------------------------------+--------|")
+    print("|-------+-------------------------------------------------+--------|")
     print("| top-k | Update to the original query                    | Recall |")
     print("|-------+-------------------------------------------------+--------|")
     for res in results:
