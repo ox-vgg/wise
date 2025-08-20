@@ -41,10 +41,10 @@ parser.add_argument(
     help="Verify the model export by running inference on a dummy input.",
 )
 parser.add_argument(
-    '--batch_size',
+    "--batch_size",
     type=int,
-    default=1,
-    help='Batch size for the dummy input (default: 1).'
+    default=2,
+    help="Batch size for the dummy input (default: 2).",
 )
 args = parser.parse_args()
 if hasattr(torch.backends, 'mha'):
@@ -86,10 +86,14 @@ with torch.inference_mode():
     logger.info(f"Text Features Shape: {text_features.shape}")
 
     if feature_extractor.preprocess_audio is not None:
-        preprocessed_audio = feature_extractor.preprocess_audio(audio_tensor)
+        preprocessed_audio = torch.cat(
+            [feature_extractor.preprocess_audio(x.unsqueeze(0)) for x in audio_tensor],
+            dim=0,
+        )
+        print(preprocessed_audio.shape)
         audio_features = feature_extractor.extract_audio_features(preprocessed_audio)
         logger.info(f"Audio Features Shape: {audio_features.shape}")
-    
+
     if feature_extractor.preprocess_image is not None:
         preprocessed_image = feature_extractor.preprocess_image(image_tensor)
         image_features = feature_extractor.extract_image_features(preprocessed_image)
@@ -147,7 +151,7 @@ def _get_normalizer():
         def normalize(x):
             return x / np.linalg.norm(x, axis=-1, keepdims=True)
     return normalize
-        
+
 def _run(session: ort.InferenceSession, inputs):
     ort_inputs = {name: value.detach().numpy() for name, value in inputs.items()}
     ort_outputs = session.run(None, ort_inputs)
