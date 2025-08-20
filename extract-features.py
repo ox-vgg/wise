@@ -83,8 +83,9 @@ def initialise_feature_extractors(
 def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] = ['*'], include_filenames: list[str] = None):
 
     # Get files matching extensions
-    input_files = list(
-        get_files_from_directory_with_extensions(media_dir, include_extensions)
+    input_files = sorted(
+        get_files_from_directory_with_extensions(media_dir, include_extensions),
+        key=lambda x: str(x),
     )
 
     if include_filenames is not None:
