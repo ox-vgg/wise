@@ -1188,7 +1188,6 @@ def _get_search_router(config: APIConfig):
                     prefixed_queries = f"{query_prefix} {query.strip()}".strip()
                 else:
                     prefixed_queries = query.strip()
-                print(f'Extracting features from text: {prefixed_queries}')
                 feature_vector = extract_features_from_text([prefixed_queries])
                 weights.append(
                     config.text_queries_weight
@@ -1251,8 +1250,32 @@ def _get_search_router(config: APIConfig):
                 project_assets[media_type][feature_extractor_id],
                 feature_extractors[feature_extractor_id],
             )
-            logger.info(f"Loading faiss index from {search_indices[media_type][feature_extractor_id].get_index_filename(config.index_type)}")
-            if not search_indices[media_type][feature_extractor_id].load_index(config.index_type, project_engine):
+            asset = project_assets[media_type][feature_extractor_id]
+            index_type_to_load = config.index_type
+
+            if index_type_to_load:
+                # check if the preferred index type is available
+                preferred_index_filename = search_indices[media_type][feature_extractor_id].get_index_filename(index_type_to_load)
+                if not os.path.exists(preferred_index_filename):
+                    logger.warning(f"Index file not found for preferred index type {index_type_to_load}. Will try to load any other available index.")
+                    index_type_to_load = None
+
+            if not index_type_to_load:
+                # load any available index
+                available_indices = [
+                    f for f in asset['index_files'] if f.endswith('.faiss')
+                ]
+                if available_indices:
+                    # extract index type from filename, e.g. "video-IndexFlatIP.faiss" -> "IndexFlatIP"
+                    index_type_to_load = Path(available_indices[0]).stem.split('-')[1]
+                    logger.info(f"Loading available index of type {index_type_to_load}")
+                else:
+                    logger.error(f"No index files found for {media_type} and {feature_extractor_id}")
+                    del search_indices[media_type][feature_extractor_id]
+                    continue
+
+            logger.info(f"Loading faiss index from {search_indices[media_type][feature_extractor_id].get_index_filename(index_type_to_load)}")
+            if not search_indices[media_type][feature_extractor_id].load_index(index_type_to_load, project_engine):
                 print(f'failed to load {media_type} index: {feature_extractor_id}')
                 del search_indices[media_type][feature_extractor_id]
                 continue

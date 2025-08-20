@@ -47,6 +47,11 @@ if __name__ == '__main__':
                         type=str,
                         help='folder where all project assets are stored')
 
+    parser.add_argument('--feature-id',
+                        required=False,
+                        type=str,
+                        help='the id of the feature to create an index for')
+
     parser.add_argument('--fts-config', help='json file representing the config for building the FTS5 index')
     args = parser.parse_args()
 
@@ -86,13 +91,19 @@ if __name__ == '__main__':
                 logging.exception('failed to create metadat index')
                 project.fts_config_file.unlink(missing_ok=True)     
         else:
-            for asset_id in project_assets[media_type]:
-                asset = project_assets[media_type][asset_id]
+            feature_extractor_id_list = list(project_assets[media_type].keys())
+            if args.feature_id:
+                if args.feature_id not in feature_extractor_id_list:
+                    raise ValueError(f'feature id {args.feature_id} not found for media type {media_type}')
+                feature_extractor_id_list = [args.feature_id]
+
+            for feature_extractor_id in feature_extractor_id_list:
+                asset = project_assets[media_type][feature_extractor_id]
                 feature_extractor = FeatureExtractorFactory(
-                    asset_id,
+                    feature_extractor_id,
                     warmup=True,
                 )
                 search_index = SearchIndexFactory(
-                    media_type, asset_id, asset, feature_extractor
+                    media_type, feature_extractor_id, asset, feature_extractor
                 )
                 search_index.create_index(args.index_type, args.overwrite)
