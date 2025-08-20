@@ -1184,7 +1184,11 @@ def _get_search_router(config: APIConfig):
                                 else 1
                             )
             elif query_dict['modality'] == 'text':
-                prefixed_queries = f"{query_prefix} {query.strip()}".strip()
+                if query_prefix:
+                    prefixed_queries = f"{query_prefix} {query.strip()}".strip()
+                else:
+                    prefixed_queries = query.strip()
+                print(f'Extracting features from text: {prefixed_queries}')
                 feature_vector = extract_features_from_text([prefixed_queries])
                 weights.append(
                     config.text_queries_weight
@@ -1700,6 +1704,7 @@ def _get_search_router(config: APIConfig):
         thumbnails_to_send: int = Query(0),
         shot_scale: str = Query(None),
         metadata_filter: List[str] = Query(default=[]),
+        add_prefix: bool = Query(True)
     ):
         """
         Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
@@ -1876,7 +1881,8 @@ def _get_search_router(config: APIConfig):
             extract_image_features=extract_image_features,
             extract_audio_features=extract_audio_features,
             get_ext_metadata=search_index.feature_extractor.get_vector_metadata,
-            filter_specs=filter_specs
+            filter_specs=filter_specs,
+            add_prefix=add_prefix
         )
 
     def similarity_search(
@@ -1892,8 +1898,10 @@ def _get_search_router(config: APIConfig):
         extract_audio_features: Callable[[List[io.BytesIO]], ndarray] = None,
         get_ext_metadata: Callable[[list[int]], list[FeatureExtMetadata]] = None,
         filter_specs: Dict[str, Any] = None,
+        add_prefix: bool = True,
     ):
-        features = _get_query_features(_prefix[search_in], q, extract_text_features, extract_image_features, extract_audio_features)
+        prefix = _prefix[search_in] if add_prefix else ""
+        features = _get_query_features(prefix, q, extract_text_features, extract_image_features, extract_audio_features)
         if filter_specs is not None:
             filtered_ids = get_filtered_ids(filter_specs, search_in, feature_extractor_id)
             sel = faiss.IDSelectorBatch(filtered_ids)
