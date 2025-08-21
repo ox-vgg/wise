@@ -1144,7 +1144,7 @@ def _get_search_router(config: APIConfig):
                         else 1
                     )
                 elif query.startswith(("http://", "https://")):
-                    logger.info("Downloading", query, "to file")
+                    logger.info("Downloading %s to file", query)
                     with NamedTemporaryFile() as tmpfile:
                         download_url_to_file(query, tmpfile.name)
                         with Image.open(tmpfile.name) as im:
