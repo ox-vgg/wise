@@ -535,7 +535,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
           </div>
         </>
       )}
-      {projectInfo.is_metadata_supported && is_metadata_filter_supported(projectInfo, viewModality) && (
+      {projectInfo.is_metadata_supported && is_metadata_filter_supported(projectInfo, viewModality) && !featureExtractorId.includes('metadata') && (
         <>
           <Tooltip title="Add a metadata filter to restrict the search only to media files that match the metadata query.">
             <Divider orientation="left">
