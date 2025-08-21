@@ -56,7 +56,7 @@ const VIEW_MODALITY_OPTIONS_EXTRA = {
 type ViewModalityKey = keyof typeof VIEW_MODALITY_OPTIONS;
 
 
-const TextSearchForm: React.FunctionComponent<TextSearchFormProps> = ({
+const TextSearchForm: React.FunctionComponent<React.PropsWithChildren<TextSearchFormProps>> = ({
   multimodalQueries, setMultimodalQueries,
   searchText = '',
   submitSearch,

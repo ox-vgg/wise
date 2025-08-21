@@ -62,6 +62,11 @@ const productionConfig = {
         text: 'at night'
       },
     ],
+    'VideoAudio:clap': [
+      {
+        text: 'alarm',
+      }
+    ]
   },
   ENABLE_REPORT_MEDIA: true, // shows a "Report media" button in the image details page
   SHOT_SCALE_FILTER_LABEL: {
