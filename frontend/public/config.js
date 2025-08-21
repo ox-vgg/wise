@@ -7,27 +7,13 @@ const productionConfig = {
   FETCH_TIMEOUT: 60000, // Number of milliseconds to wait when fetching search results / featured images
   REPO_URL: "https://gitlab.com/vgg/wise/wise",
   WISE_OVERVIEW_CARD: {
+    OVERVIEW: `This is audiovisual search engine on the WISE Search Engine (<a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">WISE</a>) software.`,
     ABOUT: `
-     <p>
-      WISE Search Engine (WISE) is an open source software that enables search of
-      large collections of images, audio and video using natural language. The search is
-      based solely on audiovisual content.
-      </p>
-      For example, the search query "hand holding a cup" can be used to
-      immediately retrieve images or video clips showing relevant results,
-      where the search results are obtained solely by analysis of the visual content.
-      Similarly, sounds, faces and particular objects can also be searched for using the respective modes.
-    </p>
-     <p>
-      WISE is developed and maintained by the Visual Geometry Group (<a href="https://www.robots.ox.ac.uk/~vgg/">VGG</a>)
-      of Department of Engineering Science at University of Oxford. </p>
-      <p>More details about WISE can be found in the <a href="https://gitlab.com/vgg/wise/wise/-/tree/wise2/">code repository</a> and from the <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">project page</a>.</p>
+     <p>This audiovisual search engine is based on the WISE Search Engine (<a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">WISE</a>) software developed and maintained by the Visual Geometry Group (<a href="https://www.robots.ox.ac.uk/~vgg/">VGG</a>) of Department of Engineering Science at University of Oxford.</p>
+     <p>More details about WISE can be found in the <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">project page</a> and the <a href="https://gitlab.com/vgg/wise/wise/-/tree/wise2/">code repository</a>.</p>
     `,
     DISCLAIMER: `
-      <ul>
-        <li>Feel free to write a custom disclaimer here</li>
-        <li>Lorem ipsum</li>
-      </ul>
+      <p>The media showcased in this demo are for research purposes only. All rights to the original content are held by their respective copyright owners.</p>
     `
   },
   // Example queries shown in Overview card
