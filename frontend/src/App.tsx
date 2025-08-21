@@ -76,7 +76,7 @@ export const App: React.FunctionComponent = () => {
   useEffect(() => {
     // When WISE starts, these may be the empty string.  Wait until
     // they are set before fetching featured images.
-    if (!viewModality || !featureExtractorId || !isHomePage)
+    if (!viewModality || !featureExtractorId)
       return;
 
     // Now that we have set the feature extractor and modality, we can
@@ -99,8 +99,8 @@ export const App: React.FunctionComponent = () => {
   }, [viewModality, featureExtractorId]);
 
   const _submitSearch = (queries: Query[], _viewModality: ViewModality, _featureExtractorId: string) => {
-    setIsHomePage(false); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
     dataService.performNewSearch(queries, _viewModality, _featureExtractorId, shotScaleFilter).then(_ => {
+      setIsHomePage(false); // TODO set setIsFeaturedImages based on the page route, rather than setting it here
     }).catch((err) => {
       Modal.error({
         icon: (err.status === 403) ? <StopTwoTone twoToneColor="#ff4d4f" /> : <CloseCircleFilled />,
