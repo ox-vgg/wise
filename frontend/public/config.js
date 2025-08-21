@@ -54,7 +54,10 @@ const productionConfig = {
     2: "Medium shot",
     3: "Full shot",
     4: "Long shot"
-  }
+  },
+  METADATA_TABLE_COLUMNS: [],
+  METADATA_FILTER_PLACEHOLDER: "",
+  METADATA_FILTER_HELP: "Use AND/OR to combine filters, Ctrl + Space key to show metadata columns."
 };
 
 // Config for development mode

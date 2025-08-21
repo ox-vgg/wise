@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Header } from 'antd/es/layout/layout';
-import { Alert, Button, Checkbox, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
-import { CaretRightOutlined, CloseOutlined, FileTextTwoTone, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
+import { AutoComplete, Alert, Button, Checkbox, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
+import { CaretRightOutlined, CloseOutlined, FileTextTwoTone, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, QuestionCircleOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
@@ -38,6 +38,10 @@ const TextSearchForm: React.FunctionComponent<React.PropsWithChildren<TextSearch
   useEffect(() => {
     formRef.current?.setFieldsValue({ 'text-query': searchTextLocal });
   }, [searchTextLocal]);
+
+  useEffect(() => {
+    setSearchTextLocal(searchText);
+  }, [searchText]);
 
   const onFormSubmit = (e: any) => {
     console.log('Submit event', e);
@@ -293,6 +297,58 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
 
   const [selectedModality, setSelectedModality] = useState<string>('image');
   const [isModalitySelected, setIsModalitySelected] = useState<boolean>(false);
+
+  const [metadataFilterText, setMetadataFilterText] = useState('');
+  const [metadataOptions, setMetadataOptions] = useState<{
+    label: React.ReactNode;
+    options?: { value: string; label: string }[];
+  }[]>([]);
+  const [isMetadataDropdownVisible, setIsMetadataDropdownVisible] = useState(false);
+
+  const handleMetadataSearch = (value: string) => {
+    if (!config.METADATA_TABLE_COLUMNS) {
+      setMetadataOptions([]);
+      return;
+    }
+
+    const lastSpaceIndex = value.lastIndexOf(' ');
+    const currentTerm = value.substring(lastSpaceIndex + 1);
+
+    if (currentTerm.includes(':')) {
+      setMetadataOptions([]);
+      return;
+    }
+
+    const allColumns = config.METADATA_TABLE_COLUMNS;
+    const filteredColumns = currentTerm
+      ? allColumns.filter(col =>
+          col.toLowerCase().startsWith(currentTerm.toLowerCase())
+        )
+      : allColumns;
+
+    if (filteredColumns.length > 0) {
+      setMetadataOptions([
+        {
+          label: <b>Metadata Columns</b>,
+          options: filteredColumns.map(col => ({
+            value: col,
+            label: col,
+          })),
+        },
+      ]);
+    } else {
+      setMetadataOptions([]);
+    }
+  };
+
+  const onMetadataSelect = (selectedValue: string) => {
+    const currentText = metadataFilterText;
+    const lastSpaceIndex = currentText.lastIndexOf(' ');
+    const prefix = lastSpaceIndex === -1 ? '' : currentText.substring(0, lastSpaceIndex + 1);
+    setMetadataFilterText(prefix + selectedValue + ':');
+    setIsMetadataDropdownVisible(false);
+  };
+
   const toggleModality = (modality: string) => {
     if (isModalitySelected && selectedModality === modality) {
       setIsModalitySelected(false);
@@ -410,8 +466,13 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
       {/* fixme: find a better way to disable the shot scale filter if audio is selected */}
       {(projectInfo.shot_based_filters?.shot_scale?.options && viewModality !== 'VideoAudio' && featureExtractorId.split('/')[1] !== 'clap') && (
         <>
-          <Tooltip title="Filter results by shot scale">
-            <Divider orientation="left">Shot Scale</Divider>
+          <Tooltip title="Show search results with only frames that match the selected shot scale (e.g. close up)">
+            <Divider orientation="left">
+              <Space>
+                Filter by Shot Scale
+                <QuestionCircleOutlined />
+              </Space>
+            </Divider>
           </Tooltip>
           <div>
             <Checkbox.Group
@@ -429,17 +490,72 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
       )}
       {projectInfo.is_metadata_supported && is_metadata_filter_supported(projectInfo, viewModality) && (
         <>
-          <Divider orientation="left">Filter by Metadata</Divider>
-          <TextSearchForm multimodalQueries={multimodalQueries} setMultimodalQueries={setMultimodalQueries}
-            placeholder='Enter filter query'
-            queryType='METADATA'
-            submitSearch={submitSearch}
-            buttonText='Add Filter'
-          >
-            <p style={{ marginTop: 0, color: token.colorTextDescription }}>
-              Add a metadata filter to restrict the search only to media files that match the metadata query.
-            </p>
-          </TextSearchForm>
+          <Tooltip title="Add a metadata filter to restrict the search only to media files that match the metadata query.">
+            <Divider orientation="left">
+              <Space>
+                Filter by Metadata
+                <QuestionCircleOutlined />
+              </Space>
+            </Divider>
+          </Tooltip>
+          {config.METADATA_TABLE_COLUMNS && (
+            <>
+              <Space.Compact style={{ width: '100%' }}>
+                <AutoComplete
+                  value={metadataFilterText}
+                  options={metadataOptions}
+                  style={{ width: '100%' }}
+                  onSelect={onMetadataSelect}
+                  onSearch={handleMetadataSearch}
+                  onChange={setMetadataFilterText}
+                  onFocus={() => {
+                    handleMetadataSearch(metadataFilterText);
+                    setIsMetadataDropdownVisible(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey && e.key === ' ') {
+                      e.preventDefault();
+                      handleMetadataSearch(metadataFilterText);
+                      setIsMetadataDropdownVisible(true);
+                    }
+                  }}
+                  onBlur={() => setIsMetadataDropdownVisible(false)}
+                  open={isMetadataDropdownVisible}
+                  placeholder={config.METADATA_FILTER_PLACEHOLDER}
+                  popupMatchSelectWidth={false}
+                  popupClassName="wise-metadata-autocomplete-dropdown"
+                  dropdownRender={(menu) => (
+                    <div
+                      style={{
+                        minWidth: 150,
+                        width: 'fit-content',
+                        backgroundColor: '#f6f6f6',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      {menu}
+                    </div>
+                  )}
+                />
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    if (!metadataFilterText.trim()) return;
+                    const newQuery = { id: nanoid(), type: 'METADATA' as const, value: metadataFilterText.trim(), displayText: metadataFilterText.trim() };
+                    const updatedQueries = [...multimodalQueries, newQuery];
+                    setMultimodalQueries(updatedQueries);
+                    setMetadataFilterText('');
+                    submitSearch(updatedQueries);
+                  }}
+                >
+                  Add Filter
+                </Button>
+              </Space.Compact>
+              <p style={{ marginTop: 5, color: token.colorTextDescription }}>
+                {config.METADATA_FILTER_HELP}
+              </p>
+            </>
+          )}
         </>
       )}
       {

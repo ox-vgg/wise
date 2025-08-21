@@ -18,6 +18,9 @@ type ConfigType = {
   }[];
   ENABLE_REPORT_MEDIA: boolean;
   SHOT_SCALE_FILTER_LABEL: { [key: number]: string };
+  METADATA_TABLE_COLUMNS?: string[];
+  METADATA_FILTER_PLACEHOLDER?: string;
+  METADATA_FILTER_HELP?: string;
 };
 
 declare global {
