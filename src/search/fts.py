@@ -406,10 +406,13 @@ class FTSSearch:
 
         ids = conn.execute(stmt).scalars().all()
         cte = get_cte_from_media_ids(ids)
+        if not ids:
+            if ids_only:
+                return None
+            else:
+                return []
         if ids_only:
             return cte
-        if not ids:
-            return []
 
         from_clause = cte.join(
             db.media_table,

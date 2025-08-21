@@ -1986,6 +1986,9 @@ def _get_search_router(config: APIConfig):
                 media_ids_cte = search_indices[media_type]["wise/metadata"].search(
                     conn, metadata_query, ids_only=True
                 )
+                if media_ids_cte is None:
+                    return np.array([], dtype=np.int64)
+
                 vector_ids = (
                     conn.execute(
                         sa.select(db.vectors_table.c.id).select_from(
