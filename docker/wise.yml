@@ -31,6 +31,8 @@ dependencies:
     - filetype>=1.2.0,<2
     - webvtt-py
     - msclap>=1.3.4
+    - accelerate
+    - tritonclient[all]
 
 variables:
   PYTHONNOUSERSITE: 1
