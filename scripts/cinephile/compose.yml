@@ -1,81 +1,105 @@
+x-common: &common
+  # Request NVIDIA gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: 'nvidia'
+            capabilities: [gpu]
+            count: all
+  # Increase shared memory size to prevent segmentation faults with PyTorch/multiprocessing
+  shm_size: '2gb'
+  ulimits:
+    memlock: -1
+    stack: 67108864
+
+  # Attach a tty so that we can send interact with the container if needed
+  tty: true
+
+  volumes:
+    # For development: Mount the entire project directory to instantly reflect
+    # local changes in the container. Remove for production.
+    - ../../:/wise
+    # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
+    # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
+    - ${CINEPHILE_DATA_DIR?'CINEPHILE_DATA_DIR must be set to the location of dataset before running this container'}:/data/cinephile/
+    - wise-cache:/tmp/cache
+
+  environment: &env
+    MODE: production
+    HOST_UID: ${HOST_UID?'HOST_UID must be set before using this compose.yaml. Please see docs/Docker.md'}
+    HOST_GID: ${HOST_GID?'HOST_GID must be set before using this compose.yaml. Please see docs/Docker.md'}
+    CINEPHILE_DATA_DIR: /data/cinephile
+
 services:
   wise:
+    # add common settings
+    <<: *common
+    restart: unless-stopped
+
+    command:
+      - python3
+      - serve.py
+      - --index-type
+      - IndexFlatIP
+      - --project-dir
+      - /data/cinephile/wise-project/cinephile/
+
     build:
       context: ../../
       dockerfile: scripts/cinephile/Dockerfile
       target: wise
-      args:
-        - HOST_UID=${HOST_UID:-1000}
-        - HOST_GID=${HOST_GID:-1000}
-    image: wise-cinephile:latest
-    # Keep the container running in the background
-    tty: true
-    runtime: nvidia
+    
+    image: ${REGISTRY:-$USER}/wise:${VERSION:-cinephile}
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - ENV_NAME=wise-env # default micromamba environment
-    # HOST_UID and HOST_GID are needed at runtime to make sure the volume mounts work alright
-    user: ${HOST_UID?'HOST_UID must be set before using this compose.yaml. Please see docs/Docker.md'}:${HOST_GID?'HOST_GID must be set before using this compose.yaml. Please see docs/Docker.md'}
+      <<: *env
+      ENV_NAME: wise-env # default micromamba environment
+      PORT: ${WISE_HOST_PORT:-10001}  # Port to run the WISE server on
+      USE_SHOTS: 1
+    
+    ports:
+      # Set the WISE_HOST_PORT environment variable to map a different host port.
+      # Example: export WISE_HOST_PORT=12345
+      - "${WISE_HOST_PORT:-10001}:${WISE_HOST_PORT:-10001}"
 
-    # Increase shared memory size to prevent segmentation faults with PyTorch/multiprocessing
-    shm_size: '2gb'
     volumes:
+      # Cannot use anchors here, so repeat the volume definitions
       # For development: Mount the entire project directory to instantly reflect
       # local changes in the container. Remove for production.
       - ../../:/wise
       # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
       # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
-      - ${CINEPHILE_DATA_DIR}:/data/cinephile/
-
-    ports:
-      # Set the WISE_HOST_PORT environment variable to map a different host port.
-      # Example: export WISE_HOST_PORT=12345
-      - "${WISE_HOST_PORT:-10001}:10001"
+      - ${CINEPHILE_DATA_DIR?'CINEPHILE_DATA_DIR must be set to the location of dataset before running this container'}:/data/cinephile/
+      - wise-cache:/tmp/cache
+      - ./wise-frontend-config.js:/app/frontend/dist/config.js:ro # custom frontend config
 
   shot-detection:
+    # add common settings
+    <<: *common
+    
     build:
       context: ../../
       dockerfile: scripts/cinephile/Dockerfile
       target: shot-detection-env
-      args:
-        - HOST_UID=${HOST_UID:-1000}
-        - HOST_GID=${HOST_GID:-1000}
-    image: wise-shot-detection:latest
-    # Keep the container running in the background
-    tty: true
+
+    image: ${REGISTRY:-$USER}/shot-detection:${VERSION:-cinephile}
     environment:
-      - ENV_NAME=shot-detection-env # default micromamba environment
-    volumes:
-      # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
-      # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
-      - ${CINEPHILE_DATA_DIR}:/data/cinephile/
-      # For development: Mount the entire project directory to instantly reflect
-      # local changes in the container. Remove for production.
-      - ../../:/wise
+      <<: *env
+      ENV_NAME: shot-detection-env # default micromamba environment
 
   shot-scale-classifier:
+    <<: *common
+
     build:
       context: ../../
       dockerfile: scripts/cinephile/Dockerfile
       target: shot-scale-classifier-env
-      args:
-        - HOST_UID=${HOST_UID:-1000}
-        - HOST_GID=${HOST_GID:-1000}
-    image: wise-shot-scale-classifier:latest
-    # Keep the container running in the background
-    tty: true
-    runtime: nvidia
+
+    image: ${REGISTRY:-$USER}/shot-scale-classifier:${VERSION:-cinephile}
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - ENV_NAME=shot-scale-classifier-env # default micromamba environment
-    # Increase shared memory size to prevent segmentation faults with PyTorch/multiprocessing
-    shm_size: '2gb'
-    volumes:
-      # Set the CINEPHILE_DATA_DIR environment variable on your host to map a local folder here.
-      # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
-      - ${CINEPHILE_DATA_DIR}:/data/cinephile/
-      # For development: Mount the entire project directory to instantly reflect
-      # local changes in the container. Remove for production.
-      - ../../:/wise
+      <<: *env
+      ENV_NAME: shot-scale-classifier-env # default micromamba environment
+
+
+volumes:
+  wise-cache:

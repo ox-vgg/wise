@@ -29,31 +29,27 @@ After step 3, a basic audiovisual search engine is ready. The remaining steps ar
 
 ## Create Audiovisual Search Engine (Simple)
 Uses pre-computed data and therefore does not demand huge computational and storage resources.
-@TODO
 
-## Create Audiovisual Search Engine (Advanced)
-```
-export BASEDIR=$HOME
-cd $BASEDIR
-git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
-cd $BASEDIR/wise/
-docker system prune -a                      # to free docker storage
-export CINEPHILE_DATA_DIR=/data/cinephile/  # folder to store all data
+```bash
+# Clone the code
+git clone -b cinephile2025 https://gitlab.com/vgg/wise/wise.git
+cd wise
 
-# Build docker image for WISE (requires 11.4GB, takes 13min)
-# if sudo is required, the use `sudo -E HOST_UID=$(id -u) ...`
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml \
-  build wise
+# Setup env vars
+HOST_UID=$(id -u $USER) HOST_GID=$(id -g $USER) envsubst < .env.template > .env
+export COMPOSE_FILE="scripts/cinephile/compose.yml"
 
-# Run wise container in background
-HOST_UID=$(id -u) HOST_GID=$(id -g) CINEPHILE_DATA_DIR="/data/cinephile/" docker compose -f scripts/cinephile/compose.yml up -d wise
+# folder to store all data
+# change this if you want to store the data elsewhere
+export CINEPHILE_DATA_DIR="$PWD/data/cinephile/" 
+mkdir -p ${CINEPHILE_DATA_DIR}
 
-# Create WISE project containing audiovisual features (requires 8GB, takes 13.6 hours)
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
-  /wise/scripts/cinephile/create-wise-project.sh
+# pull pre-built docker image
+docker compose pull wise
+
+# Download data and features
+docker compose run --rm -it wise scripts/cinephile/download-data.sh
+docker compose run --rm -it wise scripts/cinephile/download-project.sh
 ```
 
 At this stage, the `CINEPHILE_DATA_DIR/wise-project/cinephile` folder
@@ -62,22 +58,59 @@ and metadata corresponding to all the 787 videos in the Cinephile dataset.
 A WISE search engine based on this project can be made available to users
 as follows:
 
+```bash
+# Serve
+docker compose up wise
 ```
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
-  bash -c '
-    LISTEN_ADDRESS="0.0.0.0" \
-    PORT="10001" \
-    python serve.py \
-      --index-type IndexFlatIP \
-      --project-dir /data/cinephile/wise-project/cinephile/
-  '
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f docs/cinephile/compose.yml exec \
-  wise bash -c 'LISTEN_ADDRESS="0.0.0.0" PORT="10001" /env/bin/python serve.py --index-type 
-     IndexFlatIP --project-dir /data/cinephile/wise-project/cinephile/'
 
+You will see an output as follows when the service is up and running
+```
+...
+2025-08-19 13:04:11,422 (MainThread): api - INFO - Loading html user interface from frontend/dist
+2025-08-19 13:04:11,422 (MainThread): api - INFO - Open http://0.0.0.0:10001/cinephile/ in your browser
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:10001 (Press CTRL+C to quit)
+...
+```
+
+Now the search engine can be accessed by visiting [http://0.0.0.0:10001/cinephile/](http://0.0.0.0:10001/cinephile/) using a web browser. We recommand using the Google Chrome (or Chromium) browser as they have better handling for web pages containing a large number of videos.
+
+## Create Audiovisual Search Engine (Advanced)
+
+Step by step instructions to reproduce the project from scratch
+
+```bash
+export BASEDIR=$HOME
+cd $BASEDIR
+git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
+cd $BASEDIR/wise/
+HOST_UID=$(id -u $USER) HOST_GID=$(id -g $USER) envsubst < .env.template > .env
+export COMPOSE_FILE=scripts/cinephile/compose.yml
+
+export CINEPHILE_DATA_DIR="$PWD/data/cinephile/"  # folder to store all data.
+mkdir -p ${CINEPHILE_DATA_DIR}
+
+# Build docker image for WISE (requires 11.4GB, takes 13min)
+# if sudo is required, the use `sudo -E HOST_UID=$(id -u) ...`
+docker compose build wise
+
+# Create WISE project containing audiovisual features (requires 8GB, takes 13.6 hours)
+docker compose run -it wise scripts/cinephile/create-wise-project.sh
+```
+
+At this stage, the `${CINEPHILE_DATA_DIR}/wise-project/cinephile` folder
+contains a WISE project that can be used to search audio, video, face
+and metadata corresponding to all the 787 videos in the Cinephile dataset.
+A WISE search engine based on this project can be made available to users
+as follows:
+
+```bash
+docker compose up wise
+```
+
+Once the app is up and running you will see a log similar to one shown below
+
+```
 ...
 2025-08-19 13:04:11,422 (MainThread): api - INFO - Loading html user interface from frontend/dist
 2025-08-19 13:04:11,422 (MainThread): api - INFO - Open http://0.0.0.0:10001/cinephile/ in your browser
@@ -87,78 +120,60 @@ INFO:     Uvicorn running on http://0.0.0.0:10001 (Press CTRL+C to quit)
 ```
 Now the search engine can be accessed by visiting [http://0.0.0.0:10001/cinephile/](http://0.0.0.0:10001/cinephile/) using a web browser. We recommand using the Google Chrome (or Chromium) browser as they have better handling for web pages containing a large number of videos.
 
-We now detect the shot boundaries (i.e. shot video segments).
+We now proceed to detect the shot boundaries (i.e. shot video segments).
 
-```
+```bash
 # Create docker container for detecting shot boundaries (requires 12GB, takes 7 min)
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml \
-  build shot-detection
-
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml \
-  up -d shot-detection
+docker compose build shot-detection
 
 # Find shot boundaries for visual content (requires 70MB, takes 3.3 hours)
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile shot-detection \
-  /wise/scripts/cinephile/generate-shot-boundary.sh
+docker compose run -it shot-detection bash generate-shot-boundary.sh
 
 # Import shot boundaries in the WISE project
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
-  bash -c '
-    /opt/conda/envs/wise-env/bin/python media-metadata.py \
+docker compose run -it wise \
+  python media-metadata.py \
     import-shots \
     --project-dir "/data/cinephile/wise-project/cinephile/" \
     --from-csv "/data/cinephile/wise-project/cinephile/shot-boundaries.csv"
-  '
 ```
-
 
 Next, we detect the scale (i.e. close-up, full shot, etc) of each shot.
 
+```bash
+# Build docker container for classifying shot scale
+docker compose build shot-scale-classifier
+
+# Classify scale of each shot and import as metadata (requires 3Mb, takes ~ 1 hour)
+docker compose run -it shot-scale-classifier bash classify-shot-scale.sh
+
+# import shot scale
+docker compose run -it wise \
+  python3 media-metadata.py \
+    import-shot-scale \
+    --project-dir "/data/cinephile/wise-project/cinephile/" \
+    --from-csv "/data/cinephile/wise-project/cinephile/thumbs-shot-scale.csv"
 ```
-# Build docker container for classifying shot scale (requires ?, takes ? hours)
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml \
-  build shot-scale-classifier
 
-# Classify scale of each shot and import as metadata (requires ?, takes ? hours)
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile \
-  -e CUDA_VISIBLE_DEVICES=1 \
-  shot-scale-classifier \
-  /wise/scripts/cinephile/classify-shot-scale.sh
+We now proceed to detect individual objects in the dataset.
 
+```bash
 # Extract object features. (requires 5.4GB, takes 6.6 hours)
 # To reduce the storage requirements, you can set `objectness_threshold=0.1` in line 190 of `src/feature/transformers_owlv2.py`
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
-  /wise/scripts/cinephile/extract-objects.sh
+docker compose run -it wise scripts/cinephile/extract-objects.sh
 
 # Re-run the import-shots command to ensure that vectors_to_shots_map is contains new vector
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
-  bash -c '
-    /opt/conda/envs/wise-env/bin/python media-metadata.py \
+docker compose run -it wise \
+  python media-metadata.py \
     import-shots \
     --project-dir "/data/cinephile/wise-project/cinephile/" \
     --from-csv "/data/cinephile/wise-project/cinephile/shot-boundaries.csv"
-  '
+```
 
+As before, you can run the whole app with the following command to search based on all features of WISE
+
+```bash
 # Serve search engine over web
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose \
-  -f scripts/cinephile/compose.yml exec \
-  -e CINEPHILE_DATA_DIR=/data/cinephile wise \
-  LISTEN_ADDRESS="0.0.0.0" PORT="10001" /wise/serve.py \
-  --index-type IndexFlatIP\
-  --project-dir /home/tlm/data/wise/projects/cinephile/
+docker compose up wise
 ```
 
 ## Frequently Asked Questions (FAQ)

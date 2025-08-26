@@ -12,9 +12,6 @@
 
 set -euo pipefail
 
-eval "$(micromamba shell hook -s bash)"
-micromamba activate wise-env
-
 #------------------------------------------------------------------------------
 # Sanity checks
 #------------------------------------------------------------------------------
@@ -33,71 +30,17 @@ fi
 # Set cache directories
 #------------------------------------------------------------------------------
 
-
 #------------------------------------------------------------------------------
-# Step 1: Download the ZIP file containing videos and metadata
+# Step 1 + 2: Download data
 #------------------------------------------------------------------------------
-echo "--- Step 1: Downloading video archives ---"
+bash scripts/cinephile/download-data.sh
 
-URL1="https://hessenbox.uni-marburg.de/dl/fiP3skhbYUzNcsnsQoS8ND/DFF.dir"
-URL2="https://hessenbox.uni-marburg.de/dl/fiDW4TuWzSmqmeLPsNYgGf/NIBG.dir"
-TEMP_DIR="${CINEPHILE_DATA_DIR}/temp"
-TARGET_DIR="${TEMP_DIR}/videos_zip"
-FILE1="${TARGET_DIR}/DFF.zip"
-FILE2="${TARGET_DIR}/NIBG.zip"
-
-mkdir -p "${TARGET_DIR}"
-
-if [ ! -f "${FILE1}" ]; then
-  echo "Downloading DFF.zip (21GB, takes ~15 minutes) ..."
-  curl -L -o "${FILE1}" "${URL1}"
-else
-  echo "DFF.zip already exists. Skipping download."
-fi
-
-if [ ! -f "${FILE2}" ]; then
-  echo "Downloading NIBG.zip (18GB, takes ~12 minutes) ..."
-  curl -L -o "${FILE2}" "${URL2}"
-else
-  echo "NIBG.zip already exists. Skipping download."
-fi
-
-echo "Step 1 complete."
-echo
-
-#------------------------------------------------------------------------------
-# Step 2: Extract the archives using a custom script to handle unicode filenames.
-#------------------------------------------------------------------------------
-echo "--- Step 2: Extracting video archives ---"
-
-UNZIP_DEST_DFF="${CINEPHILE_DATA_DIR}/videos/DFF"
-UNZIP_DEST_NIBG="${CINEPHILE_DATA_DIR}/videos/NIBG"
-EXTRACT_SCRIPT="/wise/scripts/cinephile/extract_matched_video_json_pairs.py"
-
-if [ ! -d "${UNZIP_DEST_DFF}" ] || [ -z "$(ls -A "${UNZIP_DEST_DFF}")" ]; then
-  echo "Extracting DFF.zip to ${UNZIP_DEST_DFF}..."
-  mkdir -p "${UNZIP_DEST_DFF}"
-  python "${EXTRACT_SCRIPT}" "${FILE1}" "${UNZIP_DEST_DFF}"
-else
-  echo "DFF directory already exists and is not empty. Skipping extraction."
-fi
-
-if [ ! -d "${UNZIP_DEST_NIBG}" ] || [ -z "$(ls -A "${UNZIP_DEST_NIBG}")" ]; then
-  echo "Extracting NIBG.zip to ${UNZIP_DEST_NIBG}..."
-  mkdir -p "${UNZIP_DEST_NIBG}"
-  python "${EXTRACT_SCRIPT}" "${FILE2}" "${UNZIP_DEST_NIBG}"
-else
-  echo "NIBG directory already exists and is not empty. Skipping extraction."
-fi
-
-echo "Step 2 complete."
-echo
 
 #------------------------------------------------------------------------------
 # Step 3: Extract audio and visual features from the video files.
 #------------------------------------------------------------------------------
 echo "--- Step 3: Extracting audio and visual features ---"
-
+TEMP_DIR="${CINEPHILE_DATA_DIR}/temp"
 PROJECT_DIR="${CINEPHILE_DATA_DIR}/wise-project/cinephile"
 STATE_DIR="${CINEPHILE_DATA_DIR}/state/wise-project/cinephile"
 FEATURE_SET1_EXTRACTION_SUCCESS_FILE="${STATE_DIR}/feature-set1-extraction.success"
@@ -130,7 +73,7 @@ else
     fi
 
     echo "Extracting features ... (takes ~14 hours)"
-    python /wise/extract-features.py \
+    python extract-features.py \
         "/data/cinephile/videos/" \
         --media-include "*.mp4" \
         --shard-maxcount 4096 \
@@ -235,7 +178,7 @@ VIDEO_INDEX_FILENAME2="${PROJECT_DIR}/store/${VIDEO_FEATURE_ID2}/index/video-${F
 AUDIO_INDEX_FILENAME="${PROJECT_DIR}/store/${AUDIO_FEATURE_ID}/index/audio-${FAISS_INDEX_TYPE}.faiss"
 if [ ! -f "${VIDEO_INDEX_FILENAME1}" ] || [ ! -f "${VIDEO_INDEX_FILENAME2}" ] || [ ! -f "${AUDIO_INDEX_FILENAME}" ]; then
     echo "Creating index (takes about 5 min.) ..."
-    python /wise/create-index.py \
+    python create-index.py \
            --index-type "${FAISS_INDEX_TYPE}" \
            --fts-config "${FTS_CONFIG_FILENAME}" \
            --project-dir "$PROJECT_DIR"

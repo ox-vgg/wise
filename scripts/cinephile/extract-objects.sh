@@ -2,9 +2,6 @@
 
 set -euo pipefail
 
-eval "$(micromamba shell hook -s bash)"
-micromamba activate wise-env
-
 #------------------------------------------------------------------------------
 # Sanity checks
 #------------------------------------------------------------------------------
@@ -35,8 +32,8 @@ mkdir -p "${STATE_DIR}"
 if [ -f "${FEATURE_SET2_EXTRACTION_SUCCESS_FILE}" ]; then
     echo "Feature extraction has already completed successfully. Skipping."
 else
-    echo "Extracting object features ... (takes ? hours)"
-    python /wise/extract-features.py \
+    echo "Extracting object features ... (takes ~7 hours)"
+    python extract-features.py \
         --yes \
         --media-include "*.mp4" \
         --shard-maxcount 4096 \
@@ -71,7 +68,7 @@ VIDEO_INDEX_FILENAME3="${PROJECT_DIR}/store/${VIDEO_FEATURE_ID3}/index/video-${F
 
 if [ ! -f "${VIDEO_INDEX_FILENAME3}" ]; then
     echo "Creating index (takes about 5 min.) ..."
-    python /wise/create-index.py \
+    python create-index.py \
            --media-type "video" \
            --feature-id "${VIDEO_FEATURE_ID3}" \
            --index-type "${FAISS_INDEX_TYPE}" \

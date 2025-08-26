@@ -12,9 +12,6 @@
 
 set -euo pipefail
 
-eval "$(micromamba shell hook -s bash)"
-micromamba activate shot-scale-classifier-env
-
 #------------------------------------------------------------------------------
 # Sanity checks
 #------------------------------------------------------------------------------
@@ -34,7 +31,7 @@ fi
 # https://github.com/Jyxarthur/shot-by-shot/blob/main/film_grammar/shot_scale_classifier.py
 #------------------------------------------------------------------------------
 WEIGHTS_FILE_URL="https://thor.robots.ox.ac.uk/wise/assets/cinephile/shot_scale_ckpt.pth"
-WEIGHTS_BASEDIR="/tmp/shot-scale-classifier/checkpoints"
+WEIGHTS_BASEDIR="/tmp/cache/shot-scale-classifier/checkpoints"
 # check if the size of /tmp/shot-scale-classifier/checkpoints/shot_scale_ckpt.pth is less than 200 bytes
 if [ ! -f "${WEIGHTS_BASEDIR}/shot_scale_ckpt.pth" ]; then
     echo "Downloading weights ..."
@@ -47,7 +44,7 @@ if [ ! -f "${WEIGHTS_BASEDIR}/shot_scale_ckpt.pth" ]; then
 fi
 
 #------------------------------------------------------------------------------
-# Extract shot boundaries for all videos
+# Extract shot scale for all videos
 #------------------------------------------------------------------------------
 TEMP_DIR="${CINEPHILE_DATA_DIR}/temp"
 PROJECT_DIR="${CINEPHILE_DATA_DIR}/wise-project/cinephile"
@@ -55,22 +52,22 @@ THUMBNAIL_SHOT_SCALE_FILENAME="${CINEPHILE_DATA_DIR}/wise-project/cinephile/thum
 
 # check if shot boundaries file exists
 if [ ! -f "${THUMBNAIL_SHOT_SCALE_FILENAME}" ]; then
-    echo "Generating shot boundaries ... (take ~ ? hours)"
-    cd /tmp/shot-scale-classifier/
-    CUDA_VISIBLE_DEVICES=1 python3 classify_shot_scale.py \
+    echo "Finding shot scales ... (take ~ 1 hour)"
+    python3 classify_shot_scale.py \
         --batch-size 64 \
         --num-workers 4 \
-        --resume_path /tmp/shot-scale-classifier/checkpoints/shot_scale_ckpt.pth \
+        --resume_path ${WEIGHTS_BASEDIR}/shot_scale_ckpt.pth \
         --out-csv $THUMBNAIL_SHOT_SCALE_FILENAME \
         --project-dir $PROJECT_DIR
 fi
 
-# check if shot_scale column of shots table in internal.db has values set or if all of them are empty
-if [ -z "$(sqlite3 ${PROJECT_DIR}/metadata/internal.db "SELECT shot_scale FROM shots WHERE shot_scale IS NOT NULL AND shot_scale != '' LIMIT 1;")" ]; then
-    echo "No shot_scale values found. Importing from CSV ..."
-    cd /wise
-    python3 media-metadata.py \
-         import-shot-scale \
-         --project-dir $PROJECT_DIR \
-         --from-csv $THUMBNAIL_SHOT_SCALE_FILENAME
-fi
+# # check if shot_scale column of shots table in internal.db has values set or if all of them are empty
+# Cannot do it here - must be done in WISE container
+# if [ -z "$(sqlite3 ${PROJECT_DIR}/metadata/internal.db "SELECT shot_scale FROM shots WHERE shot_scale IS NOT NULL AND shot_scale != '' LIMIT 1;")" ]; then
+#     echo "No shot_scale values found. Importing from CSV ..."
+#     cd /wise
+#     python3 media-metadata.py \
+#          import-shot-scale \
+#          --project-dir $PROJECT_DIR \
+#          --from-csv $THUMBNAIL_SHOT_SCALE_FILENAME
+# fi

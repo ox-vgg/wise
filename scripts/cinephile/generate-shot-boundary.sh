@@ -12,9 +12,6 @@
 
 set -euo pipefail
 
-eval "$(micromamba shell hook -s bash)"
-micromamba activate shot-detection-env
-
 #------------------------------------------------------------------------------
 # Sanity checks
 #------------------------------------------------------------------------------
@@ -33,9 +30,10 @@ fi
 # Download transnetv2 model
 #------------------------------------------------------------------------------
 WEIGHTS_FILE_URL="https://thor.robots.ox.ac.uk/wise/assets/cinephile/transnetv2-weights.tar.gz"
-WEIGHTS_BASEDIR="/tmp/shot-detection/transnetv2/inference/"
+WEIGHTS_BASEDIR="/tmp/cache/shot-detection/transnetv2/inference/"
+mkdir -p "${WEIGHTS_BASEDIR}"
 # check if the size of /tmp/shot-detection/transnetv2/inference/transnetv2-weights/saved_model.pb is less than 200 bytes
-if [ -f "${WEIGHTS_BASEDIR}/transnetv2-weights/saved_model.pb" ] && [ $(stat -c%s "${WEIGHTS_BASEDIR}/transnetv2-weights/saved_model.pb") -lt 200 ]; then
+if [ ! -f "${WEIGHTS_BASEDIR}/transnetv2-weights/saved_model.pb" ] || [ $(stat -c%s "${WEIGHTS_BASEDIR}/transnetv2-weights/saved_model.pb") -lt 200 ]; then
     echo "Downloading weights ..."
     rm -rf "${WEIGHTS_BASEDIR}/transnetv2-weights"
     curl -L "${WEIGHTS_FILE_URL}" -o "${WEIGHTS_BASEDIR}/transnetv2-weights.tar.gz"
@@ -46,7 +44,7 @@ if [ -f "${WEIGHTS_BASEDIR}/transnetv2-weights/saved_model.pb" ] && [ $(stat -c%
         exit 1
     fi
 fi
-
+cp -r "${WEIGHTS_BASEDIR}/transnetv2-weights" "./transnetv2/inference/"
 #------------------------------------------------------------------------------
 # Extract shot boundaries for all videos
 #------------------------------------------------------------------------------
@@ -58,8 +56,7 @@ mkdir -p $SHOT_TEMPDIR
 
 # check if shot boundaries file exists
 if [ ! -f "${SHOT_BOUNDARIES_FILENAME}" ]; then
-    echo "Generating shot boundaries ... (take ~ ? hours)"
-    cd /tmp/shot-detection
+    echo "Generating shot boundaries ... (take ~ 3.3 hours)"
     export PYTHONPATH="transnetv2/inference"
     start_time=$(date +%s)
     echo "Started shot boundary detection at: $(date)"
@@ -71,11 +68,11 @@ if [ ! -f "${SHOT_BOUNDARIES_FILENAME}" ]; then
     echo "Finished shot boundary detection at: $(date)"
     duration=$((end_time - start_time))
     echo "Shot boundary detection took $duration seconds."
-    # ensure that /tmp/shot-detection/shots.csv file has been created
-    if [ ! -f "/tmp/shot-detection/shots.csv" ]; then
+    # ensure that shots.csv file has been created
+    if [ ! -f "shots.csv" ]; then
         echo "Failed to generate shot boundaries."
         exit 1
     fi
-    mv /tmp/shot-detection/shots.csv $SHOT_BOUNDARIES_FILENAME
+    mv shots.csv $SHOT_BOUNDARIES_FILENAME
     echo "Saved shot boundaries to ${SHOT_BOUNDARIES_FILENAME}"
 fi
