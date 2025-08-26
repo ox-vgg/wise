@@ -39,7 +39,10 @@ const productionConfig = {
       },
       {
         text: 'building with large columns'
-      }
+      },
+      {
+        text: 'flag',
+      },
     ],
     'Video:insightface': [
       {
@@ -54,23 +57,43 @@ const productionConfig = {
     ],
     'VideoAudio:clap': [
       {
-        text: 'siren'
-      },
-      {
         text: 'shouting'
       },
       {
-        text: 'laughter'
+        text: 'camera noise'
       },
       {
-        text: 'electronic noise'
+        text: 'horn'
       },
       {
-        text: 'silence'
-      },
+        text: 'trumpet'
+      }
       {
         url: 'https://thor.robots.ox.ac.uk/wise/assets/cinephile/example-queries/La_Donna_e_mobile.mp3'
       }
+    ],
+    'Video:owlv2': [
+      {
+        text: 'gun',
+      },
+      {
+        text: 'suitcase',
+      },
+      {
+        text: 'bicycle',
+      },
+      {
+        text: 'gate',
+      },
+      {
+        text: 'propeller',
+      },
+      {
+        text: 'medal'
+      },
+      {
+        text: 'flag',
+      },
     ]
   },
   ENABLE_REPORT_MEDIA: true, // shows a "Report media" button in the image details page
