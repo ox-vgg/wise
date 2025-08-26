@@ -30,6 +30,7 @@ x-common: &common
     HOST_UID: ${HOST_UID?'HOST_UID must be set before using this compose.yaml. Please see docs/Docker.md'}
     HOST_GID: ${HOST_GID?'HOST_GID must be set before using this compose.yaml. Please see docs/Docker.md'}
     CINEPHILE_DATA_DIR: /data/cinephile
+    QUERY_PREFIX: ""
 
 services:
   wise:
