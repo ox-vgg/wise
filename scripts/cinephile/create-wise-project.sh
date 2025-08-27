@@ -192,3 +192,24 @@ fi
 
 echo "Step 5 complete."
 echo
+
+#------------------------------------------------------------------------------
+# Step 6: Remove silent videos
+#------------------------------------------------------------------------------
+echo "--- Step 6: Remove silent videos ---"
+
+if [ -f "${AUDIO_INDEX_FILENAME}" ]; then
+    echo "Removing silent videos from audio search index (takes about 1 min) ..."
+    python3 scripts/cinephile/remove-silent-videos-from-search-index.py \
+            --project-dir "$PROJECT_DIR" \
+            --block-filename-list scripts/cinephile/silent-video-filenames.txt
+    if [ $? -eq 0 ]; then
+        echo "Silent videos removed successfully."
+    else
+        echo "Failed to remove silent videos."
+        exit 1
+    fi
+fi
+
+echo "Step 6 complete."
+echo
