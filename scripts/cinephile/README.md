@@ -70,6 +70,7 @@ export COMPOSE_FILE="scripts/cinephile/compose.yml"
 
 # folder to store all data
 # change this if you want to store the data elsewhere
+# NOTE: Must be either an absolute path or be relative to the COMPOSE_FILE
 export CINEPHILE_DATA_DIR="$PWD/data/cinephile/" 
 mkdir -p ${CINEPHILE_DATA_DIR}
 
@@ -122,7 +123,10 @@ cd $BASEDIR/wise/
 HOST_UID=$(id -u $USER) HOST_GID=$(id -g $USER) envsubst < .env.template > .env
 export COMPOSE_FILE=scripts/cinephile/compose.yml
 
-export CINEPHILE_DATA_DIR="$PWD/data/cinephile/"  # folder to store all data.
+# folder to store all data
+# change this if you want to store the data elsewhere
+# NOTE: Must be either an absolute path or be relative to the COMPOSE_FILE
+export CINEPHILE_DATA_DIR="$PWD/data/cinephile/"
 mkdir -p ${CINEPHILE_DATA_DIR}
 
 # Build docker image for WISE (requires 11.4GB, takes 13min)
