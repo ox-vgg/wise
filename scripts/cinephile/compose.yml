@@ -72,7 +72,7 @@ services:
       # For example: export CINEPHILE_DATA_DIR=/path/to/my/data
       - ${CINEPHILE_DATA_DIR?'CINEPHILE_DATA_DIR must be set to the location of dataset before running this container'}:/data/cinephile/
       - wise-cache:/tmp/cache
-      - ./wise-frontend-config.js:/app/frontend/dist/config.js:ro # custom frontend config
+      - ./wise-frontend-config.js:/app/frontend/dist/config.js # custom frontend config
 
   shot-detection:
     # add common settings
