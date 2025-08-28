@@ -67,7 +67,7 @@ const productionConfig = {
       },
       {
         text: 'trumpet'
-      }
+      },
       {
         url: 'https://thor.robots.ox.ac.uk/wise/assets/cinephile/example-queries/La_Donna_e_mobile.mp3'
       }
