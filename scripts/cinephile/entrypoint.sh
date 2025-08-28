@@ -18,8 +18,8 @@ if [ "$(id -g $USERNAME)" != "$GROUP_ID" ]; then
 fi
 
 # chown all files using find xargs chown
-find /home/${USERNAME} \( -not -user $USER_ID -o -not -group $GROUP_ID \) -print0 | xargs -0 -P$(nproc) -n128 -r chown ${USERNAME}:${USERNAME}
-find /app \( -not -user $USER_ID -o -not -group $GROUP_ID \) -print0 | xargs -0 -P$(nproc) -n128 -r chown ${USERNAME}:${USERNAME}
+find /home/${USERNAME} \( -not -user $USER_ID -o -not -group $GROUP_ID \) -print0 | xargs -0 -P$(nproc) -n128 -r chown ${USER_ID}:${GROUP_ID}
+find /app \( -not -user $USER_ID -o -not -group $GROUP_ID \) -print0 | xargs -0 -P$(nproc) -n128 -r chown ${USER_ID}:${GROUP_ID}
 
 # switch to user
 echo "Switching to user $USERNAME with UID $USER_ID and GID $GROUP_ID"
