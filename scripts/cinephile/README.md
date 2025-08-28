@@ -3,9 +3,9 @@ These instructions describe the process to reproduce the [WISE Search Engine (WI
 
 ## Pre-requisites
 
-- Storage space of 120GB and a GPU with 24GB RAM are required to build an audiovisual search engine described below.
+- Storage space of 120GB are required to build and run the audiovisual search engine
 
-- NVIDIA GPU
+- NVIDIA GPU with 11 GB to [re-use precomputed features](#create-audiovisual-search-engine-simple) (or) 24 GB of memory for reproducing the results [from scratch](#create-audiovisual-search-engine-advanced)
   - Note: GPU must be Volta Architecture or newer. Kepler, Maxwell and Pascal Architectures are not supported with this release. Please contact us if you need a version that works with these unsupported GPUs
 
 - Docker with GPU support
@@ -26,7 +26,7 @@ These instructions describe the process to reproduce the [WISE Search Engine (WI
 We tested everything on a server running Ubuntu Linux. While everything should work as is on other platforms, we haven't explicitly tested them ourselves. We recommend running the script on a Linux server to reproduce the results.
 
 
-## Computing and Storage Requirements
+## Computing and Storage Estimates
 The computing time reported in this document are based on the following hardware and software configurations.
 
  * OS: Ubuntu 22.04.5 LTS
