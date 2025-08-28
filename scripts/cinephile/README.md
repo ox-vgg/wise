@@ -1,8 +1,30 @@
 # Cinephile Challenge 2025
 These instructions describe the process to reproduce the [WISE Search Engine (WISE)](https://meru.robots.ox.ac.uk/cinephile/) operating on 40 hours of 787 videos released by the [Cinephile Challenge 2025](https://hermes-hub.de/forschen/datachallenges/challenges/challenge-2025.html).
 
+## Pre-requisites
 
-## Time and Storage Requirements
+- NVIDIA GPU
+  - Note: GPU must be Volta Architecture or newer. Kepler, Maxwell and Pascal Architectures are not supported with this release. Please contact us if you need a version that works with these unsupported GPUs
+
+- Docker with GPU support
+  - First, ensure docker desktop / docker engine is installed on your system - [instructions](https://docs.docker.com/desktop/)
+  - To enable GPU support,
+    - Linux:
+      - Install NVIDIA Driver for your GPU - [installation guide](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/index.html)
+      - Install NVIDIA Container Toolkit - [installation Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+    - Windows
+      - Please follow the steps in this [guide](https://docs.docker.com/desktop/features/gpu/)
+
+  - To test if GPU support works, run the following. It should complete without error and print your GPU device and the FLOPs observed.
+  ```bash
+  docker run --rm -it --gpus=all nvcr.io/nvidia/k8s/cuda-sample:nbody nbody -gpu -benchmark
+  ```
+- gettext (for envsubst command in Unix / Linux, optional)
+
+We tested everything on a server running Ubuntu Linux. While everything should work as is on other platforms, we haven't explicitly tested them ourselves. We recommend running the script on a Linux server to reproduce the results.
+
+
+## Time and Storage estimates
 The results are based on the following software and hardware configurations.
 
  * OS: Ubuntu 22.04.5 LTS
@@ -36,7 +58,12 @@ git clone -b cinephile2025 https://gitlab.com/vgg/wise/wise.git
 cd wise
 
 # Setup env vars
+## NOTE: If you are running on windows or if envsubst is unavailable
+## Please copy .env.template to .env and manually set the values for the HOST_UID and HOST_GID,
+## matching your current user id and group id. It can usually be set to 1000 when using docker desktop
+## on windows and mac.
 HOST_UID=$(id -u $USER) HOST_GID=$(id -g $USER) envsubst < .env.template > .env
+
 export COMPOSE_FILE="scripts/cinephile/compose.yml"
 
 # folder to store all data
@@ -59,6 +86,12 @@ A WISE search engine based on this project can be made available to users
 as follows:
 
 ```bash
+# Must run the following commands everytime you start a new shell
+# make sure to change the CINEPHILE_DATA_DIR if you have a different path
+# cd /path/to/wise/
+# export COMPOSE_FILE="scripts/cinephile/compose.yml"
+# export CINEPHILE_DATA_DIR="$PWD/data/cinephile/" 
+
 # Serve
 docker compose up wise
 ```
