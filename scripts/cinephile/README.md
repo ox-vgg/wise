@@ -215,6 +215,21 @@ As before, you can run the whole app with the following command to search based 
 docker compose up wise
 ```
 
+
+## Methodology
+
+The WISE search engine has the following five search modes: Visual, Face, Object, Metadata and Audio. 
+The Visual search mode is based on vision-language models (e.g. [CLIP](https://github.com/mlfoundations/open_clip/)) and has already been described in [1].
+The Audio search mode relies on audio-language model (e.g. [CLAP](https://github.com/microsoft/CLAP)) for feature representation of audio content and operates in a way similar to the Visual mode.
+The Face search mode uses [Insightface](https://github.com/deepinsight/insightface) model to represent each automatically detected face region using a feature vector followed by a nearest neighbour search (e.g. using [faiss](https://github.com/facebookresearch/faiss) library) to find other matching faces in a large collection of images or videos.
+The Object search mode relies on the [OWLv2](https://huggingface.co/docs/transformers/en/model_doc/owlv2) open-vocabulary object detection model, which allows users to search for objects in images and video frames using natural language descriptions instead of fixed category labels.
+Finally, the Metadata mode uses the full text search capabilities of SQL database engine (e.g. [SQLite](https://sqlite.org/fts5.html)) to search through text metadata (e.g. title, description, year, etc.) associated with each media file.
+The Visual, Audio, Face and Object search modes can be combined with Metadata mode to filter audiovisual search results based on metadata constraints.
+
+References:
+
+[1] Sridhar, Prasanna, Horace Lee, Abhishek Dutta, and Andrew Zisserman. "WISE image search engine (WISE)." In Wiki workshop, virtual event. 2023.
+
 ## Frequently Asked Questions (FAQ)
 
 ### Docker compose commands fail with `no space left on device` error
