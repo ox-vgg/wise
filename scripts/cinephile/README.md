@@ -3,6 +3,8 @@ These instructions describe the process to reproduce the [WISE Search Engine (WI
 
 ## Pre-requisites
 
+- Storage space of 120GB and a GPU with 24GB RAM are required to build an audiovisual search engine described below.
+
 - NVIDIA GPU
   - Note: GPU must be Volta Architecture or newer. Kepler, Maxwell and Pascal Architectures are not supported with this release. Please contact us if you need a version that works with these unsupported GPUs
 
@@ -24,8 +26,8 @@ These instructions describe the process to reproduce the [WISE Search Engine (WI
 We tested everything on a server running Ubuntu Linux. While everything should work as is on other platforms, we haven't explicitly tested them ourselves. We recommend running the script on a Linux server to reproduce the results.
 
 
-## Time and Storage estimates
-The results are based on the following software and hardware configurations.
+## Computing and Storage Requirements
+The computing time reported in this document are based on the following hardware and software configurations.
 
  * OS: Ubuntu 22.04.5 LTS
  * CPU: Intel Xeon Silver 4216 CPU @ 2.10GHz with 64 cores and 377GB of RAM
@@ -211,6 +213,22 @@ docker compose up wise
 
 ## Frequently Asked Questions (FAQ)
 
-- docker compose commands fail with `no space left on device` error
+- Docker compose commands fail with `no space left on device` error
 
 Use `docker system prune` command to free up space before running the `docker compose` command.
+
+- After the videos are extracted, is it safe to delete the downloaded ZIP files (size=40GB) containing the videos?
+
+Yes, it safe to delete the ZIP files to free up storage space.
+
+- What models are being used for visual, face, object and audio searches?
+
+The following models are being used for audiovisual search engine publicly available at [https://meru.robots.ox.ac.uk/cinephile/](https://meru.robots.ox.ac.uk/cinephile/).
+
+| Search Mode | Model |
+|-------------|-------|
+| Visual   | [OpenCLIP ViT-L-16-SigLIP2-512](https://github.com/mlfoundations/open_clip/) trained on [webli](https://research.google/blog/pali-scaling-language-image-learning-in-100-languages/) dataset |
+| Face     | [InsightFace buffalo_l](https://github.com/deepinsight/insightface) model trained on [various face datasets](https://github.com/deepinsight/insightface#datasets) |
+| Object   | [Google owlv2-large-patch14-ensemble](https://huggingface.co/google/owlv2-large-patch14-ensemble) trained on [various datasets](https://arxiv.org/abs/2306.09683) |
+| Audio    | [Microsoft CLAP](https://github.com/microsoft/CLAP) model trained on [four datasets](https://arxiv.org/abs/2309.05767) |
+| Metadata | [SQLite](https://sqlite.org/) database engine's full text search module |
