@@ -213,15 +213,15 @@ docker compose up wise
 
 ## Frequently Asked Questions (FAQ)
 
-- Docker compose commands fail with `no space left on device` error
+### Docker compose commands fail with `no space left on device` error
 
 Use `docker system prune` command to free up space before running the `docker compose` command.
 
-- After the videos are extracted, is it safe to delete the downloaded ZIP files (size=40GB) containing the videos?
+### After the videos are extracted, is it safe to delete the downloaded ZIP files (size=40GB) containing the videos?
 
 Yes, it safe to delete the ZIP files to free up storage space.
 
-- What models are being used for visual, face, object and audio searches?
+### What models are being used for visual, face, object and audio searches?
 
 The following models are being used for audiovisual search engine publicly available at [https://meru.robots.ox.ac.uk/cinephile/](https://meru.robots.ox.ac.uk/cinephile/).
 
