@@ -103,7 +103,15 @@ class MicrosoftClap(FeatureExtractor):
     def model(self):
         use_cuda = self.DEVICE.type == 'cuda'
         logger.info(f'Initialising model {self.ID_PREFIX} ({self.version}, use_cuda={use_cuda})')
-        return CLAP(version=self.version, use_cuda=use_cuda)
+        instance = CLAP(version=self.version, use_cuda=use_cuda)
+        # TODO get it from config along with options?
+        available_backends = torch._dynamo.list_backends()
+        backend = "inductor"
+        if "tensorrt" in available_backends:
+            backend = "tensorrt"
+        logger.info(f"Compiling model with backend {backend}")
+        instance.clap.compile(mode="reduce-overhead", backend=backend)
+        return instance
 
     @staticmethod
     def preprocess_audio(audio: torch.Tensor) -> torch.Tensor:

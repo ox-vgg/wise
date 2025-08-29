@@ -227,6 +227,12 @@ class TransformersOWLv2(FeatureExtractor):
         logger.info(f'Initialising model {self.ID_PREFIX} - {self.model_name} (device={self.DEVICE})')
         _model = Owlv2ForObjectDetection.from_pretrained(self.model_name).to(self.DEVICE)
         _model.eval()
+        available_backends = torch._dynamo.list_backends()
+        backend = "inductor"
+        if "tensorrt" in available_backends:
+            backend = "tensorrt"
+        logger.info(f"Compiling model with backend {backend}")
+        _model.compile(mode="reduce-overhead", backend=backend)
         return _model
 
     @cached_property
