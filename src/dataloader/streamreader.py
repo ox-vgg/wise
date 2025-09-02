@@ -18,6 +18,10 @@ class BaseStreamOutputOptions(object):
     frames_per_chunk: int
     buffer_chunk_size: int = -1
     stream_index: Optional[int] = None
+    # Add decoder and decoder_option, hw_accel
+    # https://pytorch.org/audio/stable/generated/torio.io.StreamingMediaDecoder.html#add-basic-video-stream
+    decoder: Optional[str] = None
+    decoder_option: Optional[dict[str, str]] = None
 
 
 @dataclasses.dataclass
@@ -27,9 +31,10 @@ class BasicVideoStreamOutputOptions(BaseStreamOutputOptions):
     width: Optional[int] = None
     height: Optional[int] = None
 
-    # TODO
     # Add decoder and decoder_option, hw_accel
     # https://pytorch.org/audio/stable/generated/torio.io.StreamingMediaDecoder.html#add-basic-video-stream
+
+    hw_accel: Optional[str] = None
 
 @dataclasses.dataclass
 class BasicImageStreamOutputOptions(BasicVideoStreamOutputOptions):

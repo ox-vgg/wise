@@ -445,10 +445,12 @@ class AVDataset(MediaDataset):
             BasicVideoStreamOutputOptions(
                 frames_per_chunk=video_frames_per_chunk,
                 frame_rate=video_frame_rate,
+                decoder_option={"threads": "0"}, # let ffmpeg decide
             ),
             BasicAudioStreamOutputOptions(
                 frames_per_chunk=audio_samples_per_chunk,
                 sample_rate=audio_sample_rate,
+                decoder_option={"threads": "0"}, # let ffmpeg decide
             ),
         ]
 
@@ -458,12 +460,11 @@ class AVDataset(MediaDataset):
         else:
             transforms[0] = video_preprocessing_function_map
 
-        
         if audio_preprocessing_function_map is None:
             transforms[1] = IdentityTransform
         else:
             transforms[1] = audio_preprocessing_function_map
-            
+
         super(AVDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,

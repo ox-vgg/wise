@@ -59,8 +59,11 @@ def initialise_feature_extractors(
         feature_stores[modality_type] = {}
         for feature_extractor_id in feature_extractor_id_map:
             ## 3.1 Initialise feature extractor
-            feature_extractors[modality_type][feature_extractor_id] = FeatureExtractorFactory(
-                feature_extractor_id
+            feature_extractors[modality_type][feature_extractor_id] = (
+                FeatureExtractorFactory(
+                    feature_extractor_id,
+                    warmup=True, # needed for using workers in dataloader
+                )
             )
             feature_extractors[modality_type][feature_extractor_id].create_vector_metadata_table(db_engine)
             print(f"Using {feature_extractor_id} for {modality_type}")
@@ -283,6 +286,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if args.num_workers <= 0:
+        args.num_workers = 0
+    else:
+        torch.multiprocessing.set_start_method("spawn")
+
     # If no feature extractor ids are provided, use the default feature extractor ids
     if args.video_feature_id_map is None and args.image_feature_id_map is None and args.audio_feature_id_map is None:
         args.video_feature_id_map = ["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"]
@@ -468,9 +476,21 @@ if __name__ == "__main__":
     else:
         logger.info("Using fixed frame sampling for feature extraction")
         stream = uniform_stream
+
+    prefetch_factor = None
+    persistent_workers = False
+    if args.num_workers > 0:
+        prefetch_factor = 4
+        persistent_workers = True
+
     av_data_loader = torch_data.DataLoader(
-        stream, batch_size=None, num_workers=args.num_workers
+        stream,
+        batch_size=None,
+        num_workers=args.num_workers,
+        persistent_workers=persistent_workers,
+        prefetch_factor=prefetch_factor,
     )
+
     MAX_BULK_INSERT = 8192
     with (
         db_engine.connect() as conn,
