@@ -634,6 +634,8 @@ if __name__ == "__main__":
         conn.commit()
         thumbs_conn.commit()
 
+    del av_data_loader
+
     for id in feature_stores:
         for feature_extractor_id in feature_stores[id]:
             feature_stores[id][feature_extractor_id].close()
