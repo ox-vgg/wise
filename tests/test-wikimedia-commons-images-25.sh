@@ -34,6 +34,7 @@ HTTP_SERVER_HOST="0.0.0.0"
 HTTP_SERVER_PORT="10001"
 MAX_POLL_SERVER_COUNT=15
 CUDA_VISIBLE_DEVICES=1
+NUM_WORKERS=2
 
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
@@ -96,14 +97,14 @@ fi
 
 ## Task: 2. Extract features
 if [ ! -d "${WISE_PROJECT_DIR}" ]; then
-    echo "Extracting features from videos (takes about 3 min.) ..."
+    echo "Extracting features from videos using ${NUM_WORKERS} workers (takes about 3 min.) ..."
     cd "${WISE_CODE_DIR}"
     CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python extract-features.py \
            "${TEST_DATA_DIR}" \
            --media-include "*.jpg" \
            --shard-maxcount 4096 \
            --shard-maxsize 20971520 \
-           --num-workers 0 \
+           --num-workers $NUM_WORKERS \
            --feature-store webdataset \
            --image-feature-id "${IMAGE_FEATURE_ID1}" \
            --image-feature-id "${IMAGE_FEATURE_ID2}" \

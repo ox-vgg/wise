@@ -35,6 +35,7 @@ FAISS_INDEX_TYPE="IndexFlatIP"
 HTTP_SERVER_HOST="0.0.0.0"
 HTTP_SERVER_PORT="10001"
 MAX_POLL_SERVER_COUNT=60
+NUM_WORKERS=2
 
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
@@ -97,14 +98,14 @@ fi
 
 ## Task: 2. Extract audio features
 if [ ! -d "${WISE_PROJECT_DIR}" ]; then
-    echo "Extracting audio features from videos (takes about 3 min.) ..."
+    echo "Extracting audio features from videos with ${NUM_WORKERS} workers (takes about 3 min.) ..."
     cd "${WISE_CODE_DIR}"
     python extract-features.py \
         "${TEST_DATA_DIR}" \
         --media-include "*.mp4" \
         --shard-maxcount 4096 \
         --shard-maxsize 20971520 \
-        --num-workers 0 \
+        --num-workers $NUM_WORKERS \
         --feature-store webdataset \
         --no-thumbnails \
         --audio-feature-id "${AUDIO_FEATURE_ID}" \
@@ -213,7 +214,7 @@ if [ ! -d "${FEATURE_STORE1}" ]; then
         --media-include "*.mp4" \
         --shard-maxcount 4096 \
         --shard-maxsize 20971520 \
-        --num-workers 0 \
+        --num-workers $NUM_WORKERS \
         --feature-store webdataset \
         --no-thumbnails \
         --use-shots \
