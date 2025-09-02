@@ -1,3 +1,15 @@
+import logging
+
+logger = logging.getLogger(__name__)
+# must import torch tensorrt before compile calls
+try:
+    import torch_tensorrt
+except ImportError:
+    logger.warning(
+        "torch_tensorrt is not installed. Models will be compiled with inductor backend."
+    )
+    pass
+
 from .mlfoundation_openclip import MlfoundationOpenClip
 from .microsoft_clap import MicrosoftClap
 from .transformers_owlv2 import TransformersOWLv2

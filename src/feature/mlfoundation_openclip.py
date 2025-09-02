@@ -57,6 +57,12 @@ class MlfoundationOpenClip(FeatureExtractor):
             device=self.DEVICE
         )
         model.eval()
+        available_backends = torch._dynamo.list_backends()
+        backend = "inductor"
+        if "tensorrt" in available_backends:
+            backend = "tensorrt"
+        logger.info(f"Compiling model with backend {backend}")
+        model.compile(mode="reduce-overhead", backend=backend)
         return model, preprocess
 
     @cached_property
