@@ -2,6 +2,8 @@ import argparse
 import os
 import time
 from pathlib import Path
+import pprint
+
 from typing import Dict, Literal
 import torch
 import torch.utils.data as torch_data
@@ -431,28 +433,56 @@ if __name__ == "__main__":
     audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
 
     params = {
-        "video_frames_per_chunk": video_frames_per_chunk,
+        "video_frames_per_chunk": (
+            video_frames_per_chunk if ModalityType.VIDEO in feature_extractors else 0
+        ),
         "video_frame_rate": video_frame_rate,
-        "video_preprocessing_function_map": {
-            feature_extractor_id: feature_extractors[ModalityType.VIDEO][feature_extractor_id].preprocess_image
-            for feature_extractor_id in feature_extractors.get(ModalityType.VIDEO, {})
-        } if ModalityType.VIDEO in feature_extractors else None,
-
-        "audio_samples_per_chunk": audio_frames_per_chunk,
+        "video_preprocessing_function_map": (
+            {
+                feature_extractor_id: feature_extractors[ModalityType.VIDEO][
+                    feature_extractor_id
+                ].preprocess_image
+                for feature_extractor_id in feature_extractors.get(
+                    ModalityType.VIDEO, {}
+                )
+            }
+            if ModalityType.VIDEO in feature_extractors
+            else None
+        ),
+        "audio_samples_per_chunk": (
+            audio_frames_per_chunk if ModalityType.AUDIO in feature_extractors else 0
+        ),
         "audio_sampling_rate": audio_sampling_rate,
-        "audio_preprocessing_function_map": {
-            feature_extractor_id: feature_extractors[ModalityType.AUDIO][feature_extractor_id].preprocess_audio
-            for feature_extractor_id in feature_extractors.get(ModalityType.AUDIO, {})
-        } if ModalityType.AUDIO in feature_extractors else None,
-
-        "image_preprocessing_function_map": {
-            feature_extractor_id: feature_extractors[ModalityType.IMAGE][feature_extractor_id].preprocess_image
-            for feature_extractor_id in feature_extractors.get(ModalityType.IMAGE, {})
-        } if ModalityType.IMAGE in feature_extractors else None,
-
+        "audio_preprocessing_function_map": (
+            {
+                feature_extractor_id: feature_extractors[ModalityType.AUDIO][
+                    feature_extractor_id
+                ].preprocess_audio
+                for feature_extractor_id in feature_extractors.get(
+                    ModalityType.AUDIO, {}
+                )
+            }
+            if ModalityType.AUDIO in feature_extractors
+            else None
+        ),
+        "image_preprocessing_function_map": (
+            {
+                feature_extractor_id: feature_extractors[ModalityType.IMAGE][
+                    feature_extractor_id
+                ].preprocess_image
+                for feature_extractor_id in feature_extractors.get(
+                    ModalityType.IMAGE, {}
+                )
+            }
+            if ModalityType.IMAGE in feature_extractors
+            else None
+        ),
         "offset": None,
-        "thumbnails": args.thumbnails
+        "thumbnails": args.thumbnails,
     }
+
+    logger.info(f"Dataset parameters: {pprint.pformat(params)}")
+
     uniform_stream = torch_data.ChainDataset(
         get_dataset(all_metadata, params)
     )

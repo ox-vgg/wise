@@ -426,8 +426,8 @@ class AVDataset(MediaDataset):
     def __init__(
         self,
         input_files: Union[List[str], Dict[str, str]],
-        video_frames_per_chunk: int,
-        audio_samples_per_chunk: int,
+        video_frames_per_chunk: int = 0,
+        audio_samples_per_chunk: int = 0,
         *,
         audio_preprocessing_function_map: Optional[
             List[Callable[[torch.Tensor], torch.Tensor]]
@@ -440,30 +440,33 @@ class AVDataset(MediaDataset):
         offset: Optional[float] = None,
         thumbnails: bool = True,
     ):
+        stream_opts = []
+        transforms = []
+        if video_frames_per_chunk > 0:
+            stream_opts.append(
+                BasicVideoStreamOutputOptions(
+                    frames_per_chunk=video_frames_per_chunk,
+                    frame_rate=video_frame_rate,
+                    decoder_option={"threads": "0"}, # let ffmpeg decide
+                )
+            )
+            if video_preprocessing_function_map is None:
+                transforms.append(IdentityTransform)
+            else:
+                transforms.append(video_preprocessing_function_map)
 
-        stream_opts = [
-            BasicVideoStreamOutputOptions(
-                frames_per_chunk=video_frames_per_chunk,
-                frame_rate=video_frame_rate,
-                decoder_option={"threads": "0"}, # let ffmpeg decide
-            ),
-            BasicAudioStreamOutputOptions(
-                frames_per_chunk=audio_samples_per_chunk,
-                sample_rate=audio_sample_rate,
-                decoder_option={"threads": "0"}, # let ffmpeg decide
-            ),
-        ]
-
-        transforms = [{}, {}]
-        if video_preprocessing_function_map is None:
-            transforms[0] = IdentityTransform
-        else:
-            transforms[0] = video_preprocessing_function_map
-
-        if audio_preprocessing_function_map is None:
-            transforms[1] = IdentityTransform
-        else:
-            transforms[1] = audio_preprocessing_function_map
+        if audio_samples_per_chunk > 0:
+            stream_opts.append(
+                BasicAudioStreamOutputOptions(
+                    frames_per_chunk=audio_samples_per_chunk,
+                    sample_rate=audio_sample_rate,
+                    decoder_option={"threads": "0"}, # let ffmpeg decide
+                )
+            )
+            if audio_preprocessing_function_map is None:
+                transforms.append(IdentityTransform)
+            else:
+                transforms.append(audio_preprocessing_function_map)
 
         super(AVDataset, self).__init__(
             input_files=input_files,
@@ -582,6 +585,11 @@ def _get_dataset(
         offset: float | None = None,
         thumbnails: bool = True ):
     if media_type == SourceMediaType.AV:
+        if video_frames_per_chunk <= 0 and audio_samples_per_chunk <= 0:
+            logger.warning(
+                "Both video_frames_per_chunk and audio_samples_per_chunk are <= 0, skipping video files"
+            )
+            return None
         stream = AVDataset(
             input_files,
             video_frames_per_chunk=video_frames_per_chunk,
@@ -594,6 +602,9 @@ def _get_dataset(
             thumbnails=thumbnails,
         )
     elif media_type == SourceMediaType.VIDEO:
+        if video_frames_per_chunk <= 0:
+            logger.warning("video_frames_per_chunk is <= 0, skipping video-only files")
+            return None
         stream = VideoDataset(
             input_files,
             frames_per_chunk=video_frames_per_chunk,
@@ -603,6 +614,9 @@ def _get_dataset(
             thumbnails=thumbnails
         )
     elif media_type == SourceMediaType.AUDIO:
+        if audio_samples_per_chunk <= 0:
+            logger.warning("audio_samples_per_chunk is <= 0, skipping audio-only files")
+            return None
         stream = AudioDataset(
             input_files,
             samples_per_chunk=audio_samples_per_chunk,
@@ -624,10 +638,15 @@ def get_dataset(media_metadata: list[DatasetPayload], params: Dict[str, Any]):
     # sort and group (by media_type - image/video/audio/av)
     sort_func = lambda x: x.media_type
     sorted_metadata = sorted(media_metadata, key=sort_func)
-    datasets = [
-        _get_dataset({x.id: x.path for x in g}, k, **params)
-        for k, g in itertools.groupby(sorted_metadata, key=sort_func)
-    ]
+    datasets = list(
+        filter(
+            None,
+            (
+                _get_dataset({x.id: x.path for x in g}, k, **params)
+                for k, g in itertools.groupby(sorted_metadata, key=sort_func)
+            ),
+        )
+    )
     return datasets
 
 
