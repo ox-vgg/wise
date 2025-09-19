@@ -5,24 +5,39 @@ WISE supports running the multi-modal models separately using [Triton Inference 
 ## Pre-requisites
 
 1. Python 3.12 (if not using Python 3.12, you may have to change the triton image in the compose file)
-1. You have a working installation of WISE with venv (You maybe able to use conda with [conda-pack](https://conda.github.io/conda-pack/) if you use correct python version and triton image combination)
-1. [venv-pack](https://jcristharif.com/venv-pack/)
+1. You have a working installation of WISE with venv (or conda)
+1. [venv-pack](https://jcristharif.com/venv-pack/). You maybe able to use conda with [conda-pack](https://conda.github.io/conda-pack/) if you use correct python version and triton image combination.
 
 The default triton server docker image in `compose.triton.yaml` assumes python3.12 is being used. If you use a different python version, adjust the triton image version to match your python version (see [here](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/introduction/compatibility.html) - example, last image with python3.10 as default is 24.10) or follow the [instructions here](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/python_backend/README.html#building-custom-python-backend-stub) to compile a stub compatible with your version.
 
-
+For venv,
 ```bash
 source PATH_TO_WISE_ENV/bin/activate
 pip install venv-pack
 venv-pack -o triton/wise-env.tar
+```
 
-# delete existing env
+For conda
+```bash
+conda activate wise2
+export PYTHONNOUSERSITE=1
+conda install -c conda-forge conda-pack
+conda-pack -o triton/wise-env.tar
+```
+
+Once you have the environment packaged, extract it to the `triton/wise-env` folder
+```bash
 tar -xf triton/wise-env.tar -C triton/wise-env
+```
+
+_Note:_ If using conda, run `conda-unpack` as an additional step
+```
+./triton/wise-env/bin/conda-unpack
 ```
 
 ## Getting started
 
-To get started with Triton, we need to create a folder under `triton_model` corresponding to the feature extractor you are interested in. 
+To get started with Triton, we need to create a folder under `triton/models` corresponding to the feature extractor you are interested in. 
 
 Triton requires your models directories to follow a specific structure and doesnt support models deep inside other folders. It needs to be flat.
 
@@ -35,7 +50,7 @@ We will provide a CLI / migrate to [PyTriton](https://triton-inference-server.gi
 ```bash
 FEATURE_ID='deepinsight/insightface/buffalo_l/_unknown'
 
-MODEL_DIR="triton_models/${FEATURE_ID#/#--}--image"
+MODEL_DIR="triton/models/${FEATURE_ID#/#--}--image"
 
 mkdir -p ${MODEL_DIR}/1
 (cd ${MODEL_DIR}/1 && ln -sf ../../model.py .)
@@ -95,20 +110,12 @@ instance_group [
 EOF
 ```
 
-_TODO: Add other models to `triton_models`_
-
-
 To run triton with this model
 
 ```bash
-
-# activate your environment if not already done
-# source /path/to/env/bin/activate
-export WISE_ENV=${VIRTUAL_ENV} # or $CONDA_PREFIX if using that
-
 # create a cache dir for triton to store any temporary data
-mkdir -p cache
-chmod 2777 cache
+mkdir -p triton/cache
+chmod 2777 triton/cache
 
 docker compose -f compose.triton.yaml up -d
 ```

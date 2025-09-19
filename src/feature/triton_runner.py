@@ -66,6 +66,19 @@ class TritonModel(MultiModalModel):
         self._model = model_id
         self._triton_configs = {}
 
+    @property
+    def input_image_size(self):
+        model_name = f"{self._model}--image"
+        if "image" not in self._triton_configs:
+            self._triton_configs["image"] = get_config_and_metadata(
+                self._client, model_name
+            )
+        _, inputs, _ = self._triton_configs["image"]
+        # NOTE Assuming the first input is always the image in our case
+        first_key = next(iter(inputs))
+        shape = inputs[first_key]["shape"]
+        return tuple(shape[-2:])
+
     def _get_features(
         self, _type: Literal["image", "audio", "text"], input_params: dict
     ):
@@ -226,10 +239,10 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
         def __init__(self, model_id, config: Config, **kwargs):
             """Initializes the Triton feature extractor with the given ID and configuration."""
 
-            super().__init__(model_id, config=config, **kwargs)
-            self.__model_name = model_id.replace('/', '--')
-
+            self.__model_name = model_id.replace("/", "--")
             self.config = config
+            super().__init__(model_id, config=config, **kwargs)
+
 
         @cached_property
         def model(self):

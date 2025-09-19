@@ -457,12 +457,13 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
         if warmup:
             self.warmup()
 
+    @cached_property
     def model(self):
         model = TransformersOWLv2Model(
             model_id=self.model_name,
             device=self.DEVICE,
             pretraining_dataset=None,  # OWLv2 does not use pretraining dataset
-            compile=self.compile
+            compile=self.compile,
             **self.model_kwargs,
         )
         return model

@@ -4,7 +4,7 @@ from pathlib import Path
 import open_clip
 import torch
 import numpy as np
-from typing import List, Union
+from typing import List, Union, Any
 from PIL import Image
 import torchvision.transforms.functional as F
 from collections.abc import Iterable
@@ -186,7 +186,7 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
     extract_audio_features = None
 
     class Config(FeatureExtractor.Config):
-        model_kwargs: dict[str, any] = {}
+        model_kwargs: dict[str, Any] = {}
 
     def __init__(
         self,
@@ -221,12 +221,12 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         with torch.inference_mode():
             self.logit_scale = (
                 _model.logit_scale.detach()
-                if hasattr(_model, "logit_scale")
+                if hasattr(_model, "logit_scale") and _model.logit_scale is not None
                 else torch.tensor(0.0)
             )
             self.logit_bias = (
                 _model.logit_bias.detach()
-                if hasattr(_model, "logit_bias")
+                if hasattr(_model, "logit_bias") and _model.logit_bias is not None
                 else torch.tensor(0.0)
             )
         del _model  # we only needed it to get the preprocess function

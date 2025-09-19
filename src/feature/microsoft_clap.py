@@ -73,8 +73,10 @@ class MicrosoftClapModel(MultiModalModel):
     @cached_property
     def _clap_wrapper(self):
         use_cuda = self.DEVICE.type == 'cuda'
-        logger.info(f'Initialising model {self.ID_PREFIX} ({self.version}, use_cuda={use_cuda})')
-        instance = CLAP(version=self.version, use_cuda=use_cuda)
+        logger.info(
+            f"Initialising microsoft/clap (version={self.model_id}, use_cuda={use_cuda})"
+        )
+        instance = CLAP(version=self.model_id, use_cuda=use_cuda)
         # TODO get it from config along with options?
         if self.compile:
             available_backends = torch._dynamo.list_backends()

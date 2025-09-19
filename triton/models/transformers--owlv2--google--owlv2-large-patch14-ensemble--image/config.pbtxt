@@ -4,9 +4,9 @@ max_batch_size: 16
 
 input [
     {
-        name: "pixel_values"
+        name: "images"
         data_type: TYPE_FP32
-        dims: [ 3, 512, 512 ]
+        dims: [ 3, 1008, 1008 ]
     }
 ]
 
