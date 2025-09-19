@@ -61,12 +61,13 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 default_config = {
-    'default': {
-        'device': args.device,
+    "default": {
+        "device": args.device,
+        "compile": False,
     },
-    'transformers/owlv2/google/owlv2-large-patch14-ensemble': {
-        'objectness_threshold': 1e-3,
-    }
+    "transformers/owlv2/google/owlv2-large-patch14-ensemble": {
+        "objectness_threshold": 1e-3,
+    },
 }
 feature_extractor = FeatureExtractorFactory(args.feature_extractor, default_config)
 
