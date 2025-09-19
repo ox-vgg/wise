@@ -1,5 +1,7 @@
 # Triton Inference Server with WISE
 
+> **Note:** The features described in this document are [still being finalized](https://gitlab.com/vgg/wise/wise/-/merge_requests/96) and may change. They are not yet stable.
+
 WISE supports running the multi-modal models separately using [Triton Inference Server](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html) (maintained by NVIDIA). This allows better utilisation of GPU memory and opens doors for running inference optimised models (eg. ONNX, TensorRT, Quantization) with WISE
 
 ## Pre-requisites
