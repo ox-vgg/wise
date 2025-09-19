@@ -24,7 +24,7 @@ class TritonPythonModel:
         repository = args['model_repository']
         model_name = args['model_name']
         model_version = args['model_version']
-        
+
         config_path = Path(repository) / model_version / 'config.yaml'
         config = {}
         try:
@@ -32,22 +32,27 @@ class TritonPythonModel:
         except Exception as e:
             print(f"Unable to read config at {config_path} - {e}, using empty config.")
 
+        self.enable_autocast = config.pop("enable_autocast", False)
+        self.device = device
+
+        self.config = config
         default_config = config.get('default', {})
         default_config['device'] = device
+        self.config["default"] = default_config
 
         model_name = model_name.replace('--', '/')
         model_id, feature_type = model_name.rsplit('/', 1)
 
         triton_model_config = json.loads(args['model_config'])
         print(triton_model_config)
-        
+
         self.inputs = [
             input['name'] for input in triton_model_config['input']
         ]
         self.outputs = [
             output['name'] for output in triton_model_config['output']
         ]
-        feature_extractor = wise_feature.FeatureExtractorFactory(model_id, config)
+        feature_extractor = wise_feature.FeatureExtractorFactory(model_id, self.config)
         self.model = feature_extractor.model
         self.feature_type = feature_type
 
@@ -67,8 +72,12 @@ class TritonPythonModel:
                 fn = self.model.get_audio_features
             else:
                 raise ValueError(f"Unsupported feature type: {self.feature_type}")
-            
-            outputs = fn(**inputs)
+
+            with torch.autocast(
+                device_type=self.device,
+                enabled=self.enable_autocast,
+            ):
+                outputs = fn(**inputs)
 
             if not isinstance(outputs, dict):
                 if len(self.outputs) == 1:
@@ -80,13 +89,13 @@ class TritonPythonModel:
                 pb_utils.Tensor.from_dlpack(k, v)
                 for k, v in outputs.items()
             ]
-            
+
             inference_response = pb_utils.InferenceResponse(
                 output_tensors=output_tensors
             )
             responses.append(inference_response)
         return responses
-    
+
     def finalize(self):
         # Cleanup if necessary
         pass
