@@ -83,6 +83,15 @@ Test 8.3 PASSED
 *** All tests for wikimedia-commons-edited-videos completed in 60 sec. ***
 ```
 
+To use the triton inference server, run tests with the `FEATURE_EXTRACTOR_CONFIG` 
+environment variable defined as follows:
+```
+export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}" 
+bash test-wikimedia-commons-25.sh  $HOME/temp/
+bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
+bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
+```
+
 # Unit Tests
 
 Individual tests can be executed as follows.

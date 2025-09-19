@@ -6,7 +6,11 @@ from sklearn.datasets import load_sample_image
 import torch
 from PIL import Image
 
-from .transformers_owlv2 import TransformersOWLv2, owlv2_bbox_to_xywh, sort_by_objectness
+from .transformers_owlv2 import (
+    TransformersOWLv2FeatureExtractor,
+    owlv2_bbox_to_xywh,
+    sort_by_objectness,
+)
 from .feature_extractor_factory import FeatureExtractorFactory
 
 ## Typically, imports from external libraries come before local
@@ -292,7 +296,13 @@ class TestOWLv2PatchSorting(unittest.TestCase):
 class TestOWLv2FeatureExtractor(unittest.TestCase):
     def setUp(self):
         # use an objectness threshold of 0.0 to avoid filtering out any boxes in the output
-        self._extractor = TransformersOWLv2("transformers/owlv2/google/owlv2-base-patch16-ensemble", objectness_threshold=0.0)
+        model_config = TransformersOWLv2FeatureExtractor.Config(
+            objectness_threshold=0.0,
+        )
+        self._extractor = TransformersOWLv2FeatureExtractor(
+            "transformers/owlv2/google/owlv2-base-patch16-ensemble",
+            config=model_config,
+        )
 
     def test_feature_extractor_factory_setup(self):
         # try setting up using the feature extractor factory (just to check no errors were raised)

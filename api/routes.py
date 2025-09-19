@@ -1242,7 +1242,7 @@ def _get_search_router(config: APIConfig):
             if feature_extractor_id not in feature_extractors:
                 feature_extractors[feature_extractor_id] = FeatureExtractorFactory(
                     feature_extractor_id,
-                    warmup=config.mode != 'development',
+                    config.feature_extractor_config,
                 )
             search_indices[media_type][feature_extractor_id] = SearchIndexFactory(
                 media_type,

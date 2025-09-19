@@ -1,10 +1,47 @@
+from __future__ import annotations
+import inspect
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, NamedTuple, Optional, Union
-
+from typing import Any, List, NamedTuple, Optional, Union, Type
+from pydantic import BaseModel, ConfigDict
 from PIL import Image
 import torch
 import numpy as np
 import sqlalchemy as sa
+
+
+class FeatureExtractorConfig(BaseModel):
+    """Configuration for a feature extractor.
+    Feature extractor implementations can extend this class to add
+    additional configuration parameters and validation.
+
+    The base feature extractor class will use this configuration to configure
+    the feature extractor instance.
+
+    This class is expected to be defined within the feature extractor implementation as class attribute `Config`
+
+    Attributes
+    ----------
+    device : str | torch.device | None
+        The device to use for the feature extractor. If None, it defaults to 'cuda'
+        if available, otherwise 'cpu'. It can also be a string representing a specific
+        device (e.g., 'cuda:0', 'cpu', etc.).
+
+    warmup : bool
+        Whether to warm up the feature extractor. This is useful for models that are lazy loaded
+        and if someone wants to eagerly load them and allocate memory beforehand.
+
+    compile : bool
+        Whether to compile the model using `torch.compile()`. This can improve performance
+        for some models, but may not be supported for all models or devices.
+
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    device: str | None = None
+    warmup: bool = False
+    compile: bool = True  # whether to compile the model using torch.compile()
 
 
 @dataclass
@@ -63,6 +100,63 @@ class FeatureExtMetadata:
     bbox: Optional[BBoxXYWH] = None
 
 
+def check_config_in_init_args(cls: Type["FeatureExtractor"]) -> bool:
+    """Check if the class constructor accepts a config argument."""
+    parameters = inspect.signature(cls.__init__).parameters
+    if "config" not in parameters:
+        return False
+    param = parameters["config"]
+    return issubclass(param.annotation, FeatureExtractorConfig) and param.kind in (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY,
+    )
+
+
+class MultiModalModel(ABC):
+    """Base class for multi-modal models.
+
+    This class is used to define the interface for multi-modal models that can
+    extract features from images, text, and audio. Subclasses should implement
+    the methods to extract features for each modality.
+
+    """
+
+    def __init__(
+        self,
+        model_id: str,
+        pretraining_dataset: str | None = None,
+        device: str | torch.device | None = None,
+        compile: bool = True,
+        **kwargs,
+    ):
+        self.model_id = model_id
+        self.pretraining_dataset = pretraining_dataset
+        self.DEVICE = get_torch_device(device)
+        self.compile = compile
+        self.model_kwargs = kwargs
+
+    @abstractmethod
+    def get_image_features(self, **kwargs):
+        """Extracts image features."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def get_text_features(self, **kwargs):
+        """Extracts text features."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def get_audio_features(self, **kwargs):
+        """Extracts audio features."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def export_to_onnx(self, output_path: str):
+        """Export the model to ONNX format."""
+        raise NotImplementedError(
+            "No implementation for ONNX export found for this model"
+        )
+
+
 class FeatureExtractor:
     """ABC for extractor of feature vectors from audio, image, and text.
 
@@ -71,10 +165,45 @@ class FeatureExtractor:
     `None` (see :py:exc:`NotImplementedError`).
 
     """
+    ID_PREFIX = None
     _vector_metadata_table: sa.Table | None = None
+    class Config(FeatureExtractorConfig):
+        """Configuration for the feature extractor."""
 
-    def __init__(self):
-        raise NotImplementedError
+        pass
+
+    @classmethod
+    def from_config(
+        cls,
+        model_id: str,
+        config: dict[str, Any] = {},
+    ) -> FeatureExtractor:
+        """Create a feature extractor instance from the given configuration."""
+        _config = cls.Config.model_validate(config)
+
+        return cls(
+            model_id,
+            device=get_torch_device(_config.device),
+            warmup=_config.warmup,
+            config=_config,
+        )
+
+    def __init__(
+        self,
+        model_id: str,
+        *,
+        device: str | torch.device | None = None,
+    ):
+        if self.ID_PREFIX is None:
+            raise ValueError(
+                "FeatureExtractor.ID_PREFIX must be set to a non-empty string by the subclass"
+            )
+
+        if not model_id.startswith(self.ID_PREFIX):
+            raise ValueError(
+                f"feature id cannot start with {model_id} and must start with {self.ID_PREFIX}"
+            )
+        self.DEVICE = get_torch_device(device)
 
     @classmethod
     def create_vector_metadata_table(cls, db_engine: sa.Engine) -> None:
@@ -101,7 +230,7 @@ class FeatureExtractor:
 
         """
         pass  # default to no-op
-    
+
     @classmethod
     def get_vector_metadata(
         cls, conn: sa.Connection, vid: list[int]

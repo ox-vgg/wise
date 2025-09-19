@@ -1,0 +1,5 @@
+cache/**
+wise-env*
+wise-env/**
+!wise-env/.gitkeep
+!cache/.gitkeep

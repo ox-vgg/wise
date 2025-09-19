@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 ## Copyright (C) 2025 University of Oxford
-
+from __future__ import annotations
 import contextlib
 from functools import cached_property
 import logging
@@ -47,6 +47,7 @@ from .feature_extractor import (
     FeatureExtractor,
     FeatureExtMetadata,
     Features,
+    MultiModalModel,
 )
 from ..db import project_metadata_obj
 
@@ -76,6 +77,51 @@ def pil_img_list_to_nhwc_tensor(images: list[PIL.Image.Image]) -> torch.Tensor:
     assert len({x.size for x in images}) in [0, 1], \
         "multiple PIL images of different sizes"
     return torch.stack([rgb_pil_to_bgr_hwc_tensor(x) for x in images])
+
+
+@dataclass
+class FaceInferenceResponse:
+    """
+    Represents the response from the InsightFace inference.
+    Contains the embeddings, scores, boxes, age, gender
+    """
+
+    embeddings: np.ndarray
+    scores: np.ndarray
+    boxes: np.ndarray
+    age: np.ndarray
+    is_male: np.ndarray
+
+    def to_app_face(self) -> list[insightface.app.common.Face]:
+        """
+        Converts the inference response to a Faces object.
+        """
+        metadata = []
+        for score, box, age, is_male in zip(
+            self.scores, self.boxes, self.age, self.is_male
+        ):
+            _face = insightface.app.common.Face(
+                det_score=score.item(),
+                bbox=box,
+                age=age.item(),
+                gender=int(is_male)
+            )
+            metadata.append(_face)
+        return metadata
+
+    @classmethod
+    def from_tensor(cls, **outputs):
+        """
+        Converts the outputs from the InsightFace model to a FaceInferenceResponse.
+        """
+        embeddings = outputs["embeddings"].cpu().numpy()
+        scores = outputs["scores"].cpu().numpy()
+        boxes = outputs["boxes"].cpu().numpy()
+        age = outputs["age"].cpu().numpy()
+        is_male = outputs["is_male"].cpu().numpy()
+        return cls(
+            embeddings=embeddings, scores=scores, boxes=boxes, age=age, is_male=is_male
+        )
 
 
 @dataclass
@@ -114,6 +160,116 @@ class FaceFeatureMetadata:
         }
 
 
+class InsightFaceModel(MultiModalModel):
+    @cached_property
+    def model(self):
+        ## XXX: investigate allowed_modules arg to FaceAnalysis
+
+        ## InsightFace and GPU
+        ##
+        ## ONNX models are loaded when FaceAnalysis is constructed.
+        ## Whether the models are loaded in CPU or GPU (or others) is
+        ## dependent on the available execution providers (see
+        ## https://onnxruntime.ai/docs/execution-providers/) and any
+        ## particular model dependency.
+        ##
+        ## For CUDA, the user needs to have ONNX runtime built with
+        ## CUDA (onnxruntime-gpu on PyPI).  This can be checked with
+        ## onnxruntime.get_available_providers().  But cudnn is also
+        ## needed and that is only checked after loading the model.
+        ## So we do nothing and check afterwards if the CUDA provider
+        ## is available to the models.
+        ##
+        ## The ctx_id argument to prepare is undocumented, but does
+        ## the following (checked from reading the source).  If
+        ## negative, uses CPU even if the CUDA provider is available.
+        ## If non-negative, it uses the default preference which is
+        ## CUDA if available and CPU if not.  The ctx_id is NOT the
+        ## index for the GPU.  So we just leave ctx_id set to zero to
+        ## use the ONNX possible preference default (which seem
+        ## reasonable).
+
+        ## FaceAnalysis() and FaceAnalysis.prepare() print to stdout
+        ## which mess up our own stdout so we throw it away.
+
+        _logger.info(f"Initialising model {self.model_id}")
+        # TODO - based on device, pass the current provider and provider options as kwargs
+
+        with open(os.devnull, "w") as devnull:
+            with contextlib.redirect_stdout(devnull):
+                _app = insightface.app.FaceAnalysis(
+                    self.model_id,
+                    allowed_modules=["detection", "recognition", "genderage"],
+                )
+                _app.prepare(
+                    ctx_id=0,
+                    det_thresh=0.5,
+                    det_size=(640, 640),
+                )
+
+        ## Check if all models have the CUDA execution model available
+        ## to them.
+        for task_name, model in _app.models.items():
+            task_providers = model.session.get_providers()
+            _logger.debug(
+                "InsightFace '%s' task has '%s' execution providers available",
+                task_name,
+                task_providers,
+            )
+            if "CUDAExecutionProvider" not in task_providers:
+                _logger.warning(
+                    "CUDA provider not available for '%s' task", task_name
+                )
+
+        return _app
+
+    @property
+    def embedding_size(self) -> int:
+        """
+        Returns the size of the embedding vector for the recognition model.
+        """
+        recognition_outputs = self.model.models["recognition"].session.get_outputs()[0]
+        assert len(recognition_outputs.shape) == 2 and recognition_outputs.shape[0] == 1
+        assert recognition_outputs.type == "tensor(float)"
+        return recognition_outputs.shape[-1]
+
+    @torch.inference_mode()
+    def get_image_features(self, **kwargs):
+        image = kwargs.get("image", None)
+        if not isinstance(image, torch.Tensor):
+            raise ValueError("Image input is required for image feature extraction.")
+        faces = self.model.get(image.numpy())
+        n_faces = len(faces)
+
+        if len(faces) == 0:
+            return {
+                "embeddings": torch.empty(
+                    (n_faces, self.embedding_size), dtype=torch.float32
+                ),
+                "scores": torch.empty((n_faces,), dtype=torch.float32),
+                "boxes": torch.empty((n_faces, 4), dtype=torch.float32),
+                "age": torch.empty((n_faces,), dtype=torch.int32),
+                "is_male": torch.empty((n_faces,), dtype=torch.bool),
+            }
+
+        embeddings = np.stack([face.normed_embedding for face in faces], axis=0)
+        scores = np.array([face.det_score for face in faces], dtype=np.float32)
+        boxes = np.array([face.bbox for face in faces], dtype=np.float32)
+        age = np.array([face.age for face in faces], dtype=np.int32)
+        is_male = np.array([face.sex == "M" for face in faces], dtype=bool)
+
+        return {
+            "embeddings": torch.from_numpy(embeddings),
+            "scores": torch.from_numpy(scores),
+            "boxes": torch.from_numpy(boxes),
+            "age": torch.from_numpy(age),
+            "is_male": torch.from_numpy(is_male),
+        }
+
+    get_text_features = None  # InsightFace does not support text features
+    get_audio_features = None  # InsightFace does not support audio features
+
+
 class InsightFaceFeatureExtractor(FeatureExtractor):
 
     ## InsightFace supports image only (no audio and no text)
@@ -147,14 +303,20 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
         keep_existing=True,
     )
 
-    def __init__(self, feature_id: str, warmup: bool = False):
+    def __init__(
+        self,
+        feature_id: str,
+        *,
+        warmup: bool = False,
+        **kwargs,
+    ):
         _logger.info("initialising feature extractor for %s", feature_id)
         feature_id_parts = feature_id.split("/")
         assert (
             len(feature_id_parts) == 4
             and feature_id_parts[0] == "deepinsight"
             and feature_id_parts[1] == "insightface",
-            f"Invalid feature-id: {feature_id}, an example of a valid feature-id is 'deepinsight/insightface/buffalo_l/_unknown'"
+            f"Invalid feature-id: {feature_id}, an example of a valid feature-id is 'deepinsight/insightface/buffalo_l/_unknown'",
         )
         self.model_name = feature_id_parts[2]
 
@@ -162,87 +324,6 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
         if warmup:
             self.warmup()
-
-    @cached_property
-    def _app(self):
-        ## XXX: investigate allowed_modules arg to FaceAnalysis
-
-        ## InsightFace and GPU
-        ##
-        ## ONNX models are loaded when FaceAnalysis is constructed.
-        ## Whether the models are loaded in CPU or GPU (or others) is
-        ## dependent on the available execution providers (see
-        ## https://onnxruntime.ai/docs/execution-providers/) and any
-        ## particular model dependency.
-        ##
-        ## For CUDA, the user needs to have ONNX runtime built with
-        ## CUDA (onnxruntime-gpu on PyPI).  This can be checked with
-        ## onnxruntime.get_available_providers().  But cudnn is also
-        ## needed and that is only checked after loading the model.
-        ## So we do nothing and check afterwards if the CUDA provider
-        ## is available to the models.
-        ##
-        ## The ctx_id argument to prepare is undocumented, but does
-        ## the following (checked from reading the source).  If
-        ## negative, uses CPU even if the CUDA provider is available.
-        ## If non-negative, it uses the default preference which is
-        ## CUDA if available and CPU if not.  The ctx_id is NOT the
-        ## index for the GPU.  So we just leave ctx_id set to zero to
-        ## use the ONNX possible preference default (which seem
-        ## reasonable).
-
-        ## FaceAnalysis() and FaceAnalysis.prepare() print to stdout
-        ## which mess up our own stdout so we throw it away.
-
-        _logger.info(f'Initialising model {self.model_name}')
-        # TODO - based on device, pass the current provider and provider options as kwargs
-
-        with open(os.devnull, "w") as devnull:
-            with contextlib.redirect_stdout(devnull):
-                _app = insightface.app.FaceAnalysis(
-                    self.model_name,
-                    allowed_modules=["detection", "recognition", "genderage"],
-                )
-                _app.prepare(
-                    ctx_id=0,
-                    det_thresh=0.5,
-                    det_size=(640, 640),
-                )
-
-        ## Check if all models have the CUDA execution model available
-        ## to them.
-        for task_name, model in _app.models.items():
-            task_providers = model.session.get_providers()
-            _logger.debug(
-                "InsightFace '%s' task has '%s' execution providers available",
-                task_name,
-                task_providers,
-            )
-            if "CUDAExecutionProvider" not in task_providers:
-                _logger.warning(
-                    "CUDA provider not available for '%s' task", task_name
-                )
-
-        return _app
-
-    @cached_property
-    def _embedding_size(self):
-        recognition_outputs = self._app.models[
-            "recognition"
-        ].session.get_outputs()[0]
-
-        assert (
-            len(recognition_outputs.shape) == 2
-            and recognition_outputs.shape[0] == 1
-        )
-
-        ## It should be possible to get the numpy type from the
-        ## onxxruntime NodeArg type but I couldn't figure it out.  So
-        ## just hardcode float which seems to be the case for all
-        ## models anyway.
-        assert recognition_outputs.type == "tensor(float)"
-
-        return recognition_outputs.shape[-1]
 
     @classmethod
     def create_vector_metadata_table(cls, db_engine: sa.Engine) -> None:
@@ -294,13 +375,21 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
         else:
             raise Exception("unexpected input images of type %s" % type(images))
 
-    @torch.inference_mode
+    @cached_property
+    def model(self) -> InsightFaceModel:
+        """
+        Returns the InsightFace model instance.
+        """
+        return InsightFaceModel(
+            self.model_name,
+        )
+
     def extract_image_features(self, images: torch.Tensor) -> list[Features]:
         _logger.debug("extracting image features from a %s", type(images))
         features: list[Features] = []
         for image in images:
             ## NB: undocumented but `get()` expects a numpy ndarray,
-            ##     of shape `(H, W, C)`, and mode BRG.  The mode seems
+            ##     of shape `(H, W, C)`, and mode BGR.  The mode seems
             ##     less (not?) important for detection but has an
             ##     impact on recognition models, namely gender
             ##     recognition.
@@ -311,15 +400,14 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             ##     one we are most confident about (the big frontal
             ##     and centre face instead of a small, barely
             ##     noticeable, face in the background).
-            faces = self._app.get(image.numpy())
+            outputs = self.model.get_image_features(image=image)
+            response = FaceInferenceResponse.from_tensor(**outputs)
+            faces = response.to_app_face()
             _logger.debug("found %d faces", len(faces))
 
-            feature_vectors = np.empty(
-                (len(faces), self._embedding_size), dtype=self._embedding_dtype
-            )
+            feature_vectors = response.embeddings
             feature_metadata: list[FaceFeatureMetadata] = []
             for i, face in enumerate(faces):
-                feature_vectors[i] = face.normed_embedding
                 feature_metadata.append(
                     FaceFeatureMetadata.from_app_face(face, image)
                 )

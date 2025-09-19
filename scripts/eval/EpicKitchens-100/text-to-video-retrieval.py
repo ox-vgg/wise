@@ -125,7 +125,7 @@ def compute_text_embedding(project_dir, text_queries):
     media_type = 'video'
     query_prefix = "This is a photo of a"
     feature_extractor_id = list(project_assets[media_type].keys())[0]
-    
+
     print(f'Initialising feature extractor for {feature_extractor_id}')
     feature_extractor = FeatureExtractorFactory(feature_extractor_id)
     feature_dim = feature_extractor.output_dim
@@ -338,7 +338,7 @@ def get_video_thumbnails(project_dir, video_ids, start_times, stop_times, delta_
         if media_id is not None:
             start_time = max(start_times[i] - delta_time, 0)
             stop_time = stop_times[i] + delta_time
-            
+
             cursor.execute(
                 "SELECT content FROM thumbnails WHERE media_id = ? AND timestamp BETWEEN ? AND ?",
                 (media_id, start_time, stop_time),
@@ -354,7 +354,7 @@ def get_video_thumbnails(project_dir, video_ids, start_times, stop_times, delta_
             video_thumbnails.append('') # an indicator of missing video
     thumbs_db.close()
     return video_thumbnails
-    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog="text-to-video-retrieval-eval",

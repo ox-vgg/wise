@@ -35,6 +35,14 @@ HTTP_SERVER_PORT="10001"
 MAX_POLL_SERVER_COUNT=15
 NUM_WORKERS=2
 
+# to enable triton server, export an environment variable FEATURE_EXTRACTOR_CONFIG
+# containing a JSON string with the URL of the triton server. For example:
+# $ export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
+triton_url=`echo "${FEATURE_EXTRACTOR_CONFIG}" | jq -e '.default.url'`
+if [ ! -z "$triton_url" ]; then
+    NUM_WORKERS=0 # set to 0 only if default.url is not defined in FEATURE_EXTRACTOR_CONFIG
+fi
+
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
 OUTDIR="${TMP_DIR}/wise-test/"

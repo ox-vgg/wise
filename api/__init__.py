@@ -84,7 +84,8 @@ def serve(
     query_blocklist_file: Path = None,
     callback: Callable = None # You can pass in a callback function to be called when the server has started
 ):
-    options = {"project_dir": project_dir} if project_dir else {}
+    options = {"command": "serve"}
+    options = options | ({"project_dir": project_dir} if project_dir else {})
     if index_type:
         options.update({"index_type": index_type})
     if query_blocklist_file:

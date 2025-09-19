@@ -1,8 +1,42 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing_extensions import Self
+from pydantic import BaseModel, model_validator
+
+from pydantic_settings import (
+    BaseSettings,
+    SettingsConfigDict,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
+
 from typing import Literal, Set, Optional, Dict
 from pathlib import Path
 
 class APIConfig(BaseSettings):
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+            YamlConfigSettingsSource(settings_cls),
+        )
+
+    model_config = SettingsConfigDict(
+        yaml_file="wise_config.yaml", env_file_encoding="utf-8"
+    )
+    project_dir: Path
+    command: Literal['serve', 'create_index', 'extract_features', 'search']
+
     mode: Literal['production', 'development'] = 'production'
     listen_address: str = "0.0.0.0"
     port: int = 9670
@@ -14,7 +48,6 @@ class APIConfig(BaseSettings):
     index_type: str = "IndexFlatIP"
     nprobe: int = 1024
     query_blocklist: Set[str] = set()
-    project_dir: Path
     thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
 
     # If you want to serve the media files from a different static file server,
@@ -40,3 +73,29 @@ class APIConfig(BaseSettings):
 
     # enable profiling for development mode
     enable_profiling: bool = False
+
+    # feature extractor configuration
+    # key must be the feature extractor id
+    # value is a dictionary with the configuration for the feature extractor
+    # e.g. {"open_clip": {"device": "cuda:0", "warmup": True}}
+    feature_extractor_config: dict[str, dict] = {"default": {}}
+
+    @model_validator(mode='after')
+    def validate_feature_extractor_config(self) -> Self:
+        if 'default' not in self.feature_extractor_config:
+            self.feature_extractor_config['default'] = {}
+
+        if 'warmup' not in self.feature_extractor_config['default']:
+            if self.command == 'serve':
+                # warmup in serve when not in development mode
+                self.feature_extractor_config['default']['warmup'] = self.mode != 'development'
+
+            elif self.command == 'extract_features':
+                # warmup in extract_features always
+                self.feature_extractor_config['default']['warmup'] = True
+        
+            else:
+                # default to False if not set
+                self.feature_extractor_config['default']['warmup'] = False
+
+        return self
