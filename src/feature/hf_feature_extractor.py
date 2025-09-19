@@ -70,6 +70,13 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         logger.info(f'Initialising model {self.ID_PREFIX} - {self.__model_name} (device={self.DEVICE})')
         model = AutoModel.from_pretrained(self.__model_name, config=self.model_config, device_map=f'{self.DEVICE}', **self.model_kwargs)
         model.eval()
+        if self._config.compile:
+            available_backends = torch._dynamo.list_backends()
+            backend = "inductor"
+            if "tensorrt" in available_backends:
+                backend = "tensorrt"
+            logger.info(f"Compiling model with backend {backend}")
+            model = torch.compile(model, mode="reduce-overhead", backend=backend)
         return model
 
     def preprocess_image(self, images):
