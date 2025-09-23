@@ -27,12 +27,17 @@ const exampleQueries = process_example_queries(config.EXAMPLE_QUERIES);
 const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handleExampleQueryClick, projectInfo, tourVariables}) => {
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
   
+  const _handleExampleQueryClick = (query: string) => {
+    setIsTourOpen(false); // Close the tour (and the search dropdown as well) when the user clicks on the example query inside the tour
+    handleExampleQueryClick(query);
+  };
+
   const tourSteps: TourProps['steps'] = [
     {
       title: 'Enter your search query here',
       description: <>
         You can enter a detailed description such as 
-        <Button size="small" shape="round" type='primary' ghost onClick={() => handleExampleQueryClick('hand holding a cup')}>Hand holding a cup</Button>
+        <Button size="small" shape="round" type='primary' ghost onClick={() => _handleExampleQueryClick('hand holding a cup')}>Hand holding a cup</Button>
         <br />
         WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. WISE then tries to find images whose visual contents match what you are trying to look for.
       </>,
