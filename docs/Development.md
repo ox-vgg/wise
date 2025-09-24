@@ -6,6 +6,13 @@ Here are some notes for developers:
 
 - Ensure that the `tests/test-wikimedia-commons-25.sh` test script runs successfully before committing your changes to the WISE repository. See [Tests.md](Tests.md) for more details.
 
+## Best practices
+- Use dataclasses / pydantic models to give the object you pass around meaningful names, types and validation. This will help catch mistakes at development time.
+- Depend on an interface rather than the implementation for a sufficiently complex feature - this allows future optimisation and extensions
+- If there is a dependency, Keep initilisation (factory, constructor, etc) separate from the dependent class / function which uses it. This enables dependency injection from top level based on config passed by user.
+- Add a test that shows how to initialise and use a feature. Tests will complement the documentation and code is likely to be more up-to-date than text strings
+
+
 ### Profiling the API
 
 [PyInstrument](https://pyinstrument.readthedocs.io/en/latest/home.html) is used to help profile the API requests in development mode. It is added as a middleware.
