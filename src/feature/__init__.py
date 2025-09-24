@@ -1,4 +1,3 @@
-from .store import FeatureStore, FeatureStoreFactory
 from .feature_extractor import (
     FeatureExtractor as FeatureExtractor,
     FeatureExtractorConfig as FeatureExtractorConfig,

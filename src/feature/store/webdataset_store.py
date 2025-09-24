@@ -9,7 +9,7 @@ import tarfile
 import logging
 from tqdm import tqdm
 
-from src.dataloader.utils import md5
+from ...dataloader.utils import md5
 from .feature_store import FeatureStore
 
 logger = logging.getLogger()
