@@ -1,5 +1,5 @@
 from typing_extensions import Self
-from pydantic import BaseModel, model_validator
+from pydantic import model_validator
 
 from pydantic_settings import (
     BaseSettings,
@@ -9,7 +9,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from typing import Literal, Set, Optional, Dict
+from typing import Literal, Set, Optional
 from pathlib import Path
 
 class APIConfig(BaseSettings):
@@ -48,6 +48,8 @@ class APIConfig(BaseSettings):
     index_type: str = "IndexFlatIP"
     nprobe: int = 1024
     query_blocklist: Set[str] = set()
+    project_dir: Path
+    remote_projects: Set[str] = set()
     thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
 
     # If you want to serve the media files from a different static file server,
@@ -98,4 +100,29 @@ class APIConfig(BaseSettings):
                 # default to False if not set
                 self.feature_extractor_config['default']['warmup'] = False
 
+        return self
+    
+    @model_validator(mode="after")
+    def check_project(self) -> Self:
+        if self.remote_projects:
+            # remote projects are provided, no need to check local project dir
+            return self
+
+        # Local project dir must be provided
+        if not self.project_dir.exists() or not self.project_dir.is_dir():
+            raise ValueError(
+                f"Local path does not exist or is not a directory: {self.project_dir}"
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def check_redirect_config(self) -> Self:
+        if (
+            self.redirect_media_url_by_path
+            and self.redirect_media_url_num_components < 1
+        ):
+            raise ValueError(
+                "redirect_media_url_num_components must be greater than 0 when redirect_media_url_by_path is True"
+            )
         return self
