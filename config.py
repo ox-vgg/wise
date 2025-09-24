@@ -95,23 +95,25 @@ class APIConfig(BaseSettings):
             elif self.command == 'extract_features':
                 # warmup in extract_features always
                 self.feature_extractor_config['default']['warmup'] = True
-        
+
             else:
                 # default to False if not set
                 self.feature_extractor_config['default']['warmup'] = False
 
         return self
-    
+
     @model_validator(mode="after")
     def check_project(self) -> Self:
         if self.remote_projects:
             # remote projects are provided, no need to check local project dir
             return self
 
-        # Local project dir must be provided
-        if not self.project_dir.exists() or not self.project_dir.is_dir():
+        # Local project dir must be provided and must exist for all commands except 'extract_features'
+        if self.command != "extract_features" and not (
+            self.project_dir.exists() and self.project_dir.is_dir()
+        ):
             raise ValueError(
-                f"Local path does not exist or is not a directory: {self.project_dir}"
+                f"Local project does not exist or is not a directory: {self.project_dir}"
             )
 
         return self
