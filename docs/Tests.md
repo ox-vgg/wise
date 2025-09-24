@@ -23,6 +23,9 @@ bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
 
 # 5. Run tests based on edited videos with shots
 bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
+
+# 6. Run tests for WISE aggregator
+bash tests/test-aggregator.sh $HOME/temp/
 ```
 
 Here is a sample output obtained by executing the test based on videos.
@@ -90,6 +93,16 @@ export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
 bash test-wikimedia-commons-25.sh  $HOME/temp/
 bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
 bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
+
+export FEATURE_EXTRACTOR_CONFIG='{
+    "default": {
+        "url": "localhost:8801"
+    },
+    "transformers/owlv2/google/owlv2-large-patch14-ensemble": {
+        "objectness_threshold": 0.11
+    }
+}'
+bash tests/test-aggregator.sh $HOME/temp/
 ```
 
 # Unit Tests
