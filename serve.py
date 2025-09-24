@@ -1,9 +1,8 @@
 import typer
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional
 import logging
-import json
-from src.wise_project import WiseProject
+
 from src.enums import IndexType
 
 logging.basicConfig(
@@ -57,12 +56,6 @@ def main(
             "Please build the frontend assets using `npm install && npm run build`."
         )
     from api import serve
-
-    project = WiseProject(
-        project_dir,
-        create_project=False
-    )
-    project_assets = project.discover_assets()
 
     serve(
         project_dir,
