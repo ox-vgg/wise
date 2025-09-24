@@ -12,7 +12,10 @@ import torchaudio
 
 logger = logging.getLogger(__name__)
 
-def initialize_feature_extractors(feature_extractor_ids: list[str], **kwargs) -> dict[str, FeatureExtractor]:
+
+def initialize_feature_extractors(
+    feature_extractor_ids: list[str], config: dict
+) -> dict[str, FeatureExtractor]:
     """
     Initialize feature extractors based on the provided feature_extractor_ids
     """
@@ -21,11 +24,12 @@ def initialize_feature_extractors(feature_extractor_ids: list[str], **kwargs) ->
         if _id in feature_extractors:
             logger.warning(f"Feature extractor {_id} is already initialized. Ignoring duplicate.")
             continue
-        
-        feature_extractor = FeatureExtractorFactory(_id, **kwargs)
+
+        feature_extractor = FeatureExtractorFactory(_id, config)
         feature_extractors[_id] = feature_extractor
-    
+
     return feature_extractors
+
 
 def load_audio(x: list[io.BytesIO]) -> torch.Tensor:
     # TODO add support for loading multiple audio files
@@ -50,22 +54,26 @@ class EmbeddingService:
         self.feature_extractors = feature_extractors
 
     @classmethod
-    def from_ids(cls, feature_extractor_ids: list[str], **kwargs) -> "EmbeddingService":
-        feature_extractors = initialize_feature_extractors(feature_extractor_ids, **kwargs)
+    def from_ids(
+        cls, feature_extractor_ids: list[str], config: dict
+    ) -> "EmbeddingService":
+        feature_extractors = initialize_feature_extractors(
+            feature_extractor_ids, config
+        )
         return cls(feature_extractors)
-    
+
     def transform_distances(self, feature_extractor_id: str, distances: list) -> list:
         feature_extractor = self.feature_extractors.get(feature_extractor_id)
         if feature_extractor is None:
             raise FeatureExtractorNotFoundError(f"Feature extractor {feature_extractor_id} not initialized!")
         ret = feature_extractor.transform_faiss_distances_hook(np.array(distances))
         return ret.tolist()
-    
+
     def transform_internal_image_queries(self, feature_extractor_id: str, image_query: np.ndarray) -> np.ndarray:
         feature_extractor = self.feature_extractors.get(feature_extractor_id)
         if feature_extractor is None:
             raise FeatureExtractorNotFoundError(f"Feature extractor {feature_extractor_id} not initialized!")
-        
+
         return feature_extractor.transform_internal_image_queries_hook(image_query)
 
     def embed(
@@ -74,19 +82,19 @@ class EmbeddingService:
         config: EmbeddingConfig,
         q: list[dict[str, np.ndarray | bytes | str]],
     ) -> np.ndarray:
-        
+
         feature_vectors = []
         weights = []
 
         feature_extractor = self.feature_extractors.get(feature_extractor_id)
         if feature_extractor is None:
             raise FeatureExtractorNotFoundError(f"Feature extractor {feature_extractor_id} not initialized!")
-        
+
         def extract_text_features(text: list[str]) -> np.ndarray:
             if feature_extractor.extract_text_features is None:
                 raise ModalityNotSupportedError("text modality not supported")
             return feature_extractor.extract_text_features(text)
-        
+
         def extract_image_features(images: list[Image.Image]) -> np.ndarray:
             if feature_extractor.extract_image_features is None:
                 raise ModalityNotSupportedError("image modality not supported")
@@ -99,7 +107,7 @@ class EmbeddingService:
             if len(features.vectors) > 1:
                 logger.debug("multiple features found, will return vector for the top feature only")
             return features.vectors[0:1]
-        
+
         def extract_audio_features(audio: torch.Tensor) -> np.ndarray:
             if feature_extractor.extract_audio_features is None:
                 raise ModalityNotSupportedError("audio modality not supported")
