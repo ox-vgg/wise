@@ -1,4 +1,5 @@
 import enum
+from pathlib import Path
 from pydantic import ConfigDict, BaseModel, dataclasses
 from typing import Optional, Dict, Any
 import datetime
@@ -48,6 +49,14 @@ class MediaMetadata(BaseModel):
     num_frames: int
     duration: float
     model_config = ConfigDict(from_attributes=True)
+
+
+class MediaMetadataWithSource(MediaMetadata):
+    source_collection: SourceCollection
+
+    @property
+    def full_path(self) -> Path:
+        return Path(self.source_collection.location) / self.path
 
 
 class VectorMetadata(BaseModel):
@@ -112,4 +121,3 @@ class DatasetPayload(object):
     id: Any
     path: str
     media_type: SourceMediaType
-

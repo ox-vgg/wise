@@ -841,9 +841,7 @@ if __name__ == '__main__':
         feature_extractor = FeatureExtractorFactory(
             asset_id, config.feature_extractor_config
         )
-        search_index_list[media_type] = SearchIndexFactory(
-            media_type, asset_id, asset, feature_extractor
-        )
+        search_index_list[media_type] = SearchIndexFactory(media_type, asset_id, asset)
         if not search_index_list[media_type].load_index(args.index_type):
             print(f'failed to load {media_type} index: {asset_id}')
             del search_index_list[media_type]
