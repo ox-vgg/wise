@@ -337,11 +337,7 @@ class FTSSearch:
         self.project = project
         self.db_metadata = metadata
 
-        self.tables = {
-            t: metadata.tables[t]
-            for t in metadata.tables
-            if t.startswith("metadata-")
-        }
+        self.tables = { t.name: t for t in project.external_metadata_tables() }
         self.fts_table = metadata.tables.get(self.table_name)
 
         try:
