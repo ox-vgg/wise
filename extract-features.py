@@ -241,7 +241,7 @@ if __name__ == "__main__":
         type=str,
         default="webdataset",
         dest="feature_store_type",
-        choices=["webdataset", "numpy"],
+        choices=["webdataset", "numpy", "faiss"],
         help="extracted features are stored using this data structure",
     )
 

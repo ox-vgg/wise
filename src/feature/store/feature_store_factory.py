@@ -4,10 +4,12 @@ import enum
 
 from .webdataset_store import WebdatasetStore
 from .numpy_save_store import NumpySaveStore
+from .faiss_store import FaissStore
 
 class FeatureStoreType(str, enum.Enum):
     WEBDATASET = "webdataset"
     NUMPY = "numpy"
+    FAISS = "faiss"
 
 class FeatureStoreFactory:
     @classmethod
@@ -16,6 +18,8 @@ class FeatureStoreFactory:
             return WebdatasetStore(media_type, features_dir)
         elif feature_store_type == FeatureStoreType.NUMPY:
             return NumpySaveStore(media_type, features_dir)
+        elif feature_store_type == FeatureStoreType.FAISS:
+            return FaissStore(media_type, features_dir)
         else:
             raise ValueError(f'unknown feature_store_type {feature_store_type}')
 
@@ -36,5 +40,7 @@ class FeatureStoreFactory:
             return WebdatasetStore(media_type, features_dir)
         elif shard_ext_list[0] == '.npz':
             return NumpySaveStore(media_type, features_dir)
+        elif shard_ext_list[0] == ".faiss":
+            return FaissStore(media_type, features_dir)
         else:
             raise ValueError(f'unknown store containing shard filenames with extension {shard_ext_list[0]}')

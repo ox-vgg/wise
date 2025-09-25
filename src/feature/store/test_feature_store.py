@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .webdataset_store import WebdatasetStore
 from .numpy_save_store import NumpySaveStore
+from .faiss_store import FaissStore
 
 class TestFeatureExtractorFactory(unittest.TestCase):
     def setUp(self):
@@ -155,6 +156,85 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             self.assertTrue(np.array_equal(read_store[5], featureC))
             self.assertTrue(np.array_equal(read_store[1], featureA))
             self.assertTrue(np.array_equal(read_store[2], featureB))
+
+    def test_faiss_store(self):
+        with tempfile.TemporaryDirectory() as temp_store_dir:
+            store = FaissStore(self.store_name, temp_store_dir)
+            featureA = np.array([[1, 2, 3, 4]])
+            featureB = np.array([[5, 6, 7, 8]])
+            featureC = np.array([[9, 10, 11, 12]])
+
+            feature0 = np.concatenate((featureA, featureB, featureC), axis=0)
+            feature3 = np.concatenate((featureC, featureB, featureA), axis=0)
+
+            store.enable_write()
+
+            store.add([0, 1, 2], feature0)
+            self.assertEqual(store.feature_count, 3)
+            self.assertEqual(store.feature_dim, 4)
+
+            store.close()
+            self.assertEqual(
+                store.filenames,
+                [
+                    f"{temp_store_dir}/{self.store_name}-000000.faiss",
+                ],
+            )
+            store.enable_write()
+            store.add([3, 4, 5], feature3)
+            store.close()
+
+            self.assertEqual(store.feature_count, 6)
+            self.assertEqual(store.feature_dim, 4)
+            self.assertEqual(
+                store.filenames,
+                [
+                    f"{temp_store_dir}/{self.store_name}-000000.faiss",
+                    f"{temp_store_dir}/{self.store_name}-000001.faiss",
+                ],
+            )
+
+            read_feature_id = []
+            for feature_id, feature_vector in store:
+                read_feature_id.append(int(feature_id))
+                if int(feature_id) < 3:
+                    self.assertTrue(
+                        np.all(np.equal(feature_vector, feature0[feature_id]))
+                    )
+                else:
+                    self.assertTrue(
+                        np.all(np.equal(feature_vector, feature3[feature_id - 3]))
+                    )
+
+            self.assertEqual(read_feature_id, [0, 1, 2, 3, 4, 5])
+
+            # Read vectors in a different order
+            self.assertTrue(np.array_equal(store[2], featureC))
+            self.assertTrue(np.array_equal(store[3], featureC))
+
+            self.assertTrue(np.array_equal(store[0], featureA))
+            self.assertTrue(np.array_equal(store[5], featureA))
+
+            self.assertTrue(np.array_equal(store[1], featureB))
+            self.assertTrue(np.array_equal(store[4], featureB))
+
+            # check overwrite
+            store.enable_write(overwrite=True)
+            self.assertEqual(store.feature_count, 0)
+            self.assertEqual(store.feature_dim, None)
+
+            store.add([0, 1, 2], feature0)
+            self.assertEqual(store.feature_count, 3)
+            self.assertEqual(store.feature_dim, 4)
+
+            store.close()
+            self.assertEqual(
+                store.filenames,
+                [
+                    f"{temp_store_dir}/{self.store_name}-000000.faiss",
+                ],
+            )
+            del store
 
     def tearDown(self):
         pass
