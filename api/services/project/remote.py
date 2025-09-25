@@ -105,7 +105,6 @@ class RemoteWiseProjectService(WiseProjectService):
         data = rp_resp.json()
         if not data:
             raise ValueError("Failed to retrieve search results from remote service")
-        print(data)
         response =  common.SearchResponse.model_validate(data)
         response = self.modify_response(response)
 
@@ -136,12 +135,10 @@ class RemoteWiseProjectService(WiseProjectService):
             },
             json=feature_obj.model_dump()
         )
-        print(resp.text)
         resp.raise_for_status()
         data = resp.json()
         if not data:
             raise ValueError("Failed to retrieve search results from remote service")
-        print(data)
         response =  common.SearchResponse.model_validate(data)
         response = self.modify_response(response)
 
@@ -155,7 +152,6 @@ class RemoteWiseProjectService(WiseProjectService):
         data = resp.json()
         if not data:
             raise ValueError("Failed to retrieve featured items from remote service")
-        print(data)
         response =  [common.VectorInfo.model_validate(d) for d in data]
         response = self.modify_vector_info(response)
         return response

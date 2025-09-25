@@ -434,7 +434,6 @@ async def handle_post_search_feature(
         }
 
     vectors = feature.to_array()
-    print(vectors.shape, vectors.dtype)
     search_output = search_service.search_with_feature(
         vectors,
         media_type=media_type,
