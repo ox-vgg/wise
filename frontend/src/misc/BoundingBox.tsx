@@ -151,7 +151,7 @@ export const BoundingBoxes = ({
                     bbox_text={distance_str}
                     bbox_type={bboxType}
                     handleInternalSearchButtonClick={handleInternalSearchButtonClick}
-                    key={imageDetails.vector_id}
+                    key={`${imageDetails.media_id}-${imageDetails.vector_id}`}
                 />
             );
         } else if (boundingBoxVectors.length > 0) {
@@ -167,7 +167,7 @@ export const BoundingBoxes = ({
                         }
                         bbox_type={bboxType}
                         handleInternalSearchButtonClick={handleInternalSearchButtonClick}
-                        key={vec.vector_id}
+                        key={`${vec.media_id}-${vec.vector_id}`}
                     />
                 ))
             );
@@ -186,7 +186,7 @@ export const BoundingBoxes = ({
                         bbox_text={""}
                         bbox_type={bboxType}
                         handleInternalSearchButtonClick={handleInternalSearchButtonClick}
-                        key={vector.vector_id}
+                        key={`${vector.media_id}-${vector.vector_id}`}
                     />
                 );
             }

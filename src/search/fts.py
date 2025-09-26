@@ -1,19 +1,23 @@
+from __future__ import annotations
 import bisect
 from collections import defaultdict
 import itertools
 import functools
 import json
 import logging
-from typing import Literal, Annotated
+from typing import Literal, Annotated, TYPE_CHECKING
 
 from src import db
 from src.data_models import MediaMetadata, VectorAndMediaMetadata, MediaType, ModalityType
-from src.wise_project import WiseProject
+
 
 from pydantic import Field, RootModel
 import sqlalchemy as sa
 from sqlalchemy.ext import compiler
 from sqlalchemy.schema import DDLElement
+
+if TYPE_CHECKING:
+    from src.wise_project import WiseProject
 
 logger = logging.getLogger(__name__)
 
@@ -333,11 +337,7 @@ class FTSSearch:
         self.project = project
         self.db_metadata = metadata
 
-        self.tables = {
-            t: metadata.tables[t]
-            for t in metadata.tables
-            if t.startswith("metadata-")
-        }
+        self.tables = { t.name: t for t in project.external_metadata_tables() }
         self.fts_table = metadata.tables.get(self.table_name)
 
         try:
@@ -405,15 +405,10 @@ class FTSSearch:
         )
 
         ids = conn.execute(stmt).scalars().all()
-        cte = get_cte_from_media_ids(ids)
-        if not ids:
-            if ids_only:
-                return None
-            else:
-                return []
-        if ids_only:
-            return cte
+        if ids_only or not ids:
+            return ids
 
+        cte = get_cte_from_media_ids(ids)
         from_clause = cte.join(
             db.media_table,
             cte.c.media_id == db.media_table.c.id,

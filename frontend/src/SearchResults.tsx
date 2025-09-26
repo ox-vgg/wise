@@ -163,7 +163,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
           }
         ];
         const isVector = (searchResult.vector_id != 'None');
-        const renderKey = isVector ? searchResult.vector_id : `result-${pageNum*FRONTEND_PAGE_SIZE + index}`
+        const renderKey = isVector ? `${searchResult.media_id}-${searchResult.vector_id}` : `result-${pageNum * FRONTEND_PAGE_SIZE + index}`
         return (
           <div key={renderKey}
               style={{width: `${width*170/height}px`, flexGrow: width*170/height}}

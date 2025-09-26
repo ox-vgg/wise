@@ -20,7 +20,7 @@ const VideoOccurrencesView: React.FunctionComponent<VideoOccurrencesViewProps> =
 
   const occurrencesHTML = occurrences.map((searchResult, index) => {
     const isVector = searchResult.vector_id !== 'None';
-    const renderKey = isVector ? searchResult.vector_id : `occurrence-${searchResult.media_id}-${index}`;
+    const renderKey = isVector ? `${searchResult.media_id}-${searchResult.vector_id}` : `occurrence-${searchResult.media_id}-${index}`;
 
     return <div className="wise-occurrence" onClick={() => handleClickOccurrence(searchResult)} key={renderKey}>
       <div className="wise-occurrence-preview">

@@ -1,0 +1,2 @@
+class UnknownSearchIndexError(Exception):
+    pass

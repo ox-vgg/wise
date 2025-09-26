@@ -4,7 +4,7 @@ from pathlib import Path
 import glob
 import random
 
-from src.utils import batched
+from ...utils import batched
 from .feature_store import FeatureStore
 
 class NumpySaveStore(FeatureStore):

@@ -1,13 +1,16 @@
 import logging
 
-from typing import Optional, Callable, Dict
-from fastapi import FastAPI, HTTPException, Request
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Optional, TypedDict
+
+from fastapi import FastAPI, HTTPException, Request, APIRouter
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from config import APIConfig
-from .routes import get_project_router, WiseFrontendUserException
-
+from . import common
+from . import dependencies
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -21,9 +24,55 @@ def log_custom_format(message: str):
         f'{COLOR_SEQ}{BOLD_SEQ}{message}{RESET_SEQ}',
     )
 
-def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = None):
-    app = FastAPI()
-    app.state.config = config
+
+class WiseFrontendUserException(Exception):
+    """An exception whose message can be sent to the user.
+
+    Exceptions by default will only send an "Internal server error"
+    message to the user.  This separate class enables us to catch only
+    some with a message meant to the frontend user.
+    """
+
+    pass
+
+
+class State(TypedDict):
+    config: APIConfig
+
+
+def setup_routers(config: APIConfig):
+    dependencies.init(config)
+
+    from .standalone import report_router
+
+    if config.remote_projects:
+        from .aggregator import project_router
+        from .aggregator import search_router
+    else:
+        from .standalone import project_router
+        from .standalone import search_router
+
+    project_info = dependencies.project_info
+    project_name = project_info.name
+
+    router = APIRouter(prefix=f"/{project_name}", tags=[f"{project_name}"])
+    router.include_router(project_router)
+    router.include_router(report_router)
+    router.include_router(search_router)
+    return router
+
+
+def create_app(config: APIConfig, theme_asset_dir: Path):
+    # Apply precision monkey patching
+    common.patch_precision(config)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[State]:
+        # Startup code
+        yield {"config": config}
+        # Shutdown code
+
+    app = FastAPI(lifespan=lifespan)
 
     # Enable CORS for development mode
     # If you are running a dev server for the frontend React app,
@@ -57,22 +106,17 @@ def create_app(config: APIConfig, theme_asset_dir: Path, callback: Callable = No
     async def frontend_user_exception_handler(request: Request, exc: WiseFrontendUserException):
         raise HTTPException(400, {"message": str(exc)})
 
-    @app.on_event("startup")
-    async def startup():
-        app.include_router(get_project_router(config))
-        logger.info(f"Loading html user interface from {theme_asset_dir}")
-        app.mount(
-            f"/{config.project_dir.stem}/",
-            StaticFiles(directory=theme_asset_dir, html=True),
-            name="assets",
-        )
-        log_custom_format(f'Open http://{config.listen_address}:{config.port}/{config.project_dir.stem}/ in your browser')
-        if callback:
-            callback()
+    logger.info(f"Loading html user interface from {theme_asset_dir}")
+    app.include_router(setup_routers(config))
 
-    @app.on_event("shutdown")
-    async def shutdown():
-        pass
+    app.mount(
+        f"/{config.project_dir.stem}/",
+        StaticFiles(directory=theme_asset_dir, html=True),
+        name="assets",
+    )
+    log_custom_format(
+        f"Open http://{config.listen_address}:{config.port}/{config.project_dir.stem}/ in your browser"
+    )
 
     return app
 
@@ -82,7 +126,6 @@ def serve(
     theme_asset_dir: Path,
     index_type: Optional[str] = None,
     query_blocklist_file: Path = None,
-    callback: Callable = None # You can pass in a callback function to be called when the server has started
 ):
     options = {"command": "serve"}
     options = options | ({"project_dir": project_dir} if project_dir else {})
@@ -99,6 +142,5 @@ def serve(
 
     config = APIConfig.model_validate(options)  # type: ignore
 
-
-    app = create_app(config, theme_asset_dir, callback)
+    app = create_app(config, theme_asset_dir)
     uvicorn.run(app, host=config.listen_address, port=config.port, log_level="info")

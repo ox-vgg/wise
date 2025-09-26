@@ -23,6 +23,9 @@ bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
 
 # 5. Run tests based on edited videos with shots
 bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
+
+# 6. Run tests for WISE aggregator
+bash tests/test-aggregator.sh $HOME/temp/
 ```
 
 Here is a sample output obtained by executing the test based on videos.
@@ -90,6 +93,45 @@ export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
 bash test-wikimedia-commons-25.sh  $HOME/temp/
 bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
 bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
+```
+
+The aggregator feature enables WISE to aggregate search response from multiple standalone 
+WISE projects. The aggregator feature can be tested as follows:
+
+```
+export FEATURE_EXTRACTOR_CONFIG='{
+    "default": {
+        "url": "localhost:8801"
+    },
+    "transformers/owlv2/google/owlv2-large-patch14-ensemble": {
+        "objectness_threshold": 0.11
+    }
+}'
+bash tests/test-aggregator.sh $HOME/temp/
+```
+
+This test takes around 30 minutes to generate the four test projects named `1`, `2`, `3`, and `123`.
+Here is a sample output obtained by executing the test based on the [aggregator-3](https://thor.robots.ox.ac.uk/wise/assets/test/aggregator-3.zip) dataset.
+```
+Starting tests for aggregator-3 ...
+...
+Started server for 1 on port 10001 with PID 1098030
+Started server for 2 on port 10002 with PID 1098031
+Started server for 3 on port 10003 with PID 1098032
+REMOTE_PROJECTS=["http://localhost:10001/1/","http://localhost:10002/2/","http://localhost:10003/3/"]
+...
+Server for project 123 on port 10004 is running.
+All servers are up and running.
+...
+------ Test Summary ------
+Test 6.1 PASSED: identical values in /info endpoints
+Test 6.2 PASSED: identical results for video search query 'panda'
+Test 6.3 PASSED: identical results for audio search query 'gunshot'
+Test 6.4 PASSED: identical results for object search query 'boat'
+Test 6.5 PASSED: identical results for face search query
+Test 6.6 PASSED: identical results for metadata search query
+--------------------------
+All tests passed.
 ```
 
 # Unit Tests

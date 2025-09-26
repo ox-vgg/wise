@@ -230,7 +230,7 @@ const convertQueriesToFormData = (queries: Query[]) => {
     } else if (q.type === 'INTERNAL_IMAGE') {
       let query_type = 'internal_image_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, q.value.vector_id);
+      formData.append(query_type, `${q.value.media_id}/${q.value.vector_id}`);
     } else if (q.type === 'TEXT') {
       let query_type = 'text_queries';
       if (q.isNegative) query_type = 'negative_' + query_type
@@ -243,14 +243,15 @@ const convertQueriesToFormData = (queries: Query[]) => {
 }
 
 
-const fetchRelatedVectors = (vector_id: string): Promise<VectorInfo[]> => {
-  return fetchWithTimeout(
-    "related-vectors/" + vector_id,
+const fetchRelatedVectors = async (vector_id: string, media_id: string): Promise<VectorInfo[]> => {
+  const params = new URLSearchParams();
+  params.append("media_id", media_id);
+
+  const r = await fetchWithTimeout(
+    `related-vectors/${vector_id}?${params}`,
     config.FETCH_TIMEOUT,
-    {method: "GET"},
-  ).then(
-      r => r.json()
-  );
+    { method: "GET" });
+  return await r.json();
 }
 
 
@@ -275,7 +276,7 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
     ['search_in', viewModalityToSearchInType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
-    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries', q.value.vector_id as string]),
+    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries',  `${q.value.media_id}/${q.value.vector_id}` as string]),
     ...metadataFilterQueries.map(q => ['metadata_filter', q.value as string])
   ];
   if (shotScaleFilter.length > 0) {
@@ -394,7 +395,7 @@ export const useDataService = (): DataServiceOutput => {
 
 
   const fillRelatedVectors = async (imageDetails: ProcessedImageVector | ProcessedVideoSegment) => {
-    const vectors = await fetchRelatedVectors(imageDetails.vector_id);
+    const vectors = await fetchRelatedVectors(imageDetails.vector_id, imageDetails.media_id);
     // This mediaInfo is used to get the image width/height which is
     // used in a bunch of places to draw the thumbnail in a manner
     // compatible with the compact/justified image grid in the search

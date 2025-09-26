@@ -6,18 +6,20 @@ import math
 import itertools
 
 from .search_index import SearchIndex
-from ..feature import FeatureExtractor
+
 from ..feature.store.feature_store_factory import FeatureStoreFactory
 from ..feature.store.webdataset_store import WebdatasetStore
 
 class FeatureSearchIndex(SearchIndex):
 
     def __init__(
-        self, media_type, asset_id, asset, feature_extractor: FeatureExtractor
+        self,
+        media_type,
+        asset_id,
+        asset,
     ):
         self.media_type = media_type
         self.feature_extractor_id = asset_id
-        self.feature_extractor = feature_extractor
 
         assert 'features_dir' in asset, "features_dir missing in assets"
         self.features_dir = Path(asset['features_dir'])
@@ -93,7 +95,7 @@ class FeatureSearchIndex(SearchIndex):
     def is_index_loaded(self):
         return hasattr(self, 'index')
 
-    def load_index(self, index_type, db_engine):
+    def load_index(self, index_type):
         self.index_type = index_type
         index_fn = self.get_index_filename(index_type)
         if not index_fn.exists():
@@ -101,7 +103,6 @@ class FeatureSearchIndex(SearchIndex):
             print(f'  use create-index.py script to create an index')
             return False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
-        self.feature_extractor.create_vector_metadata_table(db_engine)
         return True
 
     @property
@@ -120,19 +121,3 @@ class FeatureSearchIndex(SearchIndex):
         elif self.index_type == 'IndexIVFFlat':
             # Check if the direct map was enabled
             return hasattr(self.index, 'direct_map') and not self.index.direct_map.no()
-
-    def search(self, media_type, query, topk=5, query_type='text'):
-        if query_type != 'text':
-            raise ValueError('query_type={query_type} not implemented')
-
-        if media_type == 'audio':
-            if isinstance(query, str):
-                media_query_text = [query]
-            else:
-                media_query_text = [ (self.prompt[media_type] + x) for x in query]
-        else:
-            media_query_text = [ (self.prompt[media_type] + query) ]
-
-        query_features = self.feature_extractor.extract_text_features(media_query_text)
-        dist, ids  = self.index.search(query_features, topk)
-        return dist[0], ids[0]

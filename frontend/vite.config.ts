@@ -14,6 +14,7 @@ export default defineConfig({
       '/featured': process.env.API_BASE_URL,
       '/related-vectors/': process.env.API_BASE_URL,
       '/search': process.env.API_BASE_URL,
+      '/shard/': process.env.API_BASE_URL,
     }
   },
   plugins: [react()],

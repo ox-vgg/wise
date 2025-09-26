@@ -107,6 +107,6 @@ if __name__ == '__main__':
                     config.feature_extractor_config
                 )
                 search_index = SearchIndexFactory(
-                    media_type, feature_extractor_id, asset, feature_extractor
+                    media_type, feature_extractor_id, asset
                 )
                 search_index.create_index(args.index_type, args.overwrite)
