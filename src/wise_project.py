@@ -143,7 +143,7 @@ class WiseProject:
         if not index_store.exists():
             index_store.mkdir(parents=True, exist_ok=True)
         return index_store
-    
+
     @property
     def supported_media_types_and_features(self):
         _assets = None
@@ -164,10 +164,9 @@ class WiseProject:
                     if _assets is None:
                         _assets = self.discover_assets()
                     feature_extractor_ids = set(_assets[g].keys())
-                
+
                 _supported[g].update(feature_extractor_ids)
         return _supported
-
 
     def discover_assets(self):
         """
@@ -970,6 +969,14 @@ class WiseProject:
         # sanity checks - TODO
         NO_ID = {'id': None}
         supported_assets = other.supported_media_types_and_features
+
+        # Create the required tables for feature extractor metadata
+        for media_type in supported_assets:
+            for feature_extractor_id in supported_assets[media_type]:
+                feature_extractor_cls = get_feature_extractor_class(
+                    feature_extractor_id
+                )
+                feature_extractor_cls.create_vector_metadata_table(self.db_engine)
         with (
             self.db_engine.connect() as conn,
             other.db_engine.connect() as other_conn,
@@ -987,7 +994,9 @@ class WiseProject:
                     )
                 ).scalar_one_or_none()
                 if existing_source_collection is None:
-                    logger.info(f'could not find source collection {other_source_collection} - copying over')
+                    logger.debug(
+                        f"could not find source collection {other_source_collection} - copying over"
+                    )
                     # none match, create new
                     existing_source_collection = SourceCollectionRepo.create(
                         conn,
@@ -997,12 +1006,12 @@ class WiseProject:
                     logger.debug(f'found existing source collection at id - {existing_source_collection}')
                     existing_source_collection = SourceCollectionRepo.get(conn, existing_source_collection)
                 return other_source_collection.id, existing_source_collection.id
-            
+
             source_collection_id_map = dict(map(handle_source_collection, SourceCollectionRepo.list(other_conn)))
             logger.info(f'Updated source collection map - {source_collection_id_map}')
             if not dry_run:
                 conn.commit()
-            
+
             # Merge media by full path, checksum, size
             def handle_media(other_media: MediaMetadata):
                 source_collection = SourceCollectionRepo.get(
@@ -1023,7 +1032,9 @@ class WiseProject:
                 ).scalar_one_or_none()
                 if not existing_media_id:
                     # new media
-                    logger.info(f'could not find media {other_media} - copying over metadata and shots')
+                    logger.debug(
+                        f"could not find media {other_media} - copying over metadata and shots"
+                    )
                     existing_media_id = MediaRepo.create(
                         conn,
                         data=other_media.model_copy(update= NO_ID | {'source_collection_id': source_collection.id})
@@ -1035,15 +1046,15 @@ class WiseProject:
                         )
                 else:
                     existing_media_id = MediaRepo.get(conn, existing_media_id)
-                
+
                 return other_media.id, existing_media_id.id
-            
+
             media_id_map = dict(map(handle_media, MediaRepo.list(other_conn)))
             if not dry_run:
                 conn.commit()
 
             logger.info(f'Updated media map - {media_id_map}')
-            
+
             # Merge thumbnails, shots
             def handle_thumbnail(t: ThumbnailMetadata):
                 media_id = media_id_map[t.media_id]
@@ -1056,15 +1067,25 @@ class WiseProject:
                     )
                 ).scalar_one_or_none()
                 if not existing_thumbnail:
-                    logger.info(f'could not find thumbnail ({t.media_id}, {t.timestamp}) - copying over')
+                    logger.debug(
+                        f"could not find thumbnail ({t.media_id}, {t.timestamp}) - copying over"
+                    )
                     ThumbnailRepo.create(
                         thumbs_conn,
                         data=t.model_copy(update= NO_ID | {'media_id': media_id})
                     )
-            
-            any(map(handle_thumbnail, ThumbnailRepo.list(other_thumbs_conn, batch_size=1024)))
+                    return 1
+                return 0
+
+            num_copied_thumbnails = sum(
+                map(
+                    handle_thumbnail,
+                    ThumbnailRepo.list(other_thumbs_conn, batch_size=1024),
+                )
+            )
+            logger.info(f"copied over {num_copied_thumbnails} thumbnails")
             if not dry_run:
-                conn.commit()
+                thumbs_conn.commit()
 
             def get_last_vector_timestamps():
                 vector_timestamp_limits = {}
@@ -1086,9 +1107,10 @@ class WiseProject:
                     vector_timestamp_limits[(media_id, modality, feature_extractor_id)] = timestamp
 
                 return vector_timestamp_limits
-            
+
             min_time_stamp_per_media_id = get_last_vector_timestamps()
-            logger.info(f'vector timestamp - {min_time_stamp_per_media_id}')
+            logger.debug(f"vector timestamp - {min_time_stamp_per_media_id}")
+
             def copy_vectors(media_type: str, feature_extractor_id: str, other_store: FeatureStore):
                 logger.info(f'copying for feature_extractor - {feature_extractor_id} ({media_type})')
                 feature_count = other_store.feature_count
@@ -1099,8 +1121,9 @@ class WiseProject:
                     store = FeatureStoreFactory.create_store('webdataset', media_type, self.features_dir(feature_extractor_id))
                 store.enable_write()
 
-                feature_extractor_cls = get_feature_extractor_class(feature_extractor_id)
-                feature_extractor_cls.create_vector_metadata_table(self.db_engine)
+                feature_extractor_cls = get_feature_extractor_class(
+                    feature_extractor_id
+                )
 
                 total_copied = 0
                 try:
@@ -1146,12 +1169,12 @@ class WiseProject:
                 finally:
                     store.close()
                 logger.info(f'copied {total_copied} vectors over for feature extractor - {feature_extractor_id} ({media_type})')
-                    
+
             for media_type in supported_assets:
                 for feature_extractor_id in supported_assets[media_type]:    
                     other_store = FeatureStoreFactory.load_store(media_type, other.features_dir(feature_extractor_id))
                     copy_vectors(media_type, feature_extractor_id, other_store)                    
-                
+
         # merge tables in database
     def merge(self, other: WiseProject, dry_run: bool = True):
 
@@ -1177,7 +1200,7 @@ class WiseProject:
                     elif feature_extractor_id not in supported_assets[media_type]:
                         logger.info(f'deleting - {p}')
                         shutil.rmtree(self.features_root(feature_extractor_id))
-                    
+
                     else:
                         for p in self.features_dir(feature_extractor_id).rglob(f'{media_type}-*'):
                             if p.name not in supported_assets[media_type][feature_extractor_id]['features_files']:
@@ -1201,7 +1224,7 @@ class WiseProject:
                         logger.error(f'ERROR - dry run inserted rows in {table} - {extra_rows}')
                     else:
                         conn.commit()
-                        
+
             delete_rows_from_id(wise_db.source_collections_table, last_collection_id)
             delete_rows_from_id(wise_db.media_table, last_media_id)
             delete_rows_from_id(wise_db.vectors_table, last_vector_id)
@@ -1215,7 +1238,63 @@ class WiseProject:
             logger.exception('Error in merge, rolling back - dont interrupt')
             cleanup_features()
             cleanup_tables()
-            
+
         # sanity checks - TODO
 
-        
+
+if __name__ == "__main__":
+    # temp cli for merging projects
+    import typer
+
+    app = typer.Typer()
+    app_state = {"verbose": True}
+
+    @app.callback()
+    def base(verbose: bool = False):
+        """
+        APP CLI
+        Add description about the CLI
+        """
+        app_state["verbose"] = verbose
+        logging.basicConfig(
+            level=logging.DEBUG if verbose else logging.INFO,
+            format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
+        )
+        global logger
+        logger = logging.getLogger()
+
+    @app.command()
+    def merge(
+        other_projects: list[str] = typer.Argument(
+            ..., help="the source project directory to merge from"
+        ),
+        into: str = typer.Option(..., help="the target project directory"),
+        dry_run: bool = typer.Option(False, help="if set, will not make any changes"),
+    ):
+        """
+        Merges another wise project into this one
+
+        WARNING: EXPERIMENTAL - use at your own risk
+        """
+        verbose = app_state["verbose"]
+        project = WiseProject(
+            into,
+            create_project=True,
+            db_kwargs={"echo": verbose},
+            thumbsdb_kwargs={"echo": verbose},
+        )
+        for _other_project_dir in other_projects:
+            other_project = WiseProject(
+                _other_project_dir,
+                db_kwargs={"echo": verbose},
+                thumbsdb_kwargs={"echo": verbose},
+            )
+
+            project.merge(other_project, dry_run=dry_run)
+            if dry_run:
+                logger.info("Dry run - no changes made")
+            else:
+                logger.info("Merge complete")
+
+    if __name__ == "__main__":
+        app()

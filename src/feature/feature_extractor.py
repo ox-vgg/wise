@@ -81,7 +81,7 @@ class BBoxXYWH(NamedTuple):
     h: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FeatureExtMetadata:
     """Optional feature metadata that WISE "core" knows how to handle.
 
