@@ -49,7 +49,7 @@ class FaissStore(FeatureStore):
         self._dim = None
 
         for filename in self._filenames:
-            index = faiss.read_index(filename, faiss.IO_FLAG_MMAP_IFC | faiss.IO_FLAG_READ_ONLY)
+            index = faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
             N = index.ntotal
             self._count += N
             if self._dim is None:
@@ -178,7 +178,7 @@ class FaissStore(FeatureStore):
             _filelist = random.shuffle(_filelist)
 
         for filename in _filelist:
-            index = faiss.read_index(filename, faiss.IO_FLAG_MMAP_IFC | faiss.IO_FLAG_READ_ONLY)
+            index = faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
             N = index.ntotal
             feature_ids = faiss.vector_to_array(index.id_map)
             features = index.reconstruct_batch(feature_ids)
@@ -191,6 +191,7 @@ class FaissStore(FeatureStore):
                 batch_features = features[batch_indices, :]
                 yield batch_feature_ids, batch_features
 
+    # TODO: Add LRU like cache to speed up repeated access to most commonly used shard
     def __getitem__(self, id: int):
         # Random access to features by ID
         if id not in self._vector_id_to_shard_location:
@@ -202,7 +203,7 @@ class FaissStore(FeatureStore):
                 raise KeyError(f'Feature ID {id} not found in the store')
 
         filename = self._vector_id_to_shard_location[id]
-        index = faiss.read_index(filename, faiss.IO_FLAG_MMAP_IFC | faiss.IO_FLAG_READ_ONLY)
+        index = faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
         feature_vector = index.reconstruct_n(id, 1)
         return feature_vector
 
