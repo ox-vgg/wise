@@ -288,21 +288,24 @@ def construct_search_response(
             image_top_dist = [top_dist[i] for i in image_indices]
             image_all_metadata = [all_metadata[i] for i in image_indices]
             image_ext_metadata = [all_ext_metadata[i] for i in image_indices]
-            image_results = construct_image_search_response(image_top_dist, image_all_metadata, image_ext_metadata, all_thumbs)
+            image_thumbs = [all_thumbs[i] for i in image_indices]
+            image_results = construct_image_search_response(image_top_dist, image_all_metadata, image_ext_metadata, image_thumbs)
     if search_in is None or search_in == MediaType.VIDEO:
         video_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.VIDEO]
         if len(video_indices) > 0:
             video_top_dist = [top_dist[i] for i in video_indices]
             video_all_metadata = [all_metadata[i] for i in video_indices]
             video_ext_metadata = [all_ext_metadata[i] for i in video_indices]
-            video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, video_ext_metadata, all_thumbs, merge_function)
+            video_thumbs = [all_thumbs[i] for i in video_indices]
+            video_results = construct_video_search_response(MediaType.VIDEO, video_top_dist, video_all_metadata, video_ext_metadata, video_thumbs, merge_function)
     if search_in is None or search_in == MediaType.AV:
         av_indices = [i for i, x in enumerate(all_metadata) if x.modality == ModalityType.AUDIO and x.media_type == MediaType.AV]
         if len(av_indices) > 0:
             av_top_dist = [top_dist[i] for i in av_indices]
             av_all_metadata = [all_metadata[i] for i in av_indices]
             av_ext_metadata = [all_ext_metadata[i] for i in av_indices]
-            video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, av_ext_metadata, all_thumbs, merge_function)
+            av_thumbs = [all_thumbs[i] for i in av_indices]
+            video_audio_results = construct_video_search_response(MediaType.AV, av_top_dist, av_all_metadata, av_ext_metadata, av_thumbs, merge_function)
     if search_in is not None and search_in not in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AV]:
         raise NotImplementedError("`search_in` must be either `MediaType.IMAGE`, `MediaType.VIDEO`, or `MediaType.AV`. Support for `MediaType.AUDIO` is not available yet")
 
