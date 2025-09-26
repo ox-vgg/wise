@@ -37,6 +37,9 @@ HTTP_SERVER_PORT="10001"
 MAX_POLL_SERVER_COUNT=60
 NUM_WORKERS=2
 
+FEATURE_STORE="webdataset" # options are: faiss, webdataset, numpy
+EXTENSION="tar" # options are: faiss, tar, npy
+
 # to enable triton server, export an environment variable FEATURE_EXTRACTOR_CONFIG
 # containing a JSON string with the URL of the triton server. For example:
 # $ export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
@@ -114,7 +117,7 @@ if [ ! -d "${WISE_PROJECT_DIR}" ]; then
         --shard-maxcount 4096 \
         --shard-maxsize 20971520 \
         --num-workers $NUM_WORKERS \
-        --feature-store webdataset \
+        --feature-store ${FEATURE_STORE} \
         --no-thumbnails \
         --audio-feature-id "${AUDIO_FEATURE_ID}" \
         --project-dir "$WISE_PROJECT_DIR"
@@ -132,13 +135,13 @@ if [ ! -d "${AUDIO_FEATURE_STORE}" ]; then
 else
     echo "Test 2.1 PASSED"
 fi
-# Test 2.2 : check that the audio feature store directory contains more than 0 *.tar files
-AUDIO_TAR_COUNT=$(find "${AUDIO_FEATURE_STORE}" -type f -name "*.tar" | wc -l)
+# Test 2.2 : check that the audio feature store directory contains more than 0 *.${EXTENSION} files
+AUDIO_TAR_COUNT=$(find "${AUDIO_FEATURE_STORE}" -type f -name "*.${EXTENSION}" | wc -l)
 if [ "$AUDIO_TAR_COUNT" -eq 0 ]; then
-    echo "Test 2.2 FAILED: audio feature store directory ${AUDIO_FEATURE_STORE} does not contain any *.tar files"
+    echo "Test 2.2 FAILED: audio feature store directory ${AUDIO_FEATURE_STORE} does not contain any *.${EXTENSION} files"
     exit 1
 else
-    echo "Test 2.2 PASSED: audio feature store directory ${AUDIO_FEATURE_STORE} contains ${AUDIO_TAR_COUNT} *.tar files"
+    echo "Test 2.2 PASSED: audio feature store directory ${AUDIO_FEATURE_STORE} contains ${AUDIO_TAR_COUNT} *.${EXTENSION} files"
 fi
 
 ## Task: 3. Import media metadata
@@ -223,7 +226,7 @@ if [ ! -d "${FEATURE_STORE1}" ]; then
         --shard-maxcount 4096 \
         --shard-maxsize 20971520 \
         --num-workers $NUM_WORKERS \
-        --feature-store webdataset \
+        --feature-store ${FEATURE_STORE} \
         --no-thumbnails \
         --use-shots \
         --video-feature-id "${VIDEO_FEATURE_ID1}" \
@@ -244,7 +247,7 @@ if [ ! -d "${FEATURE_STORE2}" ]; then
         --shard-maxcount 4096 \
         --shard-maxsize 20971520 \
         --num-workers 0 \
-        --feature-store webdataset \
+        --feature-store ${FEATURE_STORE} \
         --thumbnails \
         --use-shots \
         --video-feature-id "${VIDEO_FEATURE_ID2}" \
@@ -262,14 +265,14 @@ if [ ! -d "${FEATURE_STORE1}" ] || [ ! -d "${FEATURE_STORE2}" ]; then
 else
     echo "Test 5.1 PASSED"
 fi
-# Test 5.2 : check that the video feature store directories contains more than 0 *.tar files
-VIDEO_TAR_COUNT1=$(find "${FEATURE_STORE1}" -type f -name "*.tar" | wc -l)
-VIDEO_TAR_COUNT2=$(find "${FEATURE_STORE2}" -type f -name "*.tar" | wc -l)
+# Test 5.2 : check that the video feature store directories contains more than 0 *.${EXTENSION} files
+VIDEO_TAR_COUNT1=$(find "${FEATURE_STORE1}" -type f -name "*.${EXTENSION}" | wc -l)
+VIDEO_TAR_COUNT2=$(find "${FEATURE_STORE2}" -type f -name "*.${EXTENSION}" | wc -l)
 if [ "$VIDEO_TAR_COUNT1" -eq 0 ] || [ "$VIDEO_TAR_COUNT2" -eq 0 ]; then
-    echo "Test 5.2 FAILED: video feature store directories ${FEATURE_STORE1} and ${FEATURE_STORE2} do not contain any *.tar files"
+    echo "Test 5.2 FAILED: video feature store directories ${FEATURE_STORE1} and ${FEATURE_STORE2} do not contain any *.${EXTENSION} files"
     exit 1
 else
-    echo "Test 5.2 PASSED: video feature store directories ${FEATURE_STORE1} and ${FEATURE_STORE2} contain ${VIDEO_TAR_COUNT1} and ${VIDEO_TAR_COUNT2} *.tar files, respectively"
+    echo "Test 5.2 PASSED: video feature store directories ${FEATURE_STORE1} and ${FEATURE_STORE2} contain ${VIDEO_TAR_COUNT1} and ${VIDEO_TAR_COUNT2} *.${EXTENSION} files, respectively"
 fi
 
 ## Task 6. Create search index for features and metadata

@@ -103,7 +103,7 @@ def initialise_feature_extractors(
                 project.features_dir(feature_extractor_id),
             )
             feature_stores[modality_type][feature_extractor_id].enable_write(
-                shard_max_count, shard_max_size
+                shard_maxcount=shard_max_count, shard_maxsize=shard_max_size
             )
 
     return feature_extractors, feature_stores
@@ -241,7 +241,7 @@ if __name__ == "__main__":
         type=str,
         default="webdataset",
         dest="feature_store_type",
-        choices=["webdataset", "numpy"],
+        choices=["webdataset", "numpy", "faiss"],
         help="extracted features are stored using this data structure",
     )
 
