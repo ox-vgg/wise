@@ -36,6 +36,9 @@ MAX_POLL_SERVER_COUNT=15
 CUDA_VISIBLE_DEVICES=1
 NUM_WORKERS=2
 
+FEATURE_STORE="webdataset" # options are: faiss, webdataset, numpy
+EXTENSION="tar" # options are: faiss, tar, npy
+
 # to enable triton server, export an environment variable FEATURE_EXTRACTOR_CONFIG
 # containing a JSON string with the URL of the triton server. For example:
 # $ export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
@@ -113,7 +116,7 @@ if [ ! -d "${WISE_PROJECT_DIR}" ]; then
            --shard-maxcount 4096 \
            --shard-maxsize 20971520 \
            --num-workers $NUM_WORKERS \
-           --feature-store webdataset \
+           --feature-store ${FEATURE_STORE} \
            --image-feature-id "${IMAGE_FEATURE_ID1}" \
            --image-feature-id "${IMAGE_FEATURE_ID2}" \
            --image-feature-id "${IMAGE_FEATURE_ID3}" \

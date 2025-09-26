@@ -6,7 +6,6 @@ import logging
 from .feature_store import FeatureStore
 from ...utils import batched
 
-import torch
 import numpy as np
 import faiss
 
@@ -17,6 +16,10 @@ class FaissStore(FeatureStore):
     Feature store that uses Faiss for storing and retrieving feature vectors.
 
     When writing, creates a new Flat Index + IDMap and appends feature vectors to it.
+
+    A new shard is created when the close method is called or when object goes out of scope (__del__)
+
+    NOTE: This store doesnt implement shard_maxcount or shard_maxsize
     """
     EXTENSION = "faiss"
 
@@ -111,7 +114,6 @@ class FaissStore(FeatureStore):
 
     def save_current_shard(self):
         if self._current_shard is None or self._current_shard.ntotal == 0:
-            logger.debug("No current shard to save")
             return
 
         filename = self._pattern % self._current_shard_idx
@@ -132,7 +134,7 @@ class FaissStore(FeatureStore):
 
         logger.debug("FaissStore: count=%d", self.feature_count)
 
-    def add(self, id: int | list[int], features: np.ndarray | torch.Tensor):
+    def add(self, id: int | list[int], features: np.ndarray):
         """
         Add features with associated IDs to the Faiss index.
         Expects features to be 1 x N and id to be a single integer, or
@@ -162,9 +164,6 @@ class FaissStore(FeatureStore):
             )
 
         ids_array = np.array(id, dtype=np.int64)
-        if isinstance(features, torch.Tensor):
-            ids_array = torch.from_numpy(ids_array)
-
         self._current_shard.add_with_ids(features, ids_array)
 
     def __iter__(self):
