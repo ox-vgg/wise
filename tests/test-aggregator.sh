@@ -37,6 +37,9 @@ MAX_POLL_SERVER_COUNT=15
 GPU_ID=1
 NUM_WORKERS=2
 
+FEATURE_STORE="faiss" # options are: faiss, webdataset, numpy
+EXTENSION="faiss" # options are: faiss, tar, npy
+
 # to enable triton server, export an environment variable FEATURE_EXTRACTOR_CONFIG
 # containing a JSON string with the URL of the triton server. For example:
 # $ export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
@@ -58,6 +61,7 @@ WISE_ALL_PROJECT_DIR="${WISE_PROJECT_BASEDIR}/123/"
 WISE_PROJECT1_DIR="${WISE_PROJECT_BASEDIR}/1/"
 WISE_PROJECT2_DIR="${WISE_PROJECT_BASEDIR}/2/"
 WISE_PROJECT3_DIR="${WISE_PROJECT_BASEDIR}/3/"
+WISE_MERGED_PROJECT_DIR="${WISE_PROJECT_BASEDIR}/merged/"
 
 QUERY_DATA_DIR="${OUTDIR}/test-query/${TEST_ID}/"
 mkdir -p "${QUERY_DATA_DIR}"
@@ -111,7 +115,7 @@ fi
 ## Task: 2. Create a WISE project corresponding to each subset
 for subset_id in 1 2 3; do
     SUBSET_DIR="${TEST_DATA_DIR}${subset_id}/"
-    WISE_PROJECT_SUBSET_DIR="${OUTDIR}/wise-project/${subset_id}/"
+    WISE_PROJECT_SUBSET_DIR="${WISE_PROJECT_BASEDIR}/${subset_id}/"
 
     ## Task 2.1 : Extract features from videos in the subset
     if [ ! -d "${WISE_PROJECT_SUBSET_DIR}" ]; then
@@ -123,7 +127,7 @@ for subset_id in 1 2 3; do
                --shard-maxcount 4096 \
                --shard-maxsize 20971520 \
                --num-workers $NUM_WORKERS \
-               --feature-store webdataset \
+               --feature-store ${FEATURE_STORE} \
                --audio-feature-id "${AUDIO_FEATURE_ID}" \
                --video-feature-id "${VIDEO_FEATURE_ID1}" \
                --video-feature-id "${VIDEO_FEATURE_ID2}" \
@@ -155,7 +159,7 @@ for subset_id in 1 2 3; do
 
     ## Test 2.4 : check if all the metadata rows are imported
     ROW_COUNT=$(sqlite3 "$METADATA_DB_FILE" "SELECT COUNT(*) FROM '$METADATA_TABLE_NAME';")
-    TRUE_ROW_COUNT=$(wc -l < "${SUBSET_DIR}media-metadata.csv")
+    TRUE_ROW_COUNT=$(python -c "import csv; print(sum(1 for i in csv.reader(open('"${SUBSET_DIR}media-metadata.csv"'))))")
     TRUE_ROW_COUNT=$((TRUE_ROW_COUNT - 1)) # subtract 1 for the header row
     if [ "$ROW_COUNT" -ne "$TRUE_ROW_COUNT" ]; then
         echo "[${subset_id}] Test 2.4 FAILED: metadata table $TABLE_NAME has $ROW_COUNT rows, expected $TRUE_ROW_COUNT rows"
@@ -208,53 +212,89 @@ METADATA_DB_FILE="${WISE_ALL_PROJECT_DIR}metadata/internal.db"
 METADATA_TABLE_NAME="metadata-123"
 RESULT=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
 if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
-    echo "[123] Importing metadata from ${TEST_DATA_DIR}all-media-metadata.csv (takes few seconds) ..."
+    echo "[123] Importing metadata from ${TEST_DATA_DIR}media-metadata.csv (takes few seconds) ..."
     python3 media-metadata.py import \
             --metadata-id "123" \
             --from-csv "${TEST_DATA_DIR}media-metadata.csv" \
             --metadata-type "media" \
-            --project-dir "$WISE_ALL_PROJECT_DIR"
+            --project-dir "${WISE_ALL_PROJECT_DIR}"
 fi
 
-## Test 3.3 : check if the metadata table exists
-TABLE_NAME=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
-if [ "$TABLE_NAME" != "$METADATA_TABLE_NAME" ]; then
-    echo "[123] Test 3.3 FAILED: metadata table $TABLE_NAME does not exist in $METADATA_DB_FILE"
-    exit 1
-else
-    echo "[123] Test 3.3 PASSED"
-fi
-
-## Test 3.4 : check if all the metadata rows are imported
-ROW_COUNT=$(sqlite3 "$METADATA_DB_FILE" "SELECT COUNT(*) FROM '$METADATA_TABLE_NAME';")
-TRUE_ROW_COUNT=$(wc -l < "${TEST_DATA_DIR}media-metadata.csv")
-TRUE_ROW_COUNT=$((TRUE_ROW_COUNT - 1)) # subtract 1 for the header row
-if [ "$ROW_COUNT" -ne "$TRUE_ROW_COUNT" ]; then
-    echo "[123] Test 3.4 FAILED: metadata table $TABLE_NAME has $ROW_COUNT rows, expected $TRUE_ROW_COUNT rows"
-    exit 1
-else
-    echo "[123] Test 3.4 PASSED"
-fi
-
-## Test 3.5 : create index
-FTS_CONFIG_FILE="${WISE_ALL_PROJECT_DIR}fts-config.json"
-echo "{ \"metadata-123\": [ \"description\", \"source_url\" ] }" > "${FTS_CONFIG_FILE}"
-NUM_INDEX_FILES=$(find "${WISE_ALL_PROJECT_DIR}store/" -type f -name "*.faiss" | wc -l)
-if [ "$NUM_INDEX_FILES" -eq 0 ]; then
-    echo "Creating FAISS index of type ${FAISS_INDEX_TYPE} for video feature ${VIDEO_FEATURE_ID1} (takes about 5 min.) ..."
+if [ ! -d ${WISE_MERGED_PROJECT_DIR} ]; then
+    echo "[merged] Merging the 3 subsets into a single WISE project (takes about 6 min.) ..."
     cd "${WISE_CODE_DIR}"
-    python create-index.py \
-        --index-type "IndexFlatIP" \
-        --fts-config "${FTS_CONFIG_FILE}" \
-        --project-dir "$WISE_ALL_PROJECT_DIR"
+    python3 -m src.wise_project merge \
+       --into "${WISE_MERGED_PROJECT_DIR}" \
+       "${WISE_PROJECT1_DIR}" \
+       "${WISE_PROJECT2_DIR}" \
+       "${WISE_PROJECT3_DIR}"
 fi
-NUM_INDEX_FILES=$(find "${WISE_ALL_PROJECT_DIR}store/" -type f -name "*.faiss" | wc -l)
-if [ "$NUM_INDEX_FILES" -ne 4 ]; then
-    echo "[123] Test 3.5 FAILED: expected 4 but only $NUM_INDEX_FILES indices found in ${WISE_ALL_PROJECT_DIR}store/"
-    exit 1
-else
-    echo "[123] Test 3.5 PASSED"
+
+# NOTE: This metadata import only works because filenames are unique across the 3 subsets
+METADATA_DB_FILE="${WISE_MERGED_PROJECT_DIR}metadata/internal.db"
+METADATA_TABLE_NAME="metadata-123"
+RESULT=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
+if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
+    ## Task 2.2 : Import media metadata
+    echo "[${subset_id}] Importing metadata from ${TEST_DATA_DIR}media-metadata.csv (takes few seconds) ..."
+    TMPFILE=$(mktemp)
+    cat ${TEST_DATA_DIR}1/media-metadata.csv | sed -e '$a\' > $TMPFILE
+    tail -n +2 ${TEST_DATA_DIR}2/media-metadata.csv | sed -e '$a\' >> $TMPFILE
+    tail -n +2 ${TEST_DATA_DIR}3/media-metadata.csv | sed -e '$a\' >> $TMPFILE
+    python3 media-metadata.py import \
+            --metadata-id "123" \
+            --from-csv ${TMPFILE} \
+            --metadata-type "media" \
+            --project-dir "${WISE_MERGED_PROJECT_DIR}"
+
+    rm -f $TMPFILE
 fi
+
+for PROJECT in "${WISE_ALL_PROJECT_DIR}" "${WISE_MERGED_PROJECT_DIR}"; do
+    METADATA_DB_FILE="${PROJECT}metadata/internal.db"
+    METADATA_TABLE_NAME="metadata-123"
+    ## Test 3.3 : check if the metadata table exists
+    TABLE_NAME=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
+    if [ "$TABLE_NAME" != "$METADATA_TABLE_NAME" ]; then
+        echo "[123] Test 3.3 FAILED: metadata table $TABLE_NAME does not exist in $METADATA_DB_FILE"
+        exit 1
+    else
+        echo "[123] Test 3.3 PASSED"
+    fi
+
+    ## Test 3.4 : check if all the metadata rows are imported
+    ROW_COUNT=$(sqlite3 "$METADATA_DB_FILE" "SELECT COUNT(*) FROM '$METADATA_TABLE_NAME';")
+    TRUE_ROW_COUNT=$(python -c "import csv; print(sum(1 for i in csv.reader(open('"${TEST_DATA_DIR}media-metadata.csv"'))))")
+    TRUE_ROW_COUNT=$((TRUE_ROW_COUNT - 1)) # subtract 1 for the header row
+    if [ "$ROW_COUNT" -ne "$TRUE_ROW_COUNT" ]; then
+        echo "[123] Test 3.4 FAILED: metadata table $TABLE_NAME has $ROW_COUNT rows, expected $TRUE_ROW_COUNT rows"
+        exit 1
+    else
+        echo "[123] Test 3.4 PASSED"
+    fi
+
+    ## Test 3.5 : create index
+    FTS_CONFIG_FILE="${PROJECT}fts-config.json"
+    echo "{ \"metadata-123\": [ \"description\", \"source_url\" ] }" > "${FTS_CONFIG_FILE}"
+    NUM_INDEX_FILES=$(find "${PROJECT}store/" -type f -name "*.faiss" | wc -l)
+    if [ "$NUM_INDEX_FILES" -eq 0 ]; then
+        echo "Creating FAISS index of type ${FAISS_INDEX_TYPE} (takes about 5 min.) ..."
+        cd "${WISE_CODE_DIR}"
+        python create-index.py \
+            --index-type "IndexFlatIP" \
+            --fts-config "${FTS_CONFIG_FILE}" \
+            --project-dir "${PROJECT}"
+    fi
+    NUM_INDEX_FILES=$(find "${PROJECT}store/" -type f -name "*.faiss" | wc -l)
+    if [ "$NUM_INDEX_FILES" -ne 4 ]; then
+        echo "[123] Test 3.5 FAILED: expected 4 but only $NUM_INDEX_FILES indices found in ${PROJECT}store/"
+        exit 1
+    else
+        echo "[123] Test 3.5 PASSED"
+    fi
+
+done
+end=`date +%s`
 
 ## Helper function to start multiple WISE servers
 BIND_ADDRESS="0.0.0.0"
@@ -274,9 +314,13 @@ trap "cleanup 1" SIGINT
 
 # Task 4.1 : Start WISE server for each of the 3 subsets
 PROJECT_LIST=("1" "2" "3")
+PROJECTS_TO_CHECK=("${PROJECT_LIST[@]}" "123" "merged")
+
 REMOTE_PROJECTS='['
+PORTS_TO_CHECK=()
 for i in "${!PROJECT_LIST[@]}"; do
     PORT=$((BIND_BASE_PORT + 1 + i))
+    PORTS_TO_CHECK+=($PORT)
     LISTEN_ADDRESS=$BIND_ADDRESS PORT=$PORT CUDA_VISIBLE_DEVICES=$GPU_ID python serve.py \
         --index-type IndexFlatIP \
         --project-dir "$WISE_PROJECT_BASEDIR/${PROJECT_LIST[$i]}/" &
@@ -288,25 +332,22 @@ done
 REMOTE_PROJECTS="${REMOTE_PROJECTS%,}]"
 
 # Task 4.2 : Start WISE server for the merged project
-MERGED_PROJECT_PORT=$((BIND_BASE_PORT + 1 + ${#PROJECT_LIST[@]}))
-LISTEN_ADDRESS=$BIND_ADDRESS PORT=$MERGED_PROJECT_PORT CUDA_VISIBLE_DEVICES=$GPU_ID python serve.py \
-    --index-type IndexFlatIP \
-    --project-dir "$WISE_PROJECT_BASEDIR/123/" &
-PIDS+=($!)
-echo "Started server for merged project on port $MERGED_PROJECT_PORT with PID ${PIDS[-1]}"
+MERGED_PROJECT_PORT=$((BIND_BASE_PORT + ${#PROJECT_LIST[@]}))
+for PROJECT in "${WISE_ALL_PROJECT_DIR}" "${WISE_MERGED_PROJECT_DIR}"; do
+    MERGED_PROJECT_PORT=$((MERGED_PROJECT_PORT + 1))
+    PORTS_TO_CHECK+=($MERGED_PROJECT_PORT)
+    LISTEN_ADDRESS=$BIND_ADDRESS PORT=$MERGED_PROJECT_PORT CUDA_VISIBLE_DEVICES=$GPU_ID python serve.py \
+        --index-type IndexFlatIP \
+        --project-dir "${PROJECT}" &
+    PIDS+=($!)
+    echo "Started server for $(basename ${PROJECT}) on port $MERGED_PROJECT_PORT with PID ${PIDS[-1]}"
+done
 echo "PIDS: ${PIDS[@]}"
 echo "REMOTE_PROJECTS=${REMOTE_PROJECTS}"
 
 # Task 4.3 : Wait for all http endpoints to be available
 echo "Waiting for all servers to be available ..."
 SLEEP_DURATION=5
-
-PROJECTS_TO_CHECK=("${PROJECT_LIST[@]}" "123")
-PORTS_TO_CHECK=()
-for i in "${!PROJECT_LIST[@]}"; do
-    PORTS_TO_CHECK+=($((BIND_BASE_PORT + 1 + i)))
-done
-PORTS_TO_CHECK+=($MERGED_PROJECT_PORT)
 
 for ((poll_count=1; poll_count<=MAX_POLL_SERVER_COUNT; poll_count++)); do
     all_servers_up=true
@@ -342,7 +383,8 @@ done
 PORT=$BIND_BASE_PORT REMOTE_PROJECTS=$REMOTE_PROJECTS python3 serve.py --project-dir tmp/123/ &
 PIDS+=($!)
 AGGREGATOR_URL="http://localhost:${BIND_BASE_PORT}/123/"
-MERGED_URL="http://localhost:${MERGED_PROJECT_PORT}/123/"
+COMBINED_URL="http://localhost:$((MERGED_PROJECT_PORT-1))/123/"
+MERGED_URL="http://localhost:${MERGED_PROJECT_PORT}/merged/"
 
 echo "Waiting for the aggregator server to be available ..."
 for ((poll_count=1; poll_count<=MAX_POLL_SERVER_COUNT; poll_count++)); do
@@ -498,64 +540,70 @@ ASSERT_TOPK_EQUAL() {
     fi
 }
 
-# Task 6.1 : ensure the /info endpoint for both the aggregator and merged project return identical results
-AGGREGATOR_INFO_URL="${AGGREGATOR_URL}info"
-MERGED_INFO_URL="${MERGED_URL}info"
-ASSERT_EQUAL "$AGGREGATOR_INFO_URL" "$MERGED_INFO_URL" "6.1" "identical values in /info endpoints"
+TEST_EQUIVALENCE() {
+    local MERGED_URL=$1
 
-# Task 6.2 : ensure the /search endpoint has identical video search results for both the aggregator and merged project
-SEARCH_QUERY="panda"
-RESULT_COUNT=1000 # needs to be sufficiently large in order to get all the relevant video segments
-TOP_K=6           # we know there are only 6 videos in the test dataset that match the query
-SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
-AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
-MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.2" "identical results for video search query '${SEARCH_QUERY}'" "video_results" $TOP_K
+    # Task 6.1 : ensure the /info endpoint for both the aggregator and merged project return identical results
+    AGGREGATOR_INFO_URL="${AGGREGATOR_URL}info"
+    MERGED_INFO_URL="${MERGED_URL}info"
+    ASSERT_EQUAL "$AGGREGATOR_INFO_URL" "$MERGED_INFO_URL" "6.1" "identical values in /info endpoints"
 
-# Task 6.3 : ensure the /search endpoint has identical audio search results for both the aggregator and merged project
-SEARCH_QUERY="gunshot"
-RESULT_COUNT=1000
-TOP_K=5
-SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}&text_queries=${SEARCH_QUERY}"
-AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
-MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.3" "identical results for audio search query '${SEARCH_QUERY}'" "video_audio_results" $TOP_K
+    # Task 6.2 : ensure the /search endpoint has identical video search results for both the aggregator and merged project
+    SEARCH_QUERY="panda"
+    RESULT_COUNT=1000 # needs to be sufficiently large in order to get all the relevant video segments
+    TOP_K=6           # we know there are only 6 videos in the test dataset that match the query
+    SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
+    AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
+    MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.2" "identical results for video search query '${SEARCH_QUERY}'" "video_results" $TOP_K
 
-# Task 6.4 : ensure the /search endpoint has identical object search results for both the aggregator and merged project
-SEARCH_QUERY="boat"
-RESULT_COUNT=1000
-TOP_K=5
-SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID3}&text_queries=${SEARCH_QUERY}"
-AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
-MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.4" "identical results for object search query '${SEARCH_QUERY}'" "video_results" $TOP_K
+    # Task 6.3 : ensure the /search endpoint has identical audio search results for both the aggregator and merged project
+    SEARCH_QUERY="gunshot"
+    RESULT_COUNT=1000
+    TOP_K=5
+    SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}&text_queries=${SEARCH_QUERY}"
+    AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
+    MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.3" "identical results for audio search query '${SEARCH_QUERY}'" "video_audio_results" $TOP_K
 
-# Task 6.5 : ensure the /search endpoint has identical face search results for both the aggregator and merged project
-FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/President_Barack_Obama.jpg/500px-President_Barack_Obama.jpg"
-FACE_IMG_FILE="${QUERY_DATA_DIR}/President_Obama_wikipedia_384x480.jpg"
-if [ ! -f "${FACE_IMG_FILE}" ]; then
-    echo "Downloading face image to ${FACE_IMG_FILE} ..."
-    curl -sLO "${FACE_IMG_URL}"
-    mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
-fi
-if [ ! -f "${FACE_IMG_FILE}" ]; then
-    echo "Failed to download face image from ${FACE_IMG_URL}"
-    exit 1
-fi
-RESULT_COUNT=500
-TOP_K=6
-SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
-AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
-MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.5" "identical results for face search query" "video_results" $TOP_K "$FACE_IMG_FILE"
+    # Task 6.4 : ensure the /search endpoint has identical object search results for both the aggregator and merged project
+    SEARCH_QUERY="boat"
+    RESULT_COUNT=1000
+    TOP_K=5
+    SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID3}&text_queries=${SEARCH_QUERY}"
+    AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
+    MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.4" "identical results for object search query '${SEARCH_QUERY}'" "video_results" $TOP_K
 
-# Task 6.6 : ensure the /search endpoint has identical metadata search results for both the aggregator and merged project
-RESULT_COUNT=500
-TOP_K=4
-SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=wise/metadata&text_queries=president"
-AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
-MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-ASSERT_SAME_FILENAME_LIST "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.6" "identical results for metadata search query" "video_results" $TOP_K
+    # Task 6.5 : ensure the /search endpoint has identical face search results for both the aggregator and merged project
+    FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/President_Barack_Obama.jpg/500px-President_Barack_Obama.jpg"
+    FACE_IMG_FILE="${QUERY_DATA_DIR}/President_Obama_wikipedia_384x480.jpg"
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Downloading face image to ${FACE_IMG_FILE} ..."
+        curl -sLO "${FACE_IMG_URL}"
+        mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
+    fi
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Failed to download face image from ${FACE_IMG_URL}"
+        exit 1
+    fi
+    RESULT_COUNT=500
+    TOP_K=6
+    SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
+    AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
+    MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.5" "identical results for face search query" "video_results" $TOP_K "$FACE_IMG_FILE"
+
+    # Task 6.6 : ensure the /search endpoint has identical metadata search results for both the aggregator and merged project
+    RESULT_COUNT=500
+    TOP_K=4
+    SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=wise/metadata&text_queries=president"
+    AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
+    MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
+    ASSERT_SAME_FILENAME_LIST "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.6" "identical results for metadata search query" "video_results" $TOP_K
+}
+TEST_EQUIVALENCE ${MERGED_URL}
+TEST_EQUIVALENCE ${COMBINED_URL}
 
 echo ""
 echo "------ Test Summary ------"
