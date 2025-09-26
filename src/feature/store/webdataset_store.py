@@ -1,12 +1,14 @@
+import io
+import glob
+import logging
 import os
+from pathlib import Path
+import sys
+import tarfile
+
 import numpy as np
 import webdataset as wds
 import wids
-import glob
-import io
-import sys
-import tarfile
-import logging
 from tqdm import tqdm
 
 from ...dataloader.utils import md5
@@ -38,64 +40,106 @@ class WebdatasetStore(FeatureStore):
         self.EXTENSION = 'tar'
         self.store_data_filename = os.path.join(self.store_data_dir,
                                                 self.store_name + '-%06d.' + self.EXTENSION)
-        self.feature_count = -1
-        self.feature_dim = -1
+        self._wds_tar_prefix = os.path.join(self.store_data_dir, self.store_name + '-')
+
+        self.shard_list_dataset = None
+        self.vector_id_to_webdataset_idx_mapping = None
+        self._tar_filenames = []
+
+        # key: filesize of tar file; value: number of features in tar file
+        self._filesize_to_count_mapping = {}
+
+        self._reset()
+        self.enable_read()
+
+    def _reset(self):
+        self._tar_filenames = self._get_current_tar_filenames()
         self.shard_list_dataset = None
         self.vector_id_to_webdataset_idx_mapping = None
 
-    def enable_write(self, shard_maxcount, shard_maxsize, verbose=0):
-        self.shard_maxcount = shard_maxcount
-        self.shard_maxsize = shard_maxsize
-        self.shardWriter = wds.ShardWriter(pattern=self.store_data_filename,
-                                           maxcount=self.shard_maxcount,
-                                           maxsize=self.shard_maxsize)
-        self.shardWriter.verbose = verbose
+    @property
+    def tar_filenames(self):
+        return self._tar_filenames
 
-    def enable_read(self, shard_shuffle=False, shuffle_values=False, shuffle_bufsize=10000):
-        self.shard_shuffle = shard_shuffle
-        self.shuffle_values = shuffle_values
-        self.shuffle_bufsize = shuffle_bufsize
+    def _get_current_tar_filenames(self):
+        wds_tar_pattern = self._wds_tar_prefix + '*.tar'
+        return sorted(glob.iglob(pathname=wds_tar_pattern, recursive=False))
 
-        # Load the feature dimension
-        wds_tar_prefix = os.path.join(self.store_data_dir, self.store_name + '-')
-        wds_tar_pattern = wds_tar_prefix + '*.tar'
-        self.tar_index = [sys.maxsize, -1]
-        self.tar_index_str = ['', '']
-        for tar_filename in glob.iglob(pathname=wds_tar_pattern, recursive=False):
-            tar_filename_tok = tar_filename.split(wds_tar_prefix)
-            tar_index = tar_filename_tok[1].split('.tar')[0]
-            if int(tar_index) < self.tar_index[0]:
-                self.tar_index[0] = int(tar_index)
-                self.tar_index_str[0] = tar_index
-            if int(tar_index) > self.tar_index[1]:
-                self.tar_index[1] = int(tar_index)
-                self.tar_index_str[1] = tar_index
-        tar_index_range = '{%s..%s}' % (self.tar_index_str[0], self.tar_index_str[1])
-        self.wds_src_url = wds_tar_prefix + tar_index_range + '.tar'
-        temp_shard_reader = wds.WebDataset(self.wds_src_url,
-                                           shardshuffle=False,
-                                           repeat=False)
-        for payload in temp_shard_reader:
-            feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
-            self.feature_dim = feature_vector.shape[1]
-            break
-        temp_shard_reader.close()
+    def _update_tar_filenames(self, fname):
+        self._tar_filenames.append(fname)
 
+    @property
+    def feature_count(self):
         # Fast method for counting the total number of features
         # We assume that tar files with the same filesize have the same number of features.
         # The process of counting the number of files (features) within a tar is slow,
         # whereas filesizes can be computed much faster.
         # Therefore, after we have counted the number of features of a given tar file,
         # we skip the counting process for all the other tar files with the same filesize
-        self.feature_count = 0
-        filesize_to_count_mapping = {} # key: filesize of tar file; value: number of features in tar file
-        for tar_filename in glob.iglob(pathname=wds_tar_pattern, recursive=False):
+        _feature_count = 0
+        for tar_filename in self.tar_filenames:
             filesize = os.stat(tar_filename).st_size
-            if filesize not in filesize_to_count_mapping:
+            if filesize not in self._filesize_to_count_mapping:
                 with tarfile.open(tar_filename) as f:
                     # Count the number of files in the tar (assuming each file is a feature vector)
-                    filesize_to_count_mapping[filesize] = sum(1 for member in f if member.isreg())
-            self.feature_count += filesize_to_count_mapping[filesize]        
+                    self._filesize_to_count_mapping[filesize] = sum(1 for member in f if member.isreg())
+            _feature_count += self._filesize_to_count_mapping[filesize]
+
+        return _feature_count
+
+    @property
+    def wds_src_url(self):
+        if len(self.tar_filenames) == 0:
+            raise ValueError(f'No webdataset tar files matching {self._wds_tar_prefix}*.tar found!')
+
+        # Load the feature dimension
+        tar_index = [sys.maxsize, -1]
+        tar_index_str = ['', '']
+        for tar_filename in self.tar_filenames:
+            tar_filename_tok = tar_filename.split(self._wds_tar_prefix)
+            _tar_index = tar_filename_tok[1].split('.tar')[0]
+            if int(_tar_index) < tar_index[0]:
+                tar_index[0] = int(_tar_index)
+                tar_index_str[0] = _tar_index
+            if int(_tar_index) > tar_index[1]:
+                tar_index[1] = int(_tar_index)
+                tar_index_str[1] = _tar_index
+        tar_index_range = '{%s..%s}' % (tar_index_str[0], tar_index_str[1])
+        return self._wds_tar_prefix + tar_index_range + '.tar'
+
+    @property
+    def feature_dim(self) -> int | None:
+        if len(self.tar_filenames) == 0:
+            return None
+
+        with wds.WebDataset(self.wds_src_url,
+                                           shardshuffle=False,
+                                           repeat=False) as temp_shard_reader:
+            for payload in temp_shard_reader:
+                feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
+                return feature_vector.shape[1]
+
+    def enable_write(self, shard_maxcount = 100_000, shard_maxsize = 3 * 1024 ** 3, verbose=0, overwrite: bool = False):
+        self.shard_maxcount = shard_maxcount
+        self.shard_maxsize = shard_maxsize
+        if overwrite:
+            for tar_filename in self.tar_filenames:
+                Path(tar_filename).unlink(missing_ok=True)
+            self._reset()
+
+        self.shardWriter = wds.ShardWriter(
+            pattern=self.store_data_filename,
+            maxcount=self.shard_maxcount,
+            maxsize=self.shard_maxsize,
+            verbose=verbose,
+            start_shard=len(self.tar_filenames),
+            post=self._update_tar_filenames,
+        )
+
+    def enable_read(self, shard_shuffle=False, shuffle_values=False, shuffle_bufsize=10000):
+        self.shard_shuffle = shard_shuffle
+        self.shuffle_values = shuffle_values
+        self.shuffle_bufsize = shuffle_bufsize if self.shuffle_values else -1
 
     def add(self, id, features):
         if not self.shardWriter:
@@ -105,47 +149,41 @@ class WebdatasetStore(FeatureStore):
             'features.pyd': features
         })
 
-
-    def __iter__(self):
-        if self.shuffle_values:
-            shard_reader = wds.WebDataset(self.wds_src_url,
-                                          shardshuffle=self.shard_shuffle,
-                                          repeat=False).shuffle(self.shuffle_bufsize)
-        else:
-            shard_reader = wds.WebDataset(self.wds_src_url,
-                                          shardshuffle=self.shard_shuffle,
-                                          repeat=False)
-        for payload in shard_reader:
-            feature_id = int(payload['__key__'])
-            feature_vector = np.load(io.BytesIO(payload['features.pyd']), allow_pickle=True)
-            yield feature_id, feature_vector
-    
-    def iter_batch(self, batch_size=512):
-        if self.shuffle_values:
-            shard_reader = wds.WebDataset(self.wds_src_url,
-                                          shardshuffle=self.shard_shuffle,
-                                          repeat=False).shuffle(self.shuffle_bufsize)
-        else:
-            shard_reader = wds.WebDataset(self.wds_src_url,
-                                          shardshuffle=self.shard_shuffle,
-                                          repeat=False)
-        
+    def _webdataset(self):
         def numpy_decoder(key, value):
             assert key.endswith('features.pyd'), f"Unexpected key: {key}"
             assert isinstance(value, bytes), f"Unexpected type: {type(value)}"
             return np.load(io.BytesIO(value), allow_pickle=True)
 
-        shard_reader = (
-            shard_reader
+        return (
+            wds.WebDataset(
+                self.wds_src_url,
+                shardshuffle=self.shard_shuffle,
+                repeat=False
+            )
+            .shuffle(self.shuffle_bufsize)
             .decode(numpy_decoder)
             .to_tuple("__key__", "features.pyd")
             .map_tuple(
-                int, # convert key to int
+                int,
+                lambda x: x
+            )
+        )
+
+    def __iter__(self):
+        with self._webdataset() as wds:
+            yield from wds
+
+    def iter_batch(self, batch_size=512):
+        with (
+            self._webdataset()
+            .map_tuple(
+                lambda x: x, # convert key to int
                 lambda x: x.squeeze(axis=0), # change shape of numpy array from (1, d) to (d,)
             )
             .batched(batch_size)
-        )
-        yield from shard_reader
+        ) as _wds:
+            yield from _wds
 
     def enable_random_access(self):
         """
@@ -177,16 +215,13 @@ class WebdatasetStore(FeatureStore):
             (instead of 0), and shard_list_dataset[8] might have a vector id of 11
 
         """
-        wds_tar_prefix = os.path.join(self.store_data_dir, self.store_name + '-')
-        wds_tar_pattern = wds_tar_prefix + '*.tar'
-        tar_filenames = sorted(glob.iglob(pathname=wds_tar_pattern, recursive=False))
 
         shardlist = []
         # a dictionary with key: vector id and value: webdataset index
         vector_id_to_webdataset_idx_mapping: dict[int, int] = {}
         webdataset_idx = 0
         logger.info("Enabling random access to feature store")
-        for tar_filename in tqdm(tar_filenames):
+        for tar_filename in tqdm(self.tar_filenames):
             nsamples = None
             with tarfile.open(tar_filename) as f:
                 feature_filenames = f.getnames()
@@ -235,8 +270,8 @@ class WebdatasetStore(FeatureStore):
         return feature_vector
 
     def close(self):
-        self.shardWriter.close()
+        if hasattr(self, "shardWriter") and hasattr(self.shardWriter, "tarstream"):
+            self.shardWriter.close()
 
     def __del__(self):
-        if hasattr(self, 'shardWriter') and hasattr(self.shardWriter, 'tarstream'):
-            self.shardWriter.close()
+        self.close()
