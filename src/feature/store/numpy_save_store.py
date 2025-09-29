@@ -41,14 +41,12 @@ class NumpySaveStore(FeatureStore):
             feature_id_list = payload['feature_id']
             self._feature_count += feature_id_list.shape[0]
             features_list = payload['features']
-
             if len(features_list[0].shape) == 1:
                 _feature_dim = features_list[0].shape[0]
             elif len(features_list[0].shape) == 2:
                 _feature_dim = features_list[0].shape[1]
             else:
                 raise ValueError(f'unrecognized feature shape {features_list[0].shape}')
-
             if self.feature_dim is None:
                 self.feature_dim = _feature_dim
             elif self.feature_dim != _feature_dim:
@@ -93,7 +91,7 @@ class NumpySaveStore(FeatureStore):
         self.shard_shuffle = shard_shuffle
         self.shuffle_values = shuffle_values
         self.shuffle_bufsize = shuffle_bufsize        
-
+    
     def add(self, id, features):
         if self.feature_dim is None:
             self.feature_dim = features.shape[1]

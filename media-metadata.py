@@ -279,6 +279,13 @@ def resolve_media_path(db_engine, metadata):
             else:
                 metadata[i]['media_id'] = -1
                 failed_count += 1
+                if failed_count < 10:
+                    print(
+                        f'failed to resolve media_path "{media_path}" to a valid media_id'
+                    )
+                else:
+                    if failed_count == 10:
+                        print("... skipping further error messages ...")
         if failed_count:
             raise ValueError(f'failed to resolved media_path for {failed_count} metadata rows')
 

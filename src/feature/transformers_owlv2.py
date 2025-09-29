@@ -173,10 +173,10 @@ def get_text_embeddings(
     return text_embeds
 
 
-@dataclass
-class OWLv2FeatureMetadata:
-    objectness_score: float
+@dataclass(kw_only=True)
+class OWLv2FeatureMetadata(FeatureExtMetadata):
     bbox: BBoxXYWH
+    objectness_score: float
 
     @classmethod
     def from_owlv2(cls, owlv2_bbox: np.ndarray, objectness_score: np.floating, im_width: int, im_height: int):
@@ -214,6 +214,18 @@ class OWLv2FeatureMetadata:
         return cls(
             objectness_score=objectness_score.item(),
             bbox=BBoxXYWH(x0.item(), y0.item(), width.item(), height.item()),
+        )
+
+    @classmethod
+    def from_sql_values(cls, row: dict):
+        return cls(
+            objectness_score=row["objectness_score"],
+            bbox=BBoxXYWH(
+                row["bbox_x"],
+                row["bbox_y"],
+                row["bbox_w"],
+                row["bbox_h"],
+            ),
         )
 
     def to_sql_values(self, vector_id: int):
@@ -495,13 +507,11 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
     ) -> list[FeatureExtMetadata]:
         c = cls._vector_metadata_table.c
         res = conn.execute(
-            sa.select(c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
+            sa.select(c.objectness_score, c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
             .where(c.vector_id.in_(vid))
-            .order_by(
-                sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id)
-            )
+            .order_by(sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id))
         )
-        res = [FeatureExtMetadata(BBoxXYWH(*x)) for x in res]
+        res = [OWLv2FeatureMetadata.from_sql_values(x) for x in res.mappings()]
         assert len(vid) == len(res)
         return res
 

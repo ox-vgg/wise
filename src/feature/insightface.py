@@ -124,10 +124,10 @@ class FaceInferenceResponse:
         )
 
 
-@dataclass
-class FaceFeatureMetadata:
-    detection_score: float
+@dataclass(kw_only=True)
+class FaceFeatureMetadata(FeatureExtMetadata):
     bbox: BBoxXYWH
+    detection_score: float
     age: int
     is_male: bool
 
@@ -145,6 +145,20 @@ class FaceFeatureMetadata:
             bbox=BBoxXYWH(*bbox),
             age=face.age,
             is_male=(face.sex == "M"),
+        )
+
+    @classmethod
+    def from_sql_values(cls, row: dict):
+        return cls(
+            detection_score=row["detection_score"],
+            bbox=BBoxXYWH(
+                row["bbox_x"],
+                row["bbox_y"],
+                row["bbox_w"],
+                row["bbox_h"],
+            ),
+            age=row["age"],
+            is_male=row["is_male"],
         )
 
     def to_sql_values(self, vector_id: int):
@@ -348,13 +362,19 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
     ) -> list[FeatureExtMetadata]:
         c = cls._vector_metadata_table.c
         res = conn.execute(
-            sa.select(c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
-            .where(c.vector_id.in_(vid))
-            .order_by(
-                sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id)
+            sa.select(
+                c.detection_score,
+                c.bbox_x,
+                c.bbox_y,
+                c.bbox_w,
+                c.bbox_h,
+                c.age,
+                c.is_male,
             )
+            .where(c.vector_id.in_(vid))
+            .order_by(sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id))
         )
-        res = [FeatureExtMetadata(BBoxXYWH(*x)) for x in res]
+        res = [FaceFeatureMetadata.from_sql_values(x) for x in res.mappings()]
         assert len(vid) == len(res)
         return res
 

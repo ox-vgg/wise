@@ -2,6 +2,35 @@
 
 > **Note:** The features described in this document are still being finalized and may change. They are not yet stable.
 
+## Updating an Existing Project
+
+There are three main ways to update a WISE project:
+
+- **Add New Features:**  
+  Run `extract-features.py` on your project without specifying a folder path. Provide the desired feature extractor to process all media files in the project.  
+  Example (adding face search features):
+  ```
+  python extract-features.py \
+    --media-include "*.mp4" \
+    --video-feature-id "deepinsight/insightface/buffalo_l/_unknown" \
+    --project-dir /data/wise/my-project/
+  ```
+
+- **Add New Media:**  
+  Supply a folder containing new media files to `extract-features.py` to add them to your project.
+  ```
+  python extract-features.py \
+    "/data/videos/new-set/" \
+    --media-include "*.mp4" \
+    --project-dir /data/wise/my-project/
+  ```
+
+- **Merge Projects:**  
+  Combine multiple WISE projects (with the same feature extraction setup but different media) into a new project. This is useful for handling large datasets in smaller chunks. The merge method copies features, thumbnails, media, and shots from source projects, and supports a dry run for review. Metadata merging is not yet automated and must be handled manually via SQLite dumps.
+  ```
+  python3 -m src.wise_project merge --into DEST_PROJECT PROJECT_1 PROJECT_2 PROJECT_3 ...
+  ```
+
 ## Aggregator
 The aggregator feature of WISE allows to present search results from multiple standalone WISE projects.
 The [tests/test-aggregator.sh](../tests/test-aggregator.sh) script shows an example of how to use this
