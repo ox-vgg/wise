@@ -542,40 +542,41 @@ ASSERT_TOPK_EQUAL() {
 
 TEST_EQUIVALENCE() {
     local MERGED_URL=$1
+    local TEST_MAJOR_NUM=$2
 
-    # Task 6.1 : ensure the /info endpoint for both the aggregator and merged project return identical results
+    # Task ${TEST_MAJOR_NUM}.1 : ensure the /info endpoint for both the aggregator and merged project return identical results
     AGGREGATOR_INFO_URL="${AGGREGATOR_URL}info"
     MERGED_INFO_URL="${MERGED_URL}info"
-    ASSERT_EQUAL "$AGGREGATOR_INFO_URL" "$MERGED_INFO_URL" "6.1" "identical values in /info endpoints"
+    ASSERT_EQUAL "$AGGREGATOR_INFO_URL" "$MERGED_INFO_URL" "${TEST_MAJOR_NUM}.1" "identical values in /info endpoints"
 
-    # Task 6.2 : ensure the /search endpoint has identical video search results for both the aggregator and merged project
+    # Task ${TEST_MAJOR_NUM}.2 : ensure the /search endpoint has identical video search results for both the aggregator and merged project
     SEARCH_QUERY="panda"
     RESULT_COUNT=1000 # needs to be sufficiently large in order to get all the relevant video segments
     TOP_K=6           # we know there are only 6 videos in the test dataset that match the query
     SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.2" "identical results for video search query '${SEARCH_QUERY}'" "video_results" $TOP_K
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "${TEST_MAJOR_NUM}.2" "identical results for video search query '${SEARCH_QUERY}'" "video_results" $TOP_K
 
-    # Task 6.3 : ensure the /search endpoint has identical audio search results for both the aggregator and merged project
+    # Task ${TEST_MAJOR_NUM}.3 : ensure the /search endpoint has identical audio search results for both the aggregator and merged project
     SEARCH_QUERY="gunshot"
     RESULT_COUNT=1000
     TOP_K=5
     SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}&text_queries=${SEARCH_QUERY}"
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.3" "identical results for audio search query '${SEARCH_QUERY}'" "video_audio_results" $TOP_K
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "${TEST_MAJOR_NUM}.3" "identical results for audio search query '${SEARCH_QUERY}'" "video_audio_results" $TOP_K
 
-    # Task 6.4 : ensure the /search endpoint has identical object search results for both the aggregator and merged project
+    # Task ${TEST_MAJOR_NUM}.4 : ensure the /search endpoint has identical object search results for both the aggregator and merged project
     SEARCH_QUERY="boat"
     RESULT_COUNT=1000
     TOP_K=5
     SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID3}&text_queries=${SEARCH_QUERY}"
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.4" "identical results for object search query '${SEARCH_QUERY}'" "video_results" $TOP_K
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "${TEST_MAJOR_NUM}.4" "identical results for object search query '${SEARCH_QUERY}'" "video_results" $TOP_K
 
-    # Task 6.5 : ensure the /search endpoint has identical face search results for both the aggregator and merged project
+    # Task ${TEST_MAJOR_NUM}.5 : ensure the /search endpoint has identical face search results for both the aggregator and merged project
     FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/President_Barack_Obama.jpg/500px-President_Barack_Obama.jpg"
     FACE_IMG_FILE="${QUERY_DATA_DIR}/President_Obama_wikipedia_384x480.jpg"
     if [ ! -f "${FACE_IMG_FILE}" ]; then
@@ -592,18 +593,18 @@ TEST_EQUIVALENCE() {
     SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.5" "identical results for face search query" "video_results" $TOP_K "$FACE_IMG_FILE"
+    ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "${TEST_MAJOR_NUM}.5" "identical results for face search query" "video_results" $TOP_K "$FACE_IMG_FILE"
 
-    # Task 6.6 : ensure the /search endpoint has identical metadata search results for both the aggregator and merged project
+    # Task ${TEST_MAJOR_NUM}.6 : ensure the /search endpoint has identical metadata search results for both the aggregator and merged project
     RESULT_COUNT=500
     TOP_K=4
     SEARCH_URL_SUFFIX="search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=wise/metadata&text_queries=president"
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
-    ASSERT_SAME_FILENAME_LIST "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "6.6" "identical results for metadata search query" "video_results" $TOP_K
+    ASSERT_SAME_FILENAME_LIST "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "${TEST_MAJOR_NUM}.6" "identical results for metadata search query" "video_results" $TOP_K
 }
-TEST_EQUIVALENCE ${MERGED_URL}
-TEST_EQUIVALENCE ${COMBINED_URL}
+TEST_EQUIVALENCE ${MERGED_URL} 6
+TEST_EQUIVALENCE ${COMBINED_URL} 7
 
 echo ""
 echo "------ Test Summary ------"
