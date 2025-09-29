@@ -213,6 +213,23 @@ class TritonModel(MultiModalModel):
         return self._get_features("audio", kwargs)
 
 
+class _InitializeParameterized(object):
+    """
+    When called with the cls as the only argument, returns an
+    un-initialized instance of the parameterized class. Subsequent __setstate__
+    will be called by pickle.
+    """
+
+    def __call__(
+        self,
+        cls,
+    ):
+        # make a simple object which has no complex __init__
+        obj = _InitializeParameterized()
+        obj.__class__ = make_triton_feature_extractor(cls)
+        return obj
+
+
 def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
     """A class factory that creates a Triton-enabled feature extractor.
 
@@ -243,12 +260,51 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
             self.config = config
             super().__init__(model_id, config=config, **kwargs)
 
-
         @cached_property
         def model(self):
             """Returns the Triton model client."""
             return TritonModel(
                 self.__model_name, self.config.url, debug=self.config.debug
+            )
+
+        def __getstate__(self):
+            print(f"getstate: {self.__dict__}")
+            state = self.__dict__.copy()
+            # Remove unpicklable entries.
+            entries = {"model", "tokenizer", "processor"}
+            for entry in entries:
+                if entry in state:
+                    del state[entry]
+
+            if "config" in state:
+                # dump model config as dict, so that we can reload it in __setstate__
+                config_state = state["config"].model_dump()
+                state["config"] = config_state
+
+            if "_TritonFeatureExtractor__model_name" in state:
+                # Ensure the model name is a string
+                state["model_id"] = state.pop("_TritonFeatureExtractor__model_name")
+            return state
+
+        def __setstate__(self, state):
+            print(f"setstate: {state}")
+            # Restore instance attributes
+            self.__dict__.update(state)
+            # Re-initialize the model property
+            if "config" in state and not isinstance(state["config"], self.Config):
+                self.config = self.Config(**state["config"])
+            if (
+                "_TritonFeatureExtractor__model_name" not in state
+                and "model_id" in state
+            ):
+                self.__model_name = state["model_id"].replace("/", "--")
+
+        def __reduce__(self):
+            # Ensure the object can be pickled
+            return (
+                _InitializeParameterized(),
+                (cls,),
+                self.__getstate__(),
             )
 
     return TritonFeatureExtractor

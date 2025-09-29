@@ -45,7 +45,6 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         self.model_kwargs = config.model_kwargs
 
         self.model_config = AutoConfig.from_pretrained(model_name)
-        self.processor = AutoProcessor.from_pretrained(model_name, use_fast=True)
         model = AutoModel.from_config(self.model_config, **self.model_kwargs)
 
         self.logit_scale = getattr(model, "logit_scale", torch.tensor(0.0))
@@ -64,6 +63,10 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
             self.warmup()
 
         self.__model_name = model_name
+
+    @cached_property
+    def processor(self):
+        return AutoProcessor.from_pretrained(self.__model_name, use_fast=True)
 
     @cached_property
     def model(self):
