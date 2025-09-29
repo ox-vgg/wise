@@ -43,7 +43,7 @@ dataset. Here is an example of how this feature can be used in general.
 #   * http://localhost:10002/2/
 #   * http://localhost:10003/3/
 
-REMOTE_PROJECTS==["http://localhost:10001/1/","http://localhost:10002/2/","http://localhost:10003/3/"] \
+REMOTE_PROJECTS='["http://localhost:10001/1/","http://localhost:10002/2/","http://localhost:10003/3/"]' \
   PORT=10000 \
   python3 serve.py --project-dir tmp/123/
 ```
