@@ -1118,7 +1118,9 @@ class WiseProject:
                 try:
                     store = FeatureStoreFactory.load_store(media_type, self.features_dir(feature_extractor_id))
                 except ValueError:
-                    store = FeatureStoreFactory.create_store('webdataset', media_type, self.features_dir(feature_extractor_id))
+                    store = FeatureStoreFactory.create_store(
+                        "faiss", media_type, self.features_dir(feature_extractor_id)
+                    )
                 store.enable_write()
 
                 feature_extractor_cls = get_feature_extractor_class(
@@ -1198,7 +1200,9 @@ class WiseProject:
                             p.unlink(missing_ok=True)
 
                     elif feature_extractor_id not in supported_assets[media_type]:
-                        logger.info(f'deleting - {p}')
+                        logger.info(
+                            f"deleting directory of {feature_extractor_id} from project"
+                        )
                         shutil.rmtree(self.features_root(feature_extractor_id))
 
                     else:
