@@ -210,14 +210,13 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         self.model_kwargs = config.model_kwargs
         self.compile = config.compile
 
-        _model, self.preprocess = _load_openclip_model(
+        _model, _ = _load_openclip_model(
             self.pretrained_model_name,
             pretrained=self.pretraining_dataset,
             device="cpu",
             **self.model_kwargs,
         )
 
-        self.tokenizer = open_clip.get_tokenizer(self.pretrained_model_name)
         with torch.inference_mode():
             self.logit_scale = (
                 _model.logit_scale.detach()
@@ -232,6 +231,17 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         del _model  # we only needed it to get the preprocess function
         if warmup:
             self.warmup()
+
+    @cached_property
+    def processor(self):
+        print("Loading openclip preprocessor")
+        _, preprocessor = _load_openclip_model(
+            self.pretrained_model_name,
+            pretrained=self.pretraining_dataset,
+            device="cpu",
+            **self.model_kwargs,
+        )
+        return preprocessor
 
     @cached_property
     def tokenizer(self):
@@ -269,10 +279,12 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
 
     def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
         if isinstance(images, list) and all(isinstance(img, Image.Image) for img in images):
-            result = torch.stack([self.preprocess(im) for im in images], dim=0).to(device=self.DEVICE)
+            result = torch.stack([self.processor(im) for im in images], dim=0)
             return result
         elif isinstance(images, torch.Tensor) and len(images.shape) == 4:
-            result = torch.stack([self.preprocess(F.to_pil_image(im)) for im in images], dim=0).to(device=self.DEVICE)
+            result = torch.stack(
+                [self.processor(F.to_pil_image(im)) for im in images], dim=0
+            )
             return result
 
         else:

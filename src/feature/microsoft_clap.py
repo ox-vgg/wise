@@ -235,15 +235,22 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
 
         # we instantiate the mode, but we do not keep the CLAP model, as we load it lazily on the requested device
         # later
-        self.processor = CLAP(version=self.model_id, use_cuda=False)
+        _model = CLAP(version=self.model_id, use_cuda=False)
         with torch.no_grad():
-            self.logit_scale = self.processor.clap.logit_scale.detach().clone()
+            self.logit_scale = _model.clap.logit_scale.detach().clone()
 
-        self.processor.clap = None
-        del self.processor.clap
+        del _model
 
         if warmup:
             self.warmup()
+
+    @cached_property
+    def processor(self):
+        _processor = CLAP(version=self.model_id, use_cuda=False)
+        _processor.clap = None
+        del _processor.clap
+
+        return _processor
 
     @cached_property
     def model(self):
