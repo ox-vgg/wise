@@ -23,6 +23,7 @@ import sqlite3
 from collections import defaultdict
 from functools import cached_property
 from pathlib import Path
+from typing import Callable
 
 from wise.utils import batched, profiled
 
@@ -80,6 +81,146 @@ def get_cte_from_ids(ids: list[int], label="media_id"):
     )
 
     return cte
+
+
+# utility to scan columns from a table in batches, either as a row tuple or dict
+def batch_select(
+    conn: sa.Connection,
+    stmt,
+    batch_size: int | None = None,
+    as_dict: bool = False,
+):
+    _conn = conn
+    if batch_size is not None:
+        _conn = conn.execution_options(stream_results=True)
+
+    result = _conn.execute(stmt)
+
+    while rows := result.fetchmany(batch_size):
+        if as_dict:
+            yield [r._asdict() for r in rows]
+        else:
+            yield rows
+
+
+# utility to insert a batch of rows into a table, and optionally return the inserted ids
+def batch_insert(
+    conn: sa.Connection, table: sa.Table, batch: list[dict], return_ids: bool = True
+):
+    stmt = table.insert()
+    if return_ids:
+        stmt = stmt.returning(table.c.id)
+
+    result = conn.execute(
+        stmt,
+        batch,
+    )
+    if return_ids:
+        return result.scalars().all()
+
+
+# utility to query a table by a column with a list of values, preserving the order of the input list
+def batch_query_by_column(
+    conn: sa.Connection, table: sa.Table, column: str, vals: list
+):
+    if column not in table.c:
+        raise ValueError(f"column {column} not found in table {table.name}")
+
+    id_ordering = sa.case(
+        {_id: index for index, _id in enumerate(vals)},
+        value=table.c.id,
+    )
+
+    stmt = sa.select(table).where(table.c[column].in_(vals)).order_by(id_ordering)
+    return conn.execute(stmt).mappings().all()
+
+
+def prepare_cte_for_join(
+    table: sa.Table,
+    columns: list[str],
+    query_fn: Callable[[sa.CTE], sa.Select],
+    include_ordering: bool = True,
+):
+    query = sa.select(*[table.c[col] for col in columns])
+
+    def get_filter_cte(num_filters: int = 10):
+        """
+        Create a pre-compiled CTE statement with placeholders for bind parameters.
+
+        Args:
+            num_values: Number of placeholders to prepare for in the statement
+
+        Returns:
+            tuple: (cte, param_names) where:
+                - cte expression representing the filter to be used in join
+                - param_names is a dict mapping tuple index positions to param names
+        """
+
+        # Create bind parameters for each possible value in the batch
+        values_data = []
+        param_names = []
+        for i in range(num_filters):
+            # Create named parameters for each column in each row
+            params = tuple(
+                sa.bindparam(f"{c}_{i}", type_=table.c[c].type) for c in columns
+            )
+            names = {c: x.key for c, x in zip(columns, params)}
+            param_names.append(names)
+
+            if include_ordering:
+                params = (
+                    sa.bindparam(f"rank_{i}", type_=sa.Integer, value=i),
+                ) + params
+            values_data.append(params)
+
+        # Create the values expression
+        values_columns = [sa.column(c, type_=table.c[c].type) for c in columns]
+        if include_ordering:
+            values_columns = [sa.column("rank", type_=sa.Integer)] + values_columns
+        values_expr = sa.values(*values_columns).data(values_data).cte("cte")
+
+        return values_expr, param_names
+
+    def populate_filters(param_names: list[dict], filters: list[tuple]):
+        """
+        Get parameters for the compiled statement
+
+        Args:
+            param_names: Parameter name mapping from create_compiled_cte_statement
+            filters: List of filter tuples (id, src_id, path, checksum, size)
+
+        Returns:
+            The parameters dictionary to be passed to the execution
+        """
+        # Prepare parameters for execution
+        params = {}
+
+        # Fill only the parameters we need based on the number of filters
+        if len(filters) > len(param_names):
+            raise ValueError(
+                f"Number of filters {len(filters)} exceeds number of prepared parameters {len(param_names)}"
+            )
+
+        for names, vals in zip(param_names, filters):
+            for c, v in zip(columns, vals):
+                params[names[c]] = v
+
+        return params
+
+    param_names = []
+    compiled_stmt = None
+
+    def run(conn: sa.Connection, filters: list[tuple]):
+        nonlocal param_names, compiled_stmt
+        if compiled_stmt is None or len(filters) != len(param_names):
+            filter_cte, param_names = get_filter_cte(len(filters))
+            sql_stmt = query_fn(filter_cte)
+            compiled_stmt = sql_stmt.compile(conn)
+
+        params = populate_filters(param_names, filters)
+        return conn.execute(compiled_stmt, params)
+
+    return query, run
 
 
 class WiseProject:
