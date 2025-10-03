@@ -171,7 +171,7 @@ for subset_id in 1 2 3; do
     ## Test 2.5 : create index
     FTS_CONFIG_FILE="${WISE_PROJECT_SUBSET_DIR}fts-config.json"
     echo "{ \"metadata-${subset_id}\": [ \"description\", \"source_url\" ] }" > "${FTS_CONFIG_FILE}"
-    NUM_INDEX_FILES=$(find "${WISE_PROJECT_SUBSET_DIR}store/" -type f -name "*.faiss" | wc -l)
+    NUM_INDEX_FILES=$(find "${WISE_PROJECT_SUBSET_DIR}store/" -type f -path '*/index/*' -name "*.faiss" | wc -l)
     if [ "$NUM_INDEX_FILES" -eq 0 ]; then
         echo "[${subset_id}] Creating FAISS index of type ${FAISS_INDEX_TYPE} for video feature ${VIDEO_FEATURE_ID1} (takes about 1 min.) ..."
         cd "${WISE_CODE_DIR}"
@@ -180,7 +180,7 @@ for subset_id in 1 2 3; do
             --fts-config "${FTS_CONFIG_FILE}" \
             --project-dir "$WISE_PROJECT_SUBSET_DIR"
     fi
-    NUM_INDEX_FILES=$(find "${WISE_PROJECT_SUBSET_DIR}store/" -type f -name "*.faiss" | wc -l)
+    NUM_INDEX_FILES=$(find "${WISE_PROJECT_SUBSET_DIR}store/" -type f -path '*/index/*' -name "*.faiss" | wc -l)
     if [ "$NUM_INDEX_FILES" -ne 4 ]; then
         echo "[${subset_id}] Test 2.5 FAILED: expected 4 but only $NUM_INDEX_FILES indices found in ${WISE_PROJECT_SUBSET_DIR}store/"
         exit 1
@@ -276,7 +276,7 @@ for PROJECT in "${WISE_ALL_PROJECT_DIR}" "${WISE_MERGED_PROJECT_DIR}"; do
     ## Test 3.5 : create index
     FTS_CONFIG_FILE="${PROJECT}fts-config.json"
     echo "{ \"metadata-123\": [ \"description\", \"source_url\" ] }" > "${FTS_CONFIG_FILE}"
-    NUM_INDEX_FILES=$(find "${PROJECT}store/" -type f -name "*.faiss" | wc -l)
+    NUM_INDEX_FILES=$(find "${PROJECT}store/" -type f -path '*/index/*' -name "*.faiss" | wc -l)
     if [ "$NUM_INDEX_FILES" -eq 0 ]; then
         echo "Creating FAISS index of type ${FAISS_INDEX_TYPE} (takes about 5 min.) ..."
         cd "${WISE_CODE_DIR}"
@@ -285,7 +285,7 @@ for PROJECT in "${WISE_ALL_PROJECT_DIR}" "${WISE_MERGED_PROJECT_DIR}"; do
             --fts-config "${FTS_CONFIG_FILE}" \
             --project-dir "${PROJECT}"
     fi
-    NUM_INDEX_FILES=$(find "${PROJECT}store/" -type f -name "*.faiss" | wc -l)
+    NUM_INDEX_FILES=$(find "${PROJECT}store/" -type f -path '*/index/*' -name "*.faiss" | wc -l)
     if [ "$NUM_INDEX_FILES" -ne 4 ]; then
         echo "[123] Test 3.5 FAILED: expected 4 but only $NUM_INDEX_FILES indices found in ${PROJECT}store/"
         exit 1
