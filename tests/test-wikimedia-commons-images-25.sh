@@ -36,8 +36,8 @@ MAX_POLL_SERVER_COUNT=15
 CUDA_VISIBLE_DEVICES=1
 NUM_WORKERS=2
 
-FEATURE_STORE="webdataset" # options are: faiss, webdataset, numpy
-EXTENSION="tar" # options are: faiss, tar, npy
+FEATURE_STORE="faiss" # options are: faiss, webdataset, numpy
+EXTENSION="faiss" # options are: faiss, tar, npy
 
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
@@ -105,7 +105,7 @@ if [ ! -d "${WISE_PROJECT_DIR}" ]; then
     CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python extract-features.py \
            "${TEST_DATA_DIR}" \
            --media-include "*.jpg" \
-           --shard-maxcount 4096 \
+           --shard-maxcount 128 \
            --shard-maxsize 20971520 \
            --num-workers $NUM_WORKERS \
            --feature-store ${FEATURE_STORE} \
