@@ -24,6 +24,8 @@ from collections import defaultdict
 from functools import cached_property
 from pathlib import Path
 
+from wise.utils import batched, profiled
+
 import numpy as np
 import sqlalchemy as sa
 from PIL import Image
