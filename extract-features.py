@@ -468,7 +468,7 @@ if __name__ == "__main__":
         required=False,
         type=int,
         default=2048,
-        help="max number of entries in each shard of webdataset tar",
+        help="max number of entries in each shard of webdataset tar (for faiss store, using shard-maxcount=1e6 results in 4GB files with 1024-dim features)",
     )
 
     parser.add_argument(
@@ -476,7 +476,7 @@ if __name__ == "__main__":
         required=False,
         type=int,
         default=20 * 1024 * 1024,  # tar overheads results in 25MB shards
-        help="max size (in bytes) of each shard of webdataset tar",
+        help="max size (in bytes) of each shard of webdataset tar (not used for faiss store)",
     )
 
     parser.add_argument(
