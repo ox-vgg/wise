@@ -60,10 +60,24 @@ from wise.db.tables import (
     vectors_table,
 )
 
+import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 _WISE_FTS_TABLE = 'metadata_fts'
 _WISE_ASR_TABLE = 'metadata-asr'
 __wise_tables = [_WISE_FTS_TABLE, _WISE_ASR_TABLE]
+
+def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    conn.info.setdefault("query_start_time", []).append(time.time())
+    logger.info("Start Query: %s", statement)
+
+
+def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    total = time.time() - conn.info["query_start_time"].pop(-1)
+    logger.info("Query Complete!")
+    logger.info("Total Time: %f", total)
 
 
 @event.listens_for(Engine, "connect")
@@ -71,11 +85,33 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     if isinstance(dbapi_connection, SQLite3Connection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+
+        # TODO: Move these to config?
+        # use WAL mode, allows N reader and 1 writer
+        # caveat: sqlite doesn't play nicely on network disks
+        # cursor.execute(
+        #    "PRAGMA journal_mode=WAL"
+        # )
+
+        # 5 second timeout for trying to get a lock
+        # cursor.execute(
+        #    "PRAGMA busy_timeout = 5000"
+        # )
+
+        # force sqlite to store temporary tables and indexes in memory, not on disk
+        # cursor.execute("PRAGMA temp_store = MEMORY")
+
         cursor.close()
 
 
 def _init(dburi: str, metadata_obj: MetaData, **kwargs) -> Engine:
+    profile = kwargs.pop("profile", False)
+
     engine = create_engine(dburi, **kwargs)
+    if profile:
+        event.listen(engine, "before_cursor_execute", before_cursor_execute)
+        event.listen(engine, "after_cursor_execute", after_cursor_execute)
+
     if "mode=ro" not in dburi:
         metadata_obj.create_all(engine)
     return engine
