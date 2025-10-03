@@ -25,7 +25,8 @@ class FaissStore(FeatureStore):
 
     When writing, creates a new Flat Index + IDMap and appends feature vectors to it.
 
-    A new shard is created when the close method is called or when object goes out of scope (__del__)
+    A new shard is created when the current shard contains shard_maxcount entries or
+    when the close method is called or when object goes out of scope (__del__)
 
     NOTE: This store doesnt implement shard_maxsize
     """
