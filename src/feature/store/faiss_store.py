@@ -1,3 +1,4 @@
+import functools
 from pathlib import Path
 import glob
 import random
@@ -10,6 +11,10 @@ import numpy as np
 import faiss
 
 logger = logging.getLogger(__name__)
+
+MAX_CACHE_SIZE = 32
+
+
 def load_faiss_index(filename: str) -> faiss.Index:
     return faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
 
@@ -39,11 +44,15 @@ class FaissStore(FeatureStore):
             f"FaissStore: store_name={self.store_name}, store_data_dir={self.store_data_dir}, pattern={self._pattern}"
         )
 
+        self.load_faiss_index = functools.lru_cache(maxsize=MAX_CACHE_SIZE)(
+            load_faiss_index
+        )
         self._reset()
         self.enable_read()
 
     def _reset(self):
         _vector_id_to_shard_location: dict[int, str] = {}
+        self.load_faiss_index.cache_clear()
 
         self._filenames = self._get_current_filenames()
         self._current_shard_idx = len(self._filenames)
@@ -241,13 +250,16 @@ class FaissStore(FeatureStore):
                 raise KeyError(f'Feature ID {id} not found in the store')
 
         filename = self._vector_id_to_shard_location[id]
-        index = faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+
+        # Access through the cached load_faiss_index function
+        index = self.load_faiss_index(filename)
         feature_vector = index.reconstruct_n(id, 1)
         return feature_vector
 
     def close(self):
         # Close any resources if necessary
         self.save_current_shard()
+        self.load_faiss_index.cache_clear()
 
     def __del__(self):
         self.close()
