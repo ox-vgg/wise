@@ -91,13 +91,19 @@ class FaissStore(FeatureStore):
     def feature_dim(self):
         return self._dim
 
-    def enable_write(self, overwrite: bool = False, **kwargs):
+    def enable_write(self, shard_maxcount=1e6, overwrite: bool = False, **kwargs):
+        # At around 1 million vectors of 1024 dimensions, the file size is around 4GB
         # Enable write mode for the Faiss index
         if overwrite:
             logger.info("Overwriting existing Faiss store")
             for filename in self._filenames:
                 Path(filename).unlink(missing_ok=True)
             self._reset()
+
+        if shard_maxcount < 1:
+            raise ValueError("shard max count must be positive integer")
+
+        self.shard_maxcount = int(shard_maxcount)
 
     def enable_read(self, shard_shuffle=False, shuffle_values=False, shuffle_bufsize=10000):
         # TODO - handle shuffle parameters
@@ -134,24 +140,29 @@ class FaissStore(FeatureStore):
 
         logger.debug("FaissStore: count=%d", self.feature_count)
 
-    def add(self, id: int | list[int], features: np.ndarray):
+    def add(self, _ids: int | list[int], features: np.ndarray):
         """
         Add features with associated IDs to the Faiss index.
         Expects features to be 1 x N and id to be a single integer, or
         features to be M x N and id to be a list of M integers.
         """
 
-        if isinstance(id, int):
-            return self.add([id], features)
+        if isinstance(_ids, int):
+            return self.add([_ids], features)
+
+        if not (isinstance(_ids, list) and all(isinstance(i, int) for i in _ids)):
+            raise ValueError("ID must be an integer or a list of integers")
+
+        if len(_ids) == 0:
+            raise ValueError("ID list cannot be empty")
 
         if len(features.shape) != 2:
-            raise ValueError(f'Features must be a 2D array (Got: {features.shape})')
+            raise ValueError(f"Features must be a 2D array (Got: {features.shape})")
 
-        if not (isinstance(id, list) and all(isinstance(i, int) for i in id)):
-            raise ValueError('ID must be an integer or a list of integers')
-
-        if features.shape[0] != len(id):
-            raise ValueError(f'Feature count and ID count mismatch (Features: {features.shape[0]}, IDs: {len(id)})')
+        if features.shape[0] != len(_ids):
+            raise ValueError(
+                f"Feature count and ID count mismatch (Features: {features.shape[0]}, IDs: {len(_ids)})"
+            )
 
         # Add features to the Faiss index
         if self.feature_dim is None:
@@ -163,8 +174,21 @@ class FaissStore(FeatureStore):
                 f"Feature dimension mismatch (Expected: {self.feature_dim}, Got: {features.shape[1]})"
             )
 
-        ids_array = np.array(id, dtype=np.int64)
-        self._current_shard.add_with_ids(features, ids_array)
+        if self._current_shard.ntotal + features.shape[0] <= self.shard_maxcount:
+            ids_array = np.array(_ids, dtype=np.int64)
+            self._current_shard.add_with_ids(features, ids_array)
+            # Update vector ID to shard location mapping
+            for feature_id in _ids:
+                self._vector_id_to_shard_location[int(feature_id)] = "current"
+            return
+
+        # add upto maxcount and rollover
+        space_left = self.shard_maxcount - self._current_shard.ntotal
+        if space_left > 0:
+            self.add(_ids[:space_left], features[:space_left])
+
+        self.save_current_shard()
+        self.add(_ids[space_left:], features[space_left:])
 
     def __iter__(self):
         # Iterate over the Faiss index
