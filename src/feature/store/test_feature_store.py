@@ -218,8 +218,13 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             self.assertTrue(np.array_equal(store[1], featureB))
             self.assertTrue(np.array_equal(store[4], featureB))
 
+            # print cache info to check cache access
+            # should print something like
+            # CacheInfo(hits=4, misses=2, maxsize=32, current_size=2)
+            print(store.load_faiss_index.cache_info())
+
             # check overwrite
-            store.enable_write(overwrite=True)
+            store.enable_write(shard_maxcount=1, overwrite=True)
             self.assertEqual(store.feature_count, 0)
             self.assertEqual(store.feature_dim, None)
 
@@ -232,6 +237,8 @@ class TestFeatureExtractorFactory(unittest.TestCase):
                 store.filenames,
                 [
                     f"{temp_store_dir}/{self.store_name}-000000.faiss",
+                    f"{temp_store_dir}/{self.store_name}-000001.faiss",
+                    f"{temp_store_dir}/{self.store_name}-000002.faiss",
                 ],
             )
             del store
