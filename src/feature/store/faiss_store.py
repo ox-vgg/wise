@@ -10,6 +10,9 @@ import numpy as np
 import faiss
 
 logger = logging.getLogger(__name__)
+def load_faiss_index(filename: str) -> faiss.Index:
+    return faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+
 
 class FaissStore(FeatureStore):
     """
@@ -19,7 +22,7 @@ class FaissStore(FeatureStore):
 
     A new shard is created when the close method is called or when object goes out of scope (__del__)
 
-    NOTE: This store doesnt implement shard_maxcount or shard_maxsize
+    NOTE: This store doesnt implement shard_maxsize
     """
     EXTENSION = "faiss"
 
@@ -49,7 +52,7 @@ class FaissStore(FeatureStore):
         self._dim = None
 
         for filename in self._filenames:
-            index = faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+            index = load_faiss_index(filename)
             N = index.ntotal
             self._count += N
             if self._dim is None:
@@ -198,15 +201,24 @@ class FaissStore(FeatureStore):
     def iter_batch(self, batch_size = 512):
         # Iterate over the Faiss index in batches
         _filelist = self.filenames.copy()
+
+        if self._current_shard is not None and self._current_shard.ntotal > 0:
+            _filelist.append("current")
+
         if self.shard_shuffle:
             _filelist = random.shuffle(_filelist)
 
         for filename in _filelist:
-            index = faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+            if filename == "current":
+                index = self._current_shard
+            else:
+                index = load_faiss_index(filename)
+
             N = index.ntotal
             feature_ids = faiss.vector_to_array(index.id_map)
             features = index.reconstruct_batch(feature_ids)
             index_list = list(range(0, N))
+
             if self.shuffle_values:
                 random.shuffle(index_list)
 
@@ -215,10 +227,12 @@ class FaissStore(FeatureStore):
                 batch_features = features[batch_indices, :]
                 yield batch_feature_ids, batch_features
 
-    # TODO: Add LRU like cache to speed up repeated access to most commonly used shard
     def __getitem__(self, id: int):
         # Random access to features by ID
-        if id not in self._vector_id_to_shard_location:
+        if (
+            id not in self._vector_id_to_shard_location
+            or self._vector_id_to_shard_location[id] == "current"
+        ):
             # try the current shard
             try:
                 feature_vector = self._current_shard.reconstruct(id)
