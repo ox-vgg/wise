@@ -135,94 +135,6 @@ def batch_query_by_column(
     return conn.execute(stmt).mappings().all()
 
 
-def prepare_cte_for_join(
-    table: sa.Table,
-    columns: list[str],
-    query_fn: Callable[[sa.CTE], sa.Select],
-    include_ordering: bool = True,
-):
-    query = sa.select(*[table.c[col] for col in columns])
-
-    def get_filter_cte(num_filters: int = 10):
-        """
-        Create a pre-compiled CTE statement with placeholders for bind parameters.
-
-        Args:
-            num_values: Number of placeholders to prepare for in the statement
-
-        Returns:
-            tuple: (cte, param_names) where:
-                - cte expression representing the filter to be used in join
-                - param_names is a dict mapping tuple index positions to param names
-        """
-
-        # Create bind parameters for each possible value in the batch
-        values_data = []
-        param_names = []
-        for i in range(num_filters):
-            # Create named parameters for each column in each row
-            params = tuple(
-                sa.bindparam(f"{c}_{i}", type_=table.c[c].type) for c in columns
-            )
-            names = {c: x.key for c, x in zip(columns, params)}
-            param_names.append(names)
-
-            if include_ordering:
-                params = (
-                    sa.bindparam(f"rank_{i}", type_=sa.Integer, value=i),
-                ) + params
-            values_data.append(params)
-
-        # Create the values expression
-        values_columns = [sa.column(c, type_=table.c[c].type) for c in columns]
-        if include_ordering:
-            values_columns = [sa.column("rank", type_=sa.Integer)] + values_columns
-        values_expr = sa.values(*values_columns).data(values_data).cte("cte")
-
-        return values_expr, param_names
-
-    def populate_filters(param_names: list[dict], filters: list[tuple]):
-        """
-        Get parameters for the compiled statement
-
-        Args:
-            param_names: Parameter name mapping from create_compiled_cte_statement
-            filters: List of filter tuples (id, src_id, path, checksum, size)
-
-        Returns:
-            The parameters dictionary to be passed to the execution
-        """
-        # Prepare parameters for execution
-        params = {}
-
-        # Fill only the parameters we need based on the number of filters
-        if len(filters) > len(param_names):
-            raise ValueError(
-                f"Number of filters {len(filters)} exceeds number of prepared parameters {len(param_names)}"
-            )
-
-        for names, vals in zip(param_names, filters):
-            for c, v in zip(columns, vals):
-                params[names[c]] = v
-
-        return params
-
-    param_names = []
-    compiled_stmt = None
-
-    def run(conn: sa.Connection, filters: list[tuple]):
-        nonlocal param_names, compiled_stmt
-        if compiled_stmt is None or len(filters) != len(param_names):
-            filter_cte, param_names = get_filter_cte(len(filters))
-            sql_stmt = query_fn(filter_cte)
-            compiled_stmt = sql_stmt.compile(conn)
-
-        params = populate_filters(param_names, filters)
-        return conn.execute(compiled_stmt, params)
-
-    return query, run
-
-
 class WiseProject:
     """
     WISE Project class that encapsulates all operations related to a WISE project folder.
@@ -1301,6 +1213,18 @@ class WiseProject:
         logger.debug(f"{source_collection_id_map}")
 
         def get_match_media_fn():
+            # columns to filter and match against
+            media_columns = [
+                "id",
+                "source_collection_id",
+                "path",
+                "checksum",
+                "size_in_bytes",
+            ]
+            media_row_query = sa.select(
+                *[wise_db.media_table.c[x] for x in media_columns]
+            )
+
             # left join to find matching media
             def get_matching_media_stmt(cte: sa.CTE):
                 return sa.select(cte.c.id, wise_db.media_table.c.id).select_from(
@@ -1317,15 +1241,9 @@ class WiseProject:
                     )
                 )
 
-            media_row_query, run = prepare_cte_for_join(
+            run = wise_db.prepare_filter_stmt(
                 wise_db.media_table,
-                [
-                    "id",
-                    "source_collection_id",
-                    "path",
-                    "checksum",
-                    "size_in_bytes",
-                ],
+                media_columns,
                 get_matching_media_stmt,
             )
 
@@ -1357,7 +1275,9 @@ class WiseProject:
                     .order_by(cte.c.rank)
                 )
 
-            _, run = prepare_cte_for_join(
+            # the prepared statement takes the ids as input and binds it to the cte
+            # used in the get_media_by_ids_stmt
+            run = wise_db.prepare_filter_stmt(
                 wise_db.media_table,
                 ["id"],
                 get_media_by_ids_stmt,
@@ -1376,7 +1296,7 @@ class WiseProject:
                     .order_by(cte.c.rank)
                 )
 
-            _, run_shots = prepare_cte_for_join(
+            run_shots = wise_db.prepare_filter_stmt(
                 wise_db.shots_table,
                 ["media_id"],
                 get_shots_by_media_ids_stmt,
@@ -1467,6 +1387,14 @@ class WiseProject:
         logger.debug(f"{media_id_map}")
 
         def get_matching_thumbnails_fn():
+            thumbnail_columns = [
+                "id",
+                "media_id",
+                "timestamp",
+            ]
+            thumbs_row_query = sa.select(
+                *[wise_db.thumbnails_table.c[x] for x in thumbnail_columns]
+            )
             def get_thumbnail_ids_to_copy_stmt(cte: sa.CTE):
                 return (
                     sa.select(cte.c.id)
@@ -1483,13 +1411,9 @@ class WiseProject:
                     .where(wise_db.thumbnails_table.c.id == None)
                 )
 
-            thumbs_row_query, run = prepare_cte_for_join(
+            run = wise_db.prepare_filter_stmt(
                 wise_db.thumbnails_table,
-                [
-                    "id",
-                    "media_id",
-                    "timestamp",
-                ],
+                thumbnail_columns,
                 get_thumbnail_ids_to_copy_stmt,
             )
 
@@ -1513,7 +1437,7 @@ class WiseProject:
                     .order_by(cte.c.rank)
                 )
 
-            _, run = prepare_cte_for_join(
+            run = wise_db.prepare_filter_stmt(
                 wise_db.thumbnails_table,
                 ["id"],
                 get_thumbnails_by_ids_stmt,
@@ -1664,7 +1588,7 @@ class WiseProject:
                         .order_by(cte.c.rank)
                     )
 
-                _, run = prepare_cte_for_join(
+                run = wise_db.prepare_filter_stmt(
                     wise_db.vectors_table,
                     ["id"],
                     get_vectors_by_ids_stmt,

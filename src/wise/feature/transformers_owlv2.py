@@ -22,7 +22,7 @@
 
 import logging
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, cache
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +33,7 @@ from PIL import Image
 from torchvision.transforms.functional import pil_to_tensor
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 
-from wise.db import project_metadata_obj
+from wise.db import project_metadata_obj, prepare_filter_stmt
 from wise.feature.feature_extractor import (
     BBoxXYWH,
     FeatureExtMetadata,
@@ -42,7 +42,6 @@ from wise.feature.feature_extractor import (
     MultiModalModel,
     get_torch_device,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -503,15 +502,33 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
             )
 
     @classmethod
+    def get_vector_metadata_by_ids_stmt(cls, cte: sa.CTE):
+        # to be passed into wise_db.prepare_filter_stmt
+        c = cls._vector_metadata_table.c
+        return (
+            sa.select(c.objectness_score, c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
+            .select_from(
+                cte.join(cls._vector_metadata_table, c.vector_id == cte.c.vector_id)
+            )
+            .order_by(cte.c.rank)
+        )
+
+    @classmethod
+    @cache
+    def vector_metadata_query(cls):
+        # prepare once and reuse
+        return prepare_filter_stmt(
+            cls._vector_metadata_table,
+            ["vector_id"],  # column to filter on, provided later
+            cls.get_vector_metadata_by_ids_stmt,  # function that takes a CTE containing the filters and returns a query
+            include_ordering=True,  # preserve the order of input ids
+        )
+
+    @classmethod
     def get_vector_metadata(
         cls, conn: sa.Connection, vid: list[int]
     ) -> list[FeatureExtMetadata]:
-        c = cls._vector_metadata_table.c
-        res = conn.execute(
-            sa.select(c.objectness_score, c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
-            .where(c.vector_id.in_(vid))
-            .order_by(sa.case({x: i for i, x in enumerate(vid)}, value=c.vector_id))
-        )
+        res = cls.vector_metadata_query()(conn, [(x,) for x in vid])
         res = [OWLv2FeatureMetadata.from_sql_values(x) for x in res.mappings()]
         assert len(vid) == len(res)
         return res
