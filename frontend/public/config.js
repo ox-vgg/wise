@@ -66,11 +66,11 @@ const productionConfig = {
   METADATA_FILTER_PLACEHOLDER: "",
   METADATA_FILTER_HELP: "Use AND/OR to combine filters, Ctrl + Space key to show metadata columns.",
   PREFERRED_SEARCH_TARGETS_NAME: {
-    "open_clip": "Visual",
-    "insightface": "Faces",
-    "metadata": "Metadata",
-    "owlv2": "Objects",
-    "clap": "Audio"
+    "mlfoundations/open_clip/": "Visual",
+    "deepinsight/insightface/": "Faces",
+    "wise/metadata/": "Metadata",
+    "transformers/owlv2/": "Objects",
+    "microsoft/clap/": "Audio"
   }
 };
 
