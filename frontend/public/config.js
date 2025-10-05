@@ -68,6 +68,7 @@ const productionConfig = {
   PREFERRED_SEARCH_TARGETS_NAME: {
     "mlfoundations/open_clip/": "Visual",
     "deepinsight/insightface/": "Faces",
+    "deepinsight/insightface-average/": "Many Faces",
     "wise/metadata/": "Metadata",
     "transformers/owlv2/": "Objects",
     "microsoft/clap/": "Audio"

@@ -73,6 +73,11 @@ def get_feature_extractor_class(_id: str):
 
         return InsightFaceFeatureExtractor
 
+    if _id.startswith("deepinsight/insightface-average/"):
+        from .insightface_average import InsightFaceAverageFeatureExtractor
+
+        return InsightFaceAverageFeatureExtractor
+
     if _id.startswith("hf/"):
         from .hf_feature_extractor import HFMultiModalFeatureExtractor
 
