@@ -77,6 +77,7 @@ class MicrosoftClapModel(MultiModalModel):
             f"Initialising microsoft/clap (version={self.model_id}, use_cuda={use_cuda})"
         )
         instance = CLAP(version=self.model_id, use_cuda=use_cuda)
+        instance.clap.to(self.DEVICE)
         # TODO get it from config along with options?
         if self.compile:
             available_backends = torch._dynamo.list_backends()
