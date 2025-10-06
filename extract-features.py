@@ -10,7 +10,7 @@ import torch.utils.data as torch_data
 from tqdm import tqdm
 import numpy as np
 import logging
-import json
+
 import sqlalchemy as sa
 from src.enums import BaseStrEnum
 from src.dataloader.dataset import MediaChunk
@@ -25,11 +25,10 @@ from src.feature.feature_extractor_factory import (
 )
 from src.feature.store.feature_store import FeatureStore
 from src.feature.store.feature_store_factory import FeatureStoreFactory
-from src import db
+
 from src.data_models import (
     MediaMetadata,
     SourceCollection,
-    ExtraMediaMetadata,
     VectorMetadata,
     ThumbnailMetadata,
     MediaType,
@@ -40,7 +39,6 @@ from src.repository import (
     SourceCollectionRepo,
     MediaRepo,
     VectorRepo,
-    MediaMetadataRepo,
     ThumbnailRepo,
 )
 from src.dataloader.shot import ShotStream
