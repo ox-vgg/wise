@@ -102,10 +102,6 @@ if __name__ == '__main__':
 
             for feature_extractor_id in feature_extractor_id_list:
                 asset = project_assets[media_type][feature_extractor_id]
-                feature_extractor = FeatureExtractorFactory(
-                    feature_extractor_id,
-                    config.feature_extractor_config
-                )
                 search_index = SearchIndexFactory(
                     media_type, feature_extractor_id, asset
                 )
