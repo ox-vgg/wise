@@ -155,10 +155,7 @@ class LocalWiseProjectService(WiseProjectService):
                         feature_extractor_id,
                     )
                     this_ids = list(filter(None, this_ids))
-                    print('featured ids', modality, feature_extractor_id, this_ids)
-
                     ids[modality][feature_extractor_id] = this_ids
-        print('featured ids', ids)
         return ids
 
     def get_thumbnail_spritesheet(

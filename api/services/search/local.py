@@ -155,7 +155,6 @@ class LocalSearchService:
         ):
 
         # Select up to 1000 random image ids, using the specified random seed, from the set of 10000 ids
-        print(self._featured_ids)
         if feature_extractor_id == "wise/metadata":
             # use other feature_extractor_id from the modality because "wise/metadata"
             # is a FTS search index and it does not support "feature_extractor.get_vector_metadata()"
