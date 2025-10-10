@@ -522,7 +522,12 @@ class WiseProject:
             return thumbs_conn.execute(stmt).all()
 
     def metadata(self, media_id: str):
-        stmt = sa.select(wise_db.media_table, wise_db.source_collections_table).where(
+        stmt = sa.select(wise_db.media_table, wise_db.source_collections_table).select_from(
+            wise_db.media_table.join(
+                wise_db.source_collections_table,
+                wise_db.media_table.c.source_collection_id == wise_db.source_collections_table.c.id,
+            )
+        ).where(
             wise_db.media_table.c.id == media_id
         )
         with self.db_engine.connect() as conn:
