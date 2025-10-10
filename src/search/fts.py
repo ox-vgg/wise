@@ -7,8 +7,8 @@ import json
 import logging
 from typing import Literal, Annotated, TYPE_CHECKING
 
-from src import db
-from src.data_models import MediaMetadata, VectorAndMediaMetadata, MediaType, ModalityType
+from .. import db
+from ..data_models import MediaMetadata, VectorAndMediaMetadata, MediaType, ModalityType
 
 
 from pydantic import Field, RootModel
