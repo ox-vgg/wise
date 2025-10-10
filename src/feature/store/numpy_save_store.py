@@ -146,7 +146,7 @@ class NumpySaveStore(FeatureStore):
 
         _file_list = self.npz_filenames.copy()
         if self.shard_shuffle:
-            _file_list = random.shuffle(_file_list)
+            random.shuffle(_file_list)
 
         for npz_filename in _file_list:
             payload = np.load(npz_filename)

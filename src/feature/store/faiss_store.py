@@ -216,7 +216,7 @@ class FaissStore(FeatureStore):
             _filelist.append("current")
 
         if self.shard_shuffle:
-            _filelist = random.shuffle(_filelist)
+            random.shuffle(_filelist)
 
         for filename in _filelist:
             if filename == "current":

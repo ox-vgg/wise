@@ -68,8 +68,8 @@ class FeatureSearchIndex(SearchIndex):
             index.set_direct_map_type(faiss.DirectMap.Hashtable) # Hashtable needed to support non-sequential ids
 
             print(f'  loading a random sample of {train_count} features from {feature_count} features ...')
-            shuffled_features = WebdatasetStore(self.media_type, self.features_dir)
-            shuffled_features.enable_read(shard_shuffle=True)
+            shuffled_features = FeatureStoreFactory.load_store(self.media_type, self.features_dir)
+            shuffled_features.enable_read(shard_shuffle=True, shuffle_values=True)
 
             train_features = np.ndarray((train_count, feature_dim), dtype=np.float32)
             for i, (feature_id, feature_vector) in tqdm(
