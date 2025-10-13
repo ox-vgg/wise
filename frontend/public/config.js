@@ -7,7 +7,7 @@ const productionConfig = {
   FETCH_TIMEOUT: 60000, // Number of milliseconds to wait when fetching search results / featured images
   REPO_URL: "https://gitlab.com/vgg/wise/wise",
   WISE_OVERVIEW_CARD: {
-    OVERVIEW: `This is audiovisual search engine on the WISE Search Engine (<a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">WISE</a>) software.`,
+    OVERVIEW: `This is an audiovisual search engine based on the WISE Search Engine (<a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">WISE</a>) software.`,
     ABOUT: `
      <p>This audiovisual search engine is based on the WISE Search Engine (<a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">WISE</a>) software developed and maintained by the Visual Geometry Group (<a href="https://www.robots.ox.ac.uk/~vgg/">VGG</a>) of Department of Engineering Science at University of Oxford.</p>
      <p>More details about WISE can be found in the <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">project page</a> and the <a href="https://gitlab.com/vgg/wise/wise/-/tree/wise2/">code repository</a>.</p>
