@@ -79,6 +79,10 @@ export const App: React.FunctionComponent = () => {
     if (!viewModality || !featureExtractorId)
       return;
 
+    // Dont submit another search - probably it was triggered manually in the handle example query function
+    if (dataService.isLoadingNewSearch) {
+      return;
+    }
     // Now that we have set the feature extractor and modality, we can
     // initialise home page with featured images
     if (isHomePage) {
