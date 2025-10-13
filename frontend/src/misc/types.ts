@@ -44,6 +44,7 @@ export type MediaInfo = {
   title: string;
   external_metadata: {
     asr_segments?: ASRSegment[];
+    title?: string;
   }
 };
 export type ImageInfo = MediaInfo & {};

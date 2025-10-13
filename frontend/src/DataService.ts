@@ -32,13 +32,13 @@ const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[])
       if (external_metadata.asr_segments) {
         asr_segments = external_metadata.asr_segments.slice();
       }
-
+      const title = videoInfo.title || external_metadata.title || videoInfo.filename;
       return [
         mediaId,
         {
           ...videoInfo,
           shots: shots.filter(shot => shot.media_id === mediaId), // populate shots
-          title: videoInfo.filename,
+          title: title,
           asrSegments: asr_segments,
         }
       ] as [string, ProcessedVideoInfo]
@@ -107,7 +107,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
       Object.entries(results.image_results.images)
         .map(([mediaId, imageInfo]) => {
           // Populate title field with filename if it doesn't exist
-          if (!imageInfo.title) imageInfo.title = imageInfo.filename;
+          imageInfo.title = imageInfo.title || imageInfo.external_metadata.title || imageInfo.filename;
           return [
             mediaId,
             {
