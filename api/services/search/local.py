@@ -115,9 +115,10 @@ class LocalSearchService:
 
     def filter_vectors(self, media_type: MediaType, feature_extractor_id: str, filter_spec: dict) -> np.ndarray:
         id_constraint = np.array([], dtype=np.int64)
+        project_engine = self.wise_project.db_engine
+
         metadata_query = filter_spec.get("metadata_query", None)
         if metadata_query:
-            project_engine = self.wise_project.db_engine
             with project_engine.connect() as conn:
                 media_ids = self.search_indices[media_type]["wise/metadata"].search(
                     conn, metadata_query, ids_only=True
