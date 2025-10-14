@@ -439,13 +439,16 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
     }
   }, [multimodalQueries, searchText]);
 
+  const [_, _featureExtractorId] = featureExtractorId.split('/', 2);
   let _modalities = modalities;
   if (viewModality == 'Image' || viewModality == 'Video') {
     _modalities = _modalities.filter(modality => modality.id != 'audio');
+    if (_featureExtractorId.includes('insightface')) {
+      _modalities = _modalities.filter(modality => modality.id != 'text');
+    }
   } else if (viewModality == 'VideoAudio') {
     _modalities = _modalities.filter(modality => modality.id != 'image');
   }
-  const [_, _featureExtractorId] = featureExtractorId.split('/', 2);
   return (
     <div style={dropdownStyle}>
       <p style={{ marginTop: 0, color: token.colorTextDescription }}>
