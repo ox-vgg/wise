@@ -1,14 +1,62 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { Header } from 'antd/es/layout/layout';
-import { AutoComplete, Alert, Button, Checkbox, Collapse, Divider, Dropdown, Flex, Form, FormInstance, Input, Popover, Select, Space, Tag, Tooltip, Upload, UploadFile, theme } from 'antd';
-import { CaretRightOutlined, CloseOutlined, FileTextTwoTone, FontColorsOutlined, PictureOutlined, PictureTwoTone, PlusOutlined, QuestionCircleOutlined, SearchOutlined, SoundOutlined, SoundTwoTone, UploadOutlined, VideoCameraTwoTone } from '@ant-design/icons';
+import {
+  Alert,
+  AutoComplete,
+  Button,
+  Checkbox,
+  Collapse,
+  Divider,
+  Dropdown,
+  Flex,
+  Form,
+  FormInstance,
+  Input,
+  Popover,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+  Upload,
+  UploadFile,
+  theme,
+} from 'antd';
+import {
+  CaretRightOutlined,
+  CloseOutlined,
+  FileTextTwoTone,
+  FontColorsOutlined,
+  PictureOutlined,
+  PictureTwoTone,
+  PlusOutlined,
+  QuestionCircleOutlined,
+  SearchOutlined,
+  SoundOutlined,
+  SoundTwoTone,
+  UploadOutlined,
+  VideoCameraTwoTone,
+} from '@ant-design/icons';
 import { nanoid } from 'nanoid'
 
 import './WiseHeader.scss';
 import { WiseLogo } from './misc/logo.tsx';
 import config from './config.ts';
 import StillImageView from './misc/StillImageView.tsx';
-import { TextSearchFormProps, MediaSearchFormProps, SearchExamplesProps, SearchDropdownProps, WiseHeaderProps, Query, ViewModality } from './misc/types.ts';
+import {
+  MediaSearchFormProps,
+  Query,
+  SearchDropdownProps,
+  SearchExamplesProps,
+  TextSearchFormProps,
+  ViewModality,
+  WiseHeaderProps,
+} from './misc/types.ts';
 import { BoundingBoxes } from './misc/BoundingBox.tsx';
 import { is_metadata_filter_supported } from './misc/utils.ts';
 

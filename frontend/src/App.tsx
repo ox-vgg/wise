@@ -8,7 +8,12 @@ import './App.scss';
 import SearchResults from './SearchResults.tsx';
 import WiseHeader from './WiseHeader.tsx';
 import WiseOverviewCard from './WiseOverviewCard.tsx';
-import { ViewModality, ProjectInfo, Query, TourVariables } from './misc/types.ts';
+import {
+  ProjectInfo,
+  Query,
+  TourVariables,
+  ViewModality,
+} from './misc/types.ts';
 import { fetchWithTimeout, is_metadata_supported } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
 

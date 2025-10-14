@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Button, Collapse } from "antd";
-import { CaretRightOutlined, LeftOutlined, RightOutlined, StarFilled } from "@ant-design/icons";
+import {
+  CaretRightOutlined,
+  LeftOutlined,
+  RightOutlined,
+  StarFilled,
+} from "@ant-design/icons";
 import './VideoOccurrencesView.scss';
 import { VideoOccurrencesViewProps } from "./types";
 import { secondsToMinSecPadded } from "./utils";
