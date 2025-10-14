@@ -781,7 +781,7 @@ class WiseProject:
                     _vtable.c.feature_extractor_id == feature_extractor_id,
                 ),
             )
-        )
+        ).order_by(media_cte.c.rank)
 
         with self.db_engine.connect() as conn:
             return conn.execute(stmt).scalars().all()
