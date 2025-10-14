@@ -62,10 +62,10 @@ class LocalSearchService:
             dist, ids = search_index.index.search(features, end)
         
         top_ids, top_dist = ids[0, start:end], dist[0, start:end]
-        valid_indices = [i for i, x in enumerate(top_ids) if x != -1]
 
-        valid_ids = [int(top_ids[x]) for x in valid_indices]
-        valid_dist = [float(top_dist[x]) for x in valid_indices]
+        valid_ids_mask = top_ids != -1
+        valid_ids = top_ids[valid_ids_mask].tolist()
+        valid_dist = top_dist[valid_ids_mask].tolist()
 
         # Apply hook to transform Faiss distance scores
         valid_dist = self.embedding_service.transform_distances(feature_extractor_id, valid_dist)
