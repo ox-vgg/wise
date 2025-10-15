@@ -1,10 +1,32 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Divider, Dropdown, Pagination, Row, Segmented, Tooltip } from 'antd';
-import { AppstoreOutlined, BarsOutlined, DownloadOutlined, FlagFilled, LoadingOutlined, MinusCircleFilled, PictureOutlined, PlusCircleFilled } from '@ant-design/icons';
+import {
+  Button,
+  Divider,
+  Dropdown,
+  Pagination,
+  Row,
+  Segmented,
+  Tooltip,
+} from 'antd';
+import {
+  AppstoreOutlined,
+  BarsOutlined,
+  DownloadOutlined,
+  FlagFilled,
+  LoadingOutlined,
+  MinusCircleFilled,
+  PictureOutlined,
+  PlusCircleFilled,
+} from '@ant-design/icons';
 import { nanoid } from 'nanoid';
 
 import './SearchResults.scss'
-import { ProcessedImageVector, ProcessedVectorInfo, ProcessedVideoSegment, SearchResultsProps } from './misc/types.ts';
+import {
+  ProcessedImageVector,
+  ProcessedVectorInfo,
+  ProcessedVideoSegment,
+  SearchResultsProps,
+} from './misc/types.ts';
 import ReportImageModal from './misc/ReportImageModal.tsx';
 // import SensitiveImageWarning from './misc/SensitiveImageWarning.tsx';
 import ImageDetailsModal from './misc/ImageDetailsModal.tsx';

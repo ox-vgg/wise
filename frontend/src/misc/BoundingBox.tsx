@@ -1,7 +1,15 @@
 import { useMemo } from "react";
 import { Button, Popover } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import { BBoxXYWH, ProcessedVectorInfo, ProcessedVectorInfoWithBBox, isResult, isWithBBox, isWithVectors, isVideoSegment } from "./types.ts";
+import {
+  BBoxXYWH,
+  ProcessedVectorInfo,
+  ProcessedVectorInfoWithBBox,
+  isResult,
+  isVideoSegment,
+  isWithBBox,
+  isWithVectors,
+} from "./types.ts";
 import { interleaveArrayWithElement, clamp_bbox } from "./utils.ts";
 
 // The following cannot be a React component and must be used as a function

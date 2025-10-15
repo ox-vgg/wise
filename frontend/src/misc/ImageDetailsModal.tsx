@@ -4,11 +4,25 @@ import { MoreOutlined } from "@ant-design/icons";
 import sanitizeHtml from "sanitize-html";
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
-import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vidstack/react';
-import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
+import {
+  MediaPlayer,
+  MediaProvider,
+  Track,
+  type MediaPlayerInstance,
+} from '@vidstack/react';
+import {
+  DefaultVideoLayout,
+  defaultLayoutIcons,
+} from '@vidstack/react/player/layouts/default';
 
 import "./ImageDetailsModal.scss";
-import { ASRSegment, ImageDetailsModalProps, ProcessedVideoSegment, ProcessedVectorInfo, isWithBBox } from "./types";
+import {
+  ASRSegment,
+  ImageDetailsModalProps,
+  ProcessedVectorInfo,
+  ProcessedVideoSegment,
+  isWithBBox,
+} from "./types";
 import BoundingBoxOverlay from "./BoundingBoxOverlay.tsx";
 import StillImageView from "./StillImageView.tsx";
 import VideoOccurrencesView from "./VideoOccurrencesView";
