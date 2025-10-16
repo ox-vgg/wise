@@ -857,7 +857,7 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
                             options: (projectInfo.search_targets?.[key] || []).map((feature_extractor_id: string) => {
                               const extra_key = `${media_type}:${feature_extractor_id}` as keyof typeof VIEW_MODALITY_OPTIONS_EXTRA;
                               const default_label = Object.entries(config.PREFERRED_SEARCH_TARGETS_NAME).find(
-                                ([key]) => feature_extractor_id.includes(key)
+                                ([key]) => feature_extractor_id.startsWith(key)
                               )?.[1] ?? (feature_extractor_id.split('/')[1] || feature_extractor_id);
                               const optionTestId = `wise-search-target-select-option-${media_type}:${feature_extractor_id}`;
                               return {
