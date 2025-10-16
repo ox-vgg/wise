@@ -113,6 +113,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
         const [_viewModality, _featureExtractorId] = key.split(':', 2);
         let viewModality = (_viewModality === '') ? undefined : (_viewModality as ViewModality);
         let featureExtractorId = _featureExtractorId;
+        let search_target_key = _featureExtractorId;
         if (viewModality) {
           let _media_type = viewModality.toLowerCase();
           _media_type = (_media_type === 'videoaudio') ? 'audio' : _media_type
@@ -122,17 +123,17 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
             return <></>
           }
           const featureIDS = projectInfo.search_targets?.[media_type] || [];
-          const validFeatureId = featureIDS.find((fid) => fid.includes(featureExtractorId));
+          const validFeatureId = featureIDS.find((fid) => fid == featureExtractorId);
           if (!validFeatureId) {
             return <></>
           }
-          featureExtractorId = validFeatureId;
-
+          search_target_key = featureExtractorId.split("/", 2).join('/') + '/';
         } else {
-          featureExtractorId = ''
+          search_target_key = '';
+          featureExtractorId = '';
         }
 
-        let keyName = config.PREFERRED_SEARCH_TARGETS_NAME[_featureExtractorId] || (_viewModality === 'VideoAudio' ? 'Audio' : _viewModality)
+        let keyName = config.PREFERRED_SEARCH_TARGETS_NAME[search_target_key] || (_viewModality === 'VideoAudio' ? 'Audio' : _viewModality);
         return (
           <p key={key} className="wise-example-queries">
             Sample {keyName} queries: &nbsp;

@@ -26,6 +26,15 @@ const productionConfig = {
     // 'Singer next to a piano', 'Black and white photo of a steam train', 'First lady and her husband',
     // 'Cubist painting of a violin'
   ],
+  // Alternative format for EXAMPLE_QUERIES in case of multiple
+  // modality:feature_extractor_id pairs
+  // EXAMPLE_QUERIES: {
+  //   'Image:mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli': [
+  //     'Cute puppy',
+  //     'Singer next to a piano',
+  //     'Cubist painting of a violin',
+  //   ]
+  // },
   // Multimodal example queries shown in search dropdown
   MULTIMODAL_EXAMPLE_QUERIES: {
     'Video:open_clip': [
