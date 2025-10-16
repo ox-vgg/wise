@@ -28,19 +28,22 @@ class FeatureStoreFactory:
         features_dir = Path(features_dir) # convert type in case features_dir is a string
 
         # infer the store type
-        shard_ext_list = []
+        shard_ext_set = set()
         shard_file_pattern = features_dir / (media_type + '-*.*')
         for filename in glob.iglob(pathname=shard_file_pattern.as_posix(), recursive=False):
             suffix = Path(filename).suffix
-            if suffix not in shard_ext_list:
-                shard_ext_list.append(suffix)
-        if len(shard_ext_list) != 1:
-            raise ValueError(f'failed to infer type of {media_type} feature store in {features_dir}')
-        if shard_ext_list[0] == '.tar':
+            shard_ext_set.add(suffix)
+        if len(shard_ext_set) == 0:
+            raise ValueError(f'found no feature store files in {features_dir} for type {media_type}')
+        elif len(shard_ext_set) > 1:
+            raise ValueError(f'failed to infer type of {media_type} feature store in {features_dir} because there are multiple file types present ({shard_ext_set})')
+
+        shard_suffix = shard_ext_set.pop()
+        if shard_suffix == '.tar':
             return WebdatasetStore(media_type, features_dir)
-        elif shard_ext_list[0] == '.npz':
+        elif shard_suffix == '.npz':
             return NumpySaveStore(media_type, features_dir)
-        elif shard_ext_list[0] == ".faiss":
+        elif shard_suffix == ".faiss":
             return FaissStore(media_type, features_dir)
         else:
-            raise ValueError(f'unknown store containing shard filenames with extension {shard_ext_list[0]}')
+            raise ValueError(f'unknown store containing shard filenames with extension {shard_suffix}')
