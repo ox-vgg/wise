@@ -1,4 +1,3 @@
-import glob
 from pathlib import Path
 import enum
 
@@ -28,17 +27,13 @@ class FeatureStoreFactory:
         features_dir = Path(features_dir) # convert type in case features_dir is a string
 
         # infer the store type
-        shard_ext_set = set()
-        shard_file_pattern = features_dir / (media_type + '-*.*')
-        for filename in glob.iglob(pathname=shard_file_pattern.as_posix(), recursive=False):
-            suffix = Path(filename).suffix
-            shard_ext_set.add(suffix)
-        if len(shard_ext_set) == 0:
+        shard_suffixes = set([p.suffix for p in features_dir.glob(media_type + '-*')])
+        if len(shard_suffixes) == 0:
             raise ValueError(f'found no feature store files in {features_dir} for type {media_type}')
-        elif len(shard_ext_set) > 1:
-            raise ValueError(f'failed to infer type of {media_type} feature store in {features_dir} because there are multiple file types present ({shard_ext_set})')
+        elif len(shard_suffixes) > 1:
+            raise ValueError(f'failed to infer type of {media_type} feature store in {features_dir} because there are multiple file types present ({shard_suffixes})')
 
-        shard_suffix = shard_ext_set.pop()
+        shard_suffix = shard_suffixes.pop()
         if shard_suffix == '.tar':
             return WebdatasetStore(media_type, features_dir)
         elif shard_suffix == '.npz':
