@@ -146,26 +146,34 @@ class WiseProject:
 
     @property
     def supported_media_types_and_features(self):
-        _assets = None
         with self.db_engine.connect() as conn:
-            result = conn.execute(
-                sa.select(    
+            results = conn.execute(
+                sa.select(
                     wise_db.vectors_table.c.modality,
                     wise_db.vectors_table.c.feature_extractor_id
-                )
-                .group_by(wise_db.vectors_table.c.modality, wise_db.vectors_table.c.feature_extractor_id)
-                .order_by(wise_db.vectors_table.c.modality, wise_db.vectors_table.c.feature_extractor_id)
-            )
-            _supported = defaultdict(set)
-            for g, vals in itertools.groupby(result.all(), key = lambda x: x[0]):
-                feature_extractor_ids = set([v[1] for v in vals])
-                if any([ x == '' for x in feature_extractor_ids]):
-                    # Fallback - find it by globbing
-                    if _assets is None:
-                        _assets = self.discover_assets()
-                    feature_extractor_ids = set(_assets[g].keys())
+                ).distinct()
+            ).all()
+        ## Do sorting in Python because it is very very slow in SQL
+        ## (GROUP BY + ORDER BY) for very large tables.  Not sure why
+        ## it is so slow but my guess is that SQL does not know that
+        ## there are only a few modality+feature_extractor_id pairs.
+        ## Maybe once https://gitlab.com/vgg/wise/wise/-/issues/138,
+        ## then doing the whole thing in SQL will be just as fast.
+        results = sorted(
+            sorted(results, key=lambda x: x[1]), key=lambda x: x[0]
+        )
 
-                _supported[g].update(feature_extractor_ids)
+        _assets = None
+        _supported = defaultdict(set)
+        for g, vals in itertools.groupby(results, key = lambda x: x[0]):
+            feature_extractor_ids = set([v[1] for v in vals])
+            if any([ x == '' for x in feature_extractor_ids]):
+                # Fallback - find it by globbing
+                if _assets is None:
+                    _assets = self.discover_assets()
+                feature_extractor_ids = set(_assets[g].keys())
+
+            _supported[g].update(feature_extractor_ids)
         return _supported
 
     def discover_assets(self):
