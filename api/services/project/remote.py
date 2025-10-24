@@ -150,7 +150,7 @@ class RemoteWiseProjectService(WiseProjectService):
         )
         resp.raise_for_status()
         data = resp.json()
-        if not data:
+        if not isinstance(data, list):
             raise ValueError("Failed to retrieve featured items from remote service")
         response =  [common.VectorInfo.model_validate(d) for d in data]
         response = self.modify_vector_info(response)
