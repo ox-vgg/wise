@@ -6,6 +6,7 @@ import {
   Pagination,
   Row,
   Segmented,
+  Switch,
   Tooltip,
 } from 'antd';
 import {
@@ -60,6 +61,25 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   }
 
   const [isSubmitSearch, setIsSubmitSearch] = useState(false);
+
+  const STILL_IMAGE_FILTERS_KEY = 'wise:filters:stillImages';
+  const [safetyFilterEnabled, setSafetyFilterEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STILL_IMAGE_FILTERS_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (safetyFilterEnabled) document.documentElement.classList.add('wise-still-image-filters-enabled');
+      else document.documentElement.classList.remove('wise-still-image-filters-enabled');
+      localStorage.setItem(STILL_IMAGE_FILTERS_KEY, safetyFilterEnabled ? '1' : '0');
+    } catch (e) {
+      // ignore
+    }
+  }, [safetyFilterEnabled]);
   useEffect(() => {
     if (isSubmitSearch === true) {
       submitSearch();
@@ -434,7 +454,22 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
       }
       {
         (totalResultsCount > 0) &&
-        <Button onClick={exportToJSON} title="Export results in JSON format" icon={<DownloadOutlined />} />
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Button onClick={exportToJSON} title="Export results in JSON format" icon={<DownloadOutlined />} />
+            {
+              (viewModality !== 'Image') &&
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Tooltip title="Obscure potentially graphic images by applying blur and grayscale filters.">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, color: '#666', lineHeight: '32px' }}>Safety Filter</span>
+                    <Switch checked={safetyFilterEnabled} onChange={(checked: boolean) => setSafetyFilterEnabled(checked)} style={{ transform: 'scale(1.05)', marginBottom: 2 }} />
+                  </div>
+                </Tooltip>
+              </div>
+            }
+          </div>
+        </>
       }
     </Row>
 

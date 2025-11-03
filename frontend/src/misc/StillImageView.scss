@@ -14,7 +14,18 @@
     width: 100%;
     height: 100%;
     z-index: -1;
+    -webkit-filter: none;
+    filter: none;
+    will-change: filter;
+    transition: filter 180ms ease;
   }
+}
+
+/* Apply filters only when the global toggle is enabled. */
+.wise-still-image-filters-enabled .wise-still-image-wrapper > img,
+:root.wise-still-image-filters-enabled .wise-still-image-wrapper > img {
+  -webkit-filter: grayscale(90%) blur(2px);
+  filter: grayscale(90%) blur(2px);
 }
 
 .wise-bounding-box-tooltip .ant-popover-inner {
