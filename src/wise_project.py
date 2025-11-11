@@ -255,7 +255,7 @@ class WiseProject:
                 self.assets[media_type][feature_extractor_id]['index_files'].sort()
 
         # 3. locate all assets related to metadata
-        self.assets['metadata'] = {}
+        metadata_assets = {}
         for metadata_db in self.metadata_dir.glob('*/*.sqlite'):
             metadata_db_rel_path = metadata_db.relative_to(self.metadata_dir)
             assert len(metadata_db_rel_path.parts) == 2, f"unexpected {metadata_db_rel_path}, should be of form FOLDER_NAME/DB_NAME"
@@ -266,11 +266,13 @@ class WiseProject:
                     table_name = row[0]
                     if '_fts' not in table_name:
                         metadata_id = metadata_id_prefix + '/' + table_name
-                        self.assets['metadata'][metadata_id] = {
+                        metadata_assets[metadata_id] = {
                             'metadata_db': str(metadata_db),
                             'metadata_db_type': 'sqlite',
                             'metadata_table': table_name
                         }
+        if metadata_assets:
+            self.assets['metadata'] = metadata_assets
         return self.assets
 
     def get_media_files(self) -> list[DatasetPayload]:
