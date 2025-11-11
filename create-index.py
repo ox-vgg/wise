@@ -67,17 +67,11 @@ if __name__ == '__main__':
     for media_type in media_type_list:
         if media_type == 'metadata':
             if not args.fts_config:
-                logger.error(
-                    "--fts-config must be a valid json file to index metadata - skipping indexing"
-                )
-                continue
+                raise ValueError('--fts-config must be a valid json file to index metadata')
 
             fts_config = Path(args.fts_config)
             if not fts_config.exists():
-                logger.error(
-                    "--fts-config must be a valid json file to index metadata - skipping indexing"
-                )
-                continue
+                raise ValueError('--fts-config must be a valid json file to index metadata')
 
             if not args.overwrite and project.fts_config_file.exists():
                 logger.info('not overwriting existing metadata index')
@@ -97,7 +91,7 @@ if __name__ == '__main__':
 
                 logger.info('Successfully created fts5 index for metadata')
             except Exception:
-                logging.exception("failed to create metadata index")
+                logging.exception("failed to create metadat index")
                 project.fts_config_file.unlink(missing_ok=True)     
         else:
             feature_extractor_id_list = list(project_assets[media_type].keys())
