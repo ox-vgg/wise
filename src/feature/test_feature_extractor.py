@@ -146,6 +146,11 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
         self.assertListEqual(features, [])
 
 
+class TestInsightFaceWithAuraFace(TestInsightFaceFeatureExtractor):
+    def setUp(self):
+        self._extractor = FeatureExtractorFactory("deepinsight/insightface/fal/AuraFace-v1")
+
+
 class TestOWLv2BBoxConversion(unittest.TestCase):
     ## Test values picked so they can be visualised on a 20x20 grid.
     def test_original_square_image(self):
