@@ -329,9 +329,8 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
         assert (
             len(feature_id_parts) == 4
             and feature_id_parts[0] == "deepinsight"
-            and feature_id_parts[1] == "insightface",
-            f"Invalid feature-id: {feature_id}, an example of a valid feature-id is 'deepinsight/insightface/buffalo_l/_unknown'",
-        )
+            and feature_id_parts[1] == "insightface"
+        ), f"Invalid feature-id: {feature_id}, an example of a valid feature-id is 'deepinsight/insightface/buffalo_l/_unknown'"
         self.model_name = feature_id_parts[2]
 
         self._embedding_dtype = np.float32
