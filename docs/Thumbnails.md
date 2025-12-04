@@ -8,4 +8,4 @@ See [shot-detection](../src/repository/__init__.py#L59) code for an example of q
 
 See [dataloader](../src/dataloader/dataset.py#L247) for the configuration of the thumbnail stream
 
-See [Internal Metadata Database documentation](../src/db/README.md) for more details on how the thumbnails database (and internal metadata database) can be accessed.
+See the documentation in the [`db` module](../src/db/__init__.py) for more details on how the thumbnails database (and internal metadata database) can be accessed.

@@ -1,3 +1,9 @@
+"""Feature Extractor
+
+Contains implementation for feature extractor and feature store.
+
+"""
+
 from .feature_extractor import (
     FeatureExtractor as FeatureExtractor,
     FeatureExtractorConfig as FeatureExtractorConfig,

@@ -1,3 +1,4 @@
 # Internal Metadata Database
 
-Please see [src/db/README.md](../src/db/README.md) for more details.
+Please see the [`db` module](../src/db/__init__.py) documentation for
+more details.
