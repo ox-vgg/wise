@@ -10,7 +10,7 @@ You can use WISE on your own folder of images and/or videos. If you do not have
 one, you can download a set of sample videos which can be used to test the 
 audio and visual search capabilities of WISE.
 
-```
+```bash
 # We assume that the current directory contains
 # the WISE software source tree.
 mkdir -p wise-data/Kinetics-6
@@ -22,7 +22,7 @@ tar -zxvf Kinetics-6.tar.gz -C wise-data/Kinetics-6
 Next, we extract visual and audio features and create a search index that will allow
 us to perform audio and visual search on the video collection.
 
-```
+```bash
 mkdir -p wise-projects/
 python3 extract-features.py \
   wise-data/Kinetics-6/ \                   # input media folder 
@@ -53,7 +53,7 @@ Notes:
 - For more details on the options available, run `python3 extract-features.py --help`
 
 ## Step 4: Create vector search index
-```
+```bash
 python3 create-index.py \
   --project-dir wise-projects/Kinetics-6/  # Pass in the same project folder as above
 ```
@@ -68,7 +68,7 @@ We can now search the video collection either using the web-based interface, or 
 ### Search using web-based interface
 
 Start the web server using the command below:
-```
+```bash
 python3 serve.py --project-dir wise-projects/Kinetics-6/
 ```
 Once the server has been started, go to http://localhost:9670/Kinetics-6/ in your browser. This will open up a search interface like this:
@@ -81,7 +81,7 @@ Once the server has been started, go to http://localhost:9670/Kinetics-6/ in you
 
 
 ### Search using CLI
-```
+```bash
 python search.py \
   --query "cooking" --in video \
   --query "music" --in audio \
@@ -92,7 +92,7 @@ python search.py \
 The search results, shown below, shows that this search query is able to find the video that shows
 someone cooking food with music playing in the background.
 
-```
+```bash
 Searching /data/beegfs/ultrafast/home/adutta/temp/wise/Kinetics-6/ for
   [0] "cooking" in video
   [1] "music" in audio
@@ -138,7 +138,7 @@ try the WISE search console which is much faster as it needs to
 load all the required assets (e.g. models) only once. Here is an
 example of the same search query run in the search console.
 
-```
+```bash
 $ python search.py \
   --project-dir wise-projects/Kinetics-6/
 
@@ -182,7 +182,7 @@ Some examples queries (press Ctrl + D to exit):
 To save your results to a CSV text file, you can add the `--export-csv`
 flag in the search console as shown below.
 
-```
+```bash
 [1] > --query "cooking" --in video --query "music" --in audio --topk 20 --result-format csv --save-to-file cooking-music.csv
 saving results to file cooking-music.csv
 
@@ -222,7 +222,7 @@ this functionality, we first create a CSV file in which all the search
 query sentences are stored one per line of the text file with a header
 line of "query_id,query_text" as shown below.
 
-```
+```bash
 $ cat queries.csv
 query_id,query_text
 1,cooking
@@ -232,7 +232,7 @@ query_id,query_text
 The header line must be present in the input CSV file. Now, we can
 search using these queries as follows.
 
-```
+```bash
 $ python search.py \
   --in video \
   --result-format csv \
@@ -244,7 +244,7 @@ $ python search.py \
 
 The search results are exported to a csv file as shown below.
 
-```
+```bash
 $ cat results.csv
 query_id,query_text,media_type,rank,filename,start_time,end_time,score
 1,"cooking",video,0,"frying-vegetables/mwkOrWZxvrU_000006_000016.mp4",0.5,1.5,0.218

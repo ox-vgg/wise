@@ -32,7 +32,7 @@ multi-instance action retrieval challenge.
 
 The performance evaluation was carried out as follows.
 
-```
+```bash
 python search.py \
   --queries-from "epic-kitchens-100-annotations/retrieval_annotations/EPIC_100_retrieval_test_sentence.csv" \
   --in video \

@@ -29,7 +29,7 @@ neighbour search. We create a pre-defined list of search queries
 for establishing the ground truth search results for those queries on
 the wikimedia-55M set.
 
-```
+```bash
 ## We assume that a WISE server based on naive approach to search
 ## is serving on http://localhost:9670/wikimedia-55M/
 ##
@@ -56,7 +56,7 @@ search index is created using approximate methods
 neighbour search. This tutorial illustrates the performance of an [IndexIVFFlat](https://www.pinecone.io/learn/faiss-tutorial/)
 search index created using the following parameters.
 
-```
+```bash
 ## We assume that a WISE server based on HNSW search index
 ## is serving on http://localhost:9670/wikimedia-55M/
 ##
@@ -79,7 +79,7 @@ python3 scripts/query-search-engine.py \
 The search retrieval performance of a search index (e.g. IVFFlat) can be compared against
 the search results obtained using the naive approach to nearest neighbour search as follows.
 
-```
+```bash
 python3 scripts/eval-search-engine-perf.py \
   --perf-data-dir data/index/wikimedia-55M/ \
   --ref-perf-filename IndexFlatIP.json

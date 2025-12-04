@@ -11,7 +11,7 @@ uses the [Webdataset](https://webdataset.github.io/webdataset/) format to store 
 
 Here is an example of how the features stores in these stores can be accessed.
 
-```
+```python
 # source: src/search_index.py
 from pathlib import Path
 from .feature.store.feature_store_factory import FeatureStoreFactory

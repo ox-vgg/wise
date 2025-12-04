@@ -3,7 +3,7 @@
 All the assets (e.g. features, index, thumbnails, metadata, etc.) related to
 a WISE project is stored in a folder structure as shown below.
 
-```
+```bash
 user@temp:/data/wise/Kinetics-7$ tree
 .
 ├── metadata
@@ -34,7 +34,7 @@ extractor. The [WiseProject](src/wise_project.py) module manages this folder
 and provides the full path of specific folders like `features`, or `index` as shown
 below.
 
-```
+```python
 from src.wise_project import WiseProject
 ...
 

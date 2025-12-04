@@ -13,9 +13,9 @@ For each type of metadata, we write scripts that will populate the `metadata/int
 ## Media Metadata
 The script [`media-metadata.py`](../../tree/media-metadata/media-metadata.py) allows import of metadata associated with each image, video or audio file. Here is an example based on Kinetics-6c dataset which is a set of 30 videos taken from the [Kinetics](https://github.com/cvdfoundation/kinetics-dataset) dataset.
 
-The [Install](docs/Install.md) guide describes the process of installing WISE. We assume that the WISE software has already been installed in the `wise` folder.
+The [Install](Install.md) guide describes the process of installing WISE. We assume that the WISE software has already been installed in the `wise` folder.
 
-```
+```bash
 ## 1. Download the Kinetics-6c dataset
 mkdir -p wise-data/
 curl -sLO "https://thor.robots.ox.ac.uk/wise/assets/test/Kinetics-6c.tar.gz"
@@ -24,7 +24,7 @@ tar -zxvf Kinetics-6c.tar.gz -C wise-data/
 
 Next, we create a WISE project based on these videos.
 
-```
+```bash
 ## 2. Extract audiovisual features
 mkdir -p wise-projects/
 python3 extract-features.py \
@@ -34,7 +34,7 @@ python3 extract-features.py \
 
 The Kinetics-6 dataset comes with a sample metadata as shown below.
 
-```
+```bash
 cat wise-data/Kinetics-6c/metadata.csv
 
 media_path,media_category,media_description
@@ -47,7 +47,7 @@ coughing/AFRoHj8B8DM_000116_000126.mp4,"coughing","Hillary Clinton coughts while
 
 This metadata can be imported into the existing WISE project using the [media-metadata.py](media-metadata.py) script as follows.
 
-```
+```bash
 python3 media-metadata.py import \
   --metadata-id "Kinetics-6c" \
   --from-csv wise-data/Kinetics-6c/metadata.csv \
@@ -66,10 +66,10 @@ inserted 30 rows into table metadata-Kinetics-6c
 
 # Importing Metadata Stored in VISE
 The metadata stored in a project created using the VGG Image Search Engine
-([https://www.robots.ox.ac.uk/~vgg/software/vise/](VISE)) software can be
+([VISE](https://www.robots.ox.ac.uk/~vgg/software/vise/)) software can be
 imported into a WISE project as follows.
 
-```
+```bash
 # VISE project folder: /data/vise/1516ci/
 # WISE project folder: /data/wise/projects/1516ci/
 
