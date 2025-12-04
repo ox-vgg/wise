@@ -72,7 +72,24 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
         yield {"config": config}
         # Shutdown code
 
-    app = FastAPI(lifespan=lifespan)
+    app = FastAPI(
+        title="Wise API Server",
+        summary="Multi-modal search engine for audiovisual collections",
+        description="""
+        The WISE API Server provides access to a multi-modal search engine for large-scale audiovisual collections.
+        It supports searching using text queries, image queries, and sketch queries, as well as browsing and retrieving media content.
+        """,
+        contact={
+            "name": "WISE Team",
+            "email": "vgg-webmasters@robots.ox.ac.uk",
+            "url": "https://www.robots.ox.ac.uk/~vgg/software/wise/",
+        },
+        license_info={
+            "name": "Apache 2.0",
+            "url": "https://www.apache.org/licenses/LICENSE-2.0",
+        },
+        lifespan=lifespan,
+    )
 
     # Enable CORS for development mode
     # If you are running a dev server for the frontend React app,
