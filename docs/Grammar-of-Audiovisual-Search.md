@@ -15,7 +15,7 @@ audiovisual search is defined using the [syntax
 diagram](https://en.wikipedia.org/wiki/Syntax_diagram) shown below.
 
 <figure>
-  <img src="assets/audiovisual-search-syntax-diagram.svg">
+  <img src="../assets/audiovisual-search-syntax-diagram.svg">
 
   <figcaption>Figure 1: Syntax diagram defining the grammar of
   audiovisual search. To generate a sentence using this grammar,

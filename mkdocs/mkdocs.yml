@@ -39,7 +39,9 @@ plugins:
 nav:
   - WISE: README.md
   - Install: docs/Install.md
-  - User Guide: docs/UserGuide.md
+  - User Guide:
+    - docs/UserGuide.md
+    - docs/Processing-Large-Datasets.md
   - Developer Resources:
       - docs/Development.md
       - docs/Database.md
@@ -51,8 +53,6 @@ nav:
       - docs/Metadata.md
       - docs/Evaluation.md
       - Frontend: frontend/README.md
-      - Database: docs/Database.md
-      - docs/Processing-Large-Datasets.md
       - docs/Grammar-of-Audiovisual-Search.md
       - docs/Retrieval-Evaluation.md
       - docs/Search-Index-Evaluation.md
