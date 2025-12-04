@@ -9,10 +9,36 @@ variables:
 
 stages:
   - build
+  - pages
+
+pages:
+  stage: pages
+  image: python:latest
+  services: []
+  before_script:
+    - pip install pip --upgrade
+  script:
+    - pip install -r requirements-docs.txt
+    - mkdocs build --site-dir public
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - ~/.cache/ 
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  tags: 
+    - saas-linux-small-amd64
+
+.docker-rules:
+  rules:
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api")
 
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH == "wise2" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api")
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 default:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:26.1.4
@@ -47,11 +73,15 @@ build-wise:
         APP: [wise]
       - PLATFORM: [amd64, arm64]
         APP: [wise-cpu]
+  extends:
+    - .docker-rules
   tags: 
     - saas-linux-large-${PLATFORM}
 
 .push-manifest: &push-manifest
   stage: build
+  extends:
+    - .docker-rules
   script:
     - set -x
     - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/amd64
