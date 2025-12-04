@@ -28,11 +28,12 @@ fi
 TEST_ID="wikimedia-commons-25"
 VIDEO_FEATURE_ID1="mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
 VIDEO_FEATURE_ID2="deepinsight/insightface/buffalo_l/_unknown"
+#VIDEO_FEATURE_ID2="deepinsight/insightface/fal/AuraFace-v1"
 AUDIO_FEATURE_ID="microsoft/clap/2023/four-datasets"
 FAISS_INDEX_TYPE="IndexFlatIP"
 HTTP_SERVER_HOST="0.0.0.0"
 HTTP_SERVER_PORT="10001"
-MAX_POLL_SERVER_COUNT=15
+MAX_POLL_SERVER_COUNT=25
 NUM_WORKERS=2
 
 FEATURE_STORE="faiss" # options are: faiss, webdataset, numpy
@@ -233,11 +234,11 @@ fi
 response=$(curl -s -X GET -H "Content-Type: application/json" "${PROJECT_INFO_URL}")
 expected_project_name="${TEST_ID}"
 expected_video_targets=(
-    "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
-    "deepinsight/insightface/buffalo_l/_unknown"
+    "$VIDEO_FEATURE_ID1"
+    "$VIDEO_FEATURE_ID2"
 )
 expected_audio_targets=(
-    "microsoft/clap/2023/four-datasets"
+    "$AUDIO_FEATURE_ID"
 )
 
 project_name=$(echo "$response" | jq -r '.project_name')
@@ -402,7 +403,7 @@ if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
 fi
 
 # Test 5.5 : check if the server returns correct results (including metadata) for query on face
-if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
+if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ] || [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/fal/AuraFace-v1" ]; then
     FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
     FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
     if [ ! -f "${FACE_IMG_FILE}" ]; then
