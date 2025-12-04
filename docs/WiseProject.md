@@ -30,7 +30,7 @@ user@temp:/data/wise/Kinetics-7$ tree
 
 The `store` folder contains all the extracted features and their corresponding
 search index. The sub-folders of `store` represent the namespace of each feature
-extractor. The [WiseProject](src/wise_project.py) module manages this folder
+extractor. The [WiseProject](reference/wiseproject.md) module manages this folder
 and provides the full path of specific folders like `features`, or `index` as shown
 below.
 

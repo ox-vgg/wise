@@ -7,7 +7,7 @@ WISE uses [SQLAlchemy](https://www.sqlalchemy.org/) (Core API) to interact with 
 The diagram below shows the database schema. The table structures are defined [here](reference/datatables.md) and the validation models are defined [here](reference/datamodels.md)
 
 
-[![Database diagram](../assets/WISE%202%20internal%20metadata.svg)](https://dbdiagram.io/d/WISE-2-internal-metadata-65f3512eb1f3d4062cf6be68)
+[![Database diagram](assets/WISE%202%20internal%20metadata.svg)](https://dbdiagram.io/d/WISE-2-internal-metadata-65f3512eb1f3d4062cf6be68)
 
 In addition to the tables defined above, WISE stores the thumbnails as well in a separate database (`thumbs.db`) within the project folder. Thumbnails are explained in more detail [here](Thumbnails.md)
 

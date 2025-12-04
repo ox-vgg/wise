@@ -33,7 +33,7 @@ There are three main ways to update a WISE project:
 
 ## Aggregator
 The aggregator feature of WISE allows to present search results from multiple standalone WISE projects.
-The [tests/test-aggregator.sh](../tests/test-aggregator.sh) script shows an example of how to use this
+The `tests/test-aggregator.sh` script shows an example of how to use this
 feature on 3 sample projects based on the [aggregator-3](https://thor.robots.ox.ac.uk/wise/assets/test/aggregator-3.zip)
 dataset. Here is an example of how this feature can be used in general.
 

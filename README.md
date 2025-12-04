@@ -106,7 +106,7 @@ Here are some documents for users and developers of WISE.
   - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
   - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
   - [Frontend](frontend/README.md) : describes the frontend web-based interface
-  - [Database](src/db/README.md) : describes the structure of the internal metadata database, which stores information about the source collections (i.e. input folders), media files (e.g. images, videos, or audio files), vectors, and extra metadata
+  - [Database](docs/Database.md) : describes the structure of the internal metadata database, which stores information about the source collections (i.e. input folders), media files (e.g. images, videos, or audio files), vectors, and extra metadata
   - [Tests](docs/Tests.md) : describes the software testing process for WISE
 
 ## Contact

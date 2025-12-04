@@ -145,7 +145,7 @@ Recall1@N=1,K metric for reporting performance of PQ based ANN
 methods.
 
 * The reported recall values were obtained by averaging the recall
-values for the [following manually selected 60 search queries](data/index/search-queries.txt).
+values for the following manually selected 60 search queries - `data/index/search-queries.txt`.
 
 * For index IVF+PQ, the Index Parameters are given as a tuple
 `{m, nbits, nlist}` which indicates that each feature vector gets split
