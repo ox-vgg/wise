@@ -96,18 +96,18 @@ Visual Geometry Group ([VGG](https://www.robots.ox.ac.uk/~vgg/software/wise/)) a
 
 Here are some documents for users and developers of WISE.
 
-- [Install](docs/Install.md) : describes the process for installing WISE
-- [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
-- [Metadata](docs/Metadata.md) : describes support for text metadata search in WISE
-- Evaluation
-  - [Multi-Instance Video Retrieval](docs/Retrieval-Evaluation.md)
-- Developer Resources
-  - [Data Loading](docs/data-loading.md): describes interface for loading media files
-  - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
-  - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
-  - [Frontend](frontend/README.md) : describes the frontend web-based interface
-  - [Database](docs/Database.md) : describes the structure of the internal metadata database, which stores information about the source collections (i.e. input folders), media files (e.g. images, videos, or audio files), vectors, and extra metadata
-  - [Tests](docs/Tests.md) : describes the software testing process for WISE
+  - [Install](docs/Install.md) : describes the process for installing WISE
+  - [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
+  - [Metadata](docs/Metadata.md) : describes support for text metadata search in WISE
+  - Evaluation
+    - [Multi-Instance Video Retrieval](docs/Retrieval-Evaluation.md)
+  - Developer Resources
+    - [Data Loading](docs/data-loading.md): describes interface for loading media files
+    - [Feature Extractor](docs/FeatureExtractor.md) : guide for creating new feature extractors in WISE
+    - [FeatureStore](docs/FeatureStore.md) : describes the data structure containing the extracted features
+    - [Frontend](frontend/README.md) : describes the frontend web-based interface
+    - [Database](docs/Database.md) : describes the structure of the internal metadata database, which stores information about the source collections (i.e. input folders), media files (e.g. images, videos, or audio files), vectors, and extra metadata
+    - [Tests](docs/Tests.md) : describes the software testing process for WISE
 
 ## Contact
 
