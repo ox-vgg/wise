@@ -6,9 +6,11 @@ import contextlib
 from functools import cached_property
 import logging
 import os
+import os.path
 from dataclasses import dataclass
 from typing import Union
 
+import huggingface_hub
 import numpy as np
 import PIL.Image
 import sqlalchemy as sa
@@ -53,6 +55,11 @@ from ..db import project_metadata_obj
 
 
 _logger = logging.getLogger(__name__)
+
+
+def _default_insightface_models_dir():
+    root = os.path.expanduser("~/.insightface")
+    return os.path.join(root, "models")
 
 
 def rgb_nchw_to_bgr_nhwc(images: torch.Tensor) -> torch.Tensor:
@@ -206,15 +213,50 @@ class InsightFaceModel(MultiModalModel):
         ## FaceAnalysis() and FaceAnalysis.prepare() print to stdout
         ## which mess up our own stdout so we throw it away.
 
-        _logger.info(f"Initialising model {self.model_id}")
         # TODO - based on device, pass the current provider and provider options as kwargs
+
+        ## XXX: InsightFace is the Python package and comes with its
+        ## own model_zoo.  But it is also possible to use it with
+        ## weights from elsewhere, namely Hugging Face Hub which has
+        ## AuraFace (which is Apache 2).  The model id has four four
+        ## components (although at this point we already discarded the
+        ## first two elements).  We first assume that we are using
+        ## InsightFace own model_zoo (in which case we only use the
+        ## third element --- the fourth is ignored).  If that fails,
+        ## then we try the Hugging Face Hub with both elements.
+
+        _logger.info(f"Initialising model {self.model_id}")
+        insightface_model_id = self.model_id.split("/", maxsplit=1)[0]
+        huggingface_hub_model_id = self.model_id
+
+        def get_app(model_id):
+            return insightface.app.FaceAnalysis(
+                model_id,
+                allowed_modules=["detection", "recognition", "genderage"],
+            )
 
         with open(os.devnull, "w") as devnull:
             with contextlib.redirect_stdout(devnull):
-                _app = insightface.app.FaceAnalysis(
-                    self.model_id,
-                    allowed_modules=["detection", "recognition", "genderage"],
+                _logger.info(
+                    "Trying first with a model named '%s'",
+                    insightface_model_id
                 )
+                try:
+                    _app = get_app(insightface_model_id)
+                except:
+                    _logger.info(
+                        "model '%s' failed; trying '%s' from huggingface_hub",
+                        insightface_model_id,
+                        huggingface_hub_model_id
+                    )
+                    huggingface_hub.snapshot_download(
+                        huggingface_hub_model_id,
+                        local_dir=os.path.join(
+                            _default_insightface_models_dir(),
+                            huggingface_hub_model_id
+                        ),
+                    )
+                    _app = get_app(huggingface_hub_model_id)
                 _app.prepare(
                     ctx_id=0,
                     det_thresh=0.5,
@@ -285,6 +327,34 @@ class InsightFaceModel(MultiModalModel):
 
 
 class InsightFaceFeatureExtractor(FeatureExtractor):
+    """Feature extractor for InsightFace.
+
+    This feature extractor uses `InsightFace <https://insightface.ai>`
+    Python package (see also, `on github
+    <https://github.com/deepinsight/insightface>` and `on PYPI
+    <https://pypi.org/project/insightface/>`).  It can use the models
+    from InsightFace's own model zoo or compatible models from Hugging
+    Face Hub.
+
+    The `feature_id` argument is a four component string split with
+    the `"/"` character.  The initial two components are used
+    internally by Wise to identify this feature extractor and
+    therefore `feature_id` must start with
+    `"deepinsight/insightface/"`.  The remaining two components are
+    used to identify the actual model used.  This feature extractor
+    first tries to fetch a model with InsightFace's own model zoo
+    which only need one value while the fourth element is ignored.
+    For example, to use InsightFace's `buffalo_l` model, use::
+
+        deepinsight/insightface/buffalo_l/_  # the last element is ignored
+
+    If that fails, it uses both remaining components to download model
+    weights from Hugging Face Hub.  For example, to use AuraFace-v1
+    from FAL, use::
+
+        deepinsight/insightface/fal/AuraFace-v1
+
+    """
 
     ## InsightFace supports image only (no audio and no text)
     preprocess_text = None
@@ -331,7 +401,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
             and feature_id_parts[0] == "deepinsight"
             and feature_id_parts[1] == "insightface"
         ), f"Invalid feature-id: {feature_id}, an example of a valid feature-id is 'deepinsight/insightface/buffalo_l/_unknown'"
-        self.model_name = feature_id_parts[2]
+        self.model_name = "/".join(feature_id_parts[2:])
 
         self._embedding_dtype = np.float32
 
