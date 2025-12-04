@@ -1,6 +1,19 @@
+import os
 import tempfile
 import unittest
 
+# isort: off
+## InsightFace, which we will import below, imports albumentations
+## which by default checks on PyPI if the user is running the last
+## version and prints a warning if not.  This is a silly default, and
+## we want to disable it.  Upstream recommends libraries to disable
+## the check.  Refer to
+## https://github.com/albumentations-team/albumentations/issues/2206#issuecomment-2585905414
+## and https://github.com/deepinsight/insightface/pull/2849
+os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"  # disable version check
+# isort: on
+
+import insightface.data
 import numpy as np
 from sklearn.datasets import load_sample_image
 import torch
@@ -12,12 +25,6 @@ from .transformers_owlv2 import (
     sort_by_objectness,
 )
 from .feature_extractor_factory import FeatureExtractorFactory
-
-## Typically, imports from external libraries come before local
-## imports.  But insightface needs some care to import, already done
-## in ..feature.insightface, so we are importing it at the end to
-## avoid duplicating that mess.
-import insightface.data  # isort: skip
 
 
 class TestFeatureExtractor(unittest.TestCase):
