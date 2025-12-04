@@ -68,5 +68,7 @@ nav:
       - docs/reference/dataloading.md
       - docs/reference/repository.md
       - docs/reference/datatables.md
+      - docs/reference/featurestore.md
+      - docs/reference/searchindex.md
 
       
