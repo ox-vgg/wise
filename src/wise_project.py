@@ -52,6 +52,11 @@ def get_cte_from_ids(ids: list[int], label="media_id"):
 
 
 class WiseProject:
+    """
+    WISE Project class that encapsulates all operations related to a WISE project folder.
+
+
+    """
     def __init__(self, project_dir: Path, *, create_project=False, **kwargs):
         self.project_dir = Path(project_dir)
         self.store_dir = self.project_dir / "store"
@@ -75,22 +80,39 @@ class WiseProject:
 
     @property
     def name(self) -> str:
+        """
+        Return the project directory name.
+
+        """
         return self.project_dir.name
 
     @property
     def thumbs_uri(self) -> str:
+        """
+        Return the SQLAlchemy URI for the thumbnails database.
+
+        """
         return f"{DB_SCHEME}/{self.project_dir.absolute()}/thumbs.db"
 
     @property
     def dburi(self) -> str:
+        """
+        Return the SQLAlchemy URI for the main project database.
+        """
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
     @cached_property
     def db_engine(self):
+        """
+        Return the SQLAlchemy engine for the main project database.
+        """
         return wise_db.init_project(self.dburi, **self._db_kwargs)
 
     @cached_property
     def thumbsdb_engine(self):
+        """
+        Return the SQLAlchemy engine for the thumbnails database.
+        """
         return wise_db.init_thumbs(self.thumbs_uri, **self._thumbsdb_kwargs)
 
     @cached_property
@@ -838,14 +860,19 @@ class WiseProject:
 
     def get_vector_ext_metadata_for_ids(
         self, feature_extractor_id: str, ids: list[int]
-    ):
+    ) -> list:
         """
         Get the external metadata for a batch of vector ids.
 
-        Parameters
-        ----------
-        ids : list of int
-            List of vector ids
+        Args:
+            feature_extractor_id: The Feature Extractor ID associated with the vectors.
+            ids: A list of vector IDs for which to retrieve the external metadata.
+
+        Returns:
+            A list of external metadata corresponding to the provided vector IDs.
+
+        Raises:
+            ValueError: If the provided feature_extractor_id is unknown.
 
         """
         cls = get_feature_extractor_class(feature_extractor_id)

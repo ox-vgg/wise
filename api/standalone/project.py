@@ -53,7 +53,6 @@ def _get_range_header(range_header: str, file_size: int) -> tuple[int, int]:
     if start > end or start < 0 or end > file_size - 1:
         raise _invalid_range()
     return start, end
-    
 
 
 """
@@ -69,11 +68,11 @@ Provides
 
 router = APIRouter()
 
+
 @router.api_route(
     "/media/{media_id}",
-    response_class=Union[FileResponse, StreamingResponse],
     responses={404: {"content": "text/plain"}, 302: {}},
-    methods=['GET', 'HEAD'],
+    methods=["GET", "HEAD"],
 )
 def get_media_file(media_id: int, request: Request, config: ConfigDep, project_service: ProjectServiceDep):
     """
@@ -152,7 +151,6 @@ def get_media_file(media_id: int, request: Request, config: ConfigDep, project_s
 
 @router.get(
     "/thumbnail",
-    response_class=Response,
     responses={200: {"content": "image/jpeg"}, 404: {"content": "text/plain"}},
 )
 def get_thumbnail(config: ConfigDep, project_service: ProjectServiceDep, media_id: int, timestamp: float, high_res: bool = False):
@@ -180,9 +178,9 @@ def get_thumbnail(config: ConfigDep, project_service: ProjectServiceDep, media_i
             detail=f"Thumbnail for media_id {media_id} and timestamp {timestamp} not found!",
         )
 
+
 @router.get(
     "/storyboard/{_video_media_id}/{_partition}.jpg",
-    response_class=Response,
     responses={
         200: {"content": "image/jpeg"},
         404: {"content": "application/json"},
@@ -193,7 +191,7 @@ def get_storyboard_image(_video_media_id: int, _partition: int, project_service:
     # For videos longer than 30 minutes, reduce the frequency of thumbnails to 1 every 4 seconds
     num_seconds_per_image = 2 if project_info.num_thumbnails < (2 * 30 * 60) else 4
     try:
-    
+
         storyboard = project_service.get_thumbnail_spritesheet(
             _video_media_id, num_seconds_per_image, _partition
         )
@@ -213,9 +211,9 @@ def get_storyboard_image(_video_media_id: int, _partition: int, project_service:
             detail=f"Thumbnails not found for media_id={_video_media_id} partition: {_partition}!",
         )
 
+
 @router.get(
     "/storyboard/{_video_media_id}.vtt",
-    response_class=JSONResponse,
     responses={
         200: {"content": "text/vtt"},
         404: {"content": "application/json"},
@@ -260,7 +258,7 @@ def get_metadata(_id: int, project_service: ProjectServiceDep):
         return MediaMetadata(**media_metadata.model_dump(exclude={'source_collection'}))
     except MediaNotFoundException:
         raise HTTPException(status_code=404, detail=f"Metadata not found!")
-    
+
 @router.get(
     "/related-vectors/{_vector_id}",
     response_model=list[common.VectorInfo],
@@ -293,4 +291,3 @@ def get_related_vectors(_vector_id: int, project_service: ProjectServiceDep):
 @router.get("/info")
 def get_info(project_info: ProjectInfoDep):
     return project_info.model_dump(by_alias=True)
-

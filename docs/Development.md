@@ -12,17 +12,31 @@ Here are some notes for developers:
 - If there is a dependency, Keep initilisation (factory, constructor, etc) separate from the dependent class / function which uses it. This enables dependency injection from top level based on config passed by user.
 - Add a test that shows how to initialise and use a feature. Tests will complement the documentation and code is likely to be more up-to-date than text strings
 
+## Documentation
 
-### Profiling the API
+We use mkdocs and mkdocstrings for our documentation. You can install the dependencies using `pip install -r requirements-docs.txt`. During development, you can run the live docs server using
+```bash
+mkdocs serve -f mkdocs/mkdocs.yml -a localhost:8000
+```
+
+To build the documentation
+```bash
+mkdocs build -f mkdocs/mkdocs.yml --site-dir public
+```
+
+This creates a folder `mkdocs/public` which contains the statically built version (which is also published to our gitlab pages, when a new commit is added to wise2)
+
+
+## Profiling the API
 
 [PyInstrument](https://pyinstrument.readthedocs.io/en/latest/home.html) is used to help profile the API requests in development mode. It is added as a middleware.
 
-#### Setup
+### Setup
 ```
 pip install pyinstrument
 ```
 
-#### Usage
+### Usage
 
 Serve the project with the flag `MODE=development` and `ENABLE_PROFILING=1` and Add `profile=1` to the API request as query param
 

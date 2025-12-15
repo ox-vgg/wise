@@ -19,7 +19,7 @@ First, we create a new file [src/feature/random_features.py] and create an
 implementation of a feature extractor that returns a random 512 dimensional 
 vector for any input.
 
-```
+```python
 # File: src/feature/random_features.py
 import torch
 import numpy as np
@@ -87,7 +87,7 @@ class RandomFeatures(FeatureExtractor):
 Next, we register this newly created feature extractor in WISE by updating the
 [src/feature/feature_extractor_factory.py] as follows.
 
-```
+```python
 # File: src/feature/feature_extractor_factory.py
 ...
 from .random_features import RandomFeatures
@@ -108,7 +108,7 @@ Now, you can use this newly created feature extractor in the WISE software. Here
 is an example of how we can use the `RandomFeatures` feature extractor in a 
 new WISE project.
 
-```
+```bash
 # Assumption: The WISE software dependencies are already installed
 
 ## 1. Download sample videos

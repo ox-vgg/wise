@@ -4,7 +4,7 @@ We use the [wikimedia-commons-25](https://thor.robots.ox.ac.uk/wise/assets/test/
 functionalities of the WISE software. This dataset contains only 25 videos sourced from [Wikimedia Commons]() repository and therefore the 
 full test completes in less than 1 minute. This test can be executed as follows.
 
-```
+```bash
 # 1. Clone WISE code repository
 cd $HOME
 git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
@@ -29,7 +29,7 @@ bash tests/test-aggregator.sh $HOME/temp/
 ```
 
 Here is a sample output obtained by executing the test based on videos.
-```
+```bash
 ...
 Extracting features from videos (takes about 3 min.) ...
 ...
@@ -54,7 +54,7 @@ Test 5.4 PASSED
 ```
 
 Here is a sample output obtained by executing the test based on images.
-```
+```bash
 Starting tests for wikimedia-commons-images-25 ...
 Skipping test dataset download
 Test 3.1 PASSED
@@ -74,7 +74,7 @@ Test 5.3 PASSED
 ```
 
 Here is a sample output obtained by executing the test based on edited videos (with shots).
-```
+```bash
 Starting tests for wikimedia-commons-edited-videos ...
 ...
 Test 7.1 PASSED
@@ -88,7 +88,7 @@ Test 8.3 PASSED
 
 To use the triton inference server, run tests with the `FEATURE_EXTRACTOR_CONFIG` 
 environment variable defined as follows:
-```
+```bash
 export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}" 
 bash test-wikimedia-commons-25.sh  $HOME/temp/
 bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
@@ -98,7 +98,7 @@ bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
 The aggregator feature enables WISE to aggregate search response from multiple standalone 
 WISE projects. The aggregator feature can be tested as follows:
 
-```
+```bash
 export FEATURE_EXTRACTOR_CONFIG='{
     "default": {
         "url": "localhost:8801"
@@ -112,7 +112,7 @@ bash tests/test-aggregator.sh $HOME/temp/
 
 This test takes around 30 minutes to generate the four test projects named `1`, `2`, `3`, and `123`.
 Here is a sample output obtained by executing the test based on the [aggregator-3](https://thor.robots.ox.ac.uk/wise/assets/test/aggregator-3.zip) dataset.
-```
+```bash
 Starting tests for aggregator-3 ...
 ...
 Started server for 1 on port 10001 with PID 1098030

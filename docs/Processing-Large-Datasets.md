@@ -10,7 +10,7 @@ of videos using the WISE software tool.
 - A video may contain multiple audio streams. The English language audio stream is selected using the `-map 0:a:m:language:eng` flag.
 - Videos may have non-square pixels. For more details, see [this discussion](https://gitlab.com/vgg/wise/wise/-/issues/175). The `-vf "scale=trunc($VIDEO_HEIGHT*dar/2)*2:$VIDEO_HEIGHT,setsar=1"` flag resizes videos to a height of `512px` and sets the pixel aspect ratio to `1.0`.
 
-```
+```bash
 export VIDEO_HEIGHT=512
 ffmpeg -threads 8 -fflags +genpts+discardcorrupt -err_detect ignore_err \
     -i "input.mp4" \
@@ -29,7 +29,7 @@ ffmpeg -threads 8 -fflags +genpts+discardcorrupt -err_detect ignore_err \
 
 We first extract the audio features because it is faster to extract audio features as compared to visual features. The generated WISE project (containing only audio features) is then used to compute the shot boundaries.
 
-```
+```bash
 CUDA_VISIBLE_DEVICES=0 python extract-features.py \
     "/data/all_videos/" \
     --media-include "*.mp4" \
@@ -43,7 +43,7 @@ CUDA_VISIBLE_DEVICES=0 python extract-features.py \
 ```
 
 ## 3. Compute shot boundaries (only for edited videos)
-```
+```bash
 cd ~/code
 git clone git@gitlab.com:vgg/wise/shot-detection.git
 cd ~/code/shot-detection
@@ -71,7 +71,7 @@ python3 media-metadata.py \
 ```
 
 ## 4. Extract visual features
-```
+```bash
 CUDA_VISIBLE_DEVICES=0 python extract-features.py \
     --yes \
     --media-include "*.mp4" \
@@ -86,7 +86,7 @@ CUDA_VISIBLE_DEVICES=0 python extract-features.py \
 ```
 
 ## 5. Classify each shot into following shot scale types {'extreme close-up', 'close-up', 'medium shot', 'full shot', 'long shot'}
-```
+```bash
 git clone https://gitlab.com/vgg/wise/shot-scale-classifier.git
 cd $HOME/shot-scale-classifier
 micromamba create -n shot-scale-classifier python=3.12 -y

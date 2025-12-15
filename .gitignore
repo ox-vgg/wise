@@ -44,3 +44,7 @@ __pycache__/
 # huggingface
 hub/
 # trivial change to trigger test pipeline
+
+/site/
+/public/
+/mkdocs/public/

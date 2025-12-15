@@ -44,3 +44,5 @@ frontend/dist/
 *.swo
 *.swp
 
+/site/
+/public/

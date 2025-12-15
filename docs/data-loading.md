@@ -82,12 +82,13 @@ for id, chunks in stream:
 
 ## Code organisation
 
-- [`__init__.py`](../src/dataloader/__init__.py): Defines the public methods and classes exported by the module
+See [Reference: Data loading](reference/dataloading.md) module
+- `__init__.py`: Defines the public methods and classes exported by the module
 
-- [`__main__.py`](../src/dataloader/__init__.py): Module script that provides a CLI to test the features of the dataloader in isolation.
+- `__main__.py`: Module script that provides a CLI to test the features of the dataloader in isolation.
 
-- [dataset.py](../src/dataloader/dataset.py): Wrapper around the torch IterableDataset. Provides an interface to read data from the media files and apply the required transformations. The data is returned as torch Tensors, along with the presentation timestamp. Convenience wrappers based on modality (image, video, audio, audio-visual) are also provided.
+- `dataset.py`: Wrapper around the torch IterableDataset. Provides an interface to read data from the media files and apply the required transformations. The data is returned as torch Tensors, along with the presentation timestamp. Convenience wrappers based on modality (image, video, audio, audio-visual) are also provided.
 
-- [streamreader.py](../src/dataloader/streamreader.py): Wrapper around StreamReader (a.k.a StreamingMediaDecoder) functionality. Provides functions for reading metadata about the media file and creating an instance of StreamReader with the provided output stream options.
+- `streamreader.py`: Wrapper around StreamReader (a.k.a StreamingMediaDecoder) functionality. Provides functions for reading metadata about the media file and creating an instance of StreamReader with the provided output stream options.
 
-- [utils.py](../src/dataloader/utils.py): Utility functions used internally
+- `utils.py`: Utility functions used internally

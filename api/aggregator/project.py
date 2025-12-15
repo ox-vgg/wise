@@ -32,8 +32,7 @@ async def get_related_vectors(_vector_id: int, media_id: str, projects: ProjectS
 
 @router.api_route(
     "/shard/{shard_id}/{full_path:path}",
-    response_class=StreamingResponse,
-    methods=['GET', 'HEAD'],
+    methods=["GET", "HEAD"],
 )
 async def forward(shard_id: str, full_path: str, request: Request,  projects: ProjectServiceDep):
     """
