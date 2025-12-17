@@ -50,6 +50,10 @@ def main(
         None,
         help="The faiss index to use for serving"
     ),
+    proxy_root_path: str = typer.Option(
+        "",
+        help="The root path where the app is being served behind a proxy",
+    ),
 ):
     # ensure that the frontend assets are built
     if not Path(theme_asset_dir / 'index.html').exists():
@@ -63,6 +67,7 @@ def main(
         project_dir,
         theme_asset_dir,
         index_type.value if index_type else None,
+        proxy_root_path=proxy_root_path,
     )
 
 

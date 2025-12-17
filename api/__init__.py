@@ -158,6 +158,7 @@ def serve(
     project_dir: Path,
     theme_asset_dir: Path,
     index_type: Optional[str] = None,
+    proxy_root_path: str = "",
 ):
     options = {"command": "serve"}
     options = options | ({"project_dir": project_dir} if project_dir else {})
@@ -167,4 +168,10 @@ def serve(
     config = APIConfig.model_validate(options)  # type: ignore
 
     app = create_app(config, theme_asset_dir)
-    uvicorn.run(app, host=config.listen_address, port=config.port, log_level="info")
+    uvicorn.run(
+        app,
+        host=config.listen_address,
+        port=config.port,
+        log_level="info",
+        root_path=proxy_root_path,
+    )
