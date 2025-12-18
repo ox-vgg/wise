@@ -105,6 +105,7 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
             "url": "https://www.apache.org/licenses/LICENSE-2.0",
         },
         lifespan=lifespan,
+        root_path_in_servers=False,
     )
 
     # Enable CORS for development mode
