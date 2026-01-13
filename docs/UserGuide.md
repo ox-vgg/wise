@@ -14,7 +14,7 @@ audio and visual search capabilities of WISE.
 # We assume that the current directory contains
 # the WISE software source tree.
 mkdir -p wise-data/Kinetics-6
-curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/Kinetics-6.tar.gz"
+curl -sLO "https://thor.robots.ox.ac.uk/wise/assets/test/Kinetics-6.tar.gz"
 tar -zxvf Kinetics-6.tar.gz -C wise-data/Kinetics-6
 ```
 
