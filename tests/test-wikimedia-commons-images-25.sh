@@ -32,12 +32,18 @@ IMAGE_FEATURE_ID3="transformers/owlv2/google/owlv2-large-patch14-ensemble"
 FAISS_INDEX_TYPE="IndexFlatIP"
 HTTP_SERVER_HOST="0.0.0.0"
 HTTP_SERVER_PORT="10001"
-MAX_POLL_SERVER_COUNT=15
-CUDA_VISIBLE_DEVICES=1
+MAX_POLL_SERVER_COUNT=25
+CUDA_VISIBLE_DEVICES=0
 NUM_WORKERS=2
 
 FEATURE_STORE="faiss" # options are: faiss, webdataset, numpy
 EXTENSION="faiss" # options are: faiss, tar, npy
+
+FEATURE_EXTRACTOR_CONFIG="{
+    \"${IMAGE_FEATURE_ID3}\": {
+        \"objectness_threshold\": 0.10
+    }
+}"
 
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
@@ -102,7 +108,9 @@ fi
 if [ ! -d "${WISE_PROJECT_DIR}" ]; then
     echo "Extracting features from videos using ${NUM_WORKERS} workers (takes about 3 min.) ..."
     cd "${WISE_CODE_DIR}"
-    CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES python extract-features.py \
+    CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES \
+    FEATURE_EXTRACTOR_CONFIG="$FEATURE_EXTRACTOR_CONFIG" \
+    python extract-features.py \
            "${TEST_DATA_DIR}" \
            --media-include "*.jpg" \
            --shard-maxcount 128 \
@@ -276,8 +284,7 @@ for expected in "${expected_targets[@]}"; do
 done
 echo "Test 5.2b PASSED"
 
-
-# Test 5.3 : check if the server returns correct results for metadata search
+# Test 5.3 : metadata search
 METADATA_SEARCH_QUERY="church"
 RESULT_COUNT=3
 SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=wise/metadata&text_queries=${METADATA_SEARCH_QUERY}"
@@ -317,9 +324,109 @@ else
     exit 1
 fi
 
-# Test 5.4 : check if the server returns correct results for face search
+# Test 5.4 : face search
+if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
+    FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
+    FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Downloading face image to ${FACE_IMG_FILE} ..."
+        curl -sLO "${FACE_IMG_URL}"
+        mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
+    fi
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Failed to download face image from ${FACE_IMG_URL}"
+        exit 1
+    fi
+    RESULT_COUNT=3
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID2}"
+    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    response_selected_json=$(echo "$response" | jq -c '. as $root | {
+      results: (
+        .image_results.vectors |
+        map(
+          .media_id as $id |
+          {
+            filename: $root.image_results.images[$id].filename,
+            source_url: $root.image_results.images[$id].external_metadata.source_url
+          }
+        )
+      )
+    }')
+    expected_json='{
+      "results": [
+        {
+          "filename": "960px-Christy_Turlington_at_the_2024_Toronto_International_Film_Festival.jpg",
+          "source_url": "https://en.wikipedia.org/wiki/File:Christy_Turlington_at_the_2024_Toronto_International_Film_Festival.jpg"
+        },
+        {
+          "filename": "Ed_Burns,_Christy_Turlington_at_27_Dresses_Premiere_1.jpg",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Ed_Burns,_Christy_Turlington_at_27_Dresses_Premiere_1.jpg"
+        },
+        {
+          "filename": "500px-Christie_Turlington_2000.jpg",
+          "source_url": "https://en.wikipedia.org/wiki/File:Christie_Turlington_2000.jpg"
+        }
+      ]
+    }'
 
-# Test 5.5 : check if the server returns correct results for object search
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test 5.4 PASSED"
+    else
+        echo "Test 5.4 FAILED: unexpected face image search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
+fi
+
+# Test 5.5 : object search
+if [ "$IMAGE_FEATURE_ID3" == "transformers/owlv2/google/owlv2-large-patch14-ensemble" ]; then
+    RESULT_COUNT=3
+    # http://localhost:10001/wikimedia-commons-images-25/search?start=0&end=500&thumbs=1&search_in=image&feature_extractor_id=transformers/owlv2/google/owlv2-large-patch14-ensemble&text_queries=bird
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID3}&text_queries=bird"
+    response=$(curl -s -X POST "${SEARCH_URL}")
+    response_selected_json=$(echo "$response" | jq -c '. as $root | {
+      results: (
+        .image_results.vectors |
+        map(
+          .media_id as $id |
+          {
+            filename: $root.image_results.images[$id].filename,
+            source_url: $root.image_results.images[$id].external_metadata.source_url,
+          }
+        )
+      )
+    }')
+    expected_json='{
+      "results": [
+        {
+          "filename": "960px-Merisk_-_Eurasian_oystercatcher_-_Haematopus_ostralegus_(1)_copy.jpg",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Merisk_-_Eurasian_oystercatcher_-_Haematopus_ostralegus_(1)_copy.jpg"
+        },
+        {
+          "filename": "960px-Merisk_-_Eurasian_oystercatcher_-_Haematopus_ostralegus_(1)_copy.jpg",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Merisk_-_Eurasian_oystercatcher_-_Haematopus_ostralegus_(1)_copy.jpg"
+        },
+        {
+          "filename": "960px-Puffin_(Fratercula_arctica)_with_lesser_sand_eels_(Ammodytes_tobianus).jpg",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Puffin_(Fratercula_arctica)_with_lesser_sand_eels_(Ammodytes_tobianus).jpg"
+        }
+      ]
+    }'
+
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test 5.5 PASSED"
+    else
+        echo "Test 5.5 FAILED: unexpected object search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
+fi
 
 end_time=`date +%s`
 elapsed_time=$((end_time-start))
