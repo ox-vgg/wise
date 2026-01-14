@@ -118,7 +118,7 @@ Step by step instructions to reproduce the project from scratch
 ```bash
 export BASEDIR=$HOME
 cd $BASEDIR
-git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
+git clone https://gitlab.com/vgg/wise/wise.git
 cd $BASEDIR/wise/
 HOST_UID=$(id -u $USER) HOST_GID=$(id -g $USER) envsubst < .env.template > .env
 export COMPOSE_FILE=scripts/cinephile/compose.yml

@@ -1,5 +1,5 @@
 # Metadata
-WISE2 aims to support the following four types of metadata.
+WISE aims to support the following four types of metadata.
 
 | Type of Metadata | Reserved Column Names in Metadata Table | Description |
 |------------------|-----------------------------------------|-------------|

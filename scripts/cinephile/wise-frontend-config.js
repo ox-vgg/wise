@@ -20,7 +20,7 @@ const productionConfig = {
     `,
     ABOUT: `
      <p>This audiovisual search engine is based on the WISE Search Engine (<a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">WISE</a>) software developed and maintained by the Visual Geometry Group (<a href="https://www.robots.ox.ac.uk/~vgg/">VGG</a>) of Department of Engineering Science at University of Oxford.</p>
-     <p>More details about WISE can be found in the <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">project page</a> and the <a href="https://gitlab.com/vgg/wise/wise/-/tree/wise2/">code repository</a>.</p>
+     <p>More details about WISE can be found in the <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">project page</a> and the <a href="https://gitlab.com/vgg/wise/wise/-/tree/main/">code repository</a>.</p>
     `,
     DISCLAIMER: `
       <p>The media showcased in this demo are for research purposes only. All rights to the original content are held by their respective copyright owners.</p>

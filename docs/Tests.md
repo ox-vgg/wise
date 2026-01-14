@@ -7,7 +7,7 @@ full test completes in less than 1 minute. This test can be executed as follows.
 ```bash
 # 1. Clone WISE code repository
 cd $HOME
-git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
+git clone https://gitlab.com/vgg/wise/wise.git
 
 # 2. Activate virtual environment with all required python dependencies
 cd $HOME/wise/

@@ -24,7 +24,7 @@ To build the documentation
 mkdocs build -f mkdocs/mkdocs.yml --site-dir public
 ```
 
-This creates a folder `mkdocs/public` which contains the statically built version (which is also published to our gitlab pages, when a new commit is added to wise2)
+This creates a folder `mkdocs/public` which contains the statically built version (which is also published to our gitlab pages, when a new commit is added to main)
 
 
 ## Profiling the API

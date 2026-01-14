@@ -11,7 +11,7 @@ To install WISE, we first download the WISE source code.
 The latest stable release of WISE is available at https://gitlab.com/vgg/wise/wise/-/releases .
 
 ```
-## 1. Download the latest release and extract the WISE2 code
+## 1. Download the latest release and extract the WISE code
 curl -sLO https://gitlab.com/vgg/wise/wise/-/archive/wise-2.1.0/wise-wise-2.1.0.zip
 unzip wise-wise-2.1.0.zip
 mv wise-wise-2.1.0 wise-2.1.0

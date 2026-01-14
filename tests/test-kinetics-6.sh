@@ -24,12 +24,12 @@ start=`date +%s`
 
 ## 1. fetch WISE code
 if [ ! -d "${CODE_DIR}" ]; then
-    echo "Downloading WISE2 code to ${CODE_DIR} ..."
+    echo "Downloading WISE to ${CODE_DIR} ..."
     mkdir -p "${CODE_BASEDIR}"
     cd "${CODE_BASEDIR}"
-    git clone -b wise2 https://gitlab.com/vgg/wise/wise.git
+    git clone https://gitlab.com/vgg/wise/wise.git
 else
-    echo "Updating WISE2 code in ${CODE_DIR} ..."
+    echo "Updating WISE in ${CODE_DIR} ..."
     cd "${CODE_DIR}"
     if [ "$#" -eq 2 ] && [ "${2}" = "NO-GIT-PULL" ]; then
         echo "Skipping git pull on user request"
@@ -43,7 +43,7 @@ if ! command -v ffmpeg &> /dev/null; then
     exit
 fi
 
-## 2. Install WISE2 dependencies
+## 2. Install WISE dependencies
 export HF_HOME=$HUGGINGFACE_HOME
 if [ ! -d "${ENV_DIR}" ]; then
     echo "Creating python venv in ${ENV_DIR} ..."
@@ -66,9 +66,9 @@ else
     echo "Skipping Kinetics-6 dataset download"
 fi
 
-## 4. Run WISE2 tests
+## 4. Run WISE tests
 #if [ -d "${TEST_DIR}" ]; then
-#    echo "WISE2 test data directory already exists"
+#    echo "WISE test data directory already exists"
 #    echo "To run tests, delete the folder ${TEST_DIR}"
 #    exit
 #fi

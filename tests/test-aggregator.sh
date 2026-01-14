@@ -1,22 +1,22 @@
 #!/bin/bash
 
 if [ "$#" -ne 1 ]; then
-    echo "This script tests the functionality of WISE2 software's aggregator feature which"
+    echo "This script tests the functionality of WISE software's aggregator feature which"
     echo "enables WISE to aggregate search response from multiple standalone WISE projects."
     echo ""
     echo "Usage: bash tests/${0} TMP_DIR"
     echo ""
     echo "where, the assumptions are:"
     echo "  - The virtual environment containing all the required python packages is already activated."
-    echo "  - The WISE2 code is already cloned to the current directory."
+    echo "  - The WISE code is already cloned to the current directory."
     echo ""
-    echo "For example, if you have cloned the WISE2 repository to $HOME/wise, run the following commands:"
+    echo "For example, if you have cloned the WISE repository to $HOME/wise, run the following commands:"
     echo "    1. cd $HOME/wise/"
     echo "    2. source .../bin/activate"
     echo "    3. bash ${0} /tmp/wise-test/"
     echo ""
     echo "The TMP_DIR will contain everything (test data, wise project, etc.) required by this script to run the tests."
-    echo "In the final stage, this script will start the WISE2 server and run a series of tests to verify the installation."
+    echo "In the final stage, this script will start the WISE server and run a series of tests to verify the installation."
     exit
 fi
 
@@ -79,7 +79,7 @@ done
 REQUIRED_PYTHON_SCRIPTS=(extract-features.py media-metadata.py create-index.py serve.py)
 for script in "${REQUIRED_PYTHON_SCRIPTS[@]}"; do
     if [ ! -f "${script}" ]; then
-        echo "$script not found, please run this script from the WISE2 code directory"
+        echo "$script not found, please run this script from the WISE code directory"
         exit 1
     fi
 done

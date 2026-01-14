@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ "$#" -ne 1 ]; then
-    echo "This script tests the functionality of WISE2 software using the Wikimedia Commons Edited Videos dataset"
+    echo "This script tests the functionality of WISE software using the Wikimedia Commons Edited Videos dataset"
     echo "which contains edited videos (i.e. with shots) taken from the Wikimedia Commons repository. This test is"
     echo "is designed to mainly test: (a) incremental extraction of features, and (b) sampling video frames based on the shots."
     echo ""
@@ -9,15 +9,15 @@ if [ "$#" -ne 1 ]; then
     echo ""
     echo "where, the assumptions are:"
     echo "  - The virtual environment containing all the required python packages is already activated."
-    echo "  - The WISE2 code is already cloned to the current directory."
+    echo "  - The WISE code is already cloned to the current directory."
     echo ""
-    echo "For example, if you have cloned the WISE2 repository to $HOME/wise, run the following commands:"
+    echo "For example, if you have cloned the WISE repository to $HOME/wise, run the following commands:"
     echo "    1. cd $HOME/wise/"
     echo "    2. source .../bin/activate"
     echo "    3. bash ${0} /tmp/wise-test/"
     echo ""
     echo "The TMP_DIR will contain everything (test data, wise project, etc.) required by this script to run the tests."
-    echo "In the final stage, this script will start the WISE2 server and run a series of tests to verify the installation."
+    echo "In the final stage, this script will start the WISE server and run a series of tests to verify the installation."
     exit
 fi
 
@@ -66,7 +66,7 @@ done
 REQUIRED_PYTHON_SCRIPTS=(extract-features.py media-metadata.py create-index.py serve.py)
 for script in "${REQUIRED_PYTHON_SCRIPTS[@]}"; do
     if [ ! -f "${script}" ]; then
-        echo "$script not found, please run this script from the WISE2 code directory"
+        echo "$script not found, please run this script from the WISE code directory"
         exit 1
     fi
 done
@@ -299,7 +299,7 @@ else
     echo "Test 6.2 PASSED"
 fi
 
-## 7 Start WISE2 server
+## 7 Start WISE server
 # Define cleanup function to run on Ctrl+C
 cleanup() {
     echo -e "\nCaught Ctrl+C. Shutting down server..."
@@ -312,7 +312,7 @@ if [ ! -d "frontend/dist" ]; then
         (cd frontend && npm ci && npm run build)
 fi
 
-echo "Starting WISE2 server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} ( takes about 1 min.) ..."
+echo "Starting WISE server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} ( takes about 1 min.) ..."
 cd "${WISE_CODE_DIR}"
 USE_SHOTS=1 LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
         --index-type "${FAISS_INDEX_TYPE}" \

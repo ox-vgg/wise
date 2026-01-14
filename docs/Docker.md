@@ -11,8 +11,8 @@ On Windows, GPU support for docker containers is available through the WSL2 back
 ## Setup
 
 ```bash
-git clone -b wise2 https://gitlab.com/vgg/wise/wise.git wise2
-cd wise2
+git clone https://gitlab.com/vgg/wise/wise.git
+cd wise
 HOST_UID=$(id -u $USER) HOST_GID=$(id -g $USER) envsubst < .env.template > .env
 ```
 
