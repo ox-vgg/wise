@@ -2,12 +2,10 @@ from pathlib import Path
 import enum
 
 from .webdataset_store import WebdatasetStore
-from .numpy_save_store import NumpySaveStore
 from .faiss_store import FaissStore
 
 class FeatureStoreType(str, enum.Enum):
     WEBDATASET = "webdataset"
-    NUMPY = "numpy"
     FAISS = "faiss"
 
 class FeatureStoreFactory:
@@ -15,8 +13,6 @@ class FeatureStoreFactory:
     def create_store(cls, feature_store_type: FeatureStoreType, media_type, features_dir):
         if feature_store_type == FeatureStoreType.WEBDATASET:
             return WebdatasetStore(media_type, features_dir)
-        elif feature_store_type == FeatureStoreType.NUMPY:
-            return NumpySaveStore(media_type, features_dir)
         elif feature_store_type == FeatureStoreType.FAISS:
             return FaissStore(media_type, features_dir)
         else:
@@ -36,8 +32,6 @@ class FeatureStoreFactory:
         shard_suffix = shard_suffixes.pop()
         if shard_suffix == '.tar':
             return WebdatasetStore(media_type, features_dir)
-        elif shard_suffix == '.npz':
-            return NumpySaveStore(media_type, features_dir)
         elif shard_suffix == ".faiss":
             return FaissStore(media_type, features_dir)
         else:
