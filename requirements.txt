@@ -1,27 +1,27 @@
 # List of dependencies for users using pip
+accelerate
 alembic~=1.13.0
 beautifulsoup4~=4.12.2
 braceexpand~=0.1.7
 fastapi[all]~=0.110.1
-pydantic~=2.7.0
-pydantic-settings~=2.2.1
+filetype~=1.2.0
 h5py==3.11.0
 httpx[http2]~=0.27.0
 imageio~=2.34.0
+insightface
+msclap~=1.3.4  #
+numpy==1.26.4
+onnxruntime-gpu  # undeclared dependency of insightface
 open_clip_torch~=2.31
+pandas==2.2.2
+pydantic-settings~=2.2.1
+pydantic~=2.7.0
+python-magic~=0.4.27
+scikit-learn
 sqlalchemy~=2.0.42
 tqdm~=4.66.2
 transformers~=4.51.3
+tritonclient[all]
 typer~=0.12.3
 webdataset~=0.2.86
-insightface
-onnxruntime-gpu  # undeclared dependency of insightface
-numpy==1.26.4
-pandas==2.2.2
-scikit-learn
-python-magic~=0.4.27
-filetype~=1.2.0
 webvtt-py
-msclap~=1.3.4
-tritonclient[all]
-accelerate

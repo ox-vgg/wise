@@ -1,4 +1,4 @@
-mkdocs-material
-mkdocs-autorefs
-mkdocstrings[python]
 griffe-typingdoc
+mkdocs-autorefs
+mkdocs-material
+mkdocstrings[python]

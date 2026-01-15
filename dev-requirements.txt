@@ -1,6 +1,6 @@
+bump-pydantic
 httpx[cli]
-pytest
 jupyter-console
 matplotlib
-bump-pydantic
 pyinstrument
+pytest
