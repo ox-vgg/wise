@@ -3,7 +3,7 @@ accelerate
 alembic~=1.13.0
 beautifulsoup4~=4.12.2
 braceexpand~=0.1.7
-fastapi[all]~=0.110.1
+fastapi[all]~=0.110.1  # [all] required for Starlette's schema generation
 filetype~=1.2.0
 h5py==3.11.0
 httpx[http2]~=0.27.0
