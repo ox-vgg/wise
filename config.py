@@ -9,7 +9,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from typing import Literal, Set, Optional
+from typing import Literal, Optional
 from pathlib import Path
 
 class APIConfig(BaseSettings):
@@ -47,9 +47,9 @@ class APIConfig(BaseSettings):
     negative_queries_weight: float = 0.2
     index_type: str = "IndexFlatIP"
     nprobe: int = 1024
-    query_blocklist: Set[str] = set()
+    query_blocklist: set[str] = set()
     project_dir: Path
-    remote_projects: Set[str] = set()
+    remote_projects: set[str] = set()
     thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
 
     # If you want to serve the media files from a different static file server,
