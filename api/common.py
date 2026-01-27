@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Annotated, Callable, Awaitable
+from typing import Optional, Dict, Annotated, Callable, Awaitable
 import base64
 import functools
 import time
@@ -70,19 +70,19 @@ class VideoSegment(VectorResult):
 
 class VideoAudioResults(BaseModel):
     total: int # maximum number of unmerged_windows that can be returned
-    unmerged_windows: List[VideoSegment] # e.g. 7-second windows
-    merged_windows: List[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
+    unmerged_windows: list[VideoSegment] # e.g. 7-second windows
+    merged_windows: list[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
     videos: Dict[str, VideoInfo]
 
 class VideoResults(BaseModel):
     total: int # maximum number of unmerged_windows that can be returned
-    unmerged_windows: List[VideoSegment] # frames (CLIP) or unmerged 4-second segments (InternVideo/LanguageBind)
-    merged_windows: List[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
+    unmerged_windows: list[VideoSegment] # frames (CLIP) or unmerged 4-second segments (InternVideo/LanguageBind)
+    merged_windows: list[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
     videos: Dict[str, VideoInfo]
 
 class ImageResults(BaseModel):
     total: int # maximum number of images that can be returned e.g. min(1000, num_images_in_project)
-    vectors: List[ImageVector]
+    vectors: list[ImageVector]
     images: Dict[str, ImageInfo]
 
 class SearchResponse(BaseModel):

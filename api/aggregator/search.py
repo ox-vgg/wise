@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import List
 from .. import common
 from ..services.embedding import EmbeddingConfig
 
@@ -63,21 +62,21 @@ async def handle_post_search_multimodal(
     search_in: MediaType = Query(),
     feature_extractor_id: str = Query(),
     # Positive queries
-    text_queries: List[str] = Query(default=[]),
-    image_file_queries: List[bytes] = File([]),  # user-uploaded images
-    audio_file_queries: List[bytes] = File([]),  # user-uploaded audio files
-    image_url_queries: List[str] = Form([]),  # URLs to online images
-    audio_url_queries: List[str] = Form([]),  # URLs to online audio files
-    internal_image_queries: List[str] = Query(default=[]),  # ids to internal images
+    text_queries: list[str] = Query(default=[]),
+    image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
+    image_url_queries: list[str] = Form([]),  # URLs to online images
+    audio_url_queries: list[str] = Form([]),  # URLs to online audio files
+    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
     # Negative queries
-    negative_text_queries: List[str] = Query(default=[]),
-    negative_image_file_queries: List[bytes] = File([]),  # user-uploaded images
-    negative_audio_file_queries: List[bytes] = File(
+    negative_text_queries: list[str] = Query(default=[]),
+    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    negative_audio_file_queries: list[bytes] = File(
         []
     ),  # user-uploaded audio files
-    negative_image_url_queries: List[str] = Form([]),  # URLs to online images
-    negative_audio_url_queries: List[str] = Form([]),  # URLs to online audio files
-    negative_internal_image_queries: List[str] = Query(
+    negative_image_url_queries: list[str] = Form([]),  # URLs to online images
+    negative_audio_url_queries: list[str] = Form([]),  # URLs to online audio files
+    negative_internal_image_queries: list[str] = Query(
         default=[]
     ),  # ids to internal images
     # Other parameters
@@ -85,7 +84,7 @@ async def handle_post_search_multimodal(
     end: int = Query(20, gt=0, le=1000),
     thumbnails_to_send: int = Query(0),
     shot_scale: str | None = Query(None),
-    metadata_filter: List[str] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
     add_prefix: bool = Query(True)
 ):
     """

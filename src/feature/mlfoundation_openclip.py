@@ -4,7 +4,7 @@ from pathlib import Path
 import open_clip
 import torch
 import numpy as np
-from typing import List, Union, Any
+from typing import Union, Any
 from PIL import Image
 import torchvision.transforms.functional as F
 from collections.abc import Iterable
@@ -277,7 +277,7 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         assert model_image_features[0].vectors.shape[1] == model_text_features.shape[1]
         return model_text_features.shape[1]
 
-    def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
+    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> torch.Tensor:
         if isinstance(images, list) and all(isinstance(img, Image.Image) for img in images):
             result = torch.stack([self.processor(im) for im in images], dim=0)
             return result
@@ -290,12 +290,12 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         else:
             raise ValueError('all input to preprocess_image() must be an instance of torch.Tensor or PIL.Image')
 
-    def preprocess_text(self, text: Union[str, List[str]]) -> torch.Tensor:
+    def preprocess_text(self, text: Union[str, list[str]]) -> torch.Tensor:
         if isinstance(text, str):
             text = [text]
         elif not isinstance(text, list) or not all(isinstance(t, str) for t in text):
             raise ValueError(
-                "input to preprocess_text() must be an instance of str or List[str]"
+                "input to preprocess_text() must be an instance of str or list[str]"
             )
 
         return {"input_ids": self.tokenizer(text)}
@@ -312,7 +312,7 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         return [Features(vectors=x, metadata=None) for x in feature_vectors]
 
     @torch.inference_mode()
-    def extract_text_features(self, text_query: List[str]) -> np.ndarray:
+    def extract_text_features(self, text_query: list[str]) -> np.ndarray:
         model_input = self.preprocess_text(text_query)
         model_output = self.model.get_text_features(**model_input).float()
         model_output /= torch.linalg.norm(model_output, dim=-1, keepdims=True)

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import enum
 import logging
 import math
-from typing import List, Optional, Literal, TypeVar
+from typing import Optional, Literal, TypeVar
 
 from pydantic import dataclasses
 from dataclasses import asdict
@@ -195,7 +195,7 @@ def get_media_info(url: str, guess_missing_video_info: bool = False):
     return video_stream_info, audio_stream_info
 
 
-def get_stream_reader(url: str, output_stream_opts: List[BaseStreamOutputOptions] = []) -> StreamReader:
+def get_stream_reader(url: str, output_stream_opts: list[BaseStreamOutputOptions] = []) -> StreamReader:
     streamer = StreamReader(url)
 
     logger.debug(f"StreamReader: (metadata) {streamer.get_metadata()}")

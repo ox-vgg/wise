@@ -3,7 +3,6 @@ from functools import cached_property
 import logging
 import re
 from pathlib import Path
-from typing import List
 from msclap import CLAP
 import torch
 import numpy as np
@@ -284,7 +283,7 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
         return audio_embeddings.cpu().numpy()
 
     @torch.inference_mode()
-    def extract_text_features(self, text: List[str]) -> np.ndarray:
+    def extract_text_features(self, text: list[str]) -> np.ndarray:
         preprocessed_text = self.preprocess_text(text)
         text_embeddings = self.model.get_text_features(**preprocessed_text)
         text_embeddings = text_embeddings / torch.norm(

@@ -23,7 +23,7 @@ vector for any input.
 # File: src/feature/random_features.py
 import torch
 import numpy as np
-from typing import List, Union
+from typing import Union
 from PIL import Image
 import torchvision.transforms.functional as F
 from collections.abc import Iterable
@@ -66,7 +66,7 @@ class RandomFeatures(FeatureExtractor):
     def get_input_image_size(self):
         return self.input_image_size
 
-    def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
+    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> torch.Tensor:
         if isinstance(images, list) and all(isinstance(img, Image.Image) for img in images):
             result = torch.stack([self.preprocess(im) for im in images], dim=0).to(device=self.DEVICE)
             return result
@@ -80,7 +80,7 @@ class RandomFeatures(FeatureExtractor):
     def extract_image_features(self, images: torch.Tensor) -> np.ndarray:
         return torch.rand((1, self.output_dim), dtype=np.float32).numpy()
 
-    def extract_text_features(self, text_query: List[str]) -> np.ndarray:
+    def extract_text_features(self, text_query: list[str]) -> np.ndarray:
         return torch.rand((1, self.output_dim), dtype=np.float32).numpy()
 ```
 

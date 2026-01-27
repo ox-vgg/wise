@@ -12,7 +12,6 @@ from src.data_models import VectorAndMediaMetadata, MediaType
 from src.repository import get_featured_images
 
 from src.utils import convert_uint8array_to_base64
-from typing import List
 
 from PIL import Image
 from webvtt import WebVTT, Caption
@@ -119,7 +118,7 @@ class LocalWiseProjectService(WiseProjectService):
             thumbnail = project.thumbnail(media_id=_m.id, timestamp=_m.timestamp)
             return convert_uint8array_to_base64(thumbnail)
 
-        def inner(vector_and_media_metadata_list: List[VectorAndMediaMetadata]):
+        def inner(vector_and_media_metadata_list: list[VectorAndMediaMetadata]):
             thumbs = [
                 (
                     _thumbnail(vector_and_media_metadata)
@@ -259,8 +258,8 @@ class LocalWiseProjectService(WiseProjectService):
         return active_search_targets
 
     def get_vector_and_media_metadata_for_ids(
-        self, ids: List[int], external_metadata_tables: List[str] | None = None
-    ) -> List[VectorAndMediaMetadata]:
+        self, ids: list[int], external_metadata_tables: list[str] | None = None
+    ) -> list[VectorAndMediaMetadata]:
         _external_metadata_tables = external_metadata_tables
         if _external_metadata_tables is None:
             _external_metadata_tables = self.wise_project.external_metadata_tables()
@@ -269,6 +268,6 @@ class LocalWiseProjectService(WiseProjectService):
         )
     
     def get_vector_ext_metadata_for_ids(
-        self, feature_extractor_id: str, ids: List[int]
-    ) -> List[Any]:
+        self, feature_extractor_id: str, ids: list[int]
+    ) -> list[Any]:
         return self.wise_project.get_vector_ext_metadata_for_ids(feature_extractor_id, ids)

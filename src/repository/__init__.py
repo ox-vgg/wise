@@ -1,4 +1,3 @@
-from typing import List
 import sqlalchemy as sa
 
 from .base import SQLAlchemyRepository
@@ -43,7 +42,7 @@ def get_featured_images(
     conn: sa.Connection,
     modality: ModalityType,
     feature_extractor_id: str,
-) -> List[int]:
+) -> list[int]:
     """
     Get a set of featured images to be shown on the frontend.
     Returns a list of vector ids of the 4th second from each video.

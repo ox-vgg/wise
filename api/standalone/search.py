@@ -2,7 +2,7 @@ import itertools
 import json
 import logging
 import functools
-from typing import List, Callable, Iterable
+from typing import Callable, Iterable
 from config import APIConfig
 from .. import common
 from ..common import VideoSegment
@@ -22,12 +22,12 @@ from ..dependencies import ConfigDep, ProjectServiceDep, ProjectInfoDep, Embeddi
 
 logger = logging.getLogger(__name__)
 
-def merge_close_segments(_keyframes: List[VideoSegment]):
+def merge_close_segments(_keyframes: list[VideoSegment]):
     """
     Takes a list of segments of a media file and merges them if they are close - within 4 seconds of each other
     The merged segment is represented by the best matching segment based on distance
     """
-    merged_segments: List[VideoSegment] = []
+    merged_segments: list[VideoSegment] = []
     start = None
     current = None
     best = None
@@ -79,7 +79,7 @@ def merge_close_segments(_keyframes: List[VideoSegment]):
     return merged_segments
 
 def get_shots_from_segments(
-        segments: List[VideoSegment],
+        segments: list[VideoSegment],
         merge_function: Callable[[list[VideoSegment]], list[VideoSegment]] = merge_close_segments
     ):
     """
@@ -105,7 +105,7 @@ def get_shots_from_segments(
     )
     return all_merged_segments
 
-def keyframes_to_shots(_keyframes: List[VideoSegment], project: WiseProject):
+def keyframes_to_shots(_keyframes: list[VideoSegment], project: WiseProject):
     """
     Get Shot corresponding to a keyframe
     """
@@ -119,7 +119,7 @@ def keyframes_to_shots(_keyframes: List[VideoSegment], project: WiseProject):
         for x in _keyframes
     )
 
-def get_shots_from_keyframes(project: WiseProject, _keyframes: List[VideoSegment]):
+def get_shots_from_keyframes(project: WiseProject, _keyframes: list[VideoSegment]):
     """
     Get unique shots from list of keyframes belonging to a single video
     """
@@ -156,8 +156,8 @@ def get_shots_from_keyframes(project: WiseProject, _keyframes: List[VideoSegment
 
 def construct_video_search_response(
     search_in: MediaType,
-    top_dist: List[float],
-    all_metadata: List[VectorAndMediaMetadata],
+    top_dist: list[float],
+    all_metadata: list[VectorAndMediaMetadata],
     all_ext_metadata: list[FeatureExtMetadata],
     all_thumbs: Iterable[str],
     merge_function: Callable[[list[VideoSegment]], list[VideoSegment]],
@@ -228,8 +228,8 @@ def construct_video_search_response(
         raise ValueError("`search_in` must be either `MediaType.VIDEO` or `MediaType.AV`")
 
 def construct_image_search_response(
-    top_dist: List[float],
-    all_metadata: List[VectorAndMediaMetadata],
+    top_dist: list[float],
+    all_metadata: list[VectorAndMediaMetadata],
     all_ext_metadata: list[FeatureExtMetadata],
     all_thumbs: Iterable[str],
 ):
@@ -271,8 +271,8 @@ def construct_image_search_response(
     )
 
 def construct_search_response(
-    top_dist: List[float],
-    all_metadata: List[VectorAndMediaMetadata],
+    top_dist: list[float],
+    all_metadata: list[VectorAndMediaMetadata],
     all_ext_metadata: list[FeatureExtMetadata],
     all_thumbs: Iterable[str],
     merge_function: Callable[[list[VideoSegment]], list[VideoSegment]] = merge_close_segments,
@@ -337,7 +337,7 @@ def reconstruct_vectors(
     search_service: SearchServiceDep,
     search_in: MediaType = Query(),
     feature_extractor_id: str = Query(),
-    internal_ids: List[int] = Query(default=[]),  # ids to internal images
+    internal_ids: list[int] = Query(default=[]),  # ids to internal images
 ):
     media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
     search_targets = project_info.search_targets
@@ -394,7 +394,7 @@ async def handle_post_search_feature(
     end: int = Query(20, gt=0, le=1000),
     thumbnails_to_send: int = Query(0),
     shot_scale: str | None = Query(None),
-    metadata_filter: List[str] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
 ):
     media_type = 'audio' if search_in == MediaType.AV else search_in
     search_targets = project_info.search_targets
@@ -485,21 +485,22 @@ async def handle_post_search_multimodal(
     feature_extractor_id: str = Query(),
     
     # Positive queries
-    text_queries: List[str] = Query(default=[]),
-    image_file_queries: List[bytes] = File([]),  # user-uploaded images
-    audio_file_queries: List[bytes] = File([]),  # user-uploaded audio files
-    image_url_queries: List[str] = Form([]),  # URLs to online images
-    audio_url_queries: List[str] = Form([]),  # URLs to online audio files
-    internal_image_queries: List[str] = Query(default=[]),  # ids to internal images
+    text_queries: Annotated[list[str], Query()] = [],  ## dangerous default!
+    text_queries: list[str] = Query(default=[]),
+    image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
+    image_url_queries: list[str] = Form([]),  # URLs to online images
+    audio_url_queries: list[str] = Form([]),  # URLs to online audio files
+    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
     # Negative queries
-    negative_text_queries: List[str] = Query(default=[]),
-    negative_image_file_queries: List[bytes] = File([]),  # user-uploaded images
-    negative_audio_file_queries: List[bytes] = File(
+    negative_text_queries: list[str] = Query(default=[]),
+    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    negative_audio_file_queries: list[bytes] = File(
         []
     ),  # user-uploaded audio files
-    negative_image_url_queries: List[str] = Form([]),  # URLs to online images
-    negative_audio_url_queries: List[str] = Form([]),  # URLs to online audio files
-    negative_internal_image_queries: List[str] = Query(
+    negative_image_url_queries: list[str] = Form([]),  # URLs to online images
+    negative_audio_url_queries: list[str] = Form([]),  # URLs to online audio files
+    negative_internal_image_queries: list[str] = Query(
         default=[]
     ),  # ids to internal images
     # Other parameters
@@ -507,7 +508,7 @@ async def handle_post_search_multimodal(
     end: int = Query(20, gt=0, le=1000),
     thumbnails_to_send: int = Query(0),
     shot_scale: str | None = Query(None),
-    metadata_filter: List[str] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
     add_prefix: bool = Query(True)
 ):
     """

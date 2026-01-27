@@ -2,7 +2,7 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, NamedTuple, Optional, Union, Type
+from typing import Any, NamedTuple, Optional, Union, Type
 from pydantic import BaseModel, ConfigDict
 from PIL import Image
 import torch
@@ -257,7 +257,7 @@ class FeatureExtractor:
         """
         return [FeatureExtMetadata() for _ in range(len(vid))]
 
-    def preprocess_image(self, images: Union[torch.Tensor, List[Image.Image]]) -> torch.Tensor:
+    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> torch.Tensor:
         """ Preprocess media to prepare it for feature extraction
 
         Parameters
@@ -289,7 +289,7 @@ class FeatureExtractor:
     def preprocess_text(self, text: str) -> str:
         raise NotImplementedError
 
-    def extract_text_features(self, text_query: List[str]) -> np.ndarray:
+    def extract_text_features(self, text_query: list[str]) -> np.ndarray:
         """ Extracts features from text
 
         Parameters

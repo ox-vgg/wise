@@ -16,7 +16,6 @@ import torch
 import torch.utils.data as torch_data
 import typer
 from tqdm import tqdm
-from typing import List
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ if __name__ == "__main__":
 
     @app.command()
     def run(
-        media_dir_list: List[Path] = typer.Argument(
+        media_dir_list: list[Path] = typer.Argument(
             ...,
             file_okay=False,
             dir_okay=True,
@@ -54,7 +53,7 @@ if __name__ == "__main__":
             readable=True,
             help="Path to input folder of media files",
         ),
-        media_include: List[str] = typer.Option(
+        media_include: list[str] = typer.Option(
             default=["*"], help="regular expression to include certain media files"
         ),
         model: Optional[CLIPModel] = typer.Option(

@@ -1,6 +1,5 @@
 from fastapi import APIRouter, File, Form
 from fastapi.responses import PlainTextResponse
-from typing import List
 import os
 import csv
 import json
@@ -9,11 +8,11 @@ router = APIRouter()
 
 @router.post("/report")
 def report_image(
-    file_queries: List[bytes] = File([]),
-    url_queries: List[str] = Form([]),
-    text_queries: List[str] = Form([]),
+    file_queries: list[bytes] = File([]),
+    url_queries: list[str] = Form([]),
+    text_queries: list[str] = Form([]),
     sourceURI: str = Form(),
-    reasons: List[str] = Form([]),
+    reasons: list[str] = Form([]),
 ):
     # TODO implement code to store data in database
     # For now, we are saving the reports in a CSV file

@@ -119,7 +119,7 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
 
         Parameters
         ----------
-        text_query : List[str]
+        text_query : list[str]
             A list of strings representing the text queries.
 
         Returns
