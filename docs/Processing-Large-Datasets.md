@@ -34,9 +34,7 @@ CUDA_VISIBLE_DEVICES=0 python extract-features.py \
     "/data/all_videos/" \
     --media-include "*.mp4" \
     --shard-maxcount 4096 \
-    --shard-maxsize 20971520 \
     --num-workers 0 \
-    --feature-store webdataset \
     --no-thumbnails \
     --audio-feature-id "microsoft/clap/2023/four-datasets" \
     --project-dir /data/wise-project/
@@ -76,9 +74,7 @@ CUDA_VISIBLE_DEVICES=0 python extract-features.py \
     --yes \
     --media-include "*.mp4" \
     --shard-maxcount 4096 \
-    --shard-maxsize 20971520 \
     --num-workers 0 \
-    --feature-store webdataset \
     --thumbnails \
     --use-shots \
     --video-feature-id "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" \

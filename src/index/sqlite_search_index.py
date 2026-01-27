@@ -8,7 +8,6 @@ import math
 from .search_index import SearchIndex
 from ..feature.feature_extractor_factory import FeatureExtractorFactory
 from ..feature.store.feature_store_factory import FeatureStoreFactory
-from ..feature.store.webdataset_store import WebdatasetStore
 
 class SqliteSearchIndex(SearchIndex):
     def __init__(self, media_type, asset_id, asset):

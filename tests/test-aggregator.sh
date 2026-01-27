@@ -37,9 +37,6 @@ MAX_POLL_SERVER_COUNT=15
 GPU_ID=1
 NUM_WORKERS=2
 
-FEATURE_STORE="faiss" # options are: faiss, webdataset, numpy
-EXTENSION="faiss" # options are: faiss, tar, npy
-
 # to enable triton server, export an environment variable FEATURE_EXTRACTOR_CONFIG
 # containing a JSON string with the URL of the triton server. For example:
 # $ export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
@@ -85,7 +82,7 @@ for script in "${REQUIRED_PYTHON_SCRIPTS[@]}"; do
 done
 
 # check if required python packages exist
-REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss webdataset msclap open_clip)
+REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss msclap open_clip)
 for package in "${REQUIRED_PYTHON_PACKAGES[@]}"; do
     if ! python3 -c "import importlib.util; exit(0) if importlib.util.find_spec('${package}') else exit(1)"; then
         echo "$package package not found, please install the $package python package"
@@ -125,9 +122,7 @@ for subset_id in 1 2 3; do
                "${SUBSET_DIR}" \
                --media-include "*.mp4" \
                --shard-maxcount 4096 \
-               --shard-maxsize 20971520 \
                --num-workers $NUM_WORKERS \
-               --feature-store ${FEATURE_STORE} \
                --audio-feature-id "${AUDIO_FEATURE_ID}" \
                --video-feature-id "${VIDEO_FEATURE_ID1}" \
                --video-feature-id "${VIDEO_FEATURE_ID2}" \
@@ -197,9 +192,7 @@ if [ ! -d "${WISE_ALL_PROJECT_DIR}" ]; then
            "${TEST_DATA_DIR}" \
            --media-include "*.mp4" \
            --shard-maxcount 4096 \
-           --shard-maxsize 20971520 \
            --num-workers $NUM_WORKERS \
-           --feature-store webdataset \
            --audio-feature-id "${AUDIO_FEATURE_ID}" \
            --video-feature-id "${VIDEO_FEATURE_ID1}" \
            --video-feature-id "${VIDEO_FEATURE_ID2}" \

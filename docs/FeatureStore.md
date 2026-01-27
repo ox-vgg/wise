@@ -1,13 +1,9 @@
 # Feature Store
-The FeatureStore provides storage for features extracted from video frames and audio samples.
-WISE currently supports the following two types of FeatureStore:
 
- - WebdatasetStore : stores features across multiple `.tar` files
-
-The [WebdatasetStore][src.feature.store.webdataset_store.WebdatasetStore]
-uses the [Webdataset](https://webdataset.github.io/webdataset/) format
-to store extracted features across multiple shards maitained as `.tar`
-files.
+The FeatureStore provides storage for features extracted from video
+frames and audio samples.  The
+[FaissStore][src.feature.store.faiss_store.FaissStore] uses the
+[faiss](https://ai.meta.com/tools/faiss/) index.
 
 Here is an example of how the features stores in these stores can be accessed.
 

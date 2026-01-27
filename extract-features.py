@@ -54,9 +54,8 @@ def initialise_feature_extractors(
     project: WiseProject,
     feature_extractor_ids: dict[ModalityType, list],
     feature_extractor_config: dict[str, dict],
-    feature_store_type: Literal["webdataset", "numpy"],
+    feature_store_type: Literal["faiss"],
     shard_max_count: int,
-    shard_max_size: int,
     db_engine: sa.Engine,
 ) -> tuple[
     dict[ModalityType, dict[str, FeatureExtractor]],
@@ -109,7 +108,7 @@ def initialise_feature_extractors(
                     modality_type,
                     project.features_dir(feature_extractor_id),
                 )
-            store.enable_write(shard_maxcount=shard_max_count, shard_maxsize=shard_max_size)
+            store.enable_write(shard_maxcount=shard_max_count)
             feature_stores[modality_type][feature_extractor_id] = store
 
     return feature_extractors, feature_stores
@@ -466,15 +465,7 @@ if __name__ == "__main__":
         required=False,
         type=int,
         default=2048,
-        help="max number of entries in each shard of webdataset tar (for faiss store, using shard-maxcount=1e6 results in 4GB files with 1024-dim features)",
-    )
-
-    parser.add_argument(
-        "--shard-maxsize",
-        required=False,
-        type=int,
-        default=20 * 1024 * 1024,  # tar overheads results in 25MB shards
-        help="max size (in bytes) of each shard of webdataset tar (not used for faiss store)",
+        help="max number of entries in each feature store shard (for faiss store, using shard-maxcount=1e6 results in 4GB files with 1024-dim features)",
     )
 
     parser.add_argument(
@@ -489,9 +480,9 @@ if __name__ == "__main__":
         "--feature-store",
         required=False,
         type=str,
-        default="webdataset",
+        default="faiss",
         dest="feature_store_type",
-        choices=["webdataset", "numpy", "faiss"],
+        choices=["faiss"],
         help="extracted features are stored using this data structure",
     )
 
@@ -659,7 +650,6 @@ if __name__ == "__main__":
         feature_extractor_config,
         args.feature_store_type,
         args.shard_maxcount,
-        args.shard_maxsize,
         db_engine,
     )
 

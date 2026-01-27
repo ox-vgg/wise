@@ -23,5 +23,4 @@ tqdm~=4.66.2
 transformers~=4.51.3
 tritonclient[all]
 typer~=0.12.3
-webdataset~=0.2.86
 webvtt-py

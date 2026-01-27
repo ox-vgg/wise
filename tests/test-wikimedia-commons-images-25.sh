@@ -36,7 +36,6 @@ MAX_POLL_SERVER_COUNT=25
 CUDA_VISIBLE_DEVICES=0
 NUM_WORKERS=2
 
-FEATURE_STORE="faiss" # options are: faiss, webdataset, numpy
 EXTENSION="faiss" # options are: faiss, tar, npy
 
 FEATURE_EXTRACTOR_CONFIG="{
@@ -77,7 +76,7 @@ for script in "${REQUIRED_PYTHON_SCRIPTS[@]}"; do
 done
 
 # check if required python packages exist
-REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss webdataset msclap open_clip)
+REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss msclap open_clip)
 for package in "${REQUIRED_PYTHON_PACKAGES[@]}"; do
     if ! python3 -c "import importlib.util; exit(0) if importlib.util.find_spec('${package}') else exit(1)"; then
         echo "$package package not found, please install the $package python package"
@@ -114,9 +113,7 @@ if [ ! -d "${WISE_PROJECT_DIR}" ]; then
            "${TEST_DATA_DIR}" \
            --media-include "*.jpg" \
            --shard-maxcount 128 \
-           --shard-maxsize 20971520 \
            --num-workers $NUM_WORKERS \
-           --feature-store ${FEATURE_STORE} \
            --image-feature-id "${IMAGE_FEATURE_ID1}" \
            --image-feature-id "${IMAGE_FEATURE_ID2}" \
            --image-feature-id "${IMAGE_FEATURE_ID3}" \

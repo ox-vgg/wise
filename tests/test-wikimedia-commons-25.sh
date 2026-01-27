@@ -36,9 +36,6 @@ HTTP_SERVER_PORT="10001"
 MAX_POLL_SERVER_COUNT=25
 NUM_WORKERS=2
 
-FEATURE_STORE="faiss" # options are: faiss, webdataset, numpy
-EXTENSION="faiss" # options are: faiss, tar, npy
-
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
 OUTDIR="${TMP_DIR}/wise-test/"
@@ -71,7 +68,7 @@ for script in "${REQUIRED_PYTHON_SCRIPTS[@]}"; do
 done
 
 # check if required python packages exist
-REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss webdataset msclap open_clip)
+REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss msclap open_clip)
 for package in "${REQUIRED_PYTHON_PACKAGES[@]}"; do
     if ! python3 -c "import importlib.util; exit(0) if importlib.util.find_spec('${package}') else exit(1)"; then
         echo "$package package not found, please install the $package python package"
@@ -106,9 +103,7 @@ if [ ! -d "${WISE_PROJECT_DIR}" ]; then
            "${TEST_DATA_DIR}" \
            --media-include "*.mp4" \
            --shard-maxcount 512 \
-           --shard-maxsize 20971520 \
            --num-workers $NUM_WORKERS \
-           --feature-store ${FEATURE_STORE} \
            --video-feature-id "${VIDEO_FEATURE_ID1}" \
            --video-feature-id "${VIDEO_FEATURE_ID2}" \
            --audio-feature-id "${AUDIO_FEATURE_ID}" \

@@ -77,9 +77,7 @@ else
         "/data/cinephile/videos/" \
         --media-include "*.mp4" \
         --shard-maxcount 4096 \
-        --shard-maxsize 20971520 \
         --num-workers 0 \
-        --feature-store webdataset \
         --audio-feature-id "${AUDIO_FEATURE_ID}" \
         --video-feature-id "${VIDEO_FEATURE_ID1}" \
         --video-feature-id "${VIDEO_FEATURE_ID2}" \

@@ -37,9 +37,7 @@ else
         --yes \
         --media-include "*.mp4" \
         --shard-maxcount 4096 \
-        --shard-maxsize 20971520 \
         --num-workers 0 \
-        --feature-store webdataset \
         --no-thumbnails \
         --use-shots \
         --enable-autocast \

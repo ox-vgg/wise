@@ -84,9 +84,7 @@ if [ ! -d "${KINETICS_PROJECT_DIR}" ]; then
            "${KINETICS_DATA_DIR}" \
            --media-include "*.mp4" \
            --shard-maxcount 4096 \
-           --shard-maxsize 20971520 \
            --num-workers 0 \
-           --feature-store webdataset \
            --video-feature-id "mlfoundations/open_clip/ViT-L-16-SigLIP-384/webli" \
            --audio-feature-id "microsoft/clap/2023/four-datasets" \
            --project-dir "$KINETICS_PROJECT_DIR"

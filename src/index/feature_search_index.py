@@ -8,7 +8,6 @@ import itertools
 from .search_index import SearchIndex
 
 from ..feature.store.feature_store_factory import FeatureStoreFactory
-from ..feature.store.webdataset_store import WebdatasetStore
 
 class FeatureSearchIndex(SearchIndex):
 

@@ -27,8 +27,6 @@ class FaissStore(FeatureStore):
 
     A new shard is created when the current shard contains shard_maxcount entries or
     when the close method is called or when object goes out of scope (__del__)
-
-    NOTE: This store doesnt implement shard_maxsize
     """
     EXTENSION = "faiss"
 
@@ -104,7 +102,7 @@ class FaissStore(FeatureStore):
     def feature_dim(self):
         return self._dim
 
-    def enable_write(self, shard_maxcount=1e6, overwrite: bool = False, **kwargs):
+    def enable_write(self, shard_maxcount=1e6, overwrite: bool = False):
         # At around 1 million vectors of 1024 dimensions, the file size is around 4GB
         # Enable write mode for the Faiss index
         if overwrite:
