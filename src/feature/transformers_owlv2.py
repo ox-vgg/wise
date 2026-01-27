@@ -29,7 +29,6 @@ from transformers import Owlv2Processor, Owlv2ForObjectDetection
 import torch
 from torchvision.transforms.functional import pil_to_tensor
 import numpy as np
-from typing import Union
 from PIL import Image
 import sqlalchemy as sa
 
@@ -515,7 +514,7 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
         assert len(vid) == len(res)
         return res
 
-    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> torch.Tensor:
+    def preprocess_image(self, images: torch.Tensor | list[Image.Image]) -> torch.Tensor:
         if isinstance(images, torch.Tensor):
             if images.ndim != 4 or images.shape[1] != 3:
                 raise ValueError("expect tensor images to be RGB in NCHW order")

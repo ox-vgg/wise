@@ -4,7 +4,7 @@ from pathlib import Path
 import open_clip
 import torch
 import numpy as np
-from typing import Union, Any
+from typing import Any
 from PIL import Image
 import torchvision.transforms.functional as F
 from collections.abc import Iterable
@@ -277,7 +277,7 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         assert model_image_features[0].vectors.shape[1] == model_text_features.shape[1]
         return model_text_features.shape[1]
 
-    def preprocess_image(self, images: Union[torch.Tensor, list[Image.Image]]) -> torch.Tensor:
+    def preprocess_image(self, images: torch.Tensor | list[Image.Image]) -> torch.Tensor:
         if isinstance(images, list) and all(isinstance(img, Image.Image) for img in images):
             result = torch.stack([self.processor(im) for im in images], dim=0)
             return result
@@ -290,7 +290,7 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         else:
             raise ValueError('all input to preprocess_image() must be an instance of torch.Tensor or PIL.Image')
 
-    def preprocess_text(self, text: Union[str, list[str]]) -> torch.Tensor:
+    def preprocess_text(self, text: str | list[str]) -> torch.Tensor:
         if isinstance(text, str):
             text = [text]
         elif not isinstance(text, list) or not all(isinstance(t, str) for t in text):

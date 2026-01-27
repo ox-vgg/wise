@@ -8,7 +8,6 @@ import logging
 import os
 import os.path
 from dataclasses import dataclass
-from typing import Union
 
 import huggingface_hub
 import numpy as np
@@ -448,7 +447,7 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
         return res
 
     def preprocess_image(
-        self, images: Union[torch.Tensor, list[PIL.Image.Image]]
+        self, images: torch.Tensor | list[PIL.Image.Image]
     ) -> torch.Tensor:
         _logger.debug("preprocessing images of type %s", type(images))
         if isinstance(images, torch.Tensor):

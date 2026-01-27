@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from uuid import uuid4, UUID
 from collections.abc import Callable, Generator
-from typing import Optional, Union, Any, overload, Literal
+from typing import Optional, Any, overload, Literal
 from ..data_models import SourceMediaType, MediaChunkType, DatasetPayload
 from .streamreader import (
     StreamOutputOptions,
@@ -225,7 +225,7 @@ class MediaDataset(torch_data.IterableDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], dict[str, str]],
+        input_files: list[str] | dict[str, str],
         output_stream_opts=list[StreamOutputOptions],
         transforms: Optional[list[Callable[[torch.Tensor], torch.Tensor] | dict[str, Callable[[torch.Tensor], torch.Tensor]]]] = None,
         offset: Optional[float] = None,
@@ -265,7 +265,7 @@ class MediaDataset(torch_data.IterableDataset):
         # verify if length of output_stream_opts and transform matches up
         assert len(self._transforms) == len(self._output_stream_opts)
 
-    def _get_media_iterator(self, id_list: list[Union[str, int]]) -> Generator[tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
+    def _get_media_iterator(self, id_list: list[str | int]) -> Generator[tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
         for _id in id_list:
             path = self._filelist[_id]
             try:
@@ -354,7 +354,7 @@ class AudioDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], dict[str, str]],
+        input_files: list[str] | dict[str, str],
         samples_per_chunk: int,
         *,
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
@@ -382,7 +382,7 @@ class VideoDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], dict[str, str]],
+        input_files: list[str] | dict[str, str],
         frames_per_chunk: int,
         *,
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
@@ -410,7 +410,7 @@ class ImageDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], dict[str, str]],
+        input_files: list[str] | dict[str, str],
         *,
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         thumbnails: bool = True,
@@ -433,7 +433,7 @@ class AVDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], dict[str, str]],
+        input_files: list[str] | dict[str, str],
         video_frames_per_chunk: int = 0,
         audio_samples_per_chunk: int = 0,
         *,

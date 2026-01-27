@@ -1,6 +1,6 @@
 import logging
 import io
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 from .. import common
 from ..services.project import (
