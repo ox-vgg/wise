@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, TypeVar, Generic, Iterable, Any, Type, Optional
+from typing import TypeVar, Generic, Iterable, Any, Type, Optional
 
 from pydantic import BaseModel
 import sqlalchemy as sa
@@ -86,7 +86,7 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
             *,
             column_to_match: str,
             value_to_match: Any,
-            select_columns: Optional[Tuple[str]] = None,
+            select_columns: Optional[tuple[str]] = None,
             order_by_column: str,
             desc: bool = False,
             batch_size: int = 10000
@@ -119,7 +119,7 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
                 else:
                     yield self.model.model_validate(row)
 
-    def get_columns(self, conn: sa.Connection, column_names: Tuple[str]):
+    def get_columns(self, conn: sa.Connection, column_names: tuple[str]):
         result = conn.execute(sa.select(self._table.c[column_names]))
         yield from result.mappings()
 

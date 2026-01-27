@@ -3,7 +3,7 @@ import logging
 import json
 from pathlib import Path
 from uuid import uuid4, UUID
-from typing import Callable, Optional, Union, Generator, Tuple, Any, overload, Literal
+from typing import Callable, Optional, Union, Generator, Any, overload, Literal
 from ..data_models import SourceMediaType, MediaChunkType, DatasetPayload
 from .streamreader import (
     StreamOutputOptions,
@@ -264,7 +264,7 @@ class MediaDataset(torch_data.IterableDataset):
         # verify if length of output_stream_opts and transform matches up
         assert len(self._transforms) == len(self._output_stream_opts)
 
-    def _get_media_iterator(self, id_list: list[Union[str, int]]) -> Generator[Tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
+    def _get_media_iterator(self, id_list: list[Union[str, int]]) -> Generator[tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
         for _id in id_list:
             path = self._filelist[_id]
             try:
@@ -322,7 +322,7 @@ class MediaDataset(torch_data.IterableDataset):
             except Exception:
                 logger.exception(f'Exception when processing "{_id}: {path}"')
 
-    def __iter__(self) -> Generator[Tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
+    def __iter__(self) -> Generator[tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
         """
         Creates the iterator used by the dataloader
 
