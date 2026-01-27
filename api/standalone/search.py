@@ -2,7 +2,7 @@ import itertools
 import json
 import logging
 import functools
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 from config import APIConfig
 from .. import common
 from ..common import VideoSegment

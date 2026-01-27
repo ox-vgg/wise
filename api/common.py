@@ -1,4 +1,5 @@
-from typing import Optional, Annotated, Callable, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Optional, Annotated
 import base64
 import functools
 import time

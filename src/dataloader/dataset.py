@@ -3,7 +3,8 @@ import logging
 import json
 from pathlib import Path
 from uuid import uuid4, UUID
-from typing import Callable, Optional, Union, Generator, Any, overload, Literal
+from collections.abc import Callable, Generator
+from typing import Optional, Union, Any, overload, Literal
 from ..data_models import SourceMediaType, MediaChunkType, DatasetPayload
 from .streamreader import (
     StreamOutputOptions,
