@@ -72,7 +72,8 @@ source wise-dep/bin/activate
 python -m pip install --upgrade pip
 
 # Note: the following command is the key to installing CPU only version of WISE
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install --index-url https://download.pytorch.org/whl/cpu \
+    -r torch-faiss-requirements.txt
 
 pip install -r requirements.txt
 pip install faiss-cpu
