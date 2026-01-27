@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 import pprint
 
-from typing import Dict, Literal
+from typing import Literal
 import torch
 import torch.utils.data as torch_data
 from tqdm import tqdm
@@ -680,8 +680,8 @@ if __name__ == "__main__":
         torch.autocast("cuda" if torch.cuda.is_available() else "cpu", enabled=args.enable_autocast)
     ):
         mid: str | int # type annotation
-        chunks: Dict[
-            MediaChunkType, Dict[str, MediaChunk | None] | MediaChunk | None
+        chunks: dict[
+            MediaChunkType, dict[str, MediaChunk | None] | MediaChunk | None
         ]  # type annotation
 
         def handle_chunk(

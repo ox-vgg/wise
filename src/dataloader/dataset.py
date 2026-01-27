@@ -3,7 +3,7 @@ import logging
 import json
 from pathlib import Path
 from uuid import uuid4, UUID
-from typing import Dict, Callable, Optional, Union, Generator, Tuple, Any, overload, Literal
+from typing import Callable, Optional, Union, Generator, Tuple, Any, overload, Literal
 from ..data_models import SourceMediaType, MediaChunkType, DatasetPayload
 from .streamreader import (
     StreamOutputOptions,
@@ -37,7 +37,7 @@ class MediaMetadata(object):
     num_frames: int
     duration: Optional[float]
     fps: Optional[float]
-    extra: Dict
+    extra: dict
     id: UUID = dataclasses.Field(default_factory=uuid4)
 
 def get_media_metadata(url: str, media_type_from_mimetype: MediaMimetype = None, mimetype: str = None):
@@ -224,15 +224,15 @@ class MediaDataset(torch_data.IterableDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], Dict[str, str]],
+        input_files: Union[list[str], dict[str, str]],
         output_stream_opts=list[StreamOutputOptions],
-        transforms: Optional[list[Callable[[torch.Tensor], torch.Tensor] | Dict[str, Callable[[torch.Tensor], torch.Tensor]]]] = None,
+        transforms: Optional[list[Callable[[torch.Tensor], torch.Tensor] | dict[str, Callable[[torch.Tensor], torch.Tensor]]]] = None,
         offset: Optional[float] = None,
         thumbnails: bool = True,
     ):
         super(MediaDataset).__init__()
 
-        self._filelist: Dict[str | int, str] = (
+        self._filelist: dict[str | int, str] = (
             input_files
             if isinstance(input_files, dict)
             else dict(enumerate(input_files))
@@ -264,7 +264,7 @@ class MediaDataset(torch_data.IterableDataset):
         # verify if length of output_stream_opts and transform matches up
         assert len(self._transforms) == len(self._output_stream_opts)
 
-    def _get_media_iterator(self, id_list: list[Union[str, int]]) -> Generator[Tuple[str | int, Dict[MediaChunkType,  MediaChunk | None | Dict[str, MediaChunk | None]]], Any, None]:
+    def _get_media_iterator(self, id_list: list[Union[str, int]]) -> Generator[Tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
         for _id in id_list:
             path = self._filelist[_id]
             try:
@@ -284,8 +284,8 @@ class MediaDataset(torch_data.IterableDataset):
 
                 for c in reader.stream():
                     # Might contain 1 or many output streams. Apply the corresponding transform
-                    media_chunks: Dict[
-                        MediaChunkType, Dict[str, MediaChunk | None] | MediaChunk | None
+                    media_chunks: dict[
+                        MediaChunkType, dict[str, MediaChunk | None] | MediaChunk | None
                     ] = {}
                     for (stream_chunk, stream_transform, media_chunk_type) in zip(
                             c, stream_transforms, media_chunk_types
@@ -322,7 +322,7 @@ class MediaDataset(torch_data.IterableDataset):
             except Exception:
                 logger.exception(f'Exception when processing "{_id}: {path}"')
 
-    def __iter__(self) -> Generator[Tuple[str | int, Dict[MediaChunkType,  MediaChunk | None | Dict[str, MediaChunk | None]]], Any, None]:
+    def __iter__(self) -> Generator[Tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
         """
         Creates the iterator used by the dataloader
 
@@ -353,7 +353,7 @@ class AudioDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], Dict[str, str]],
+        input_files: Union[list[str], dict[str, str]],
         samples_per_chunk: int,
         *,
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
@@ -381,7 +381,7 @@ class VideoDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], Dict[str, str]],
+        input_files: Union[list[str], dict[str, str]],
         frames_per_chunk: int,
         *,
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
@@ -409,7 +409,7 @@ class ImageDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], Dict[str, str]],
+        input_files: Union[list[str], dict[str, str]],
         *,
         preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         thumbnails: bool = True,
@@ -432,7 +432,7 @@ class AVDataset(MediaDataset):
 
     def __init__(
         self,
-        input_files: Union[list[str], Dict[str, str]],
+        input_files: Union[list[str], dict[str, str]],
         video_frames_per_chunk: int = 0,
         audio_samples_per_chunk: int = 0,
         *,
@@ -517,7 +517,7 @@ def get_metadata_for_valid_files(paths: list[Path]):
 
 @overload
 def _get_dataset(
-    input_files: list[str] | Dict[str, str],
+    input_files: list[str] | dict[str, str],
     media_type: Literal[SourceMediaType.AV],
     *,
     video_frames_per_chunk: int,
@@ -533,7 +533,7 @@ def _get_dataset(
 
 @overload
 def _get_dataset(
-    input_files: list[str] | Dict[str, str],
+    input_files: list[str] | dict[str, str],
     media_type: Literal[SourceMediaType.VIDEO],
     *,
     video_frames_per_chunk: int,
@@ -549,7 +549,7 @@ def _get_dataset(
 
 @overload
 def _get_dataset(
-    input_files: list[str] | Dict[str, str],
+    input_files: list[str] | dict[str, str],
     media_type: Literal[SourceMediaType.AUDIO],
     *,
     audio_samples_per_chunk: int,
@@ -565,7 +565,7 @@ def _get_dataset(
 
 @overload
 def _get_dataset(
-    input_files: list[str] | Dict[str, str],
+    input_files: list[str] | dict[str, str],
     media_type: Literal[SourceMediaType.IMAGE],
     *,
     audio_samples_per_chunk: int = -1,
@@ -580,7 +580,7 @@ def _get_dataset(
 ) -> MediaDataset: ...
 
 def _get_dataset(
-        input_files: list[str] | Dict[str, str],
+        input_files: list[str] | dict[str, str],
         media_type: SourceMediaType,
         video_frames_per_chunk: int,
         audio_samples_per_chunk: int,
@@ -641,7 +641,7 @@ def _get_dataset(
         raise ValueError(f'Unknown media_type: {media_type}')
     return stream
 
-def get_dataset(media_metadata: list[DatasetPayload], params: Dict[str, Any]):
+def get_dataset(media_metadata: list[DatasetPayload], params: dict[str, Any]):
     # sort and group (by media_type - image/video/audio/av)
     sort_func = lambda x: x.media_type
     sorted_metadata = sorted(media_metadata, key=sort_func)

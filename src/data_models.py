@@ -1,7 +1,7 @@
 import enum
 from pathlib import Path
 from pydantic import ConfigDict, BaseModel, dataclasses
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 import datetime
 
 
@@ -69,7 +69,7 @@ class VectorMetadata(BaseModel):
 
 
 class VectorAndMediaMetadata(VectorMetadata, MediaMetadata):
-    external_metadata: Dict = {}
+    external_metadata: dict = {}
     pass
 
 
@@ -89,7 +89,7 @@ class Project(BaseModel):
 class ExtraMediaMetadata(BaseModel):
     media_id: int
     external_id: Optional[str] = None
-    metadata: Dict[str, Any]  # TODO: narrow the type
+    metadata: dict[str, Any]  # TODO: narrow the type
 
 
 class URL(str):
