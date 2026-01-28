@@ -375,8 +375,14 @@ class WiseProject:
     @property
     def total_duration(self) -> float:
         with self.db_engine.connect() as conn:
+            ## COALESCE(SUM(...), 0.0) to cover the case of no media
+            ## in the project (otherwise SUM([]) -> NULL).
             result = conn.execute(
-                sa.select(sa.func.sum(wise_db.media_table.c.duration))
+                sa.select(
+                    sa.func.coalesce(
+                        sa.func.sum(wise_db.media_table.c.duration), 0.0
+                    )
+                )
             ).scalar_one()
 
         return result
