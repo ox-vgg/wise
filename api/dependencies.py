@@ -49,7 +49,8 @@ def get_project_service(config: ConfigDep):
                     raise ValueError(
                         f"Local path does not exist or is not a directory: {project_path}"
                     )
-                from .services.project import WiseProject, LocalWiseProjectService
+                from src.wise_project import WiseProject
+                from .services.project import LocalWiseProjectService
                 project = WiseProject(project_path)
                 project.load_search_indices(config.index_type, config.nprobe)
                 _project_service = LocalWiseProjectService(project, config)
