@@ -485,7 +485,6 @@ async def handle_post_search_multimodal(
     feature_extractor_id: str = Query(),
     
     # Positive queries
-    text_queries: Annotated[list[str], Query()] = [],  ## dangerous default!
     text_queries: list[str] = Query(default=[]),
     image_file_queries: list[bytes] = File([]),  # user-uploaded images
     audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
