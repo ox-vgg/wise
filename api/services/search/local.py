@@ -19,7 +19,7 @@ class LocalSearchService:
         
         self.wise_project: WiseProject = project_service.wise_project
         self.search_indices = self.wise_project.load_search_indices()
-        print('search indices:', self.search_indices)
+        logger.info('search indices: %s', self.search_indices)
         self._featured_ids = project_service.featured_vectors_for_targets()
         
     def is_internal_search_supported(self, media_type: MediaType, feature_id: str) -> bool:
