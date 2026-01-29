@@ -1,6 +1,18 @@
 Summary of important user-visible changes for WISE
 ==================================================
 
+Next version (unreleased)
+-------------------------
+
+* Added face search (refer to `InsightFaceFeatureExtractor` and
+  `InsightFaceAverageFeatureExtractor`), and object search (refer to
+  `TransformersOWLv2Model`).
+
+* Removed support for feature stores in webdataset and numpy formats,
+  only the faiss feature store is now supported.  The extract-features
+  `--feature-store` option now only supports the `faiss` value.
+
+
 2.1.0 (2025-02-04)
 ------------------
 
