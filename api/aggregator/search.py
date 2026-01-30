@@ -99,7 +99,7 @@ async def handle_post_search_multimodal(
     start: int = Query(0, ge=0, le=980),
     end: int = Query(20, gt=0, le=1000),
     thumbnails_to_send: int = Query(0),
-    shot_scale: str | None = Query(None),
+    shot_scale: list[int] = Query(default=[]),
     metadata_filter: list[str] = Query(default=[]),
     add_prefix: bool = Query(True)
 ):
@@ -108,15 +108,6 @@ async def handle_post_search_multimodal(
     Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
     input images/text, and then using this as the query vector.
     """
-    if shot_scale:
-        logger.info('shot_scale %s', shot_scale)
-        try:
-            shot_scale = json.loads(shot_scale)
-        except Exception:
-            raise HTTPException(400, {
-                "message": "shot_scale must be a JSON array string"
-            })
-        
     for tq in text_queries:
         if tq.strip() in config.query_blocklist:
             message = (

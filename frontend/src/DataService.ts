@@ -291,11 +291,9 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries',  `${q.value.media_id}/${q.value.vector_id}` as string]),
+    ...shotScaleFilter.map(s => ['shot_scale', s]),
     ...metadataFilterQueries.map(q => ['metadata_filter', q.value as string])
   ];
-  if (shotScaleFilter.length > 0) {
-    urlParamsArray.push(['shot_scale', JSON.stringify(shotScaleFilter)]);
-  }
   const urlParams = new URLSearchParams(urlParamsArray);
   const endpoint = `search?${urlParams.toString()}`;
   

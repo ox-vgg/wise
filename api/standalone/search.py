@@ -409,7 +409,7 @@ async def handle_post_search_feature(
     start: int = Query(0, ge=0, le=980),
     end: int = Query(20, gt=0, le=1000),
     thumbnails_to_send: int = Query(0),
-    shot_scale: str | None = Query(None),
+    shot_scale: list[int] = Query(default=[]),
     metadata_filter: list[str] = Query(default=[]),
 ):
     media_type = 'audio' if search_in == MediaType.AV else search_in
@@ -418,17 +418,7 @@ async def handle_post_search_feature(
         raise HTTPException(400, {
             "message": f"No search index exists for this modality: {media_type}"
         })
-    
-    if shot_scale:
-        logger.info('shot_scale %s', shot_scale)
 
-        try:
-            shot_scale = json.loads(shot_scale)
-        except Exception:
-            raise HTTPException(400, {
-                "message": "shot_scale must be a JSON array string"
-            })
-    
     if feature_extractor_id == 'wise/metadata':
         raise HTTPException(400, {
             "message": "`wise/metadata` feature extractor cannot be used for feature-based search. Please use a different feature extractor."
@@ -522,7 +512,7 @@ async def handle_post_search_multimodal(
     start: int = Query(0, ge=0, le=980),
     end: int = Query(20, gt=0, le=1000),
     thumbnails_to_send: int = Query(0),
-    shot_scale: str | None = Query(None),
+    shot_scale: list[int] = Query(default=[]),
     metadata_filter: list[str] = Query(default=[]),
     add_prefix: bool = Query(True)
 ):
@@ -531,14 +521,6 @@ async def handle_post_search_multimodal(
     Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
     input images/text, and then using this as the query vector.
     """
-    if shot_scale:
-        logger.info('shot_scale %s', shot_scale)
-        try:
-            shot_scale = json.loads(shot_scale)
-        except Exception:
-            raise HTTPException(400, {
-                "message": "shot_scale must be a JSON array string"
-            })
     media_type = 'audio' if search_in == MediaType.AV else search_in
     search_targets = project_info.search_targets
     if media_type not in search_targets:
@@ -679,7 +661,7 @@ async def handle_post_search_multimodal(
         )
 
     filter_specs = None
-    if shot_scale is not None and len(shot_scale) > 0:
+    if len(shot_scale) > 0:
         filter_specs = {"shot_scale_query": {"$in": shot_scale}}
     if metadata_filter:
         if filter_specs is None:
