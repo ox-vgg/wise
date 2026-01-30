@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 class FeatureStore:
     def __init__(self, store_name, store_data_dir):
         raise NotImplementedError

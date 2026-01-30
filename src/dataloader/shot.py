@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from ..data_models import MediaChunkType
 import torch.utils.data as torch_data
 import numpy as np

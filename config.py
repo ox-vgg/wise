@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from typing_extensions import Self
 from pydantic import model_validator
 

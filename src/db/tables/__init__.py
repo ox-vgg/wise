@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sqlalchemy as sa
 from ..base import project_metadata_obj, thumbs_metadata_obj
 from ...data_models import SourceCollectionType, MediaType, ModalityType

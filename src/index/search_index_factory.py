@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from .feature_search_index import FeatureSearchIndex
 from .sqlite_search_index import SqliteSearchIndex
 

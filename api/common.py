@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from collections.abc import Awaitable, Callable
 from typing import Optional, Annotated
 import base64

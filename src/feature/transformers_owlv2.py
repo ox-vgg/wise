@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 ## Copyright (C) 2025 University of Oxford
 
 ## Parts of the code on this file are based on the code for the

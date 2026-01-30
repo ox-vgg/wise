@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from fastapi import APIRouter, File, Form
 from fastapi.responses import PlainTextResponse
 import os

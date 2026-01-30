@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from pydantic import BaseModel
 from src.data_models import VectorAndMediaMetadata
 from src.feature.feature_extractor import FeatureExtMetadata

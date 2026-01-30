@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import asyncio
 from functools import cached_property
 import io

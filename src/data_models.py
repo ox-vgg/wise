@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import enum
 from pathlib import Path
 from pydantic import ConfigDict, BaseModel, dataclasses

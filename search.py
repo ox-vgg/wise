@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Table of Contents
   A. Process search query and obtain search results

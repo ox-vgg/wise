@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Compute similarity score between 3843 query sentences and 9668 videos
 # from the EpicKitchens-100 dataset.
 

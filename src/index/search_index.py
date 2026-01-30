@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 class SearchIndex:
     """
     Represents various types of search indices. For example,

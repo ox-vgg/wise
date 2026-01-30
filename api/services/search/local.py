@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import logging
 from .base import SearchOutput
 from .exceptions import UnknownSearchIndexError

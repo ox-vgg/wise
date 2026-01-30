@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """Internal Metadata Database
 
 The internal metadata database is an SQLite database storing

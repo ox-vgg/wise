@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import functools
 from pathlib import Path
 import glob

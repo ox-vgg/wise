@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import faiss
 from tqdm import tqdm
 from pathlib import Path
