@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 
-## Copyright (C) 2025 University of Oxford
-
-## Parts of the code on this file are based on the code for the
-## transformers.models.owlv2.modelling_owlv2 module from the
-## transformers Python package distribution version 4.44.2 (see
-## comments on the code below for more details).  The original code
-## had the following notice:
-##
-## Copyright 2023 Google AI and The HuggingFace Team. All rights reserved.
+## Copyright 2026 University of Oxford
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License");
 ## you may not use this file except in compliance with the License.
@@ -21,6 +13,12 @@
 ## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
+##
+## Portions of this file (see comments on the code below for details)
+## contains code from the transformers.models.owlv2.modelling_owlv2
+## module from the transformers Python package distribution version
+## 4.44.2 Licensed under the Apache License, Version 2.0.
+##     Copyright 2023 Google AI and The HuggingFace Team. All rights reserved.
 
 from dataclasses import dataclass
 from functools import cached_property
