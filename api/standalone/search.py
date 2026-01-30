@@ -392,6 +392,22 @@ def reconstruct_vectors(
     response = common.NPArray.from_array(vectors)
     return response
 
+
+def build_filter_specs(shot_scale: list[int], metadata_filter: list[str]):
+    filter_specs = None
+    if shot_scale is not None and len(shot_scale) > 0:
+        filter_specs = {"shot_scale_query": {"$in": shot_scale}}
+    if metadata_filter:
+        if filter_specs is None:
+            filter_specs = {}
+        filter_specs |= {
+            "metadata_query": WISEFTSQuery.model_validate(
+                {"$match": " ".join(metadata_filter)}
+            )
+        }
+    return filter_specs
+
+
 @router.post("/search_with_feature", response_model=common.SearchResponse)
 @common.add_response_time
 async def handle_post_search_feature(
@@ -430,17 +446,7 @@ async def handle_post_search_feature(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
 
-    filter_specs = None
-    if shot_scale is not None and len(shot_scale) > 0:
-        filter_specs = {"shot_scale_query": {"$in": shot_scale}}
-    if metadata_filter:
-        if filter_specs is None:
-            filter_specs = {}
-        filter_specs |= {
-            "metadata_query": WISEFTSQuery.model_validate(
-                {"$match": " ".join(metadata_filter)}
-            )
-        }
+    filter_specs = build_filter_specs(shot_scale, metadata_filter)
 
     vectors = feature.to_array()
     search_output = search_service.search_with_feature(
@@ -660,17 +666,7 @@ async def handle_post_search_multimodal(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
 
-    filter_specs = None
-    if len(shot_scale) > 0:
-        filter_specs = {"shot_scale_query": {"$in": shot_scale}}
-    if metadata_filter:
-        if filter_specs is None:
-            filter_specs = {}
-        filter_specs |= {
-            "metadata_query": WISEFTSQuery.model_validate(
-                {"$match": " ".join(metadata_filter)}
-            )
-        }
+    filter_specs = build_filter_specs(shot_scale, metadata_filter)
 
     _prefix = get_prefix(config)
     prefix = _prefix[search_in] if add_prefix else ""
