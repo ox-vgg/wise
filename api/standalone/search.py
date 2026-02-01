@@ -394,17 +394,13 @@ def reconstruct_vectors(
 
 
 def build_filter_specs(shot_scale: list[int], metadata_filter: list[str]):
-    filter_specs = None
-    if shot_scale is not None and len(shot_scale) > 0:
-        filter_specs = {"shot_scale_query": {"$in": shot_scale}}
+    filter_specs = {}
+    if len(shot_scale) > 0:
+        filter_specs["shot_scale_query"] = {"$in": shot_scale}
     if metadata_filter:
-        if filter_specs is None:
-            filter_specs = {}
-        filter_specs |= {
-            "metadata_query": WISEFTSQuery.model_validate(
-                {"$match": " ".join(metadata_filter)}
-            )
-        }
+        filter_specs["metadata_query"] = WISEFTSQuery.model_validate(
+            {"$match": " ".join(metadata_filter)}
+        )
     return filter_specs
 
 

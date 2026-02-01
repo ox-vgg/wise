@@ -61,10 +61,10 @@ class LocalSearchService:
         feature_extractor_id: str, 
         start: int,
         end: int,
-        filter_specs: dict | None = None
+        filter_specs: dict,
     ):
         search_index = self.search_indices[media_type][feature_extractor_id]
-        if filter_specs is not None:
+        if filter_specs:
             filtered_ids = self.filter_vectors(media_type, feature_extractor_id, filter_specs)
             sel = faiss.IDSelectorBatch(filtered_ids)
             if search_index.index_type == 'IndexFlatIP':
@@ -106,7 +106,7 @@ class LocalSearchService:
         feature_extractor_id: str, 
         start: int,
         end: int,
-        filter_specs: dict | None = None
+        filter_specs: dict,
     ):
         features = self.embedding_service.embed(feature_extractor_id, embedding_config, q)
         return self.search_with_feature(
