@@ -424,7 +424,7 @@ async def handle_post_search_feature(
     shot_scale: list[int] = Query(default=[]),
     metadata_filter: list[str] = Query(default=[]),
 ):
-    media_type = 'audio' if search_in == MediaType.AV else search_in
+    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
     search_targets = project_info.search_targets
     if media_type not in search_targets:
         raise HTTPException(400, {
@@ -523,7 +523,7 @@ async def handle_post_search_multimodal(
     Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
     input images/text, and then using this as the query vector.
     """
-    media_type = 'audio' if search_in == MediaType.AV else search_in
+    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
     search_targets = project_info.search_targets
     if media_type not in search_targets:
         raise HTTPException(400, {
