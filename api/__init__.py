@@ -158,20 +158,11 @@ def serve(
     project_dir: Path,
     theme_asset_dir: Path,
     index_type: Optional[str] = None,
-    query_blocklist_file: Path = None,
 ):
     options = {"command": "serve"}
     options = options | ({"project_dir": project_dir} if project_dir else {})
     if index_type:
         options.update({"index_type": index_type})
-    if query_blocklist_file:
-        query_blocklist = []
-        with open(query_blocklist_file, 'r') as f:
-            for line in f:
-                term = line.strip()
-                if term:
-                    query_blocklist.append(term)
-        options.update({"query_blocklist": set(query_blocklist)})
 
     config = APIConfig.model_validate(options)  # type: ignore
 

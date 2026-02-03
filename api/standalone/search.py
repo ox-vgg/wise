@@ -530,15 +530,6 @@ async def handle_post_search_multimodal(
             "message": f"No search index exists for this modality: {media_type}"
         })
 
-    for tq in text_queries:
-        if tq.strip() in config.query_blocklist:
-            message = (
-                "One of the search terms you entered has been blocked"
-                if len(text_queries) > 1
-                else "The search term you entered has been blocked"
-            )
-            raise HTTPException(403, {"message": message})
-
     q = [dict(sign="positive", modality="text", val=query) for query in text_queries]
     
     if len(q) > 5:

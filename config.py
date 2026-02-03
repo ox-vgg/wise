@@ -63,7 +63,6 @@ class APIConfig(BaseSettings):
     negative_queries_weight: float = 0.2
     index_type: str = "IndexFlatIP"
     nprobe: int = 1024
-    query_blocklist: set[str] = set()
     project_dir: Path
     remote_projects: set[str] = set()
     thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"

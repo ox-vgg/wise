@@ -108,15 +108,6 @@ async def handle_post_search_multimodal(
     Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
     input images/text, and then using this as the query vector.
     """
-    for tq in text_queries:
-        if tq.strip() in config.query_blocklist:
-            message = (
-                "One of the search terms you entered has been blocked"
-                if len(text_queries) > 1
-                else "The search term you entered has been blocked"
-            )
-            raise HTTPException(403, {"message": message})
-
     q = [dict(sign="positive", modality="text", val=query) for query in text_queries]
     
     q += [dict(sign="positive", modality="image", val=query) for query in (

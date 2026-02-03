@@ -12,6 +12,9 @@ Next version (unreleased)
   only the faiss feature store is now supported.  The extract-features
   `--feature-store` option now only supports the `faiss` value.
 
+* Removed the query blocklist feature because it was not effective, it
+  was far too easy to bypass.
+
 
 2.1.0 (2025-02-04)
 ------------------
