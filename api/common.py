@@ -15,7 +15,7 @@
 ## limitations under the License.
 
 from collections.abc import Awaitable, Callable
-from typing import Optional, Annotated
+from typing import Annotated, Literal, Optional, TypedDict
 import base64
 import functools
 import time
@@ -34,6 +34,50 @@ class BBoxXYWH(BaseModel):
     y: round_float
     w: round_float
     h: round_float
+
+
+class InternalQTerm(TypedDict):
+    sign: Literal["positive", "negative"]
+    modality: Literal["image", "audio", "text"]
+    val: bytes | str
+
+
+def api_query_to_internal_q(
+    # Positive queries
+    text_queries: list[str],
+    image_file_queries: list[bytes],  # user-uploaded images
+    audio_file_queries: list[bytes],  # user-uploaded audio files
+    image_url_queries: list[str],  # URLs to online images
+    audio_url_queries: list[str],  # URLs to online audio files
+    internal_image_queries: list[str],  # ids to internal images
+    # Negative queries
+    negative_text_queries: list[str],
+    negative_image_file_queries: list[bytes],  # user-uploaded images
+    negative_audio_file_queries: list[bytes],  # user-uploaded audio files
+    negative_image_url_queries: list[str],  # URLs to online images
+    negative_audio_url_queries: list[str],  # URLs to online audio files
+    negative_internal_image_queries: list[str],  # ids to internal images
+) -> list[InternalQTerm]:
+    """Convert from the *_queries values from API into the "internal" form.
+    """
+    q = [dict(sign="positive", modality="text", val=query) for query in text_queries]
+
+    q += [dict(sign="positive", modality="image", val=query) for query in (
+        image_file_queries + image_url_queries + internal_image_queries
+    )]
+    q += [dict(sign="positive", modality="audio", val=query) for query in (
+        audio_file_queries + audio_url_queries
+    )]
+
+    q += [dict(sign="negative", modality="text", val=query) for query in negative_text_queries]
+    q += [dict(sign="negative", modality="image", val=query) for query in (
+        negative_image_file_queries + negative_image_url_queries + negative_internal_image_queries
+    )]
+    q += [dict(sign="negative", modality="audio", val=query) for query in (
+        negative_audio_file_queries + negative_audio_url_queries
+    )]
+    return q
+
 
 class VectorInfo(BaseModel):
     vector_id: str

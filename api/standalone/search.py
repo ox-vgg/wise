@@ -611,20 +611,20 @@ async def handle_post_search_multimodal(
             for x in negative_internal_image_queries
         ]
 
-    q += [dict(sign="positive", modality="image", val=query) for query in (
-        image_file_queries + image_url_queries + internal_image_queries
-    )]
-    q += [dict(sign="positive", modality="audio", val=query) for query in (
-        audio_file_queries + audio_url_queries
-    )]
-
-    q += [dict(sign="negative", modality="text", val=query) for query in negative_text_queries]
-    q += [dict(sign="negative", modality="image", val=query) for query in (
-        negative_image_file_queries + negative_image_url_queries + negative_internal_image_queries
-    )]
-    q += [dict(sign="negative", modality="audio", val=query) for query in (
-        negative_audio_file_queries + negative_audio_url_queries
-    )]
+    q = common.api_query_to_internal_q(
+        text_queries,
+        image_file_queries,
+        audio_file_queries,
+        image_url_queries,
+        audio_url_queries,
+        internal_image_queries,
+        negative_text_queries,
+        negative_image_file_queries,
+        negative_audio_file_queries,
+        negative_image_url_queries,
+        negative_audio_url_queries,
+        negative_internal_image_queries,
+    )
 
     if len(q) == 0:
         raise HTTPException(400, {"message": "Missing search query"})
