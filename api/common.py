@@ -39,7 +39,7 @@ class BBoxXYWH(BaseModel):
 class InternalQTerm(TypedDict):
     sign: Literal["positive", "negative"]
     modality: Literal["image", "audio", "text"]
-    val: bytes | str
+    val: bytes | str | np.ndarray
 
 
 def api_query_to_internal_q(
