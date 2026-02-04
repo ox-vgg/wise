@@ -79,7 +79,7 @@ class TestWithEmptyProject(unittest.TestCase):
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.json()["detail"], "Metadata not found!")
 
-    def test_get_metadata_to_nonexistent_media(self):
+    def test_get_thumbnail_to_nonexistent_media(self):
         resp = self.client.get("/wise-test-project/thumbnail/1")
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.json()["detail"], "Not Found")
