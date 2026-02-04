@@ -14,13 +14,23 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from collections.abc import Awaitable, Callable
-from typing import Annotated, Literal, Optional, TypedDict
 import base64
 import functools
 import time
+from collections.abc import Awaitable, Callable
+from typing import Annotated, Callable, Literal, Optional, TypedDict
+
 import numpy as np
-from pydantic import BaseModel, HttpUrl, PlainSerializer, field_validator
+from fastapi import HTTPException, Request, Response, UploadFile
+from fastapi.routing import APIRoute
+from pydantic import (
+    BaseModel,
+    HttpUrl,
+    PlainSerializer,
+    TypeAdapter,
+    field_validator,
+)
+
 from config import APIConfig
 
 PRECISION = 5
@@ -29,11 +39,85 @@ def round_float_(v: float) -> float:
 
 round_float = Annotated[float, PlainSerializer(round_float_, when_used='json-unless-none')]
 
+
 class BBoxXYWH(BaseModel):
     x: round_float
     y: round_float
     w: round_float
     h: round_float
+
+
+class BaseQueryTerm(BaseModel):
+    """Base class for one query term.
+
+    Each query term must have its own unique term ID across a query.
+    The term ID is used to map it to files in multipart/form-data
+    requests.  The term_id can also be useful later to send back term
+    specific data on the response.
+
+    See `MediaQueryTerm`, `VectorQueryTerm`, and `TextQueryTerm` for
+    concrete "implementations".
+
+    """
+    term_id: str
+    is_negative: bool
+
+
+class MediaQueryTerm(BaseQueryTerm):
+    """A query term based on a media file (image, audio, or video).
+
+    This provides "cropping" around space and time: `bbox` for x and y
+    dimensions and ts/te for time, thus providing an API to search
+    with image regions and video segments.
+
+    Attributes:
+        src: bytes for image, int for media id, URL string for URL to
+            download media file.
+        qtype: in the case of an audiovisual file, whether to use the
+             audio or video streams for the query.
+        bbox: region to use for search in XYWH format with origin in
+            the top left corner.  If missing, uses the whole image.
+        ts/te: time start and time end, defaulting, respectively, to
+            the start and end of the video file.  If ts and te have
+            the same value then it uses a single frame, otherwise it's
+            a video segment.
+
+    """
+    src: HttpUrl | bytes | int
+    qtype: Literal["audio", "visual"]
+    bbox: Optional[BBoxXYWH] = None
+    ts: Optional[float] = None
+    te: Optional[float] = None
+
+
+class VectorQueryTerm(BaseQueryTerm):
+    vector_id: str  # str because format is {shard_id}/{media_id}/{vector_id}
+
+
+class TextQueryTerm(BaseQueryTerm):
+    txt: str
+
+
+Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm]
+
+
+## Query's are an HTTP multipart/form-data request where the files
+## (images, audio, videos) go on a separate key.  The files filenames
+## must match the corresponding MediaQueryTerm term_id.  So we have
+## intermediary types with the `*InForm` suffix, to validate what we
+## got on the request before getting the "final" MediaQueryTerm.
+##
+## One alternative evaluated was having gzipped requests in JSON
+## format with the uploaded files in base64.  That would lead to
+## requests of roughly the same size.  However, we choose the
+## multipart approach instead of gzip+base64+json because we decided
+## it would be simpler to maintain with lower CPU usage in the client.
+
+class MediaQueryTermInForm(MediaQueryTerm):
+    src: HttpUrl | int | None  # None means bytes in another form part
+
+QueryTermInForm = MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm
+QueryTermInFormAdapter = TypeAdapter(QueryTermInForm)
 
 
 class InternalQTerm(TypedDict):
@@ -42,40 +126,65 @@ class InternalQTerm(TypedDict):
     val: bytes | HttpUrl | str | np.ndarray
 
 
+def merge_multipart_query_form(
+    query_form: list[str], query_form_files: list[UploadFile]
+) -> Query:
+    query_form = [QueryTermInFormAdapter.validate_json(x) for x in query_form]
+    term_ids = {x.term_id for x in query_form}
+    if len(term_ids) != len(query_form):
+        raise HTTPException(
+            400, {"message": "query terms must have unique term_id"}
+        )
+
+    ## We hijack the form-data filename to use as term_id
+    filename_to_file = {x.filename: x for x in query_form_files}
+    if len(filename_to_file) != len(query_form_files):
+        raise HTTPException(
+            400, {"message": "query files must have unique filenames"}
+        )
+    if any([x not in term_ids for x in filename_to_file.keys()]):
+        raise HTTPException(
+            400, {"message": "query files must have query term with matching term_id"}
+        )
+
+    query = []
+    for term_form in query_form:
+        if (isinstance(term_form, MediaQueryTermInForm)
+            and term_form.src is None):
+            query.append(
+                MediaQueryTerm(
+                    **term_form.model_dump(exclude="src"),
+                    src=filename_to_file[term_form.term_id].file.read(),
+                )
+            )
+        else:
+            query.append(term_form)
+    return query
+
+
 def api_query_to_internal_q(
-    # Positive queries
-    text_queries: list[str],
-    image_file_queries: list[bytes],  # user-uploaded images
-    audio_file_queries: list[bytes],  # user-uploaded audio files
-    image_url_queries: list[HttpUrl],  # URLs to online images
-    audio_url_queries: list[HttpUrl],  # URLs to online audio files
-    internal_image_queries: list[str],  # ids to internal images
-    # Negative queries
-    negative_text_queries: list[str],
-    negative_image_file_queries: list[bytes],  # user-uploaded images
-    negative_audio_file_queries: list[bytes],  # user-uploaded audio files
-    negative_image_url_queries: list[HttpUrl],  # URLs to online images
-    negative_audio_url_queries: list[HttpUrl],  # URLs to online audio files
-    negative_internal_image_queries: list[str],  # ids to internal images
+    query_form: list[str], query_form_files: list[UploadFile]
 ) -> list[InternalQTerm]:
-    """Convert from the *_queries values from API into the "internal" form.
-    """
-    q = [dict(sign="positive", modality="text", val=query) for query in text_queries]
-
-    q += [dict(sign="positive", modality="image", val=query) for query in (
-        image_file_queries + image_url_queries + internal_image_queries
-    )]
-    q += [dict(sign="positive", modality="audio", val=query) for query in (
-        audio_file_queries + audio_url_queries
-    )]
-
-    q += [dict(sign="negative", modality="text", val=query) for query in negative_text_queries]
-    q += [dict(sign="negative", modality="image", val=query) for query in (
-        negative_image_file_queries + negative_image_url_queries + negative_internal_image_queries
-    )]
-    q += [dict(sign="negative", modality="audio", val=query) for query in (
-        negative_audio_file_queries + negative_audio_url_queries
-    )]
+    api_query = merge_multipart_query_form(query_form, query_form_files)
+    q = []
+    for query_term in api_query:
+        sign = "negative" if query_term.is_negative else "positive"
+        if isinstance(query_term, TextQueryTerm):
+            q.append(dict(sign=sign, modality="text", val=query_term.txt))
+        elif isinstance(query_term, MediaQueryTerm):
+            modality = "image" if query_term.qtype == "visual" else "audio"
+            if query_term.bbox:
+                raise HTTPException(400, {"message": "bbox not supported"})
+            elif query_term.ts is not None or query_term.te is not None:
+                raise HTTPException(400, {"message": "ts/te not supported"})
+            q.append(dict(sign=sign, modality=modality, val=query_term.src))
+        elif isinstance(query_term, VectorQueryTerm):
+            ## Currently, vector id is only supported for images,
+            ## hence modality is always "image" (but this should
+            ## change in the future).
+            q.append(dict(sign=sign, modality="image", val=query_term.vector_id))
+        else:
+            raise Exception("unhandled type of QueryTerm")
     return q
 
 
@@ -190,3 +299,34 @@ def add_response_time(func: Callable[..., Awaitable[SearchResponse]]):
         return response
 
     return wrapper
+
+
+class CachedBodyRequest(Request):
+    """Request which caches body before parsing form.
+
+    `form()` calls stream() directly to construct `FormData` without
+    storing the request content.  `body()` also calls `stream()` but
+    stores the content which `stream()` then uses if available.  This
+    Request class calls `body()` before `form()` to ensure that the
+    stream raw content is kept.  See
+    https://github.com/Kludex/starlette/discussions/1933
+
+    This is needed in the POST search with metadata route which
+    forwards the request after parsing the form arguments.
+
+    """
+    async def form(self, *args, **kwargs):
+        await super().body()
+        return await super().form(*args, **kwargs)
+
+class CachedBodyRoute(APIRoute):
+    """Route that ensures that Request cache body, see CachedBodyRequest
+    """
+    def get_route_handler(self) -> Callable:
+        original_route_handler = super().get_route_handler()
+
+        async def cache_body_route_handler(request: Request) -> Response:
+            request = CachedBodyRequest(request.scope, request.receive)
+            return await original_route_handler(request)
+
+        return cache_body_route_handler

@@ -304,10 +304,12 @@ done
 echo "Test 5.2b PASSED"
 
 # Test 5.3 : metadata search
-METADATA_SEARCH_QUERY="church"
+METADATA_SEARCH_QUERY='{"term_id": "x", "is_negative": false, "txt": "church"}'
 RESULT_COUNT=3
-SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=wise/metadata&text_queries=${METADATA_SEARCH_QUERY}"
-response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=wise/metadata"
+response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                -F "query_term=$METADATA_SEARCH_QUERY" \
+                "${SEARCH_URL}")
 response_selected_json=$(echo "$response" | jq -c '{
   images: (
     .image_results.images | 
@@ -358,7 +360,10 @@ if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
     fi
     RESULT_COUNT=3
     SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID2}"
-    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual"}' \
+                    -F "query_file=@${FACE_IMG_FILE};filename=x" \
+                    "${SEARCH_URL}")
     response_selected_json=$(echo "$response" | jq -c '. as $root | {
       results: (
         .image_results.vectors |
@@ -404,8 +409,10 @@ fi
 if [ "$IMAGE_FEATURE_ID3" == "transformers/owlv2/google/owlv2-large-patch14-ensemble" ]; then
     RESULT_COUNT=3
     # http://localhost:10001/wikimedia-commons-images-25/search?start=0&end=500&thumbs=1&search_in=image&feature_extractor_id=transformers/owlv2/google/owlv2-large-patch14-ensemble&text_queries=bird
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID3}&text_queries=bird"
-    response=$(curl -s -X POST "${SEARCH_URL}")
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID3}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "bird"}' \
+                    "${SEARCH_URL}")
     response_selected_json=$(echo "$response" | jq -c '. as $root | {
       results: (
         .image_results.vectors |

@@ -304,10 +304,11 @@ fi
 
 # Test 5.3 : check if the server returns correct results (including metadata) for query on video
 if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
-    SEARCH_QUERY="bees"
     RESULT_COUNT=60
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
-    response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "bees"}' \
+                    "${SEARCH_URL}")
 
     # The WISE server's JSON response for search query is as follows:
     # {
@@ -374,10 +375,11 @@ fi
 
 # Test 5.4 : check if the server returns correct results (including metadata) for query on audio
 if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
-    SEARCH_QUERY="fire+engine+siren"
     RESULT_COUNT=1
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}&text_queries=${SEARCH_QUERY}"
-    response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "fire engine siren"}' \
+                    "${SEARCH_URL}")
 
     response_selected_json=$(echo "$response" | jq -c '{
         merged_windows: [
@@ -426,7 +428,10 @@ if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ] || [
     fi
     RESULT_COUNT=3
     SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
-    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual"}' \
+                    -F "query_file=@${FACE_IMG_FILE};filename=x" \
+                    "${SEARCH_URL}")
     echo $response
     response_selected_json=$(echo "$response" | jq -c '{
     results: [

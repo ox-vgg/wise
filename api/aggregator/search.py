@@ -16,15 +16,17 @@
 
 import json
 import logging
+from typing import Annotated
 
 import numpy as np
+from fastapi.routing import APIRoute
 
 from .. import common
 from ..services.embedding import EmbeddingConfig
 
 from src.data_models import MediaType, ModalityType
 
-from fastapi import APIRouter, Query, File, Form, HTTPException, Request
+from fastapi import APIRouter, Query, Form, HTTPException, Request, UploadFile
 from pydantic import HttpUrl
 
 from ..dependencies import ConfigDep, EmbeddingServiceDep, SearchServiceDep
@@ -42,7 +44,7 @@ def get_prefix(config):
     }
 
 
-router = APIRouter()
+router = APIRouter(route_class=common.CachedBodyRoute)
 
 @router.get("/featured", response_model=common.SearchResponse)
 @common.add_response_time
@@ -68,21 +70,37 @@ async def handle_get_featured(
     return response
 
 
-async def get_search_embeddings_for_internal_queries(
+async def replace_vector_ids_with_search_embeddings(
     search_service,
     embedding_service,
     media_type,
     feature_extractor_id,
-    internal_queries: list[str],
-) -> list[np.ndarray]:
-    # reconstruct features from faiss index
-    internal_queries = await search_service.reconstruct_vectors(media_type, feature_extractor_id, internal_queries)
-    # Apply hook to transform internal image query vectors
-    internal_queries = [
+    q: list[common.InternalQTerm],
+) -> list[common.InternalQTerm]:
+    ## Pick up queries for internal vectors
+    q_idx = []
+    vector_ids = []
+    for i, x in enumerate(q):
+        if x["modality"] != "text" and isinstance(x["val"], str):
+            q_idx.append(i)
+            vector_ids.append(x)
+    if not vector_ids:
+        return q
+
+    ## Reconstruct features from faiss index
+    embeddings = await search_service.reconstruct_vectors(
+        media_type, feature_extractor_id, vector_ids
+    )
+    ## Apply hook to transform internal image query vectors
+    search_embeddings = [
         embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-        for x in internal_queries
+        for x in embeddings
     ]
-    return internal_queries
+
+    new_q = q.copy()
+    for idx, embedding in zip(q_idx, search_embeddings):
+        new_q[idx] = q[idx] | {"val": embedding}
+    return new_q
 
 
 @router.post("/search", response_model=common.SearchResponse)
@@ -97,24 +115,9 @@ async def handle_post_search_multimodal(
     request: Request,
     search_in: MediaType = Query(),
     feature_extractor_id: str = Query(),
-    # Positive queries
-    text_queries: list[str] = Query(default=[]),
-    image_file_queries: list[bytes] = File([]),  # user-uploaded images
-    audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
-    image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
-    audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
-    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
-    # Negative queries
-    negative_text_queries: list[str] = Query(default=[]),
-    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
-    negative_audio_file_queries: list[bytes] = File(
-        []
-    ),  # user-uploaded audio files
-    negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
-    negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
-    negative_internal_image_queries: list[str] = Query(
-        default=[]
-    ),  # ids to internal images
+    # Query
+    query_term: Annotated[list[str], Form()] = [],
+    query_file: list[UploadFile] = [],
     # Other parameters
     start: int = Query(0, ge=0, le=980),
     end: int = Query(20, gt=0, le=1000),
@@ -128,26 +131,12 @@ async def handle_post_search_multimodal(
     Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
     input images/text, and then using this as the query vector.
     """
-    q = common.api_query_to_internal_q(
-        text_queries,
-        image_file_queries,
-        audio_file_queries,
-        image_url_queries,
-        audio_url_queries,
-        internal_image_queries,
-        negative_text_queries,
-        negative_image_file_queries,
-        negative_audio_file_queries,
-        negative_image_url_queries,
-        negative_audio_url_queries,
-        negative_internal_image_queries,
-    )
-
-    if len(q) == 0:
+    if len(query_term) == 0:
         raise HTTPException(400, {"message": "Missing search query"})
-    elif len(q) > 5:
+    elif len(query_term) > 5:
         raise HTTPException(400, {"message": "Too many query items"})
 
+    q = common.api_query_to_internal_q(query_term, query_file)
 
     if search_in == MediaType.IMAGE:
         if len([query for query in q if query['modality'] == 'audio']) > 0:
@@ -170,35 +159,9 @@ async def handle_post_search_multimodal(
         return response
 
     media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    internal_image_queries = await get_search_embeddings_for_internal_queries(
-        search_service,
-        embedding_service,
-        media_type,
-        feature_extractor_id,
-        internal_image_queries,
-    )
-    negative_internal_image_queries = await get_search_embeddings_for_internal_queries(
-        search_service,
-        embedding_service,
-        media_type,
-        feature_extractor_id,
-        negative_internal_image_queries,
-    )
 
-    ## Do this again, with the transformed internal image query vectors
-    q = common.api_query_to_internal_q(
-        text_queries,
-        image_file_queries,
-        audio_file_queries,
-        image_url_queries,
-        audio_url_queries,
-        internal_image_queries,
-        negative_text_queries,
-        negative_image_file_queries,
-        negative_audio_file_queries,
-        negative_image_url_queries,
-        negative_audio_url_queries,
-        negative_internal_image_queries,
+    q = await replace_vector_ids_with_search_embeddings(
+        search_service, embedding_service, media_type, feature_extractor_id, q
     )
 
     prefix = get_prefix(config)[search_in] if add_prefix else ""

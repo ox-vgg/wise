@@ -15,6 +15,10 @@ Next version (unreleased)
 * Removed the query blocklist feature because it was not effective, it
   was far too easy to bypass.
 
+* The new `/search2` API uses a different query structure. Consider switching to
+this new endpoint if you develop your own frontend. The older `/search` endpoint will be removed in the next
+major release (and `/search2` will become `/search`)
+
 
 2.1.0 (2025-02-04)
 ------------------
