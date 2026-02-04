@@ -538,12 +538,22 @@ async def handle_post_search_multimodal(
     if feature_extractor_id == 'wise/metadata':
         if len(q) == 0:
             raise HTTPException(400, {"message": "Missing search query"})
-        
-        if internal_image_queries or negative_internal_image_queries:
+
+        if (image_file_queries
+            or audio_file_queries
+            or image_url_queries
+            or audio_url_queries
+            or internal_image_queries
+            or negative_text_queries
+            or negative_image_file_queries
+            or negative_audio_file_queries
+            or negative_image_url_queries
+            or negative_audio_url_queries
+            or negative_internal_image_queries):
             raise HTTPException(400, {
-                "message": "`wise/metadata` feature extractor cannot be used with internal vectors. Please use a different feature extractor."
+                "message": "`wise/metadata` feature extractor can only be used with `text_queries`."
             })
-        
+
         # ASR search
         if start > end:
             raise HTTPException(
