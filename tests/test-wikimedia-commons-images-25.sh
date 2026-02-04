@@ -52,11 +52,19 @@ NUM_WORKERS=2
 
 EXTENSION="faiss" # options are: faiss, tar, npy
 
-FEATURE_EXTRACTOR_CONFIG="{
-    \"${IMAGE_FEATURE_ID3}\": {
-        \"objectness_threshold\": 0.10
-    }
+NEW_CONFIG="{
+  \"${IMAGE_FEATURE_ID3}\": {
+    \"objectness_threshold\": 0.10
+  }
 }"
+
+if [ -n "${FEATURE_EXTRACTOR_CONFIG:-}" ]; then
+  # If FEATURE_EXTRACTOR_CONFIG is already set, merge the new config into it
+  FEATURE_EXTRACTOR_CONFIG=$(jq -n --argjson old "$FEATURE_EXTRACTOR_CONFIG" --argjson new "$NEW_CONFIG" '$old + $new')
+else
+  # Otherwise, just set it to the new config
+  FEATURE_EXTRACTOR_CONFIG="$NEW_CONFIG"
+fi
 
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
