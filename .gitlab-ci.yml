@@ -61,13 +61,6 @@ pages:
     - 'NOTICE'
     - 'README.md'
 
-# build docker images on MR to main (to check if the build succeeds), or on commit to main
-.docker-rules:
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - <<: *docker-changes
-      if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
-
 # create a pipeline for main branch, and for merge requests targeting the main branch
 workflow:
   rules:
@@ -90,7 +83,31 @@ default:
   tags: 
     - saas-linux-small-amd64
 
-build-wise:
+build-only:
+  stage: build  
+  script:
+    - export CACHE_TAG=${APP//wise-/}-${PLATFORM}
+    - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/${PLATFORM}
+    - docker compose -f compose.yaml -f compose.gitlab.yaml config
+    - docker compose -f compose.yaml -f compose.gitlab.yaml --pull build wise
+  rules:
+    - <<: *docker-changes
+      if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: never
+  parallel:
+    matrix:
+      - PLATFORM: [amd64]
+        APP: [wise, wise-cpu]
+        SIZE: [medium]
+      - PLATFORM: [arm64]
+        APP: [wise-cpu]
+        SIZE: [small]
+  tags: 
+    - saas-linux-${SIZE}-${PLATFORM}
+
+build:
   stage: build  
   artifacts:
     name: ${APP}-${PLATFORM}-image-digest
@@ -109,8 +126,11 @@ build-wise:
       - PLATFORM: [arm64]
         APP: [wise-cpu]
         SIZE: [small]
-  extends:
-    - .docker-rules
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: always
   tags: 
     - saas-linux-${SIZE}-${PLATFORM}
 
@@ -135,7 +155,7 @@ build-wise:
 push-manifest:
   <<: *push-manifest
   needs: 
-    - job: build-wise
+    - job: build
       parallel:
         matrix:
           - PLATFORM: [amd64]
@@ -149,7 +169,7 @@ push-manifest:
 push-manifest-cpu:
   <<: *push-manifest
   needs: 
-    - job: build-wise
+    - job: build
       parallel:
         matrix:
           - PLATFORM: [amd64]
