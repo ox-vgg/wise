@@ -291,7 +291,7 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
     ['feature_extractor_id', featureExtractorId],
     ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
     ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries',  `${q.value.media_id}/${q.value.vector_id}` as string]),
-    ...shotScaleFilter.map(s => ['shot_scale', s]),
+    ...shotScaleFilter.map(s => ['shot_scale', s.toString()]),
     ...metadataFilterQueries.map(q => ['metadata_filter', q.value as string])
   ];
   const urlParams = new URLSearchParams(urlParamsArray);
