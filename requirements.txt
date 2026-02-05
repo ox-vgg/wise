@@ -3,6 +3,7 @@ accelerate
 alembic~=1.13.0
 beautifulsoup4~=4.12.2
 braceexpand~=0.1.7
+faiss-cpu>=1.7.4
 fastapi[all]~=0.110.1  # [all] required for Starlette's schema generation
 filetype~=1.2.0
 h5py==3.11.0
@@ -20,6 +21,9 @@ pydantic~=2.7.0
 python-magic~=0.4.27
 scikit-learn
 sqlalchemy~=2.0.42
+torch>=2.2.2
+torchaudio>=2.2.2,<2.9  # <2.9 because that's when torchaudio.io was removed
+torchvision>=0.17.2
 tqdm~=4.66.2
 transformers~=4.51.3
 tritonclient[all]

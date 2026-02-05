@@ -56,7 +56,6 @@ python3 -m venv wise-dep/          # create virtual environment
 source wise-dep/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-pip install -r torch-faiss-requirements.txt
 ```
 
 ## Option 3: Install WISE to use only CPU (i.e. no GPU)
@@ -73,8 +72,7 @@ python -m pip install --upgrade pip
 
 # Note: the following command is the key to installing CPU only version of WISE
 pip install --index-url https://download.pytorch.org/whl/cpu \
-    -r torch-faiss-requirements.txt
+    -r requirements.txt
 
 pip install -r requirements.txt
-pip install faiss-cpu
 ```

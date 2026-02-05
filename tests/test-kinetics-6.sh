@@ -66,7 +66,7 @@ fi
 echo "Ensuring dependencies are installed..."
 source "${ENV_DIR}/bin/activate"
 python3 -m pip install --upgrade pip setuptools wheel
-pip install -r "${CODE_DIR}/requirements.txt" -r "${CODE_DIR}/torch-faiss-requirements.txt"
+pip install -r "${CODE_DIR}/requirements.txt"
 
 
 ## 3. Download Kinetics-6 dataset
