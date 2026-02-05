@@ -84,7 +84,8 @@ default:
     - saas-linux-small-amd64
 
 build-only:
-  stage: build  
+  stage: build
+  interruptible: true
   script:
     - export CACHE_TAG=${APP//wise-/}-${PLATFORM}
     - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/${PLATFORM}
