@@ -37,7 +37,7 @@ Using the conda tool, the WISE software dependencies can be installed as follows
 - If you are using WISE on non-Intel platforms, edit `environment.yml` to remove the reference to `mkl`
 
 ```
-conda env create -f environment.yml
+conda env create --name wise -f environment.yml
 conda activate wise
 ```
 
