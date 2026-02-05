@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
         export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cu124'; \
     else \
         export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cpu' && \
-        sed -i 's/^onnxruntime-gpu$/onnxruntime/' requirements.txt; \
+        sed -i 's/^onnxruntime-gpu.*$/onnxruntime/' requirements.txt; \
     fi && \
     echo "Using Pip index url: ${PIP_EXTRA_INDEX_URL}" && \
     micromamba create --always-copy --yes -n wise-env -f "environment.yml"
