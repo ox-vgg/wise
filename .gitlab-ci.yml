@@ -11,6 +11,7 @@ stages:
   - build
   - pages
 
+# job to push to pages, only on commit in main branch
 pages:
   stage: pages
   image: python:latest
@@ -33,13 +34,45 @@ pages:
   tags: 
     - saas-linux-small-amd64
 
+.docker-changes: &docker-changes
+  changes:
+    - 'api/**/*'
+    - 'frontend/**/*'
+    - 'src/**/*'
+    - .dockerignore
+    - 'Dockerfile'
+    - 'compose.yaml'
+    - 'compose.cpu.yaml'
+    - 'compose.gitlab.yaml'
+    - '.gitlab-ci.yml'
+    - 'environment.yaml'
+    - 'requirements.txt'
+    - '.env.template'
+    - '*.py'
+
+.doc-changes: &doc-changes
+  changes:
+    - 'data/**/*'
+    - 'docs/**/*'
+    - 'mkdocs/**/*'
+    - '*.md'
+    - 'LICENSE'
+    - 'NEWS.md'
+    - 'NOTICE'
+    - 'README.md'
+
+# build docker images on MR to main (to check if the build succeeds), or on commit to main
 .docker-rules:
   rules:
-    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api")
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - <<: *docker-changes
+      if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
 
+# create a pipeline for main branch, and for merge requests targeting the main branch
 workflow:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
 
 default:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:26.1.4
@@ -79,10 +112,13 @@ build-wise:
   tags: 
     - saas-linux-large-${PLATFORM}
 
+# this job only runs on default branch
 .push-manifest: &push-manifest
   stage: build
-  extends:
-    - .docker-rules
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
   script:
     - set -x
     - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/amd64
