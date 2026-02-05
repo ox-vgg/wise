@@ -77,5 +77,4 @@ python -m pip install --upgrade pip
 pip install --index-url https://download.pytorch.org/whl/cpu \
     -r requirements.txt
 
-pip install -r requirements.txt
 ```
