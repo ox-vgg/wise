@@ -2,7 +2,7 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
-  - defaults
+  - nodefaults  # ensure default channel is not used due to its ToS
 
 dependencies:
   - python=3.10
