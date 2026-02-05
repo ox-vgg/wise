@@ -47,6 +47,11 @@ import torch
 ##   3. InsightFace imports albumentations which by default call PyPI
 ##      to check if it's the latest version and prints a message if
 ##      not.  We need to set env variable to disable that.
+##
+##   4. torch must be import before onnxruntime so that onnxruntime
+##      picks up the CUDA and cuDNN from torch and eliminate the need
+##      for separate cuDNN installation, see
+##      https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#compatibility-with-pytorch
 
 # isort: off
 import os

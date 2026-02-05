@@ -17,6 +17,8 @@
 import logging
 from pathlib import Path
 
+## import torch before onnxruntime so both use same cuDNN, see
+## https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#compatibility-with-pytorch
 import torch
 import numpy as np
 import onnxruntime as ort
