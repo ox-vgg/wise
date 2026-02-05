@@ -19,7 +19,8 @@ services:
 
     # Pass wise project dir to persist projects
     volumes:
-    - ${WISE_PROJECT_DIR:-$PWD/projects}:/wise/projects
+    - ${WISE_PROJECT_DIR:-$PWD/projects}:/wise/projects # need read permission for serve, read-write for other commands
+    - ${WISE_REPORT_DATA_DIR:-$PWD/data}:/wise/data # keep this with write permission for the user
     - wise-cache:/tmp
 
     deploy:

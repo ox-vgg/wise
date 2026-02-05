@@ -6,6 +6,7 @@
 !.env.template
 
 # data folder
+!/data/.gitkeep
 /data/
 /wise-data/
 /wise-projects/
