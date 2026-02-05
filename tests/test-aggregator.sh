@@ -113,6 +113,14 @@ if [ ! -d "${TEST_DATA_DIR}" ]; then
     mkdir -p "${DATA_DIR}"
     cd "${DATA_DIR}"
     curl -sLO $TEST_DATA_DOWNLOAD_URL
+    # ensure that the sha256 checksum of the downloaded zip file matches the expected value
+    EXPECTED_CHECKSUM="50af20db7ac9c56d21b84b373e2d8008417a3a8c7ea12c1ef26733d4c7ca7394"
+    DOWNLOADED_CHECKSUM=$(sha256sum "${TEST_ID}.zip" | awk '{print $1}')
+    if [ "$DOWNLOADED_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+        echo "Checksum verification failed for the downloaded test dataset. Expected: ${EXPECTED_CHECKSUM}, Got: ${DOWNLOADED_CHECKSUM}"
+        exit 1
+    fi
+
     unzip -q "${TEST_ID}.zip" -d "${DATA_DIR}"
     rm "${TEST_ID}.zip"
     if [ ! -d "${TEST_DATA_DIR}" ]; then
