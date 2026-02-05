@@ -152,7 +152,10 @@ RUN chmod +x scripts/cinephile/*.sh
 
 # For libmagic to find the database in a non standard location
 ENV MAGIC='/opt/conda/envs/wise-env/share/misc/magic' \
-    LD_LIBRARY_PATH="/opt/conda/envs/wise-env/lib/:${LD_LIBRARY_PATH}"
+    LD_LIBRARY_PATH="/opt/conda/envs/wise-env/lib/:${LD_LIBRARY_PATH}" \
+    HOME=/tmp \
+    TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor \
+    MPLCONFIGDIR=/tmp/mplconfig
 
 # Declare the volume that will hold the environment and data
 VOLUME [ "/data/cinephile", "${CACHE_DIR}" ]
