@@ -104,13 +104,15 @@ build-wise:
   parallel:
     matrix:
       - PLATFORM: [amd64]
-        APP: [wise]
-      - PLATFORM: [amd64, arm64]
+        APP: [wise, wise-cpu]
+        SIZE: [medium]
+      - PLATFORM: [arm64]
         APP: [wise-cpu]
+        SIZE: [small]
   extends:
     - .docker-rules
   tags: 
-    - saas-linux-large-${PLATFORM}
+    - saas-linux-${SIZE}-${PLATFORM}
 
 # this job only runs on default branch
 .push-manifest: &push-manifest
@@ -138,6 +140,7 @@ push-manifest:
         matrix:
           - PLATFORM: [amd64]
             APP: [wise]
+            SIZE: [medium]
       artifacts: true
   variables:
     APP: wise
@@ -149,8 +152,12 @@ push-manifest-cpu:
     - job: build-wise
       parallel:
         matrix:
-          - PLATFORM: [amd64, arm64]
+          - PLATFORM: [amd64]
             APP: [wise-cpu]
+            SIZE: [medium]
+          - PLATFORM: [arm64]
+            APP: [wise-cpu]
+            SIZE: [small]
       artifacts: true
   variables:
     APP: wise-cpu
