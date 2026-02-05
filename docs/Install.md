@@ -34,7 +34,10 @@ software tool.
 Using the conda tool, the WISE software dependencies can be installed as follows. Please note:
 
 - We recommend you to use a recent version of conda (22 or greater) / mamba (1.4+). WISE might not work on lower versions of conda / mamba.
-- If you are using WISE on non-Intel platforms, edit `environment.yml` to remove the reference to `mkl`
+
+- If you are using WISE on an Intel platforms, you may install the MKL
+  distribution of BLAS for better performance on FAISS by appending
+  the `blas=*=mkl` argument to the `conda env create` command.
 
 ```
 conda env create --name wise -f environment.yml

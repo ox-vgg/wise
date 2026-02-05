@@ -5,17 +5,13 @@ channels:
   - nodefaults  # ensure default channel is not used due to its ToS
 
 dependencies:
-  - python=3.10
-  - pip=24
-  - pytorch=2.2.2
-  - pytorch-cuda=12.1
-  - torchvision=0.17.2
-  - torchaudio=2.2.2
-  - faiss-gpu=1.8.0
-  - python-magic=0.4
-  - mkl=2023
-  - blas=*=mkl
-  - conda-forge::ffmpeg<7
+  - python>=3.10
+  - pip>=24
+  - pytorch::faiss-cpu>=1.7.4
+  - conda-forge::ffmpeg>=6,<7
+  - libmagic
+  - sqlite
+  - blas
   - pip:
     - -r requirements.txt
 variables:
