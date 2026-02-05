@@ -89,7 +89,7 @@ build-only:
     - export CACHE_TAG=${APP//wise-/}-${PLATFORM}
     - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/${PLATFORM}
     - docker compose -f compose.yaml -f compose.gitlab.yaml config
-    - docker compose -f compose.yaml -f compose.gitlab.yaml --pull build wise
+    - docker compose -f compose.yaml -f compose.gitlab.yaml build --pull wise
   rules:
     - <<: *docker-changes
       if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
