@@ -11,6 +11,7 @@ stages:
   - build
   - pages
 
+# job to push to pages, only on commit in main branch
 pages:
   stage: pages
   image: python:latest
@@ -33,13 +34,38 @@ pages:
   tags: 
     - saas-linux-small-amd64
 
-.docker-rules:
-  rules:
-    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api")
+.docker-changes: &docker-changes
+  changes:
+    - 'api/**/*'
+    - 'frontend/**/*'
+    - 'src/**/*'
+    - .dockerignore
+    - 'Dockerfile'
+    - 'compose.yaml'
+    - 'compose.cpu.yaml'
+    - 'compose.gitlab.yaml'
+    - '.gitlab-ci.yml'
+    - 'environment.yaml'
+    - 'requirements.txt'
+    - '.env.template'
+    - '*.py'
 
+.doc-changes: &doc-changes
+  changes:
+    - 'data/**/*'
+    - 'docs/**/*'
+    - 'mkdocs/**/*'
+    - '*.md'
+    - 'LICENSE'
+    - 'NEWS.md'
+    - 'NOTICE'
+    - 'README.md'
+
+# create a pipeline for main branch, and for merge requests targeting the main branch
 workflow:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
 
 default:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:26.1.4
@@ -57,7 +83,32 @@ default:
   tags: 
     - saas-linux-small-amd64
 
-build-wise:
+build-only:
+  stage: build
+  interruptible: true
+  script:
+    - export CACHE_TAG=${APP//wise-/}-${PLATFORM}
+    - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/${PLATFORM}
+    - docker compose -f compose.yaml -f compose.gitlab.yaml config
+    - docker compose -f compose.yaml -f compose.gitlab.yaml build --pull wise
+  rules:
+    - <<: *docker-changes
+      if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: never
+  parallel:
+    matrix:
+      - PLATFORM: [amd64]
+        APP: [wise, wise-cpu]
+        SIZE: [medium]
+      - PLATFORM: [arm64]
+        APP: [wise-cpu]
+        SIZE: [small]
+  tags: 
+    - saas-linux-${SIZE}-${PLATFORM}
+
+build:
   stage: build  
   artifacts:
     name: ${APP}-${PLATFORM}-image-digest
@@ -71,18 +122,26 @@ build-wise:
   parallel:
     matrix:
       - PLATFORM: [amd64]
-        APP: [wise]
-      - PLATFORM: [amd64, arm64]
+        APP: [wise, wise-cpu]
+        SIZE: [medium]
+      - PLATFORM: [arm64]
         APP: [wise-cpu]
-  extends:
-    - .docker-rules
+        SIZE: [small]
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: always
   tags: 
-    - saas-linux-large-${PLATFORM}
+    - saas-linux-${SIZE}-${PLATFORM}
 
+# this job only runs on default branch
 .push-manifest: &push-manifest
   stage: build
-  extends:
-    - .docker-rules
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
   script:
     - set -x
     - docker buildx create --driver docker-container --use --bootstrap buildx-builder --platform linux/amd64
@@ -97,11 +156,12 @@ build-wise:
 push-manifest:
   <<: *push-manifest
   needs: 
-    - job: build-wise
+    - job: build
       parallel:
         matrix:
           - PLATFORM: [amd64]
             APP: [wise]
+            SIZE: [medium]
       artifacts: true
   variables:
     APP: wise
@@ -110,11 +170,15 @@ push-manifest:
 push-manifest-cpu:
   <<: *push-manifest
   needs: 
-    - job: build-wise
+    - job: build
       parallel:
         matrix:
-          - PLATFORM: [amd64, arm64]
+          - PLATFORM: [amd64]
             APP: [wise-cpu]
+            SIZE: [medium]
+          - PLATFORM: [arm64]
+            APP: [wise-cpu]
+            SIZE: [small]
       artifacts: true
   variables:
     APP: wise-cpu

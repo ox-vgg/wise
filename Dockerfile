@@ -30,14 +30,14 @@ ARG APP
 ARG CACHE_DIR
 ENV APP=${APP} \
     CACHE_DIR=${CACHE_DIR} \
+    HOME=${CACHE_DIR} \
+    TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor \
     HF_HOME=${CACHE_DIR}/hfcache  \
     PYTHONPYCACHEPREFIX=${CACHE_DIR}/pycache
 
-
 USER root
-RUN mkdir -p ${HF_HOME} ${PYTHONPYCACHEPREFIX} && chmod 3777 -R /tmp
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential && \
+    build-essential && \
     rm -rf /var/lib/apt /var/lib/dpkg /var/lib/cache /var/lib/log
 
 USER ${MAMBA_USER}
@@ -46,12 +46,20 @@ WORKDIR /tmp
 COPY --chown=${MAMBA_USER}:${MAMBA_USER} "environment.yml" "requirements.txt" ./
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/home/${MAMBA_USER}/.cache,uid=${MAMBA_USER_ID},gid=${MAMBA_USER_GID} \
-    export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cpu' && \
     if [[ ${APP} == 'wise' ]]; then \
         export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cu124'; \
+    else \
+        export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cpu' && \
+        sed -i 's/^onnxruntime-gpu.*$/onnxruntime/' requirements.txt; \
     fi && \
     echo "Using Pip index url: ${PIP_EXTRA_INDEX_URL}" && \
     micromamba create --always-copy --yes -n wise-env -f "environment.yml"
+
+USER root
+RUN mkdir -p ${HF_HOME} ${PYTHONPYCACHEPREFIX} && chmod 3777 -R /tmp && \
+    mkdir -p /tmp/wise_root/wise && chmod -R 3775 /tmp/wise_root
+
+USER ${MAMBA_USER}
 
 FROM ${NODE_IMAGE} AS wise-frontend
 
@@ -71,28 +79,38 @@ ENV APP=${APP} \
     PYTHONUNBUFFERED=1 \
     PYTHONPYCACHEPREFIX=/tmp/pycache \
     HF_HOME=/tmp/hfcache \
+    HOME=/tmp \
     PATH="/env/bin/:${PATH}"
 
 COPY --from=wise-env --chown=nonroot:nonroot \
     /opt/conda/envs/wise-env /env
 
-WORKDIR /wise
 COPY --from=wise-env --chmod=7777 --chown=nonroot:nonroot  \
     ${CACHE_DIR}/ /tmp
 
+# since we dont have mkdir and chmod/chown in distroless, we need to create the directory with the right permissions in the build stage and copy it over
+# here we create the wise directory with the right permission and copy it over from wise_root
+COPY --from=wise-env --chmod=3775 --chown=nonroot:nonroot \
+    /tmp/wise_root/ /
+
+WORKDIR /wise
 COPY --chown=nonroot:nonroot . .
 
+# Ensure this command goes after copying the current folder
+# if the current folder already has a dist folder
 COPY --from=wise-frontend --chown=nonroot:nonroot --chmod=3775 \
     /wise/frontend/dist/ /wise/frontend/dist/
 
-# Hack to allow the rewrite of index.html when we serve the project
-# The user who runs the container is possibly not nonroot, so we need a+rw equivalent
-COPY --from=wise-frontend --chown=nonroot:nonroot --chmod=0666 \
-    /wise/frontend/dist/index.html /wise/frontend/dist/index.html
-
 # For libmagic to find the database in a non standard location
+# allow getpwuid command to work by setting the USER variable
+# we also set HOME to /tmp in the previous ENV instruction, 
+# to avoid permission issues with some libraries 
+# that try to write to the home directory
 ENV MAGIC='/env/share/misc/magic' \
-    LD_LIBRARY_PATH="/env/lib/:${LD_LIBRARY_PATH}"
+    LD_LIBRARY_PATH="/env/lib/:${LD_LIBRARY_PATH}" \
+    MPLCONFIGDIR=/tmp/mplconfig \
+    TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor \
+    USER=nonroot
 
 # You can modify the CMD statement as needed....
 ENTRYPOINT ["python3"]

@@ -11,6 +11,7 @@ __pycache__/
 
 **/*.py[cod]
 
+# virtual env
 env/
 venv/
 
@@ -27,16 +28,21 @@ build*.json
 .env.template
 *.env
 
+# frontend
+frontend/node_modules/
+frontend/dist/
+
 # Other files
 .logfire/
 docs/
+site/
 hub/
-k5/
 logs/
 projects/
+tmp/
+triton/
 data/
-frontend/node_modules/
-frontend/dist/
+
 *.tar.gz
 
 *.log
