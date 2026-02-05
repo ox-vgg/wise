@@ -19,7 +19,6 @@ pandas==2.2.2
 pydantic-settings~=2.2.1
 pydantic~=2.7.0
 python-magic~=0.4.27
-scikit-learn
 sqlalchemy~=2.0.42
 torch>=2.2.2
 torchaudio>=2.2.2,<2.9  # <2.9 because that's when torchaudio.io was removed

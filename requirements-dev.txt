@@ -4,3 +4,4 @@ jupyter-console
 matplotlib
 pyinstrument
 pytest
+scikit-learn
