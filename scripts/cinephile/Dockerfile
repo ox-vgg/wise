@@ -103,18 +103,15 @@ CMD ["bash"]
 
 FROM wise-base AS wise-env
 # Setup micromamba environment for WISE
-COPY --chown=${MAMBA_USER}:${MAMBA_USER} "docker/wise.yml" ./
+COPY --chown=${MAMBA_USER}:${MAMBA_USER} "environment.yml" "requirements.txt" ./
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/home/${MAMBA_USER}/.cache,uid=${MAMBA_USER_ID},gid=${MAMBA_USER_GID} \
     export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cpu' && \
-    export ONNXRUNTIME_PACKAGE='onnxruntime' && \
     if [[ ${APP} == 'wise' ]]; then \
-        export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cu124' && \
-        export ONNXRUNTIME_PACKAGE='onnxruntime-gpu[cuda,cudnn]'; \
+        export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cu124'; \
     fi && \
-    echo "Using Pip index url: ${PIP_EXTRA_INDEX_URL} ONNX: ${ONNXRUNTIME_PACKAGE} " && \
-    micromamba create --always-copy --yes -n wise-env -f "wise.yml" && \
-    ${MAMBA_ROOT_PREFIX}/envs/wise-env/bin/python3 -m pip install "${ONNXRUNTIME_PACKAGE}"
+    echo "Using Pip index url: ${PIP_EXTRA_INDEX_URL}" && \
+    micromamba create --always-copy --yes -n wise-env -f "environment.yml"
 
 # Setup dependencies for WISE frontend
 FROM ${NODE_IMAGE} AS wise-frontend
