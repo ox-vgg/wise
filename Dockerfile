@@ -46,9 +46,11 @@ WORKDIR /tmp
 COPY --chown=${MAMBA_USER}:${MAMBA_USER} "environment.yml" "requirements.txt" ./
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/home/${MAMBA_USER}/.cache,uid=${MAMBA_USER_ID},gid=${MAMBA_USER_GID} \
-    export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cpu' && \
     if [[ ${APP} == 'wise' ]]; then \
         export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cu124'; \
+    else \
+        export PIP_EXTRA_INDEX_URL='https://download.pytorch.org/whl/cpu' && \
+        sed -i 's/^onnxruntime-gpu$/onnxruntime/' requirements.txt; \
     fi && \
     echo "Using Pip index url: ${PIP_EXTRA_INDEX_URL}" && \
     micromamba create --always-copy --yes -n wise-env -f "environment.yml"
