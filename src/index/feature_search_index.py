@@ -24,16 +24,14 @@ import itertools
 from .search_index import SearchIndex
 
 from ..feature.store.feature_store_factory import FeatureStoreFactory
+from ..data_models import ModalityType
 
 class FeatureSearchIndex(SearchIndex):
 
     def __init__(
-        self,
-        media_type,
-        asset_id,
-        asset,
+        self, modality_type: str, asset_id, asset,
     ):
-        self.media_type = media_type
+        self.modality_type = ModalityType(modality_type)
         self.feature_extractor_id = asset_id
 
         assert 'features_dir' in asset, "features_dir missing in assets"
@@ -49,17 +47,19 @@ class FeatureSearchIndex(SearchIndex):
         }
 
     def get_index_filename(self, index_type):
-        return self.index_dir / (self.media_type + '-' + index_type + '.faiss')
+        return self.index_dir / (self.modality_type.value + '-' + index_type + '.faiss')
 
     def create_index(self, index_type, overwrite=False):
         self.index_dir.mkdir(parents=True, exist_ok=True)
         index_fn = self.get_index_filename(index_type)
         if index_fn.exists() and overwrite is False:
-            print(f'{index_type} for {self.media_type} already exists')
+            print(f'{index_type} for {self.modality_type} already exists')
             return
         self.index_type = index_type
 
-        feature_store = FeatureStoreFactory.load_store(self.media_type, self.features_dir)
+        feature_store = FeatureStoreFactory.load_store(
+            self.modality_type, self.features_dir
+        )
         feature_store.enable_read(shard_shuffle = False)
 
         feature_count = feature_store.feature_count
@@ -83,7 +83,9 @@ class FeatureSearchIndex(SearchIndex):
             index.set_direct_map_type(faiss.DirectMap.Hashtable) # Hashtable needed to support non-sequential ids
 
             print(f'  loading a random sample of {train_count} features from {feature_count} features ...')
-            shuffled_features = FeatureStoreFactory.load_store(self.media_type, self.features_dir)
+            shuffled_features = FeatureStoreFactory.load_store(
+                self.modality_type, self.features_dir
+            )
             shuffled_features.enable_read(shard_shuffle=True, shuffle_values=True)
 
             train_features = np.ndarray((train_count, feature_dim), dtype=np.float32)
