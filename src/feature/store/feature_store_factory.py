@@ -20,7 +20,7 @@ import enum
 from .faiss_store import FaissStore
 from ...data_models import ModalityType
 
-class FeatureStoreType(str, enum.Enum):
+class FeatureStoreType(enum.Enum):
     FAISS = "faiss"
 
 class FeatureStoreFactory:
@@ -32,7 +32,7 @@ class FeatureStoreFactory:
         features_dir,
     ):
         store_name_prefix = modality_type.value
-        if feature_store_type == FeatureStoreType.FAISS:
+        if feature_store_type is FeatureStoreType.FAISS:
             return FaissStore(store_name_prefix, features_dir)
         else:
             raise ValueError(f'unknown feature_store_type {feature_store_type}')

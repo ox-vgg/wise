@@ -37,7 +37,7 @@ from .data_models import (
 )
 from .repository import SourceCollectionRepo, MediaRepo, VectorRepo, ThumbnailRepo, VideoShotsRepo
 from .feature.feature_extractor_factory import get_feature_extractor_class
-from .feature.store import FeatureStoreFactory, FeatureStore
+from .feature.store import FeatureStoreFactory, FeatureStore, FeatureStoreType
 from .index.search_index_factory import SearchIndexFactory
 from .index.search_index import SearchIndex
 from .search.fts import FTSSearch
@@ -1191,7 +1191,7 @@ class WiseProject:
                     )
                 except ValueError:
                     store = FeatureStoreFactory.create_store(
-                        "faiss",
+                        FeatureStoreType.FAISS,
                         modality_type,
                         self.features_dir(feature_extractor_id),
                     )

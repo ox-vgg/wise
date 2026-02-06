@@ -39,8 +39,11 @@ from src.feature.feature_extractor_factory import (
     FeatureExtractorFactory,
     get_canonical_feature_extractor_id,
 )
-from src.feature.store.feature_store import FeatureStore
-from src.feature.store.feature_store_factory import FeatureStoreFactory
+from src.feature.store import (
+    FeatureStore,
+    FeatureStoreFactory,
+    FeatureStoreType,
+)
 
 from src.data_models import (
     MediaMetadata,
@@ -70,7 +73,7 @@ def initialise_feature_extractors(
     project: WiseProject,
     feature_extractor_ids: dict[ModalityType, list],
     feature_extractor_config: dict[str, dict],
-    feature_store_type: Literal["faiss"],
+    feature_store_type: FeatureStoreType,
     shard_max_count: int,
     db_engine: sa.Engine,
 ) -> tuple[
@@ -498,7 +501,7 @@ if __name__ == "__main__":
         type=str,
         default="faiss",
         dest="feature_store_type",
-        choices=["faiss"],
+        choices=sorted([x.value for x in FeatureStoreType]),
         help="extracted features are stored using this data structure",
     )
 
@@ -664,7 +667,7 @@ if __name__ == "__main__":
         project,
         feature_extractor_ids,
         feature_extractor_config,
-        args.feature_store_type,
+        FeatureStoreType(args.feature_store_type),
         args.shard_maxcount,
         db_engine,
     )
