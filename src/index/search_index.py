@@ -21,7 +21,7 @@ class SearchIndex:
     in FeatureSearchIndex while the search index for text metadata
     is implemented in SqldbSearchIndex.
     """
-    def __init__(self, media_type, asset_id, assets):
+    def __init__(self, modality_type, asset_id, assets):
         raise NotImplementedError
 
     def get_index_filename(self, index_type):

@@ -26,8 +26,8 @@ from ..feature.feature_extractor_factory import FeatureExtractorFactory
 from ..feature.store.feature_store_factory import FeatureStoreFactory
 
 class SqliteSearchIndex(SearchIndex):
-    def __init__(self, media_type, asset_id, asset):
-        self.media_type = media_type
+    def __init__(self, modality_type, asset_id, asset):
+        self.modality_type = modality_type
         self.metadata_id = asset_id
 
         assert 'metadata_db_type' in asset, "features_dir missing in assets"
@@ -58,7 +58,7 @@ class SqliteSearchIndex(SearchIndex):
         index_type = "FTS5" # use full text search version 5 of sqlite by default
         self.metadata_table_fts = f'{self.metadata_table}_fts'
         if self.sqlite_table_exists(self.metadata_db, self.metadata_table_fts) and not overwrite:
-            print(f'{index_type} index for {self.media_type} already exists')
+            print(f'{index_type} index for {self.modality_type} already exists')
             return
         print(f'Creating metadata index for {self.metadata_id}')
 
@@ -116,10 +116,10 @@ class SqliteSearchIndex(SearchIndex):
             print(f'use create-index.py script to create a FTS search index')
             return False
 
-    def search(self, media_type, query, topk=5, query_type='text'):
+    def search(self, modality_type, query, topk=5, query_type='text'):
         if query_type != 'text':
             raise ValueError('query_type={query_type} not implemented')
-        assert media_type == 'metadata', 'SqliteSearchIndex only supports metadata search'
+        assert modality_type == 'metadata', 'SqliteSearchIndex only supports metadata search'
 
         cursor = self.index.cursor()
         sql = f'''SELECT __filename, __starttime, __stoptime, rank FROM {self.metadata_table}

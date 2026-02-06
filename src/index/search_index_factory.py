@@ -18,21 +18,23 @@ from .feature_search_index import FeatureSearchIndex
 from .sqlite_search_index import SqliteSearchIndex
 
 
-def SearchIndexFactory(media_type, asset_id, asset):
+## FIXME: modality_type is a str because it may have the value
+## "metadata" but ideally it would be a ModalityType.
+def SearchIndexFactory(modality_type: str, asset_id, asset):
     """
-    Create search index based on media_type
+    Create search index based on modality_type
 
     Parameters
     ----------
-    media_type : str
-         can be ['audio', 'video', 'metadata']
+    modality_type : str
+         can be ['audio', 'video', 'image', 'metadata']
     media_assets : dict
          see src/wise_project.py::discover_assets()
 
     """
-    if media_type in ['audio', 'video', 'image']:
-        return FeatureSearchIndex(media_type, asset_id, asset)
-    elif media_type == 'metadata':
-        return SqliteSearchIndex(media_type, asset_id, asset)
+    if modality_type in ['audio', 'video', 'image']:
+        return FeatureSearchIndex(modality_type, asset_id, asset)
+    elif modality_type == 'metadata':
+        return SqliteSearchIndex(modality_type, asset_id, asset)
     else:
-        raise ValueError(f'Unknown media_type {media_type}')
+        raise ValueError(f'Unknown modality_type {modality_type}')
