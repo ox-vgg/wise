@@ -24,13 +24,14 @@ import itertools
 from .search_index import SearchIndex
 
 from ..feature.store.feature_store_factory import FeatureStoreFactory
+from ..data_models import ModalityType
 
 class FeatureSearchIndex(SearchIndex):
 
     def __init__(
         self, modality_type: str, asset_id, asset,
     ):
-        self.modality_type = modality_type
+        self.modality_type = ModalityType(modality_type)
         self.feature_extractor_id = asset_id
 
         assert 'features_dir' in asset, "features_dir missing in assets"
@@ -46,7 +47,7 @@ class FeatureSearchIndex(SearchIndex):
         }
 
     def get_index_filename(self, index_type):
-        return self.index_dir / (self.modality_type + '-' + index_type + '.faiss')
+        return self.index_dir / (self.modality_type.value + '-' + index_type + '.faiss')
 
     def create_index(self, index_type, overwrite=False):
         self.index_dir.mkdir(parents=True, exist_ok=True)
