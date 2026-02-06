@@ -11,11 +11,12 @@ Here is an example of how the features stores in these stores can be accessed.
 # source: src/search_index.py
 from pathlib import Path
 from .feature.store.feature_store_factory import FeatureStoreFactory
+from ...data_models import ModalityType
 
 ...
-media_type = 'video' # or 'audio'
+modality_type = ModalityType.VIDEO  # or AUDIO, IMAGE, or TEXT
 feature_dir = Path('/data/projects/Kinetics-7/store/mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k/features/')
-feature_store = FeatureStoreFactory.load_store(media_type, feature_dir)
+feature_store = FeatureStoreFactory.load_store(modality_type, feature_dir)
 feature_store.enable_read(shard_shuffle = False)
 
 for feature_id, feature_vector in feature_store:
