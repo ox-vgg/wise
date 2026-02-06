@@ -31,6 +31,7 @@ from .data_models import (
     DatasetPayload,
     MediaType,
     MediaMetadataWithSource,
+    ModalityType,
     VideoShot,
     VectorAndMediaMetadata,
 )
@@ -183,7 +184,7 @@ class WiseProject:
         return index_store
 
     @property
-    def supported_media_types_and_features(self):
+    def supported_modality_types_and_features(self) -> dict[ModalityType, set[str]]:
         with self.db_engine.connect() as conn:
             results = conn.execute(
                 sa.select(
@@ -1019,6 +1020,7 @@ class WiseProject:
 
         self._search_indices = search_indices
         return search_indices
+
     def _merge(self, other: WiseProject, dry_run: bool = True):
         """
         WARNING: EXPERIMENTAL
@@ -1032,11 +1034,11 @@ class WiseProject:
         """
         # sanity checks - TODO
         NO_ID = {'id': None}
-        supported_assets = other.supported_media_types_and_features
+        supported_assets = other.supported_modality_types_and_features
 
         # Create the required tables for feature extractor metadata
-        for media_type in supported_assets:
-            for feature_extractor_id in supported_assets[media_type]:
+        for modality_type in supported_assets:
+            for feature_extractor_id in supported_assets[modality_type]:
                 feature_extractor_cls = get_feature_extractor_class(
                     feature_extractor_id
                 )
@@ -1175,15 +1177,23 @@ class WiseProject:
             min_time_stamp_per_media_id = get_last_vector_timestamps()
             logger.debug(f"vector timestamp - {min_time_stamp_per_media_id}")
 
-            def copy_vectors(media_type: str, feature_extractor_id: str, other_store: FeatureStore):
-                logger.info(f'copying for feature_extractor - {feature_extractor_id} ({media_type})')
+            def copy_vectors(
+                modality_type: ModalityType,
+                feature_extractor_id: str,
+                other_store: FeatureStore,
+            ):
+                logger.info(f'copying for feature_extractor - {feature_extractor_id} ({modality_type})')
                 feature_count = other_store.feature_count
                 self.create_features_dir(feature_extractor_id)
                 try:
-                    store = FeatureStoreFactory.load_store(media_type, self.features_dir(feature_extractor_id))
+                    store = FeatureStoreFactory.load_store(
+                        modality_type, self.features_dir(feature_extractor_id)
+                    )
                 except ValueError:
                     store = FeatureStoreFactory.create_store(
-                        "faiss", media_type, self.features_dir(feature_extractor_id)
+                        "faiss",
+                        modality_type,
+                        self.features_dir(feature_extractor_id),
                     )
                 store.enable_write()
 
@@ -1207,8 +1217,10 @@ class WiseProject:
                                     continue
                                 new_media_id = media_id_map[vector.media_id]
                                 min_ts = min_time_stamp_per_media_id.get(
-                                    (new_media_id, media_type, feature_extractor_id),
-                                    min_time_stamp_per_media_id.get((new_media_id, media_type, ''), -1)
+                                    (new_media_id, modality_type, feature_extractor_id),
+                                    min_time_stamp_per_media_id.get(
+                                        (new_media_id, modality_type, ''), -1
+                                    )
                                 )
                                 if vector.timestamp <= min_ts:
                                     continue
@@ -1234,12 +1246,16 @@ class WiseProject:
                             pbar.update(len(feature_id_list))
                 finally:
                     store.close()
-                logger.info(f'copied {total_copied} vectors over for feature extractor - {feature_extractor_id} ({media_type})')
+                logger.info(f'copied {total_copied} vectors over for feature extractor - {feature_extractor_id} ({modality_type})')
 
-            for media_type in supported_assets:
-                for feature_extractor_id in supported_assets[media_type]:    
-                    other_store = FeatureStoreFactory.load_store(media_type, other.features_dir(feature_extractor_id))
-                    copy_vectors(media_type, feature_extractor_id, other_store)                    
+            for modality_type in supported_assets:
+                for feature_extractor_id in supported_assets[modality_type]:
+                    other_store = FeatureStoreFactory.load_store(
+                        modality_type, other.features_dir(feature_extractor_id)
+                    )
+                    copy_vectors(
+                        modality_type, feature_extractor_id, other_store
+                    )
 
         # merge tables in database
     def merge(self, other: WiseProject, dry_run: bool = True):
