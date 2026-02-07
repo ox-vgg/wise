@@ -484,35 +484,27 @@ def get_search_embeddings_for_internal_queries(
     embedding_service,
     media_type,
     feature_extractor_id,
-    internal_image_queries: list[str],
-    negative_internal_image_queries: list[str],
-) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    if internal_image_queries or negative_internal_image_queries:
-        def handle_internal_id(_id: str):
-            *_, vector_id = _id.rsplit("/", 1)
-            return int(vector_id)
+    internal_queries: list[str],
+) -> list[np.ndarray]:
+    if not internal_queries:
+        return internal_queries
 
-        internal_image_queries = list(map(handle_internal_id, internal_image_queries))
-        negative_internal_image_queries = list(map(handle_internal_id, negative_internal_image_queries))
+    def handle_internal_id(_id: str):
+        *_, vector_id = _id.rsplit("/", 1)
+        return int(vector_id)
 
-        # reconstruct features from faiss index
-        internal_image_queries = search_service.reconstruct_vectors(
-            media_type, feature_extractor_id, internal_image_queries
-        )
-        negative_internal_image_queries = search_service.reconstruct_vectors(
-            media_type, feature_extractor_id, negative_internal_image_queries
-        )
+    internal_queries = list(map(handle_internal_id, internal_queries))
 
-        # Apply hook to transform internal image query vectors
-        internal_image_queries = [
-            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-            for x in internal_image_queries
-        ]
-        negative_internal_image_queries = [
-            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-            for x in negative_internal_image_queries
-        ]
-    return internal_image_queries, negative_internal_image_queries
+    # reconstruct features from faiss index
+    internal_queries = search_service.reconstruct_vectors(
+        media_type, feature_extractor_id, internal_queries
+    )
+    # Apply hook to transform internal image query vectors
+    internal_queries = [
+        embedding_service.transform_internal_image_queries(feature_extractor_id, x)
+        for x in internal_queries
+    ]
+    return internal_queries
 
 
 @router.post("/search", response_model=common.SearchResponse)
@@ -636,15 +628,20 @@ async def handle_post_search_multimodal(
         )
 
     try:
-        internal_image_queries, negative_internal_image_queries \
-            = get_search_embeddings_for_internal_queries(
-                search_service,
-                embedding_service,
-                media_type,
-                feature_extractor_id,
-                internal_image_queries,
-                negative_internal_image_queries
-            )
+        internal_image_queries = get_search_embeddings_for_internal_queries(
+            search_service,
+            embedding_service,
+            media_type,
+            feature_extractor_id,
+            internal_image_queries,
+        )
+        negative_internal_image_queries = get_search_embeddings_for_internal_queries(
+            search_service,
+            embedding_service,
+            media_type,
+            feature_extractor_id,
+            negative_internal_image_queries,
+        )
     except Exception as e:
         logger.exception(e)
         return PlainTextResponse(
