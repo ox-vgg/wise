@@ -16,11 +16,13 @@
 
 import json
 import logging
+
+import numpy as np
+
 from .. import common
 from ..services.embedding import EmbeddingConfig
 
 from src.data_models import MediaType, ModalityType
-
 
 from fastapi import APIRouter, Query, File, Form, HTTPException, Request
 from pydantic import HttpUrl
@@ -63,8 +65,31 @@ async def handle_get_featured(
     response = await search_service.featured(
         modality, feature_extractor_id, start, end, random_seed
     )
-    
     return response
+
+
+async def get_search_embeddings_for_internal_queries(
+    search_service,
+    embedding_service,
+    media_type,
+    feature_extractor_id,
+    internal_image_queries: list[str],
+    negative_internal_image_queries: list[str],
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    # reconstruct features from faiss index
+    internal_image_queries = await search_service.reconstruct_vectors(media_type, feature_extractor_id, internal_image_queries)
+    negative_internal_image_queries = await search_service.reconstruct_vectors(media_type, feature_extractor_id, negative_internal_image_queries)
+
+    # Apply hook to transform internal image query vectors
+    internal_image_queries = [
+        embedding_service.transform_internal_image_queries(feature_extractor_id, x)
+        for x in internal_image_queries
+    ]
+    negative_internal_image_queries = [
+        embedding_service.transform_internal_image_queries(feature_extractor_id, x)
+        for x in negative_internal_image_queries
+    ]
+    return internal_image_queries, negative_internal_image_queries
 
 
 @router.post("/search", response_model=common.SearchResponse)
@@ -150,21 +175,18 @@ async def handle_post_search_multimodal(
     if feature_extractor_id == 'wise/metadata':
         response = await search_service.search(request)
         return response
-    
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    # reconstruct features from faiss index
-    internal_image_queries = await search_service.reconstruct_vectors(media_type, feature_extractor_id, internal_image_queries)
-    negative_internal_image_queries = await search_service.reconstruct_vectors(media_type, feature_extractor_id, negative_internal_image_queries)
 
-    # Apply hook to transform internal image query vectors
-    internal_image_queries = [
-        embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-        for x in internal_image_queries
-    ]
-    negative_internal_image_queries = [
-        embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-        for x in negative_internal_image_queries
-    ]
+    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
+    internal_image_queries, negative_internal_image_queries \
+        = await get_search_embeddings_for_internal_queries(
+            search_service,
+            embedding_service,
+            media_type,
+            feature_extractor_id,
+            internal_image_queries,
+            negative_internal_image_queries,
+        )
+
     ## Do this again, with the transformed internal image query vectors
     q = common.api_query_to_internal_q(
         text_queries,

@@ -477,7 +477,43 @@ async def handle_post_search_feature(
     )
 
     return response
-    
+
+
+def get_search_embeddings_for_internal_queries(
+    search_service,
+    embedding_service,
+    media_type,
+    feature_extractor_id,
+    internal_image_queries: list[str],
+    negative_internal_image_queries: list[str],
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    if internal_image_queries or negative_internal_image_queries:
+        def handle_internal_id(_id: str):
+            *_, vector_id = _id.rsplit("/", 1)
+            return int(vector_id)
+
+        internal_image_queries = list(map(handle_internal_id, internal_image_queries))
+        negative_internal_image_queries = list(map(handle_internal_id, negative_internal_image_queries))
+
+        # reconstruct features from faiss index
+        internal_image_queries = search_service.reconstruct_vectors(
+            media_type, feature_extractor_id, internal_image_queries
+        )
+        negative_internal_image_queries = search_service.reconstruct_vectors(
+            media_type, feature_extractor_id, negative_internal_image_queries
+        )
+
+        # Apply hook to transform internal image query vectors
+        internal_image_queries = [
+            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
+            for x in internal_image_queries
+        ]
+        negative_internal_image_queries = [
+            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
+            for x in negative_internal_image_queries
+        ]
+    return internal_image_queries, negative_internal_image_queries
+
 
 @router.post("/search", response_model=common.SearchResponse)
 @common.add_response_time
@@ -583,44 +619,37 @@ async def handle_post_search_multimodal(
 
         return response
 
-    if internal_image_queries or negative_internal_image_queries:
-        if search_service.is_internal_search_supported(media_type, feature_extractor_id):
-            try:
-                def handle_internal_id(_id: str):
-                    *_, vector_id = _id.rsplit("/", 1)
-                    return int(vector_id)
-                
-                internal_image_queries = list(map(handle_internal_id, internal_image_queries))
-                negative_internal_image_queries = list(map(handle_internal_id, negative_internal_image_queries))
-                
-                # reconstruct features from faiss index
-                internal_image_queries = search_service.reconstruct_vectors(media_type, feature_extractor_id, internal_image_queries)
-                negative_internal_image_queries = search_service.reconstruct_vectors(media_type, feature_extractor_id, negative_internal_image_queries)
-            except Exception as e:
-                logger.exception(e)
-                return PlainTextResponse(
-                    status_code=500, content=f"Error processing internal search query"
-                )
-        else:
-            index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
-            logger.exception(
-                "This faiss index does not support internal search. To enable "
-                "internal search, please re-create the index by running "
-                f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {index_type} --overwrite`",
-            )
-            return PlainTextResponse(
-                status_code=500, content=f"Internal search not supported in this project"
-            )
+    if (
+        (internal_image_queries or negative_internal_image_queries)
+        and not search_service.is_internal_search_supported(media_type, feature_extractor_id)
+    ):
+        index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
+        logger.exception(
+            "This faiss index does not support internal search. To enable "
+            "internal search, please re-create the index by running "
+            f"`python create-index.py --project-dir \"{config.project_dir}\" "
+            f"--media-type {media_type} --index-type {index_type} --overwrite`"
+        )
+        return PlainTextResponse(
+            status_code=500,
+            content=f"Internal search not supported in this project"
+        )
 
-        # Apply hook to transform internal image query vectors
-        internal_image_queries = [
-            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-            for x in internal_image_queries
-        ]
-        negative_internal_image_queries = [
-            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-            for x in negative_internal_image_queries
-        ]
+    try:
+        internal_image_queries, negative_internal_image_queries \
+            = get_search_embeddings_for_internal_queries(
+                search_service,
+                embedding_service,
+                media_type,
+                feature_extractor_id,
+                internal_image_queries,
+                negative_internal_image_queries
+            )
+    except Exception as e:
+        logger.exception(e)
+        return PlainTextResponse(
+            status_code=500, content=f"Error processing internal search query"
+        )
 
     q = common.api_query_to_internal_q(
         text_queries,
