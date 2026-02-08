@@ -19,7 +19,7 @@ import logging
 from tempfile import NamedTemporaryFile
 from .exceptions import ModalityNotSupportedError, FeatureExtractorNotFoundError, NoFeaturesFoundError
 from src.feature import FeatureExtractor, FeatureExtractorFactory
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 import numpy as np
 from PIL import Image
 import torch
@@ -29,6 +29,17 @@ import torchaudio
 from ...common import InternalQTerm
 
 logger = logging.getLogger(__name__)
+
+
+def _is_HttpUrl(obj) -> bool:
+    ## XXX: drop this function when we depend on pydantic>=2.10.
+    ## Before pydantic 2.10, HttpUrl implementation was a subscripted
+    ## generic so we couldn't just use instance, see
+    ## https://github.com/pydantic/pydantic/pull/10766
+    if type(HttpUrl) is type:
+        return isinstance(obj, HttpUrl)
+    else:
+        return isinstance(obj, typing.get_args(pydantic.HttpUrl)[0])
 
 
 def initialize_feature_extractors(
@@ -153,7 +164,7 @@ class EmbeddingService:
                         if query_dict["sign"] == "negative"
                         else 1
                     )
-                elif query.startswith(("http://", "https://")):
+                elif _is_HttpUrl(query):
                     logger.info("Downloading %s to file", query)
                     with NamedTemporaryFile() as tmpfile:
                         download_url_to_file(query, tmpfile.name)
@@ -181,7 +192,7 @@ class EmbeddingService:
                         if query_dict["sign"] == "negative"
                         else 1
                     )
-                elif query.startswith(("http://", "https://")):
+                elif _is_HttpUrl(query):
                     logger.info("Downloading", query, "to file")
                     with NamedTemporaryFile() as tmpfile:
                         download_url_to_file(query, tmpfile.name)

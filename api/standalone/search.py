@@ -33,6 +33,7 @@ from src.wise_project import WiseProject
 import numpy as np
 from fastapi import APIRouter, Query, File, Form, HTTPException
 from fastapi.responses import PlainTextResponse
+from pydantic import HttpUrl
 
 from ..dependencies import ConfigDep, ProjectServiceDep, ProjectInfoDep, EmbeddingServiceDep, SearchServiceDep
 
@@ -496,8 +497,8 @@ async def handle_post_search_multimodal(
     text_queries: list[str] = Query(default=[]),
     image_file_queries: list[bytes] = File([]),  # user-uploaded images
     audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
-    image_url_queries: list[str] = Form([]),  # URLs to online images
-    audio_url_queries: list[str] = Form([]),  # URLs to online audio files
+    image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
     internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
     # Negative queries
     negative_text_queries: list[str] = Query(default=[]),
@@ -505,8 +506,8 @@ async def handle_post_search_multimodal(
     negative_audio_file_queries: list[bytes] = File(
         []
     ),  # user-uploaded audio files
-    negative_image_url_queries: list[str] = Form([]),  # URLs to online images
-    negative_audio_url_queries: list[str] = Form([]),  # URLs to online audio files
+    negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
     negative_internal_image_queries: list[str] = Query(
         default=[]
     ),  # ids to internal images

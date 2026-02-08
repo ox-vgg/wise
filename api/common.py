@@ -20,7 +20,7 @@ import base64
 import functools
 import time
 import numpy as np
-from pydantic import BaseModel, PlainSerializer, field_validator
+from pydantic import BaseModel, HttpUrl, PlainSerializer, field_validator
 from config import APIConfig
 
 PRECISION = 5
@@ -39,7 +39,7 @@ class BBoxXYWH(BaseModel):
 class InternalQTerm(TypedDict):
     sign: Literal["positive", "negative"]
     modality: Literal["image", "audio", "text"]
-    val: bytes | str | np.ndarray
+    val: bytes | HttpUrl | str | np.ndarray
 
 
 def api_query_to_internal_q(
@@ -47,15 +47,15 @@ def api_query_to_internal_q(
     text_queries: list[str],
     image_file_queries: list[bytes],  # user-uploaded images
     audio_file_queries: list[bytes],  # user-uploaded audio files
-    image_url_queries: list[str],  # URLs to online images
-    audio_url_queries: list[str],  # URLs to online audio files
+    image_url_queries: list[HttpUrl],  # URLs to online images
+    audio_url_queries: list[HttpUrl],  # URLs to online audio files
     internal_image_queries: list[str],  # ids to internal images
     # Negative queries
     negative_text_queries: list[str],
     negative_image_file_queries: list[bytes],  # user-uploaded images
     negative_audio_file_queries: list[bytes],  # user-uploaded audio files
-    negative_image_url_queries: list[str],  # URLs to online images
-    negative_audio_url_queries: list[str],  # URLs to online audio files
+    negative_image_url_queries: list[HttpUrl],  # URLs to online images
+    negative_audio_url_queries: list[HttpUrl],  # URLs to online audio files
     negative_internal_image_queries: list[str],  # ids to internal images
 ) -> list[InternalQTerm]:
     """Convert from the *_queries values from API into the "internal" form.
