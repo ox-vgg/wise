@@ -26,6 +26,8 @@ import torch
 from torch.hub import download_url_to_file
 import torchaudio
 
+from ...common import InternalQTerm
+
 logger = logging.getLogger(__name__)
 
 
@@ -96,7 +98,7 @@ class EmbeddingService:
         self,
         feature_extractor_id: str,
         config: EmbeddingConfig,
-        q: list[dict[str, np.ndarray | bytes | str]],
+        q: list[InternalQTerm],
     ) -> np.ndarray:
 
         feature_vectors = []
