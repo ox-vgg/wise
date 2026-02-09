@@ -20,7 +20,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Optional, TypedDict
 
-from fastapi import FastAPI, HTTPException, Request, APIRouter
+from fastapi import FastAPI, Request, APIRouter
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
@@ -39,17 +39,6 @@ def log_custom_format(message: str):
     logger.info(
         f'{COLOR_SEQ}{BOLD_SEQ}{message}{RESET_SEQ}',
     )
-
-
-class WiseFrontendUserException(Exception):
-    """An exception whose message can be sent to the user.
-
-    Exceptions by default will only send an "Internal server error"
-    message to the user.  This separate class enables us to catch only
-    some with a message meant to the frontend user.
-    """
-
-    pass
 
 
 class State(TypedDict):
@@ -135,10 +124,6 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
                     return response
                 else:
                     return await call_next(request)
-
-    @app.exception_handler(WiseFrontendUserException)
-    async def frontend_user_exception_handler(request: Request, exc: WiseFrontendUserException):
-        raise HTTPException(400, {"message": str(exc)})
 
     logger.info(f"Loading html user interface from {theme_asset_dir}")
     app.include_router(setup_routers(config))
