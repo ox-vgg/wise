@@ -25,6 +25,7 @@ from PIL import Image
 import torch
 from torch.hub import download_url_to_file
 import torchaudio
+import typing
 
 from ...common import InternalQTerm
 
@@ -39,7 +40,7 @@ def _is_HttpUrl(obj) -> bool:
     if type(HttpUrl) is type:
         return isinstance(obj, HttpUrl)
     else:
-        return isinstance(obj, typing.get_args(pydantic.HttpUrl)[0])
+        return isinstance(obj, typing.get_args(HttpUrl)[0])
 
 
 def initialize_feature_extractors(
