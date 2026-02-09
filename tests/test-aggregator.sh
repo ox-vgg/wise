@@ -423,9 +423,10 @@ ASSERT_EQUAL() {
     URL2=$2
     TEST_ID=$3
     DESC=$4
+    HTTP_METHOD=${5:-"POST"}
 
-    RESPONSE1=$(curl -s -X GET -H "Content-Type: application/json" "$URL1")
-    RESPONSE2=$(curl -s -X GET -H "Content-Type: application/json" "$URL2")
+    RESPONSE1=$(curl -s -X "$HTTP_METHOD" -H "Content-Type: application/json" "$URL1")
+    RESPONSE2=$(curl -s -X "$HTTP_METHOD" -H "Content-Type: application/json" "$URL2")
 
     # Use jq to delete the 'total_duration' field (if it exists) and
     # the project_name (123 vs merged) and then sort keys for
@@ -564,7 +565,8 @@ TEST_EQUIVALENCE() {
     # Task ${TEST_MAJOR_NUM}.1 : ensure the /info endpoint for both the aggregator and merged project return identical results
     AGGREGATOR_INFO_URL="${AGGREGATOR_URL}info"
     MERGED_INFO_URL="${MERGED_URL}info"
-    ASSERT_EQUAL "$AGGREGATOR_INFO_URL" "$MERGED_INFO_URL" "${TEST_MAJOR_NUM}.1" "identical values in /info endpoints"
+    HTTP_METHOD="GET"
+    ASSERT_EQUAL "$AGGREGATOR_INFO_URL" "$MERGED_INFO_URL" "${TEST_MAJOR_NUM}.1" "identical values in /info endpoints" "$HTTP_METHOD"
 
     # Task ${TEST_MAJOR_NUM}.2 : ensure the /search endpoint has identical video search results for both the aggregator and merged project
     SEARCH_QUERY="panda"
