@@ -424,12 +424,14 @@ ASSERT_EQUAL() {
     TEST_ID=$3
     DESC=$4
 
-    RESPONSE1=$(curl -s -X POST -H "Content-Type: application/json" "$URL1")
-    RESPONSE2=$(curl -s -X POST -H "Content-Type: application/json" "$URL2")
+    RESPONSE1=$(curl -s -X GET -H "Content-Type: application/json" "$URL1")
+    RESPONSE2=$(curl -s -X GET -H "Content-Type: application/json" "$URL2")
 
-    # Use jq to delete the 'total_duration' field (if it exists) and then sort keys for consistent comparison
-    SORTED1=$(echo "$RESPONSE1" | jq -S 'del(.total_duration?)')
-    SORTED2=$(echo "$RESPONSE2" | jq -S 'del(.total_duration?)')
+    # Use jq to delete the 'total_duration' field (if it exists) and
+    # the project_name (123 vs merged) and then sort keys for
+    # consistent comparison.
+    SORTED1=$(echo "$RESPONSE1" | jq -S 'del(.total_duration?) | del(.project_name)')
+    SORTED2=$(echo "$RESPONSE2" | jq -S 'del(.total_duration?) | del(.project_name)')
 
     if [ "$SORTED1" == "$SORTED2" ]; then
         RESULT="Test ${TEST_ID} PASSED: ${DESC}"
@@ -442,9 +444,9 @@ ASSERT_EQUAL() {
         ANY_TEST_FAILED=1
         echo "URL1: $URL1"
         echo "URL2: $URL2"
-        echo "Response from URL1 (after removing total_duration):"
+        echo "Response from URL1 (after removing total_duration and project_name):"
         echo "$SORTED1" | jq .
-        echo "Response from URL2 (after removing total_duration):"
+        echo "Response from URL2 (after removing total_duration and project_name):"
         echo "$SORTED2" | jq .
         echo "Diff:"
         diff <(echo "$SORTED1") <(echo "$SORTED2")
