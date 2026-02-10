@@ -44,7 +44,7 @@ from src.feature.feature_extractor import FeatureExtMetadata
 from src.wise_project import WiseProject
 
 import numpy as np
-from fastapi import APIRouter, Query, UploadFile, Form, HTTPException
+from fastapi import APIRouter, Query, UploadFile, Form, File, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
 from pydantic import HttpUrl
 
@@ -305,9 +305,8 @@ def construct_search_response(
     all_ext_metadata: list[FeatureExtMetadata],
     all_thumbs: Iterable[str],
     merge_function: Callable[[list[VideoSegment]], list[VideoSegment]] = merge_close_segments,
-    search_in: MediaType = None,
+    search_in: MediaType | None = None,
 ):
-
     video_audio_results = None
     video_results = None
     image_results = None
@@ -353,6 +352,18 @@ def get_prefix(config: APIConfig):
         MediaType.AUDIO: "This is the sound of",
     }
     
+def get_media_type(search_in: Annotated[MediaType, Query()]):
+    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
+    return media_type
+
+def validate_search_targets(search_in: Annotated[MediaType, Query()], project_info: ProjectInfoDep):
+    media_type = get_media_type(search_in)
+    search_targets = project_info.search_targets
+    if media_type not in search_targets:
+        raise HTTPException(400, {
+            "message": f"No search index exists for this modality: {media_type}"
+        })
+    return search_in
 
 router = APIRouter()
 @router.get(
@@ -362,20 +373,12 @@ router = APIRouter()
 )
 def reconstruct_vectors(
     config: ConfigDep,
-    project_info: ProjectInfoDep,
     search_service: SearchServiceDep,
-    search_in: MediaType = Query(),
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
     feature_extractor_id: str = Query(),
     internal_ids: list[int] = Query(default=[]),  # ids to internal images
 ):
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    search_targets = project_info.search_targets
-
-    if media_type not in search_targets:
-        raise HTTPException(400, {
-            "message": f"No search index exists for this modality: {media_type}"
-        })
-    
+    media_type = get_media_type(search_in)
     if not internal_ids:
         vectors = np.array([])
         response = common.NPArray.from_array(vectors)
@@ -428,7 +431,7 @@ async def handle_post_search_feature(
     # Which media type to search on
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
-    search_in: MediaType = Query(),
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
     feature_extractor_id: str = Query(),
     # Other parameters
     start: int = Query(0, ge=0, le=980),
@@ -437,26 +440,19 @@ async def handle_post_search_feature(
     shot_scale: list[int] = Query(default=[]),
     metadata_filter: list[str] = Query(default=[]),
 ):
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    search_targets = project_info.search_targets
-    if media_type not in search_targets:
-        raise HTTPException(400, {
-            "message": f"No search index exists for this modality: {media_type}"
-        })
-
     if feature_extractor_id == 'wise/metadata':
         raise HTTPException(400, {
             "message": "`wise/metadata` feature extractor cannot be used for feature-based search. Please use a different feature extractor."
         })
 
-        end = min(end, project_info.num_vectors)
+    end = min(end, project_info.num_vectors)
     if start > end:
         raise HTTPException(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
-
+     
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
-
+    media_type = get_media_type(search_in)
     vectors = feature.to_array()
     search_output = cast(LocalSearchService, search_service).search_with_feature(
         vectors,
