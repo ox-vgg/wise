@@ -14,22 +14,26 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import json
 import logging
-from typing import Annotated
+from typing import Annotated, cast
 
-import numpy as np
-from fastapi.routing import APIRoute
 
 from .. import common
 from ..services.embedding import EmbeddingConfig
+from ..dependencies import (
+    APIConfig,
+    ConfigDep, 
+    EmbeddingService,
+    EmbeddingServiceDep,
+    RemoteSearchService,
+    SearchServiceDep
+)
 
 from src.data_models import MediaType, ModalityType
 
-from fastapi import APIRouter, Query, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Query, Form, HTTPException, Request, UploadFile, File
 from pydantic import HttpUrl
 
-from ..dependencies import ConfigDep, EmbeddingServiceDep, SearchServiceDep
 
 
 logger = logging.getLogger(__name__)
@@ -102,42 +106,26 @@ async def replace_vector_ids_with_search_embeddings(
         new_q[idx] = q[idx] | {"val": embedding}
     return new_q
 
-
-@router.post("/search", response_model=common.SearchResponse)
-@common.add_response_time
-async def handle_post_search_multimodal(
-    config: ConfigDep,
-    embedding_service: EmbeddingServiceDep,
-    search_service: SearchServiceDep,
+async def _search(
+    config: APIConfig,
+    embedding_service: EmbeddingService,
+    search_service: RemoteSearchService,
     # Which media type to search on
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
     request: Request,
-    search_in: MediaType = Query(),
-    feature_extractor_id: str = Query(),
+    search_in: MediaType,
+    feature_extractor_id: str,
     # Query
-    query_term: Annotated[list[str], Form()] = [],
-    query_file: list[UploadFile] = [],
+    q: list[common.InternalQTerm],
     # Other parameters
-    start: int = Query(0, ge=0, le=980),
-    end: int = Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = Query(0),
-    shot_scale: list[int] = Query(default=[]),
-    metadata_filter: list[str] = Query(default=[]),
-    add_prefix: bool = Query(True)
+    start: int,
+    end: int,
+    thumbnails_to_send: int,
+    shot_scale: list[int],
+    metadata_filter: list[str],
+    add_prefix: bool
 ):
-    """
-    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
-    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
-    input images/text, and then using this as the query vector.
-    """
-    if len(query_term) == 0:
-        raise HTTPException(400, {"message": "Missing search query"})
-    elif len(query_term) > 5:
-        raise HTTPException(400, {"message": "Too many query items"})
-
-    q = common.api_query_to_internal_q(query_term, query_file)
-
     if search_in == MediaType.IMAGE:
         if len([query for query in q if query['modality'] == 'audio']) > 0:
             raise HTTPException(400, {
@@ -183,3 +171,135 @@ async def handle_post_search_multimodal(
     )
 
     return search_response
+
+@router.post("/search", response_model=common.SearchResponse)
+@common.add_response_time
+async def handle_post_search_multimodal(
+    config: ConfigDep,
+    embedding_service: EmbeddingServiceDep,
+    search_service: SearchServiceDep,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    request: Request,
+    search_in: MediaType = Query(),
+    feature_extractor_id: str = Query(),
+    # Positive queries
+    text_queries: list[str] = Query(default=[]),
+    image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
+    image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
+    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
+    # Negative queries
+    negative_text_queries: list[str] = Query(default=[]),
+    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    negative_audio_file_queries: list[bytes] = File(
+        []
+    ),  # user-uploaded audio files
+    negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
+    negative_internal_image_queries: list[str] = Query(
+        default=[]
+    ),  # ids to internal images
+    # Other parameters
+    start: int = Query(0, ge=0, le=980),
+    end: int = Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = Query(0),
+    shot_scale: list[int] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
+    add_prefix: bool = Query(True)
+):
+    """
+    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+    input images/text, and then using this as the query vector.
+    """
+    q = common.api_query_to_internal_q_old(
+        text_queries,
+        image_file_queries,
+        audio_file_queries,
+        image_url_queries,
+        audio_url_queries,
+        internal_image_queries,
+        negative_text_queries,
+        negative_image_file_queries,
+        negative_audio_file_queries,
+        negative_image_url_queries,
+        negative_audio_url_queries,
+        negative_internal_image_queries,
+    )
+
+    if len(q) == 0:
+        raise HTTPException(400, {"message": "Missing search query"})
+    elif len(q) > 5:
+        raise HTTPException(400, {"message": "Too many query items"})
+    
+    response = await _search(
+        config,
+        embedding_service,
+        cast(RemoteSearchService, search_service),
+        request,
+        search_in,
+        feature_extractor_id,
+        q,
+        start,
+        end,
+        thumbnails_to_send,
+        shot_scale,
+        metadata_filter,
+        add_prefix
+    )
+    return response
+
+@router.post("/search2", response_model=common.SearchResponse)
+@common.add_response_time
+async def handle_post_search_multimodal(
+    config: ConfigDep,
+    embedding_service: EmbeddingServiceDep,
+    search_service: SearchServiceDep,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    request: Request,
+    search_in: MediaType = Query(),
+    feature_extractor_id: str = Query(),
+    # Query
+    query_term: Annotated[list[str], Form()] = [],
+    query_file: list[UploadFile] = [],
+    # Other parameters
+    start: int = Query(0, ge=0, le=980),
+    end: int = Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = Query(0),
+    shot_scale: list[int] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
+    add_prefix: bool = Query(True)
+):
+    """
+    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+    input images/text, and then using this as the query vector.
+    """
+    if len(query_term) == 0:
+        raise HTTPException(400, {"message": "Missing search query"})
+    elif len(query_term) > 5:
+        raise HTTPException(400, {"message": "Too many query items"})
+
+    q = common.api_query_to_internal_q(query_term, query_file)
+
+    response = await _search(
+        config,
+        embedding_service,
+        cast(RemoteSearchService, search_service),
+        request,
+        search_in,
+        feature_extractor_id,
+        q,
+        start,
+        end,
+        thumbnails_to_send,
+        shot_scale,
+        metadata_filter,
+        add_prefix
+    )
+    return response
