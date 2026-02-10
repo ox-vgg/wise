@@ -19,12 +19,23 @@ import json
 import logging
 import functools
 from collections.abc import Callable, Iterable
-from typing import Annotated
+from typing import Annotated, cast
 
 from config import APIConfig
 from .. import common
 from ..common import InternalQTerm, VideoSegment
 from ..services.embedding import EmbeddingConfig
+from ..dependencies import (
+    ConfigDep,
+    ProjectServiceDep,
+    ProjectInfo,
+    ProjectInfoDep,
+    EmbeddingService,
+    EmbeddingServiceDep,
+    SearchServiceDep,
+    LocalWiseProjectService,
+    LocalSearchService,
+)
 
 from src.data_models import MediaType, ModalityType, VectorAndMediaMetadata
 from src.search.fts import WISEFTSQuery
@@ -37,7 +48,6 @@ from fastapi import APIRouter, Query, UploadFile, Form, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import HttpUrl
 
-from ..dependencies import ConfigDep, ProjectServiceDep, ProjectInfoDep, EmbeddingServiceDep, SearchServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -371,17 +381,17 @@ def reconstruct_vectors(
         response = common.NPArray.from_array(vectors)
         return response
     
-    if search_service.is_internal_search_supported(media_type, feature_extractor_id):
+    if cast(LocalSearchService, search_service).is_internal_search_supported(media_type, feature_extractor_id):
         try:
             # reconstruct features from faiss index
-            vectors = search_service.reconstruct_vectors(media_type, feature_extractor_id, internal_ids)
+            vectors = cast(LocalSearchService, search_service).reconstruct_vectors(media_type, feature_extractor_id, internal_ids)
         except Exception as e:
             logger.exception(e)
             return PlainTextResponse(
                 status_code=500, content=f"Error processing internal search query"
             )
     else:
-        index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
+        index_type = cast(LocalSearchService, search_service).get_search_index_type(media_type, feature_extractor_id)
         logger.exception(
             "This faiss index does not support internal search. To enable "
             "internal search, please re-create the index by running "
@@ -448,7 +458,7 @@ async def handle_post_search_feature(
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
 
     vectors = feature.to_array()
-    search_output = search_service.search_with_feature(
+    search_output = cast(LocalSearchService, search_service).search_with_feature(
         vectors,
         media_type=media_type,
         feature_extractor_id=feature_extractor_id,
@@ -465,8 +475,8 @@ async def handle_post_search_feature(
             image_results=None,
         )
 
-    all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
-    _get_shots_from_keyframes = functools.partial(get_shots_from_keyframes, project_service.wise_project)
+    all_thumbs = cast(LocalWiseProjectService, project_service).get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
+    _get_shots_from_keyframes = functools.partial(get_shots_from_keyframes, cast(LocalWiseProjectService, project_service).wise_project)
     # supports shots
     is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
     response = construct_search_response(
