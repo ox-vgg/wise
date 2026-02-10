@@ -110,7 +110,7 @@ class RemoteSearchService:
             start: int, 
             end: int,
             thumbnails_to_send: int = 0,
-            shot_scale: str | None = None,
+            shot_scale: list[int] | None = None,
             metadata_filter: list[str] = [],
         ) -> common.SearchResponse:
 

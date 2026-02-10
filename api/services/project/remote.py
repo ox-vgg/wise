@@ -134,7 +134,7 @@ class RemoteWiseProjectService(WiseProjectService):
             start: int = 0, 
             end: int = 20,
             thumbnails_to_send: int = 0,
-            shot_scale: str | None = None,
+            shot_scale: list[int] | None = None,
             metadata_filter: list[str] = [],
         ):
         feature_obj = common.NPArray.from_array(features)  # validate input
