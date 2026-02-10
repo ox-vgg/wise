@@ -610,9 +610,9 @@ async def handle_post_search_multimodal(
             f"`python create-index.py --project-dir \"{config.project_dir}\" "
             f"--media-type {media_type} --index-type {index_type} --overwrite`"
         )
-        return PlainTextResponse(
+        raise HTTPException(
             status_code=500,
-            content="Internal search not supported in this project"
+            detail={"message": "Internal search not supported in this project"}
         )
 
     try:
@@ -621,8 +621,8 @@ async def handle_post_search_multimodal(
         )
     except Exception as e:
         logger.exception(e)
-        return PlainTextResponse(
-            status_code=500, content="Error processing internal search query"
+        raise HTTPException(
+            status_code=500, detail={"message": "Error processing internal search query"}
         )
 
     if search_in == MediaType.IMAGE:
