@@ -580,8 +580,8 @@ async def handle_post_search_multimodal(
         text_queries = [x["val"] for x in q]
         # TODO escape special characters
         text = " ".join(text_queries)
-        q = WISEFTSQuery.model_validate({"$match": text})
-        search_output = search_service.asr_search(q, media_type, start, end)
+        fts_q = WISEFTSQuery.model_validate({"$match": text})
+        search_output = search_service.asr_search(fts_q, media_type, start, end)
         if len(search_output.ids) == 0:
             return common.SearchResponse(
                 time=0.0,
