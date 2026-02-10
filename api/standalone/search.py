@@ -522,48 +522,27 @@ def replace_vector_ids_with_search_embeddings(
     return new_q
 
 
-@router.post("/search", response_model=common.SearchResponse)
-@common.add_response_time
-async def handle_post_search_multimodal(
-    config: ConfigDep,
-    project_info: ProjectInfoDep,
-    project_service: ProjectServiceDep,
-    embedding_service: EmbeddingServiceDep,
-    search_service: SearchServiceDep,
+def _search(
+    config: APIConfig,
+    project_info: ProjectInfo,
+    project_service: LocalWiseProjectService,
+    embedding_service: EmbeddingService,
+    search_service: LocalSearchService,
     # Which media type to search on
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
-    search_in: MediaType = Query(),
-    feature_extractor_id: str = Query(),
-    # Query
-    query_term: Annotated[list[str], Form()] = [],
-    query_file: list[UploadFile] = [],
-    # Other parameters
-    start: int = Query(0, ge=0, le=980),
-    end: int = Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = Query(0),
-    shot_scale: list[int] = Query(default=[]),
-    metadata_filter: list[str] = Query(default=[]),
-    add_prefix: bool = Query(True)
+    search_in: MediaType,
+    feature_extractor_id: str,
+    q: list[InternalQTerm],
+    start: int,
+    end: int,
+    thumbnails_to_send: int,
+    shot_scale: list[int],
+    metadata_filter: list[str],
+    add_prefix: bool
 ):
-    """
-    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
-    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
-    input images/text, and then using this as the query vector.
-    """
-    if len(query_term) == 0:
-        raise HTTPException(400, {"message": "Missing search query"})
-    elif len(query_term) > 5:
-        raise HTTPException(400, {"message": "Too many query items"})
-
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    search_targets = project_info.search_targets
-    if media_type not in search_targets:
-        raise HTTPException(400, {
-            "message": f"No search index exists for this modality: {media_type}"
-        })
-
-    q = common.api_query_to_internal_q(query_term, query_file)
+    
+    media_type = get_media_type(search_in)
 
     if feature_extractor_id == 'wise/metadata':
         if (any([x["modality"] != "text" or x["sign"] != "positive" for x in q])):
@@ -688,6 +667,141 @@ async def handle_post_search_multimodal(
     )
 
     return response
+    
+@router.post("/search", response_model=common.SearchResponse)
+@common.add_response_time
+async def handle_post_search_multimodal_old(
+    config: ConfigDep,
+    project_info: ProjectInfoDep,
+    project_service: ProjectServiceDep,
+    embedding_service: EmbeddingServiceDep,
+    search_service: SearchServiceDep,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
+    feature_extractor_id: str = Query(),
+     # Positive queries
+    text_queries: list[str] = Query(default=[]),
+    image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
+    image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
+    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
+    # Negative queries
+    negative_text_queries: list[str] = Query(default=[]),
+    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    negative_audio_file_queries: list[bytes] = File(
+        []
+    ),  # user-uploaded audio files
+    negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
+    negative_internal_image_queries: list[str] = Query(
+        default=[]
+    ),  # ids to internal images
+    start: int = Query(0, ge=0, le=980),
+    end: int = Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = Query(0),
+    shot_scale: list[int] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
+    add_prefix: bool = Query(True)
+):
+    """
+    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+    input images/text, and then using this as the query vector.
+    """
+    
+    q = common.api_query_to_internal_q_old(
+        text_queries,
+        image_file_queries,
+        audio_file_queries,
+        image_url_queries,
+        audio_url_queries,
+        internal_image_queries,
+        negative_text_queries,
+        negative_image_file_queries,
+        negative_audio_file_queries,
+        negative_image_url_queries,
+        negative_audio_url_queries,
+        negative_internal_image_queries,
+    )
+
+    if len(q) == 0:
+        raise HTTPException(400, {"message": "Missing search query"})
+    elif len(q) > 5:
+        raise HTTPException(400, {"message": "Too many query items"})
+    
+    return _search(
+        config=config,
+        project_info=project_info,
+        project_service=cast(LocalWiseProjectService, project_service),
+        embedding_service=embedding_service,
+        search_service=cast(LocalSearchService, search_service),
+        search_in=search_in,
+        feature_extractor_id=feature_extractor_id,
+        q=q,
+        start=start,
+        end=end,
+        thumbnails_to_send=thumbnails_to_send,
+        shot_scale=shot_scale,
+        metadata_filter=metadata_filter,
+        add_prefix=add_prefix
+    )
+
+@router.post("/search2", response_model=common.SearchResponse)
+@common.add_response_time
+async def handle_post_search_multimodal(
+    config: ConfigDep,
+    project_info: ProjectInfoDep,
+    project_service: ProjectServiceDep,
+    embedding_service: EmbeddingServiceDep,
+    search_service: SearchServiceDep,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
+    feature_extractor_id: str = Query(),
+    # Query
+    query_term: Annotated[list[str], Form()] = [],
+    query_file: list[UploadFile] = [],
+    # Other parameters
+    start: int = Query(0, ge=0, le=980),
+    end: int = Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = Query(0),
+    shot_scale: list[int] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
+    add_prefix: bool = Query(True)
+):
+    """
+    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+    input images/text, and then using this as the query vector.
+    """
+    if len(query_term) == 0:
+        raise HTTPException(400, {"message": "Missing search query"})
+    elif len(query_term) > 5:
+        raise HTTPException(400, {"message": "Too many query items"})
+
+    q = common.api_query_to_internal_q(query_term, query_file)
+
+    return _search(
+        config=config,
+        project_info=project_info,
+        project_service=cast(LocalWiseProjectService, project_service),
+        embedding_service=embedding_service,
+        search_service=cast(LocalSearchService, search_service),
+        search_in=search_in,
+        feature_extractor_id=feature_extractor_id,
+        q=q,
+        start=start,
+        end=end,
+        thumbnails_to_send=thumbnails_to_send,
+        shot_scale=shot_scale,
+        metadata_filter=metadata_filter,
+        add_prefix=add_prefix
+    )
+    
 
 @router.get("/featured", response_model=common.SearchResponse)
 @common.add_response_time

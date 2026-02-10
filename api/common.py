@@ -161,6 +161,42 @@ def merge_multipart_query_form(
             query.append(term_form)
     return query
 
+def api_query_to_internal_q_old(
+    # Positive queries
+    text_queries: list[str],
+    image_file_queries: list[bytes],  # user-uploaded images
+    audio_file_queries: list[bytes],  # user-uploaded audio files
+    image_url_queries: list[HttpUrl],  # URLs to online images
+    audio_url_queries: list[HttpUrl],  # URLs to online audio files
+    internal_image_queries: list[str],  # ids to internal images
+    # Negative queries
+    negative_text_queries: list[str],
+    negative_image_file_queries: list[bytes],  # user-uploaded images
+    negative_audio_file_queries: list[bytes],  # user-uploaded audio files
+    negative_image_url_queries: list[HttpUrl],  # URLs to online images
+    negative_audio_url_queries: list[HttpUrl],  # URLs to online audio files
+    negative_internal_image_queries: list[str],  # ids to internal images
+) -> list[InternalQTerm]:
+    """Convert from the *_queries values from API into the "internal" form.
+    """
+    q = [InternalQTerm(sign="positive", modality="text", val=query) for query in text_queries]
+
+    q += [InternalQTerm(sign="positive", modality="image", val=query) for query in (
+        image_file_queries + image_url_queries + internal_image_queries
+    )]
+    q += [InternalQTerm(sign="positive", modality="audio", val=query) for query in (
+        audio_file_queries + audio_url_queries
+    )]
+
+    q += [InternalQTerm(sign="negative", modality="text", val=query) for query in negative_text_queries]
+    q += [InternalQTerm(sign="negative", modality="image", val=query) for query in (
+        negative_image_file_queries + negative_image_url_queries + negative_internal_image_queries
+    )]
+    q += [InternalQTerm(sign="negative", modality="audio", val=query) for query in (
+        negative_audio_file_queries + negative_audio_url_queries
+    )]
+
+    return q
 
 def api_query_to_internal_q(
     query_form: list[str], query_form_files: list[UploadFile]
