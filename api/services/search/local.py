@@ -54,7 +54,7 @@ class LocalSearchService:
         for i in range(0, reconstructed_features.shape[0]):
             features_list.append( np.expand_dims(reconstructed_features[i,], axis=0) )
         return features_list
-        
+
     def search_with_feature(
         self,
         features: np.ndarray,

@@ -303,21 +303,36 @@ for expected in "${expected_targets[@]}"; do
 done
 echo "Test 5.2b PASSED"
 
+validate_metadata_response () {
+    local test_id="${1}"
+    local response="${2}"
+    local expected_json="${3}"
+
+    response_selected_json=$(echo "$response" | jq -c '{
+      images: (
+        .image_results.images | 
+        to_entries | 
+        map({
+          filename: .value.filename,
+          external_metadata: .value.external_metadata
+        })
+      )
+    }')
+
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test ${test_id} PASSED"
+    else
+        echo "Test ${test_id} FAILED: unexpected face image search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
+}
 # Test 5.3 : metadata search
-METADATA_SEARCH_QUERY="church"
-RESULT_COUNT=3
-SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=wise/metadata&text_queries=${METADATA_SEARCH_QUERY}"
-response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
-response_selected_json=$(echo "$response" | jq -c '{
-  images: (
-    .image_results.images | 
-    to_entries | 
-    map({
-      filename: .value.filename,
-      external_metadata: .value.external_metadata
-    })
-  )
-}')
+echo "5.3 Running metadata search test ..."
+
 expected_json='{
   "images": [
     {
@@ -332,33 +347,30 @@ expected_json='{
     }
   ]
 }'
-if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
-    echo "Test 5.3 PASSED"
-else
-    echo "Test 5.3 FAILED: unexpected search results"
-    echo "Expected:"
-    echo "$expected_json" | jq .
-    echo "Actual:"
-    echo "$response_selected_json" | jq .
-    exit 1
-fi
+METADATA_SEARCH_QUERY="church"
+RESULT_COUNT=3
+SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=wise/metadata&text_queries=${METADATA_SEARCH_QUERY}"
+response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+
+validate_metadata_response "5.3.1 (search)" "$response" "$expected_json"
+
+METADATA_SEARCH_QUERY='{"term_id": "x", "is_negative": false, "txt": "church"}'
+RESULT_COUNT=3
+SEARCH_URL="${SERVER_URL}search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=wise/metadata"
+response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                -F "query_term=$METADATA_SEARCH_QUERY" \
+                "${SEARCH_URL}")
+
+
+validate_metadata_response "5.3.2 (search2)" "$response" "$expected_json"
+
 
 # Test 5.4 : face search
-if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
-    FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
-    FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
-    if [ ! -f "${FACE_IMG_FILE}" ]; then
-        echo "Downloading face image to ${FACE_IMG_FILE} ..."
-        curl -sLO "${FACE_IMG_URL}"
-        mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
-    fi
-    if [ ! -f "${FACE_IMG_FILE}" ]; then
-        echo "Failed to download face image from ${FACE_IMG_URL}"
-        exit 1
-    fi
-    RESULT_COUNT=3
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID2}"
-    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+validate_face_response() {
+    local test_id="${1}"
+    local response="${2}"
+    local expected_json="${3}"
+
     response_selected_json=$(echo "$response" | jq -c '. as $root | {
       results: (
         .image_results.vectors |
@@ -371,6 +383,34 @@ if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
         )
       )
     }')
+
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test ${test_id} PASSED"
+    else
+        echo "Test ${test_id} FAILED: unexpected face image search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
+}
+
+if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
+    echo "5.4 Running face search test ..."
+    
+    FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
+    FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Downloading face image to ${FACE_IMG_FILE} ..."
+        curl -sLO "${FACE_IMG_URL}"
+        mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
+    fi
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Failed to download face image from ${FACE_IMG_URL}"
+        exit 1
+    fi
+
     expected_json='{
       "results": [
         {
@@ -387,25 +427,26 @@ if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
         }
       ]
     }'
-
-    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
-        echo "Test 5.4 PASSED"
-    else
-        echo "Test 5.4 FAILED: unexpected face image search results"
-        echo "Expected:"
-        echo "$expected_json" | jq .
-        echo "Actual:"
-        echo "$response_selected_json" | jq .
-        exit 1
-    fi
-fi
-
-# Test 5.5 : object search
-if [ "$IMAGE_FEATURE_ID3" == "transformers/owlv2/google/owlv2-large-patch14-ensemble" ]; then
     RESULT_COUNT=3
-    # http://localhost:10001/wikimedia-commons-images-25/search?start=0&end=500&thumbs=1&search_in=image&feature_extractor_id=transformers/owlv2/google/owlv2-large-patch14-ensemble&text_queries=bird
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID3}&text_queries=bird"
-    response=$(curl -s -X POST "${SEARCH_URL}")
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID2}"
+    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    validate_face_response "5.4.1 (search)" "$response" "$expected_json"
+
+    RESULT_COUNT=3
+    SEARCH_URL="${SERVER_URL}search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID2}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual"}' \
+                    -F "query_file=@${FACE_IMG_FILE};filename=x" \
+                    "${SEARCH_URL}")
+  
+    
+    validate_face_response "5.4.2 (search2)" "$response" "$expected_json"
+fi
+validate_object_response () {
+    local test_id="${1}"
+    local response="${2}"
+    local expected_json="${3}"
+
     response_selected_json=$(echo "$response" | jq -c '. as $root | {
       results: (
         .image_results.vectors |
@@ -413,11 +454,27 @@ if [ "$IMAGE_FEATURE_ID3" == "transformers/owlv2/google/owlv2-large-patch14-ense
           .media_id as $id |
           {
             filename: $root.image_results.images[$id].filename,
-            source_url: $root.image_results.images[$id].external_metadata.source_url,
+            source_url: $root.image_results.images[$id].external_metadata.source_url
           }
         )
       )
     }')
+
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test ${test_id} PASSED"
+    else
+        echo "Test ${test_id} FAILED: unexpected object search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
+}
+# Test 5.5 : object search
+if [ "$IMAGE_FEATURE_ID3" == "transformers/owlv2/google/owlv2-large-patch14-ensemble" ]; then
+    echo "5.5 Running object search test ..."
+
     expected_json='{
       "results": [
         {
@@ -435,16 +492,19 @@ if [ "$IMAGE_FEATURE_ID3" == "transformers/owlv2/google/owlv2-large-patch14-ense
       ]
     }'
 
-    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
-        echo "Test 5.5 PASSED"
-    else
-        echo "Test 5.5 FAILED: unexpected object search results"
-        echo "Expected:"
-        echo "$expected_json" | jq .
-        echo "Actual:"
-        echo "$response_selected_json" | jq .
-        exit 1
-    fi
+    RESULT_COUNT=3
+    # http://localhost:10001/wikimedia-commons-images-25/search?start=0&end=500&thumbs=1&search_in=image&feature_extractor_id=transformers/owlv2/google/owlv2-large-patch14-ensemble&text_queries=bird
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID3}&text_queries=bird"
+    response=$(curl -s -X POST "${SEARCH_URL}")
+    validate_object_response "5.5.1 (search)" "$response" "$expected_json"
+
+    RESULT_COUNT=3
+    # http://localhost:10001/wikimedia-commons-images-25/search?start=0&end=500&thumbs=1&search_in=image&feature_extractor_id=transformers/owlv2/google/owlv2-large-patch14-ensemble&text_queries=bird
+    SEARCH_URL="${SERVER_URL}search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID3}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "bird"}' \
+                    "${SEARCH_URL}")
+    validate_object_response "5.5.2 (search2)" "$response" "$expected_json"
 fi
 
 end_time=`date +%s`

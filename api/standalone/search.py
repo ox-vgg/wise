@@ -19,10 +19,23 @@ import json
 import logging
 import functools
 from collections.abc import Callable, Iterable
+from typing import Annotated, cast
+
 from config import APIConfig
 from .. import common
-from ..common import VideoSegment
+from ..common import InternalQTerm, VideoSegment
 from ..services.embedding import EmbeddingConfig
+from ..dependencies import (
+    ConfigDep,
+    ProjectServiceDep,
+    ProjectInfo,
+    ProjectInfoDep,
+    EmbeddingService,
+    EmbeddingServiceDep,
+    SearchServiceDep,
+    LocalWiseProjectService,
+    LocalSearchService,
+)
 
 from src.data_models import MediaType, ModalityType, VectorAndMediaMetadata
 from src.search.fts import WISEFTSQuery
@@ -31,11 +44,10 @@ from src.feature.feature_extractor import FeatureExtMetadata
 from src.wise_project import WiseProject
 
 import numpy as np
-from fastapi import APIRouter, Query, File, Form, HTTPException
+from fastapi import APIRouter, Query, UploadFile, Form, File, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
 from pydantic import HttpUrl
 
-from ..dependencies import ConfigDep, ProjectServiceDep, ProjectInfoDep, EmbeddingServiceDep, SearchServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -293,9 +305,8 @@ def construct_search_response(
     all_ext_metadata: list[FeatureExtMetadata],
     all_thumbs: Iterable[str],
     merge_function: Callable[[list[VideoSegment]], list[VideoSegment]] = merge_close_segments,
-    search_in: MediaType = None,
+    search_in: MediaType | None = None,
 ):
-
     video_audio_results = None
     video_results = None
     image_results = None
@@ -341,6 +352,18 @@ def get_prefix(config: APIConfig):
         MediaType.AUDIO: "This is the sound of",
     }
     
+def get_media_type(search_in: Annotated[MediaType, Query()]):
+    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
+    return media_type
+
+def validate_search_targets(search_in: Annotated[MediaType, Query()], project_info: ProjectInfoDep):
+    media_type = get_media_type(search_in)
+    search_targets = project_info.search_targets
+    if media_type not in search_targets:
+        raise HTTPException(400, {
+            "message": f"No search index exists for this modality: {media_type}"
+        })
+    return search_in
 
 router = APIRouter()
 @router.get(
@@ -350,36 +373,28 @@ router = APIRouter()
 )
 def reconstruct_vectors(
     config: ConfigDep,
-    project_info: ProjectInfoDep,
     search_service: SearchServiceDep,
-    search_in: MediaType = Query(),
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
     feature_extractor_id: str = Query(),
     internal_ids: list[int] = Query(default=[]),  # ids to internal images
 ):
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    search_targets = project_info.search_targets
-
-    if media_type not in search_targets:
-        raise HTTPException(400, {
-            "message": f"No search index exists for this modality: {media_type}"
-        })
-    
+    media_type = get_media_type(search_in)
     if not internal_ids:
         vectors = np.array([])
         response = common.NPArray.from_array(vectors)
         return response
     
-    if search_service.is_internal_search_supported(media_type, feature_extractor_id):
+    if cast(LocalSearchService, search_service).is_internal_search_supported(media_type, feature_extractor_id):
         try:
             # reconstruct features from faiss index
-            vectors = search_service.reconstruct_vectors(media_type, feature_extractor_id, internal_ids)
+            vectors = cast(LocalSearchService, search_service).reconstruct_vectors(media_type, feature_extractor_id, internal_ids)
         except Exception as e:
             logger.exception(e)
             return PlainTextResponse(
                 status_code=500, content=f"Error processing internal search query"
             )
     else:
-        index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
+        index_type = cast(LocalSearchService, search_service).get_search_index_type(media_type, feature_extractor_id)
         logger.exception(
             "This faiss index does not support internal search. To enable "
             "internal search, please re-create the index by running "
@@ -416,7 +431,7 @@ async def handle_post_search_feature(
     # Which media type to search on
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
-    search_in: MediaType = Query(),
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
     feature_extractor_id: str = Query(),
     # Other parameters
     start: int = Query(0, ge=0, le=980),
@@ -425,28 +440,21 @@ async def handle_post_search_feature(
     shot_scale: list[int] = Query(default=[]),
     metadata_filter: list[str] = Query(default=[]),
 ):
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    search_targets = project_info.search_targets
-    if media_type not in search_targets:
-        raise HTTPException(400, {
-            "message": f"No search index exists for this modality: {media_type}"
-        })
-
     if feature_extractor_id == 'wise/metadata':
         raise HTTPException(400, {
             "message": "`wise/metadata` feature extractor cannot be used for feature-based search. Please use a different feature extractor."
         })
 
-        end = min(end, project_info.num_vectors)
+    end = min(end, project_info.num_vectors)
     if start > end:
         raise HTTPException(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
-
+     
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
-
+    media_type = get_media_type(search_in)
     vectors = feature.to_array()
-    search_output = search_service.search_with_feature(
+    search_output = cast(LocalSearchService, search_service).search_with_feature(
         vectors,
         media_type=media_type,
         feature_extractor_id=feature_extractor_id,
@@ -463,8 +471,8 @@ async def handle_post_search_feature(
             image_results=None,
         )
 
-    all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
-    _get_shots_from_keyframes = functools.partial(get_shots_from_keyframes, project_service.wise_project)
+    all_thumbs = cast(LocalWiseProjectService, project_service).get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
+    _get_shots_from_keyframes = functools.partial(get_shots_from_keyframes, cast(LocalWiseProjectService, project_service).wise_project)
     # supports shots
     is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
     response = construct_search_response(
@@ -477,82 +485,69 @@ async def handle_post_search_feature(
     )
 
     return response
-    
 
-@router.post("/search", response_model=common.SearchResponse)
-@common.add_response_time
-async def handle_post_search_multimodal(
-    config: ConfigDep,
-    project_info: ProjectInfoDep,
-    project_service: ProjectServiceDep,
-    embedding_service: EmbeddingServiceDep,
-    search_service: SearchServiceDep,
+
+def replace_vector_ids_with_search_embeddings(
+    search_service,
+    embedding_service,
+    media_type,
+    feature_extractor_id,
+    q: list[InternalQTerm],
+) -> list[InternalQTerm]:
+    ## Pick up queries for internal vectors
+    q_idx = []
+    public_vector_ids = []
+    for i, x in enumerate(q):
+        if x["modality"] != "text" and isinstance(x["val"], str):
+            q_idx.append(i)
+            public_vector_ids.append(x["val"])
+    if not public_vector_ids:
+        return q
+
+    vector_ids = [int(x.rsplit("/", maxsplit=1)[-1]) for x in public_vector_ids]
+
+    ## Reconstruct features from faiss index
+    embeddings = search_service.reconstruct_vectors(
+        media_type, feature_extractor_id, vector_ids
+    )
+    ## Apply hook to transform internal image query vectors
+    search_embeddings = [
+        embedding_service.transform_internal_image_queries(feature_extractor_id, x)
+        for x in embeddings
+    ]
+
+    new_q = q.copy()
+    for idx, embedding in zip(q_idx, search_embeddings):
+        new_q[idx] = q[idx] | {"val": embedding}
+    return new_q
+
+
+def _search(
+    config: APIConfig,
+    project_info: ProjectInfo,
+    project_service: LocalWiseProjectService,
+    embedding_service: EmbeddingService,
+    search_service: LocalSearchService,
     # Which media type to search on
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
-    search_in: MediaType = Query(),
-    feature_extractor_id: str = Query(),
-    
-    # Positive queries
-    text_queries: list[str] = Query(default=[]),
-    image_file_queries: list[bytes] = File([]),  # user-uploaded images
-    audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
-    image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
-    audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
-    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
-    # Negative queries
-    negative_text_queries: list[str] = Query(default=[]),
-    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
-    negative_audio_file_queries: list[bytes] = File(
-        []
-    ),  # user-uploaded audio files
-    negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
-    negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
-    negative_internal_image_queries: list[str] = Query(
-        default=[]
-    ),  # ids to internal images
-    # Other parameters
-    start: int = Query(0, ge=0, le=980),
-    end: int = Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = Query(0),
-    shot_scale: list[int] = Query(default=[]),
-    metadata_filter: list[str] = Query(default=[]),
-    add_prefix: bool = Query(True)
+    search_in: MediaType,
+    feature_extractor_id: str,
+    q: list[InternalQTerm],
+    start: int,
+    end: int,
+    thumbnails_to_send: int,
+    shot_scale: list[int],
+    metadata_filter: list[str],
+    add_prefix: bool
 ):
-    """
-    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
-    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
-    input images/text, and then using this as the query vector.
-    """
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    search_targets = project_info.search_targets
-    if media_type not in search_targets:
-        raise HTTPException(400, {
-            "message": f"No search index exists for this modality: {media_type}"
-        })
-
-    q = [dict(sign="positive", modality="text", val=query) for query in text_queries]
     
-    if len(q) > 5:
-        raise HTTPException(400, {"message": "Too many query items"})
+    media_type = get_media_type(search_in)
 
     if feature_extractor_id == 'wise/metadata':
-        if len(q) == 0:
-            raise HTTPException(400, {"message": "Missing search query"})
-
-        if (image_file_queries
-            or audio_file_queries
-            or image_url_queries
-            or audio_url_queries
-            or internal_image_queries
-            or negative_text_queries
-            or negative_image_file_queries
-            or negative_audio_file_queries
-            or negative_image_url_queries
-            or negative_audio_url_queries
-            or negative_internal_image_queries):
+        if (any([x["modality"] != "text" or x["sign"] != "positive" for x in q])):
             raise HTTPException(400, {
-                "message": "`wise/metadata` feature extractor can only be used with `text_queries`."
+                "message": "`wise/metadata` feature extractor can only be used with text queries"
             })
 
         # ASR search
@@ -560,11 +555,12 @@ async def handle_post_search_multimodal(
             raise HTTPException(
                 400, {"message": "'start' cannot be greater than 'end'"}
             )
-        
+
+        text_queries = [x["val"] for x in q]
         # TODO escape special characters
         text = " ".join(text_queries)
-        q = WISEFTSQuery.model_validate({"$match": text})
-        search_output = search_service.asr_search(q, media_type, start, end)
+        fts_q = WISEFTSQuery.model_validate({"$match": text})
+        search_output = search_service.asr_search(fts_q, media_type, start, end)
         if len(search_output.ids) == 0:
             return common.SearchResponse(
                 time=0.0,
@@ -583,64 +579,30 @@ async def handle_post_search_multimodal(
 
         return response
 
-    if internal_image_queries or negative_internal_image_queries:
-        if search_service.is_internal_search_supported(media_type, feature_extractor_id):
-            try:
-                def handle_internal_id(_id: str):
-                    *_, vector_id = _id.rsplit("/", 1)
-                    return int(vector_id)
-                
-                internal_image_queries = list(map(handle_internal_id, internal_image_queries))
-                negative_internal_image_queries = list(map(handle_internal_id, negative_internal_image_queries))
-                
-                # reconstruct features from faiss index
-                internal_image_queries = search_service.reconstruct_vectors(media_type, feature_extractor_id, internal_image_queries)
-                negative_internal_image_queries = search_service.reconstruct_vectors(media_type, feature_extractor_id, negative_internal_image_queries)
-            except Exception as e:
-                logger.exception(e)
-                return PlainTextResponse(
-                    status_code=500, content=f"Error processing internal search query"
-                )
-        else:
-            index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
-            logger.exception(
-                "This faiss index does not support internal search. To enable "
-                "internal search, please re-create the index by running "
-                f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {index_type} --overwrite`",
-            )
-            return PlainTextResponse(
-                status_code=500, content=f"Internal search not supported in this project"
-            )
+    if (any([x["modality"] != "text" and isinstance(x["val"], str) for x in q])
+        and not search_service.is_internal_search_supported(media_type, feature_extractor_id)
+    ):
+        index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
+        logger.exception(
+            "This faiss index does not support internal search. To enable "
+            "internal search, please re-create the index by running "
+            f"`python create-index.py --project-dir \"{config.project_dir}\" "
+            f"--media-type {media_type} --index-type {index_type} --overwrite`"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Internal search not supported in this project"}
+        )
 
-        # Apply hook to transform internal image query vectors
-        internal_image_queries = [
-            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-            for x in internal_image_queries
-        ]
-        negative_internal_image_queries = [
-            embedding_service.transform_internal_image_queries(feature_extractor_id, x)
-            for x in negative_internal_image_queries
-        ]
-
-    q = common.api_query_to_internal_q(
-        text_queries,
-        image_file_queries,
-        audio_file_queries,
-        image_url_queries,
-        audio_url_queries,
-        internal_image_queries,
-        negative_text_queries,
-        negative_image_file_queries,
-        negative_audio_file_queries,
-        negative_image_url_queries,
-        negative_audio_url_queries,
-        negative_internal_image_queries,
-    )
-
-    if len(q) == 0:
-        raise HTTPException(400, {"message": "Missing search query"})
-    elif len(q) > 5:
-        raise HTTPException(400, {"message": "Too many query items"})
+    try:
+        q = replace_vector_ids_with_search_embeddings(
+            search_service, embedding_service, media_type, feature_extractor_id, q
+        )
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500, detail={"message": "Error processing internal search query"}
+        )
 
     if search_in == MediaType.IMAGE:
         if len([query for query in q if query['modality'] == 'audio']) > 0:
@@ -673,7 +635,7 @@ async def handle_post_search_multimodal(
         text_queries_weight=config.text_queries_weight,
         negative_queries_weight=config.negative_queries_weight,
     )
-    
+
     search_output = search_service.search(
         q,
         embedding_config=embedding_config,
@@ -705,6 +667,141 @@ async def handle_post_search_multimodal(
     )
 
     return response
+    
+@router.post("/search", response_model=common.SearchResponse)
+@common.add_response_time
+async def handle_post_search_multimodal_old(
+    config: ConfigDep,
+    project_info: ProjectInfoDep,
+    project_service: ProjectServiceDep,
+    embedding_service: EmbeddingServiceDep,
+    search_service: SearchServiceDep,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
+    feature_extractor_id: str = Query(),
+     # Positive queries
+    text_queries: list[str] = Query(default=[]),
+    image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
+    image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
+    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
+    # Negative queries
+    negative_text_queries: list[str] = Query(default=[]),
+    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    negative_audio_file_queries: list[bytes] = File(
+        []
+    ),  # user-uploaded audio files
+    negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
+    negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
+    negative_internal_image_queries: list[str] = Query(
+        default=[]
+    ),  # ids to internal images
+    start: int = Query(0, ge=0, le=980),
+    end: int = Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = Query(0),
+    shot_scale: list[int] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
+    add_prefix: bool = Query(True)
+):
+    """
+    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+    input images/text, and then using this as the query vector.
+    """
+    
+    q = common.api_query_to_internal_q_old(
+        text_queries,
+        image_file_queries,
+        audio_file_queries,
+        image_url_queries,
+        audio_url_queries,
+        internal_image_queries,
+        negative_text_queries,
+        negative_image_file_queries,
+        negative_audio_file_queries,
+        negative_image_url_queries,
+        negative_audio_url_queries,
+        negative_internal_image_queries,
+    )
+
+    if len(q) == 0:
+        raise HTTPException(400, {"message": "Missing search query"})
+    elif len(q) > 5:
+        raise HTTPException(400, {"message": "Too many query items"})
+    
+    return _search(
+        config=config,
+        project_info=project_info,
+        project_service=cast(LocalWiseProjectService, project_service),
+        embedding_service=embedding_service,
+        search_service=cast(LocalSearchService, search_service),
+        search_in=search_in,
+        feature_extractor_id=feature_extractor_id,
+        q=q,
+        start=start,
+        end=end,
+        thumbnails_to_send=thumbnails_to_send,
+        shot_scale=shot_scale,
+        metadata_filter=metadata_filter,
+        add_prefix=add_prefix
+    )
+
+@router.post("/search2", response_model=common.SearchResponse)
+@common.add_response_time
+async def handle_post_search_multimodal(
+    config: ConfigDep,
+    project_info: ProjectInfoDep,
+    project_service: ProjectServiceDep,
+    embedding_service: EmbeddingServiceDep,
+    search_service: SearchServiceDep,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
+    feature_extractor_id: str = Query(),
+    # Query
+    query_term: Annotated[list[str], Form()] = [],
+    query_file: list[UploadFile] = [],
+    # Other parameters
+    start: int = Query(0, ge=0, le=980),
+    end: int = Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = Query(0),
+    shot_scale: list[int] = Query(default=[]),
+    metadata_filter: list[str] = Query(default=[]),
+    add_prefix: bool = Query(True)
+):
+    """
+    Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
+    Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
+    input images/text, and then using this as the query vector.
+    """
+    if len(query_term) == 0:
+        raise HTTPException(400, {"message": "Missing search query"})
+    elif len(query_term) > 5:
+        raise HTTPException(400, {"message": "Too many query items"})
+
+    q = common.api_query_to_internal_q(query_term, query_file)
+
+    return _search(
+        config=config,
+        project_info=project_info,
+        project_service=cast(LocalWiseProjectService, project_service),
+        embedding_service=embedding_service,
+        search_service=cast(LocalSearchService, search_service),
+        search_in=search_in,
+        feature_extractor_id=feature_extractor_id,
+        q=q,
+        start=start,
+        end=end,
+        thumbnails_to_send=thumbnails_to_send,
+        shot_scale=shot_scale,
+        metadata_filter=metadata_filter,
+        add_prefix=add_prefix
+    )
+    
 
 @router.get("/featured", response_model=common.SearchResponse)
 @common.add_response_time

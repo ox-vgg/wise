@@ -225,32 +225,26 @@ const fetchFeaturedImages = (
 const convertQueriesToFormData = (queries: Query[]) => {
   let formData = new FormData();
   for (const q of queries) {
-    if (q.type === 'IMAGE_FILE') {
-      let query_type = 'image_file_queries';
-      if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, (q.value as unknown) as File);
-    } else if (q.type === 'AUDIO_FILE') {
-      let query_type = 'audio_file_queries';
-      if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, (q.value as unknown) as File);
-    } else if (q.type === 'IMAGE_URL') {
-      let query_type = 'image_url_queries';
-      if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, q.value);
-    } else if (q.type === 'AUDIO_URL') {
-      let query_type = 'audio_url_queries';
-      if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, q.value);
+    const qterm: any = {
+      term_id: q.id,
+      is_negative: q.isNegative ?? false,
+    };
+    if (q.type === 'TEXT') {
+      qterm.txt = q.value;
     } else if (q.type === 'INTERNAL_IMAGE') {
-      let query_type = 'internal_image_queries';
-      if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, `${q.value.media_id}/${q.value.vector_id}`);
-    } else if (q.type === 'TEXT') {
-      let query_type = 'text_queries';
-      if (q.isNegative) query_type = 'negative_' + query_type
-      formData.append(query_type, q.value);
+      qterm.vector_id = `${q.value.media_id}/${q.value.vector_id}`;
+    } else if (q.type === 'IMAGE_FILE' || q.type === 'IMAGE_URL'
+               || q.type === 'AUDIO_FILE' || q.type === 'AUDIO_URL') {
+      // Files go in a separate part with a filename matching term_id.
+      qterm.src = q.type.endsWith('_URL') ? q.value : null;
+      qterm.qtype = q.type.startsWith('IMAGE_') ? 'visual' : 'audio';
     } else {
       throw new Error('Invalid query type');
+    }
+    formData.append('query_term', JSON.stringify(qterm));
+    if (q.type === 'IMAGE_FILE' || q.type === 'AUDIO_FILE') {
+      // filename must match the qterm.term_id
+      formData.append('query_file', (q.value as unknown) as File, q.id);
     }
   }
   return formData;
@@ -273,29 +267,20 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
-
-  const textQueries = queries.filter(q => q.type === "TEXT");
-  const internalImageQueries = queries.filter(q => q.type === "INTERNAL_IMAGE");
   const metadataFilterQueries = queries.filter(q => q.type === "METADATA");
-  const otherQueries = queries.filter(q => q.type !== 'TEXT' && q.type !== 'INTERNAL_IMAGE' && q.type !== 'METADATA');
-  let formData = undefined;
-  if (otherQueries.length > 0) {
-    formData = convertQueriesToFormData(otherQueries);
-  }
-
+  
+  const formData = convertQueriesToFormData(queries.filter(q => q.type !== "METADATA"));
   const urlParamsArray = [
     ['start', start.toString()],
     ['end', end.toString()],
     ['thumbs', config.FETCH_THUMBS.toString()],
     ['search_in', viewModalityToSearchInType[viewModality]],
     ['feature_extractor_id', featureExtractorId],
-    ...textQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'text_queries', q.value as string]),
-    ...internalImageQueries.map(q => [(q.isNegative ? 'negative_' : '') + 'internal_image_queries',  `${q.value.media_id}/${q.value.vector_id}` as string]),
     ...shotScaleFilter.map(s => ['shot_scale', s.toString()]),
     ...metadataFilterQueries.map(q => ['metadata_filter', q.value as string])
   ];
   const urlParams = new URLSearchParams(urlParamsArray);
-  const endpoint = `search?${urlParams.toString()}`;
+  const endpoint = `search2?${urlParams.toString()}`;
   
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {
     method: 'POST',
