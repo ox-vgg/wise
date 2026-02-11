@@ -280,8 +280,8 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
     ...metadataFilterQueries.map(q => ['metadata_filter', q.value as string])
   ];
   const urlParams = new URLSearchParams(urlParamsArray);
-  const endpoint = `search?${urlParams.toString()}`;
-
+  const endpoint = `search2?${urlParams.toString()}`;
+  
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {
     method: 'POST',
     body: formData
