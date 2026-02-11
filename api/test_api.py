@@ -94,25 +94,24 @@ class TestWithEmptyProject(unittest.TestCase):
 
 
 class TestHandlingMultipartForm(unittest.TestCase):
-    FILE_HEADERS = {"content-type": "application/octet-stream"}
     def test_merge_with_file(self):
         query_form = [
-            '{"term_id": "moon", "is_negative": false, "txt": "church"}',
+            '{"term_id": "bill", "is_negative": true, "txt": "vi"}',
             '{"term_id": "rms", "is_negative": false, "src": null, "qtype": "visual"}',
         ]
         query_form_files = [
             UploadFile(
-                file=BytesIO(bytes([71, 78, 85])),
+                file=BytesIO(bytes([101, 109, 97, 99, 115])),
                 filename="rms",
-                headers=self.FILE_HEADERS,
+                headers={"content-type": "application/octet-stream"},
             )
         ]
         expected_query = [
-            TextQueryTerm(term_id="moon", is_negative=False, txt="church"),
+            TextQueryTerm(term_id="bill", is_negative=True, txt="vi"),
             MediaQueryTerm(
                 term_id="rms",
                 is_negative=False,
-                src=bytes([71, 78, 85]),
+                src=bytes([101, 109, 97, 99, 115]),
                 qtype="visual",
             ),
         ]
@@ -122,44 +121,36 @@ class TestHandlingMultipartForm(unittest.TestCase):
             expected_query,
         )
 
-    def test_api_to_internal_q(self):
-        query_form = [
-            '{"term_id": "foo", "is_negative": true, "txt": "vim"}',
-            '{"term_id": "bar", "is_negative": false, "src": null, "qtype": "visual"}',
-        ]
-        query_form_files = [
-            UploadFile(file=BytesIO(b"666"), filename="bar", headers=self.FILE_HEADERS),
-        ]
-        expected_q = [
-            dict(sign="negative", modality="text", val="vim"),
-            dict(sign="positive", modality="image", val=b"666"),
-        ]
-        self.assertEqual(
-            api.common.api_query_to_internal_q(query_form, query_form_files),
-            expected_q,
-        )
-
     def test_parsing_internal_vector_id(self):
         query_form = [
             '{"term_id": "foo", "is_negative": true, "txt": "crane"}',
             '{"term_id": "bar", "is_negative": false, "vector_id": "0/0/0"}',
         ]
         expected_q = [
-            dict(sign="negative", modality="text", val="crane"),
-            dict(sign="positive", modality="image", val="0/0/0"),
+            api.common.TextQueryTerm(
+                term_id="foo", is_negative=True, txt="crane"
+            ),
+            api.common.VectorQueryTerm(
+                term_id="bar", is_negative=False, vector_id="0/0/0"
+            )
         ]
         self.assertEqual(
-            api.common.api_query_to_internal_q(query_form, []), expected_q
+            api.common.merge_multipart_query_form(query_form, []), expected_q
         )
 
     def test_parsing_url(self):
         url = "http://www.example.com/960px-Flagstone_3_(20767991).jpg"
         query_form = [
-            '{"term_id": "foo", "is_negative": false, "src": "%s", "qtype": "visual"}' % url,
+            '{"term_id": "gnu", "is_negative": false, "src": "%s", "qtype": "visual"}' % url,
         ]
         expected_q = [
-            dict(sign="positive", modality="image", val=HttpUrl(url)),
+            api.common.MediaQueryTerm(
+                term_id="gnu",
+                is_negative=False,
+                src=HttpUrl(url),
+                qtype="visual",
+            )
         ]
         self.assertEqual(
-            api.common.api_query_to_internal_q(query_form, []), expected_q
+            api.common.merge_multipart_query_form(query_form, []), expected_q
         )

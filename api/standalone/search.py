@@ -23,7 +23,13 @@ from typing import Annotated, cast
 
 from config import APIConfig
 from .. import common
-from ..common import InternalQTerm, VideoSegment
+from ..common import (
+    MediaQueryTerm,
+    Query,
+    TextQueryTerm,
+    VectorQueryTerm,
+    VideoSegment,
+)
 from ..services.embedding import EmbeddingConfig
 from ..dependencies import (
     ConfigDep,
@@ -44,7 +50,8 @@ from src.feature.feature_extractor import FeatureExtMetadata
 from src.wise_project import WiseProject
 
 import numpy as np
-from fastapi import APIRouter, Query, UploadFile, Form, File, HTTPException, Depends
+import fastapi
+from fastapi import APIRouter, UploadFile, Form, File, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
 from pydantic import HttpUrl
 
@@ -352,11 +359,11 @@ def get_prefix(config: APIConfig):
         MediaType.AUDIO: "This is the sound of",
     }
     
-def get_media_type(search_in: Annotated[MediaType, Query()]):
+def get_media_type(search_in: Annotated[MediaType, fastapi.Query()]):
     media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
     return media_type
 
-def validate_search_targets(search_in: Annotated[MediaType, Query()], project_info: ProjectInfoDep):
+def validate_search_targets(search_in: Annotated[MediaType, fastapi.Query()], project_info: ProjectInfoDep):
     media_type = get_media_type(search_in)
     search_targets = project_info.search_targets
     if media_type not in search_targets:
@@ -375,8 +382,8 @@ def reconstruct_vectors(
     config: ConfigDep,
     search_service: SearchServiceDep,
     search_in: Annotated[MediaType, Depends(validate_search_targets)],
-    feature_extractor_id: str = Query(),
-    internal_ids: list[int] = Query(default=[]),  # ids to internal images
+    feature_extractor_id: str = fastapi.Query(),
+    internal_ids: list[int] = fastapi.Query(default=[]),  # ids to internal images
 ):
     media_type = get_media_type(search_in)
     if not internal_ids:
@@ -432,13 +439,13 @@ async def handle_post_search_feature(
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
     search_in: Annotated[MediaType, Depends(validate_search_targets)],
-    feature_extractor_id: str = Query(),
+    feature_extractor_id: str = fastapi.Query(),
     # Other parameters
-    start: int = Query(0, ge=0, le=980),
-    end: int = Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = Query(0),
-    shot_scale: list[int] = Query(default=[]),
-    metadata_filter: list[str] = Query(default=[]),
+    start: int = fastapi.Query(0, ge=0, le=980),
+    end: int = fastapi.Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = fastapi.Query(0),
+    shot_scale: list[int] = fastapi.Query(default=[]),
+    metadata_filter: list[str] = fastapi.Query(default=[]),
 ):
     if feature_extractor_id == 'wise/metadata':
         raise HTTPException(400, {
@@ -492,19 +499,17 @@ def replace_vector_ids_with_search_embeddings(
     embedding_service,
     media_type,
     feature_extractor_id,
-    q: list[InternalQTerm],
-) -> list[InternalQTerm]:
+    q: Query,
+) -> Query:
     ## Pick up queries for internal vectors
-    q_idx = []
-    public_vector_ids = []
+    q_idx: list[int] = []
+    vector_ids: list[str] = []
     for i, x in enumerate(q):
-        if x["modality"] != "text" and isinstance(x["val"], str):
+        if isinstance(x, VectorQueryTerm):
             q_idx.append(i)
-            public_vector_ids.append(x["val"])
-    if not public_vector_ids:
-        return q
-
-    vector_ids = [int(x.rsplit("/", maxsplit=1)[-1]) for x in public_vector_ids]
+            vector_ids.append(int(x.vector_id.rsplit("/", maxsplit=1)[-1]))
+    if not vector_ids:
+        return q.copy()
 
     ## Reconstruct features from faiss index
     embeddings = search_service.reconstruct_vectors(
@@ -518,7 +523,12 @@ def replace_vector_ids_with_search_embeddings(
 
     new_q = q.copy()
     for idx, embedding in zip(q_idx, search_embeddings):
-        new_q[idx] = q[idx] | {"val": embedding}
+        new_q[idx] = MediaQueryTerm(
+            term_id=q[idx].term_id,
+            is_negative=q[idx].is_negative,
+            src=embedding,
+            qtype="visual",  # only search on visual internal vectors
+        )
     return new_q
 
 
@@ -527,12 +537,12 @@ def _search_metadata(
     search_service: SearchServiceDep,
     search_in: MediaType,
     media_type: MediaType,
-    q: list[InternalQTerm],
+    q: Query,
     start: int,
     end: int,
     thumbnails_to_send: int,
 ) -> common.SearchResponse:
-    if (any([x["modality"] != "text" or x["sign"] != "positive" for x in q])):
+    if (any([not isinstance(x, TextQueryTerm) or x.is_negative for x in q])):
         raise HTTPException(400, {
             "message": "`wise/metadata` feature extractor can only be used with text queries"
         })
@@ -543,7 +553,7 @@ def _search_metadata(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
 
-    text_queries = [x["val"] for x in q]
+    text_queries = [x.txt for x in q]
     # TODO escape special characters
     text = " ".join(text_queries)
     fts_q = WISEFTSQuery.model_validate({"$match": text})
@@ -574,7 +584,7 @@ def _search_multimodal(
     search_in: MediaType,
     media_type: MediaType,
     feature_extractor_id: str,
-    q: list[InternalQTerm],
+    q: Query,
     start: int,
     end: int,
     thumbnails_to_send: int,
@@ -582,7 +592,7 @@ def _search_multimodal(
     metadata_filter: list[str],
     add_prefix: bool,
 ) -> common.SearchResponse:
-    if (any([x["modality"] != "text" and isinstance(x["val"], str) for x in q])
+    if (any([isinstance(x, VectorQueryTerm) for x in q])
         and not search_service.is_internal_search_supported(media_type, feature_extractor_id)
     ):
         index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
@@ -608,19 +618,19 @@ def _search_multimodal(
         )
 
     if search_in == MediaType.IMAGE:
-        if len([query for query in q if query['modality'] == 'audio']) > 0:
+        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
             raise HTTPException(400, {
                 "message": "Cannot search on images using an audio query"
             })
     elif search_in == MediaType.VIDEO:
-        if len([query for query in q if query['modality'] == 'audio']) > 0:
+        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
             raise HTTPException(400, {
                 "message": "Cannot search on visual stream of video files using an audio query"
             })
     elif search_in == MediaType.AUDIO or search_in == MediaType.AV:
-        if len([query for query in q if query['modality'] == 'image']) > 0:
+        if any([isinstance(x, MediaQueryTerm) and x.qtype == "visual" for x in q]):
             raise HTTPException(400, {
-                "message": "Cannot search on audio using an image query"
+                "message": "Cannot search on audio using a visual query"
             })
 
     end = min(end, project_info.num_vectors)
@@ -684,7 +694,7 @@ def _search(
     # "audio" refers to pure audio files, and "image" refers to images
     search_in: MediaType,
     feature_extractor_id: str,
-    q: list[InternalQTerm],
+    q: Query,
     start: int,
     end: int,
     thumbnails_to_send: int,
@@ -736,39 +746,39 @@ async def handle_post_search(
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
     search_in: Annotated[MediaType, Depends(validate_search_targets)],
-    feature_extractor_id: str = Query(),
+    feature_extractor_id: str = fastapi.Query(),
      # Positive queries
-    text_queries: list[str] = Query(default=[]),
+    text_queries: list[str] = fastapi.Query(default=[]),
     image_file_queries: list[bytes] = File([]),  # user-uploaded images
     audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
     image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
     audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
-    internal_image_queries: list[str] = Query(default=[]),  # ids to internal images
+    internal_image_queries: list[str] = fastapi.Query(default=[]),  # ids to internal images
     # Negative queries
-    negative_text_queries: list[str] = Query(default=[]),
+    negative_text_queries: list[str] = fastapi.Query(default=[]),
     negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
     negative_audio_file_queries: list[bytes] = File(
         []
     ),  # user-uploaded audio files
     negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
     negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
-    negative_internal_image_queries: list[str] = Query(
+    negative_internal_image_queries: list[str] = fastapi.Query(
         default=[]
     ),  # ids to internal images
-    start: int = Query(0, ge=0, le=980),
-    end: int = Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = Query(0),
-    shot_scale: list[int] = Query(default=[]),
-    metadata_filter: list[str] = Query(default=[]),
-    add_prefix: bool = Query(True)
+    start: int = fastapi.Query(0, ge=0, le=980),
+    end: int = fastapi.Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = fastapi.Query(0),
+    shot_scale: list[int] = fastapi.Query(default=[]),
+    metadata_filter: list[str] = fastapi.Query(default=[]),
+    add_prefix: bool = fastapi.Query(True)
 ):
     """
     Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
     Multimodal queries (i.e. images + text) are performed by computing a weighted sum of the feature vectors of the
     input images/text, and then using this as the query vector.
     """
-    
-    q = common.api_query_to_internal_q_old(
+
+    q = common.parse_old_api_query(
         text_queries,
         image_file_queries,
         audio_file_queries,
@@ -787,7 +797,7 @@ async def handle_post_search(
         raise HTTPException(400, {"message": "Missing search query"})
     elif len(q) > 5:
         raise HTTPException(400, {"message": "Too many query items"})
-    
+
     return _search(
         config=config,
         project_info=project_info,
@@ -817,17 +827,17 @@ async def handle_post_search2(
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
     search_in: Annotated[MediaType, Depends(validate_search_targets)],
-    feature_extractor_id: str = Query(),
+    feature_extractor_id: str = fastapi.Query(),
     # Query
     query_term: Annotated[list[str], Form()] = [],
     query_file: list[UploadFile] = [],
     # Other parameters
-    start: int = Query(0, ge=0, le=980),
-    end: int = Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = Query(0),
-    shot_scale: list[int] = Query(default=[]),
-    metadata_filter: list[str] = Query(default=[]),
-    add_prefix: bool = Query(True)
+    start: int = fastapi.Query(0, ge=0, le=980),
+    end: int = fastapi.Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = fastapi.Query(0),
+    shot_scale: list[int] = fastapi.Query(default=[]),
+    metadata_filter: list[str] = fastapi.Query(default=[]),
+    add_prefix: bool = fastapi.Query(True)
 ):
     """
     Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
@@ -839,7 +849,7 @@ async def handle_post_search2(
     elif len(query_term) > 5:
         raise HTTPException(400, {"message": "Too many query items"})
 
-    q = common.api_query_to_internal_q(query_term, query_file)
+    q = common.merge_multipart_query_form(query_term, query_file)
 
     return _search(
         config=config,
@@ -869,13 +879,13 @@ async def handle_get_featured(
     # closer, but not the same, to the frontend viewModality but
     # we use MediaType because it uses a subset of its keys.  This
     # is just a convenience to get the values checked.
-    featured_in: MediaType = Query(),
-    feature_extractor_id: str = Query(),
-    start: int = Query(0, ge=0, le=980),
-    end: int = Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = Query(0),
+    featured_in: MediaType = fastapi.Query(),
+    feature_extractor_id: str = fastapi.Query(),
+    start: int = fastapi.Query(0, ge=0, le=980),
+    end: int = fastapi.Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = fastapi.Query(0),
     # This seed is used to randomly select the set of images used for the featured images
-    random_seed: int = Query(123),
+    random_seed: int = fastapi.Query(123),
 ):
     modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in) 
     search_output = search_service.featured(
