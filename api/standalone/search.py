@@ -522,16 +522,57 @@ def replace_vector_ids_with_search_embeddings(
     return new_q
 
 
-def _search(
-    config: APIConfig,
-    project_info: ProjectInfo,
-    project_service: LocalWiseProjectService,
-    embedding_service: EmbeddingService,
-    search_service: LocalSearchService,
-    # Which media type to search on
-    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
-    # "audio" refers to pure audio files, and "image" refers to images
+def _search_metadata(
+    project_service: ProjectServiceDep,
+    search_service: SearchServiceDep,
     search_in: MediaType,
+    media_type: MediaType,
+    q: list[InternalQTerm],
+    start: int,
+    end: int,
+    thumbnails_to_send: int,
+) -> common.SearchResponse:
+    if (any([x["modality"] != "text" or x["sign"] != "positive" for x in q])):
+        raise HTTPException(400, {
+            "message": "`wise/metadata` feature extractor can only be used with text queries"
+        })
+
+    # ASR search
+    if start > end:
+        raise HTTPException(
+            400, {"message": "'start' cannot be greater than 'end'"}
+        )
+
+    text_queries = [x["val"] for x in q]
+    # TODO escape special characters
+    text = " ".join(text_queries)
+    fts_q = WISEFTSQuery.model_validate({"$match": text})
+    search_output = search_service.asr_search(fts_q, media_type, start, end)
+    if len(search_output.ids) == 0:
+        return common.SearchResponse(
+            time=0.0,
+            video_audio_results=None,
+            video_results=None,
+            image_results=None,
+        )
+    all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
+    return construct_search_response(
+        search_output.distances,
+        search_output.metadata,
+        search_output.ext_metadata,
+        all_thumbs,
+        search_in=search_in
+    )
+
+
+def _search_multimodal(
+    config: ConfigDep,
+    project_info: ProjectInfoDep,
+    project_service: ProjectServiceDep,
+    embedding_service: EmbeddingServiceDep,
+    search_service: SearchServiceDep,
+    search_in: MediaType,
+    media_type: MediaType,
     feature_extractor_id: str,
     q: list[InternalQTerm],
     start: int,
@@ -539,46 +580,8 @@ def _search(
     thumbnails_to_send: int,
     shot_scale: list[int],
     metadata_filter: list[str],
-    add_prefix: bool
-):
-    
-    media_type = get_media_type(search_in)
-
-    if feature_extractor_id == 'wise/metadata':
-        if (any([x["modality"] != "text" or x["sign"] != "positive" for x in q])):
-            raise HTTPException(400, {
-                "message": "`wise/metadata` feature extractor can only be used with text queries"
-            })
-
-        # ASR search
-        if start > end:
-            raise HTTPException(
-                400, {"message": "'start' cannot be greater than 'end'"}
-            )
-
-        text_queries = [x["val"] for x in q]
-        # TODO escape special characters
-        text = " ".join(text_queries)
-        fts_q = WISEFTSQuery.model_validate({"$match": text})
-        search_output = search_service.asr_search(fts_q, media_type, start, end)
-        if len(search_output.ids) == 0:
-            return common.SearchResponse(
-                time=0.0,
-                video_audio_results=None,
-                video_results=None,
-                image_results=None,
-            )
-        all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
-        response = construct_search_response(
-            search_output.distances,
-            search_output.metadata,
-            search_output.ext_metadata,
-            all_thumbs,
-            search_in=search_in
-        )
-
-        return response
-
+    add_prefix: bool,
+) -> common.SearchResponse:
     if (any([x["modality"] != "text" and isinstance(x["val"], str) for x in q])
         and not search_service.is_internal_search_supported(media_type, feature_extractor_id)
     ):
@@ -667,7 +670,60 @@ def _search(
     )
 
     return response
-    
+
+
+
+def _search(
+    config: APIConfig,
+    project_info: ProjectInfo,
+    project_service: LocalWiseProjectService,
+    embedding_service: EmbeddingService,
+    search_service: LocalSearchService,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    search_in: MediaType,
+    feature_extractor_id: str,
+    q: list[InternalQTerm],
+    start: int,
+    end: int,
+    thumbnails_to_send: int,
+    shot_scale: list[int],
+    metadata_filter: list[str],
+    add_prefix: bool
+):
+    media_type = get_media_type(search_in)
+    if feature_extractor_id == 'wise/metadata':
+        return _search_metadata(
+            project_service,
+            search_service,
+            search_in,
+            media_type,
+            q,
+            start,
+            end,
+            thumbnails_to_send,
+        )
+    else:
+        return _search_multimodal(
+            config,
+            project_info,
+            project_service,
+            embedding_service,
+            search_service,
+            search_in,
+            media_type,
+            feature_extractor_id,
+            q,
+            start,
+            end,
+            thumbnails_to_send,
+            shot_scale,
+            metadata_filter,
+            add_prefix,
+        )
+
+
 @router.post("/search", response_model=common.SearchResponse)
 @common.add_response_time
 async def handle_post_search(
