@@ -19,7 +19,7 @@ from .base import SearchOutput
 from .exceptions import UnknownSearchIndexError
 from ..embedding import EmbeddingService, EmbeddingConfig
 from ..project import LocalWiseProjectService
-from ...common import InternalQTerm
+from ...common import Query
 from src.wise_project import WiseProject
 from src.data_models import MediaType
 from src.feature.feature_extractor import FeatureExtMetadata
@@ -101,7 +101,7 @@ class LocalSearchService:
     
     def search(
         self,
-        q: list[InternalQTerm],
+        q: Query,
         embedding_config: EmbeddingConfig,
         media_type: MediaType,
         feature_extractor_id: str, 

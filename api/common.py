@@ -17,8 +17,9 @@
 import base64
 import functools
 import time
+import uuid
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Callable, Literal, Optional, TypedDict
+from typing import Annotated, Callable, Literal, Optional
 
 import numpy as np
 from fastapi import HTTPException, Request, Response, UploadFile
@@ -29,6 +30,7 @@ from pydantic import (
     PlainSerializer,
     TypeAdapter,
     field_validator,
+    ConfigDict
 )
 
 from config import APIConfig
@@ -83,7 +85,8 @@ class MediaQueryTerm(BaseQueryTerm):
             a video segment.
 
     """
-    src: HttpUrl | bytes | int
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    src: HttpUrl | bytes | int | np.ndarray
     qtype: Literal["audio", "visual"]
     bbox: Optional[BBoxXYWH] = None
     ts: Optional[float] = None
@@ -120,12 +123,6 @@ QueryTermInForm = MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm
 QueryTermInFormAdapter = TypeAdapter(QueryTermInForm)
 
 
-class InternalQTerm(TypedDict):
-    sign: Literal["positive", "negative"]
-    modality: Literal["image", "audio", "text"]
-    val: bytes | HttpUrl | str | np.ndarray
-
-
 def merge_multipart_query_form(
     query_form: list[str], query_form_files: list[UploadFile]
 ) -> Query:
@@ -149,19 +146,21 @@ def merge_multipart_query_form(
 
     query = []
     for term_form in query_form:
-        if (isinstance(term_form, MediaQueryTermInForm)
-            and term_form.src is None):
-            query.append(
-                MediaQueryTerm(
-                    **term_form.model_dump(exclude="src"),
-                    src=filename_to_file[term_form.term_id].file.read(),
+        if isinstance(term_form, MediaQueryTermInForm):
+            if term_form.src is None:  # get file from query_file
+                query.append(
+                    MediaQueryTerm(
+                        **term_form.model_dump(exclude="src"),
+                        src=filename_to_file[term_form.term_id].file.read(),
+                    )
                 )
-            )
+            else:
+                query.append(MediaQueryTerm(**term_form.model_dump()))
         else:
             query.append(term_form)
     return query
 
-def api_query_to_internal_q_old(
+def parse_old_api_query(
     # Positive queries
     text_queries: list[str],
     image_file_queries: list[bytes],  # user-uploaded images
@@ -176,51 +175,58 @@ def api_query_to_internal_q_old(
     negative_image_url_queries: list[HttpUrl],  # URLs to online images
     negative_audio_url_queries: list[HttpUrl],  # URLs to online audio files
     negative_internal_image_queries: list[str],  # ids to internal images
-) -> list[InternalQTerm]:
+) -> Query:
     """Convert from the *_queries values from API into the "internal" form.
     """
-    q = [InternalQTerm(sign="positive", modality="text", val=query) for query in text_queries]
-
-    q += [InternalQTerm(sign="positive", modality="image", val=query) for query in (
-        image_file_queries + image_url_queries + internal_image_queries
-    )]
-    q += [InternalQTerm(sign="positive", modality="audio", val=query) for query in (
-        audio_file_queries + audio_url_queries
-    )]
-
-    q += [InternalQTerm(sign="negative", modality="text", val=query) for query in negative_text_queries]
-    q += [InternalQTerm(sign="negative", modality="image", val=query) for query in (
-        negative_image_file_queries + negative_image_url_queries + negative_internal_image_queries
-    )]
-    q += [InternalQTerm(sign="negative", modality="audio", val=query) for query in (
-        negative_audio_file_queries + negative_audio_url_queries
-    )]
-
-    return q
-
-def api_query_to_internal_q(
-    query_form: list[str], query_form_files: list[UploadFile]
-) -> list[InternalQTerm]:
-    api_query = merge_multipart_query_form(query_form, query_form_files)
     q = []
-    for query_term in api_query:
-        sign = "negative" if query_term.is_negative else "positive"
-        if isinstance(query_term, TextQueryTerm):
-            q.append(dict(sign=sign, modality="text", val=query_term.txt))
-        elif isinstance(query_term, MediaQueryTerm):
-            modality = "image" if query_term.qtype == "visual" else "audio"
-            if query_term.bbox:
-                raise HTTPException(400, {"message": "bbox not supported"})
-            elif query_term.ts is not None or query_term.te is not None:
-                raise HTTPException(400, {"message": "ts/te not supported"})
-            q.append(dict(sign=sign, modality=modality, val=query_term.src))
-        elif isinstance(query_term, VectorQueryTerm):
-            ## Currently, vector id is only supported for images,
-            ## hence modality is always "image" (but this should
-            ## change in the future).
-            q.append(dict(sign=sign, modality="image", val=query_term.vector_id))
-        else:
-            raise Exception("unhandled type of QueryTerm")
+    q += [
+        TextQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, txt=val)
+        for val in text_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=val, qtype="visual")
+        for val in image_file_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=HttpUrl(val), qtype="visual")
+        for val in image_url_queries
+    ]
+    q += [
+        VectorQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, vector_id=val)
+        for val in internal_image_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=val, qtype="audio")
+        for val in audio_file_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=HttpUrl(val), qtype="audio")
+        for val in audio_url_queries
+    ]
+    q += [
+        TextQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, txt=val)
+        for val in negative_text_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=val, qtype="visual")
+        for val in negative_image_file_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=HttpUrl(val), qtype="visual")
+        for val in negative_image_url_queries
+    ]
+    q += [
+        VectorQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, vector_id=val)
+        for val in negative_internal_image_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=val, qtype="audio")
+        for val in negative_audio_file_queries
+    ]
+    q += [
+        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=HttpUrl(val), qtype="audio")
+        for val in negative_audio_url_queries
+    ]
     return q
 
 
