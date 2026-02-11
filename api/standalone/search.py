@@ -670,7 +670,7 @@ def _search(
     
 @router.post("/search", response_model=common.SearchResponse)
 @common.add_response_time
-async def handle_post_search_multimodal_old(
+async def handle_post_search(
     config: ConfigDep,
     project_info: ProjectInfoDep,
     project_service: ProjectServiceDep,
@@ -751,7 +751,7 @@ async def handle_post_search_multimodal_old(
 
 @router.post("/search2", response_model=common.SearchResponse)
 @common.add_response_time
-async def handle_post_search_multimodal(
+async def handle_post_search2(
     config: ConfigDep,
     project_info: ProjectInfoDep,
     project_service: ProjectServiceDep,

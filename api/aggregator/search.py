@@ -175,7 +175,7 @@ async def _search(
 
 @router.post("/search", response_model=common.SearchResponse)
 @common.add_response_time
-async def handle_post_search_multimodal(
+async def handle_post_search(
     config: ConfigDep,
     embedding_service: EmbeddingServiceDep,
     search_service: SearchServiceDep,
@@ -255,7 +255,7 @@ async def handle_post_search_multimodal(
 
 @router.post("/search2", response_model=common.SearchResponse)
 @common.add_response_time
-async def handle_post_search_multimodal(
+async def handle_post_search2(
     config: ConfigDep,
     embedding_service: EmbeddingServiceDep,
     search_service: SearchServiceDep,
