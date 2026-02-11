@@ -386,14 +386,11 @@ else
     cleanup
 fi
 
-# Test 8.1 : check if the server returns correct results (including metadata) for query on audio
-if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
-    RESULT_COUNT=1
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}"
-    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
-                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "trumpet"}' \
-                    "${SEARCH_URL}")
-    response_selected_json=$(echo "$response" | jq -c '{
+validate_audio_response() {
+    local test_id="${1}"
+    local response="${2}"
+    local expected_json="${3}"
+    local response_selected_json=$(echo "$response" | jq -c '{
         merged_windows: [
         .video_audio_results.merged_windows[] as $mw
         | {
@@ -403,7 +400,19 @@ if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
         }
         ]
     }')
-
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test ${test_id} PASSED"
+    else
+        echo "Test ${test_id} FAILED: unexpected search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
+}
+# Test 8.1 : check if the server returns correct results (including metadata) for query on audio
+if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
     expected_json='{
       "merged_windows": [
         {
@@ -413,17 +422,45 @@ if [ "$AUDIO_FEATURE_ID" == "microsoft/clap/2023/four-datasets" ]; then
         }
       ]
     }'
-    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
-        echo "Test 8.1 PASSED"
+    SEARCH_QUERY="trumpet"
+    RESULT_COUNT=1
+
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}&text_queries=${SEARCH_QUERY}"
+    response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+    validate_audio_response "8.1 (search)" "$response" "$expected_json"
+
+    SEARCH_URL="${SERVER_URL}search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=av&feature_extractor_id=${AUDIO_FEATURE_ID}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "'"${SEARCH_QUERY}"'"}' \
+                    "${SEARCH_URL}")
+    validate_audio_response "8.1 (search2)" "$response" "$expected_json"
+fi
+
+validate_face_response () {
+    local test_id="${1}"
+    local response="${2}"
+    local expected_json="${3}"
+    local response_selected_json=$(echo "$response" | jq -c '{
+        results: [
+        .video_results.merged_windows[] as $mw
+        | {
+            filename: .video_results.videos[$mw.media_id].filename,
+            ts: $mw.ts,
+            te: $mw.te
+        }
+        ]
+    }')
+    if diff <(echo "$expected_json" | jq -S 'sort_by(.filename) | sort_by(.ts) | sort_by(.te)' .) <(echo "$response_selected_json" | jq -S 'sort_by(.filename) | sort_by(.ts) | sort_by(.te)' .) > /dev/null; then
+        echo "Test ${test_id} PASSED"
     else
-        echo "Test 8.1 FAILED: unexpected search results"
+        echo "Test ${test_id} FAILED: unexpected search results"
         echo "Expected:"
         echo "$expected_json" | jq .
         echo "Actual:"
         echo "$response_selected_json" | jq .
         exit 1
     fi
-fi
+}
 
 # Test 8.2 : check if the server returns correct results (including metadata) for query on face
 if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
@@ -438,23 +475,8 @@ if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
         echo "Failed to download face image from ${FACE_IMG_URL}"
         exit 1
     fi
-    RESULT_COUNT=1
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
-    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
-                    -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual"}' \
-                    -F "query_file=@${FACE_IMG_FILE};filename=x" \
-                    "${SEARCH_URL}")
-    response_selected_json=$(echo "$response" | jq -c '{
-    results: [
-        .video_results.merged_windows[]
-        as $w
-        | {
-            filename: .video_results.videos[$w.media_id].filename,
-            ts: $w.ts,
-            te: $w.te
-        }
-    ]
-    }')
+    
+
     expected_json='{
     "results": [
         {
@@ -464,41 +486,49 @@ if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
         }
     ]
     }'
+
+    RESULT_COUNT=1
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
+    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    validate_face_response "8.2 (search)" "$response" "$expected_json"
+
+    SEARCH_URL="${SERVER_URL}search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual"}' \
+                    -F "query_file=@${FACE_IMG_FILE};filename=x" \
+                    "${SEARCH_URL}")
+    validate_face_response "8.2 (search2)" "$response" "$expected_json"
+fi
+
+validate_visual_response () {
+    local test_id="${1}"
+    local response="${2}"
+    local expected_json="${3}"
+    local response_selected_json=$(echo "$response" | jq -c '{
+        results: [
+        .video_results.merged_windows[] as $mw
+        | {
+            filename: .video_results.videos[$mw.media_id].filename,
+            source_url: .video_results.videos[$mw.media_id].external_metadata.source_url,
+            ts: $mw.ts,
+            te: $mw.te
+        }
+        ]
+    }')
     if diff <(echo "$expected_json" | jq -S 'sort_by(.filename) | sort_by(.ts) | sort_by(.te)' .) <(echo "$response_selected_json" | jq -S 'sort_by(.filename) | sort_by(.ts) | sort_by(.te)' .) > /dev/null; then
-        echo "Test 8.2 PASSED"
+        echo "Test ${test_id} PASSED"
     else
-        echo "Test 8.2 FAILED: unexpected search results"
+        echo "Test ${test_id} FAILED: unexpected search results"
         echo "Expected:"
         echo "$expected_json" | jq .
         echo "Actual:"
         echo "$response_selected_json" | jq .
         exit 1
     fi
-fi
-
+}
 # Test 8.3 : check if the server returns correct results (including metadata) for query on video
 if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
-    RESULT_COUNT=1
-    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}"
-    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
-                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "a person pulling a rope"}' \
-                    "${SEARCH_URL}")
-    response_selected_json=$(echo "$response" | jq -c '
-    . as $root |
-    {
-        merged_windows: [
-        .video_results.merged_windows[]
-        | .media_id as $id
-        | {
-            filename: $root.video_results.videos[$id].filename,
-            source_url: $root.video_results.videos[$id].external_metadata.source_url,
-            ts: .ts,
-            te: .te
-            }
-        ]
-    }
-    ')
-
+   
     expected_json='{
       "merged_windows": [
         {
@@ -510,16 +540,20 @@ if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli
       ]
     }'
 
-    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
-        echo "Test 8.3 PASSED"
-    else
-        echo "Test 8.3 FAILED: unexpected search results"
-        echo "Expected:"
-        echo "$expected_json" | jq .
-        echo "Actual:"
-        echo "$response_selected_json" | jq .
-        exit 1
-    fi
+    SEARCH_QUERY="a%20person%20pulling%20a%20rope" # a person pulling a rope
+    RESULT_COUNT=1
+    
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
+    response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
+    validate_visual_response "8.3 (search)" "$response" "$expected_json"
+
+    SEARCH_URL="${SERVER_URL}search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}"
+    response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "txt": "a person pulling a rope"}' \
+                    "${SEARCH_URL}")
+
+
+    validate_visual_response "8.3 (search2)" "$response" "$expected_json"
 fi
 
 end_time=`date +%s`
