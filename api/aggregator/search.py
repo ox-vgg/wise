@@ -15,7 +15,7 @@
 ## limitations under the License.
 
 import logging
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 
 from .. import common
@@ -67,9 +67,9 @@ async def handle_get_featured(
     # This seed is used to randomly select the set of images used for the featured images
     random_seed: int = Query(123),
 ):
-    modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in) 
-    response = await search_service.featured(
-        modality, feature_extractor_id, start, end, random_seed
+    # modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in) 
+    response = await cast(RemoteSearchService, search_service).featured(
+        featured_in, feature_extractor_id, start, end, random_seed
     )
     return response
 
@@ -124,7 +124,8 @@ async def _search(
     thumbnails_to_send: int,
     shot_scale: list[int],
     metadata_filter: list[str],
-    add_prefix: bool
+    add_prefix: bool,
+    search_endpoint: Literal["/search", "/search2"] = "/search"
 ):
     if search_in == MediaType.IMAGE:
         if len([query for query in q if query['modality'] == 'audio']) > 0:
@@ -143,7 +144,7 @@ async def _search(
             })
 
     if feature_extractor_id == 'wise/metadata':
-        response = await search_service.search(request)
+        response = await search_service.search(request, endpoint=search_endpoint)
         return response
 
     media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
@@ -300,6 +301,7 @@ async def handle_post_search_multimodal(
         thumbnails_to_send,
         shot_scale,
         metadata_filter,
-        add_prefix
+        add_prefix,
+        search_endpoint="/search2"
     )
     return response

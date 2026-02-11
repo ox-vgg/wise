@@ -17,7 +17,7 @@
 import asyncio
 import functools
 import logging
-
+from typing import Literal
 from ... import common
 from ..project import RemoteWiseProjectService
 from ..embedding import EmbeddingService
@@ -90,12 +90,14 @@ class RemoteSearchService:
     
     async def search(
             self,
-            request: Request
+            request: Request,
+            endpoint: Literal["/search", "/search2"] = "/search"
         ) -> common.SearchResponse:
 
         all_responses = await asyncio.gather(*[
             project_service.search(
-                request
+                request,
+                endpoint=endpoint,
             ) for project_service in self.project_services.values()
         ])
         response = functools.reduce(merge_response, all_responses)

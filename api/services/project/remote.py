@@ -17,6 +17,7 @@
 import asyncio
 from functools import cached_property
 import io
+from typing import Literal
 from .base import WiseProjectService, ProjectInfo
 import httpx
 from ... import common
@@ -105,10 +106,11 @@ class RemoteWiseProjectService(WiseProjectService):
     
     async def search(
             self,
-            request: Request
+            request: Request,
+            endpoint: Literal['/search', '/search2']= "/search"
     ):
         url = httpx.URL(
-            path="/search",
+            path=endpoint,
             query=request.url.query.encode("utf-8")
         )
         rp_req = self.client.build_request(
