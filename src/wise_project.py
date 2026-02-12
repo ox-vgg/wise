@@ -898,10 +898,12 @@ class WiseProject:
                     ),
                 ).join(
                     vtable,
-                    vtable.c.id == vectors_to_shots_map.c.vector_id,
-                    vtable.c.media_id == shots_table.c.media_id,
-                    vtable.c.modality == modality,
-                    vtable.c.feature_extractor_id == feature_extractor_id,
+                    sa.and_(
+                        vtable.c.id == vectors_to_shots_map.c.vector_id,
+                        vtable.c.media_id == shots_table.c.media_id,
+                        vtable.c.modality == modality,
+                        vtable.c.feature_extractor_id == feature_extractor_id,
+                    ),
                 )
             )
             .where(
