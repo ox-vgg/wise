@@ -68,20 +68,41 @@ class LocalSearchService:
         search_index = self.search_indices[media_type][feature_extractor_id]
         if not filter_specs and vector_id_constraint is None:
             # search on full index without any filtering
+            logger.info(
+                "Performing search - media_type=%s, feature_extractor_id=%s",
+                media_type,
+                feature_extractor_id,
+            )
             dist, ids = search_index.index.search(features, end)
         else:
             # search needs to be constrained by filter_specs and/or vector_id_constraint
             filtered_ids = None
             if filter_specs:
-                filtered_ids = self.filter_vectors(media_type, feature_extractor_id, filter_specs)
-
+                logger.info(
+                    "Applying filters for search - media_type=%s, feature_extractor_id=%s, filter_specs=%s",
+                    media_type,
+                    feature_extractor_id,
+                    filter_specs,
+                )
+                filtered_ids = self.filter_vectors(
+                    media_type, feature_extractor_id, filter_specs
+                )
             if vector_id_constraint is not None:
+                logger.info(
+                    "Applying vector ID constraint for search - media_type=%s, feature_extractor_id=%s, num_ids=%d",
+                    media_type,
+                    feature_extractor_id,
+                    len(vector_id_constraint),
+                )
                 vector_id_constraint = np.array(vector_id_constraint, dtype=np.int64)
                 if filtered_ids is None:
                     filtered_ids = vector_id_constraint
                 else:
                     filtered_ids = np.intersect1d(filtered_ids, vector_id_constraint)
             if filtered_ids is None or filtered_ids.size == 0:
+                logger.info(
+                    "No valid vector IDs after applying filters and constraints for search"
+                )
                 return SearchOutput()
             sel = faiss.IDSelectorBatch(filtered_ids)
             if search_index.index_type == 'IndexFlatIP':
@@ -90,6 +111,12 @@ class LocalSearchService:
                 params = faiss.SearchParametersIVF(sel=sel, nprobe=search_index.index.nprobe)
             else:
                 raise UnknownSearchIndexError(f"Unknown index type: {search_index.index_type}")
+            logger.info(
+                "Performing filtered search - media_type=%s, feature_extractor_id=%s, num_filtered_ids=%d",
+                media_type,
+                feature_extractor_id,
+                len(filtered_ids),
+            )
             dist, ids = search_index.index.search(features, end, params=params)
 
         top_ids, top_dist = ids[0, start:end], dist[0, start:end]
@@ -135,7 +162,6 @@ class LocalSearchService:
             vector_id_constraint
         )
 
-
     def asr_search(self, q: WISEFTSQuery, media_type: MediaType, start: int, end: int):
         search_index = self.search_indices[media_type]["wise/metadata"]
         project_engine = self.wise_project.db_engine
@@ -172,14 +198,13 @@ class LocalSearchService:
             shot_scales = shot_scale_query["$in"]
             with project_engine.connect() as conn:
 
-
                 result = self.wise_project.get_vector_ids_for_shot_scale(
                     shot_scales, media_type, feature_extractor_id,
                 )
                 shot_scale_constraint = np.array(result, dtype=np.int64)
                 id_constraint = (
                     shot_scale_constraint
-                    if id_constraint is None
+                    if len(id_constraint) == 0
                     else np.intersect1d(id_constraint, shot_scale_constraint)
                 )
         return id_constraint
