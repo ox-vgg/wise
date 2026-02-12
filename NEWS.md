@@ -4,6 +4,8 @@ Summary of important user-visible changes for WISE
 Next version (unreleased)
 -------------------------
 
+* Face search mode supports text query based filtering (e.g. chris.jpg + "in a taxi")
+
 * Added face search (refer to `InsightFaceFeatureExtractor` and
   `InsightFaceAverageFeatureExtractor`), and object search (refer to
   `TransformersOWLv2Model`).
