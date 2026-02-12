@@ -52,6 +52,9 @@ NUM_WORKERS=2
 
 EXTENSION="faiss" # options are: faiss, tar, npy
 
+# The face+text based test is reproducible only with these values
+FACE_TEXT_SEARCH_RRF='{"k":60,"face_weight":1.0,"text_weight":2.0,"face_low_weight":0.0}'
+
 NEW_CONFIG="{
   \"${IMAGE_FEATURE_ID3}\": {
     \"objectness_threshold\": 0.10
@@ -224,7 +227,7 @@ cleanup() {
 
 echo "Starting WISE server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} (takes about 1 min.) ..."
 cd "${WISE_CODE_DIR}"
-LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
+FACE_TEXT_SEARCH_RRF=$FACE_TEXT_SEARCH_RRF LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
         --index-type "${FAISS_INDEX_TYPE}" \
         --project-dir "$WISE_PROJECT_DIR" & # to start the server in the background
 SERVER_PID=$!
@@ -235,7 +238,7 @@ trap cleanup EXIT
 SERVER_URL="http://${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT}/${TEST_ID}/"
 PROJECT_INFO_URL="${SERVER_URL}info"
 SLEEP_DURATION=5
-# Wait for the server to start  
+# Wait for the server to start
 # poll server every 5 seconds for 30 seconds
 for ((i=1; i<=MAX_POLL_SERVER_COUNT; i++)); do
     if curl -s --head --request GET "${PROJECT_INFO_URL}" | grep "200 OK" > /dev/null; then
@@ -310,8 +313,8 @@ validate_metadata_response () {
 
     response_selected_json=$(echo "$response" | jq -c '{
       images: (
-        .image_results.images | 
-        to_entries | 
+        .image_results.images |
+        to_entries |
         map({
           filename: .value.filename,
           external_metadata: .value.external_metadata
@@ -398,7 +401,7 @@ validate_face_response() {
 
 if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
     echo "5.4 Running face search test ..."
-    
+
     FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
     FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
     if [ ! -f "${FACE_IMG_FILE}" ]; then
@@ -438,8 +441,8 @@ if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
                     -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual"}' \
                     -F "query_file=@${FACE_IMG_FILE};filename=x" \
                     "${SEARCH_URL}")
-  
-    
+
+
     validate_face_response "5.4.2 (search2)" "$response" "$expected_json"
 fi
 validate_object_response () {
@@ -505,6 +508,65 @@ if [ "$IMAGE_FEATURE_ID3" == "transformers/owlv2/google/owlv2-large-patch14-ense
                     -F 'query_term={"term_id": "x", "is_negative": false, "txt": "bird"}' \
                     "${SEARCH_URL}")
     validate_object_response "5.5.2 (search2)" "$response" "$expected_json"
+fi
+
+# Test 5.6 : face+text search
+if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
+    FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
+    FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Downloading face image to ${FACE_IMG_FILE} ..."
+        curl -sLO "${FACE_IMG_URL}"
+        mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
+    fi
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Failed to download face image from ${FACE_IMG_URL}"
+        exit 1
+    fi
+    RESULT_COUNT=6
+    FACE_TEXT_QUERY="two%20people"
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID2}&text_queries=${FACE_TEXT_QUERY}"
+    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    # We only look at the top 3 results here as they are correct
+    response_selected_json=$(echo "$response" | jq -c '. as $root | {
+      results: (
+        .image_results.vectors[:3] |
+        map(
+          .media_id as $id |
+          {
+            filename: $root.image_results.images[$id].filename,
+            source_url: $root.image_results.images[$id].external_metadata.source_url
+          }
+        )
+      )
+    }')
+    expected_json='{
+      "results": [
+        {
+          "filename": "Ed_Burns,_Christy_Turlington_at_27_Dresses_Premiere_1.jpg",
+          "source_url": "https://commons.wikimedia.org/wiki/File:Ed_Burns,_Christy_Turlington_at_27_Dresses_Premiere_1.jpg"
+        },
+        {
+          "filename": "500px-Christie_Turlington_2000.jpg",
+          "source_url": "https://en.wikipedia.org/wiki/File:Christie_Turlington_2000.jpg"
+        },
+        {
+          "filename": "960px-Christy_Turlington_at_the_2024_Toronto_International_Film_Festival.jpg",
+          "source_url": "https://en.wikipedia.org/wiki/File:Christy_Turlington_at_the_2024_Toronto_International_Film_Festival.jpg"
+        }
+      ]
+    }'
+
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test 5.6 PASSED"
+    else
+        echo "Test 5.6 FAILED: unexpected face image search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
 fi
 
 end_time=`date +%s`

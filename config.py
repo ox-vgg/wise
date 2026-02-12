@@ -97,6 +97,36 @@ class APIConfig(BaseSettings):
     # e.g. {"open_clip": {"device": "cuda:0", "warmup": True}}
     feature_extractor_config: dict[str, dict] = {"default": {}}
 
+    # Optional: adaptive k settings for KNN in face+text queries.
+    # Example:
+    # {
+    #   "deepinsight/insightface/buffalo_l/_unknown": {
+    #     "k_default": 500,
+    #     "k_expanded": 2000,
+    #     "score_threshold": 0.4
+    #   }
+    # }
+    face_text_search_options: dict[str, dict] = {
+        "deepinsight/insightface/buffalo_l/_unknown": {
+            "k_default": 500,
+            "k_expanded": 2000,
+            "score_threshold": 0.4,
+        }
+    }
+    # Preferred text feature extractor id for face+text queries.
+    # If unset, CLIP-based models are preferred when available.
+    face_text_search_text_embedder: Optional[str] = None
+    # Reciprocal Rank Fusion parameters for face+text ranking.
+    # face_low_weight : weight for face search results with score less than threshold
+    face_text_search_rrf: dict = {
+        "k": 60,
+        "face_weight": 1.0,
+        "text_weight": 1.0,
+        "face_low_weight": 0.0,
+    }
+    # Target k for text search in face+text mode (before capping by available vectors).
+    face_text_search_text_k: int = 500
+
     @model_validator(mode='after')
     def validate_feature_extractor_config(self) -> Self:
         if 'default' not in self.feature_extractor_config:

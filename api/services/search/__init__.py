@@ -14,6 +14,7 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
+from .base import SearchOutput
 from .local import LocalSearchService
 from .remote import RemoteSearchService
 from .exceptions import UnknownSearchIndexError

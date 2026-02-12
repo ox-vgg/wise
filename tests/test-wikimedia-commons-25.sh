@@ -50,6 +50,9 @@ HTTP_SERVER_PORT="10001"
 MAX_POLL_SERVER_COUNT=25
 NUM_WORKERS=2
 
+# The face+text based test is reproducible only with these values
+FACE_TEXT_SEARCH_RRF='{"k":60,"face_weight":1.0,"text_weight":2.0,"face_low_weight":0.0}'
+
 WISE_CODE_DIR=`pwd`
 TMP_DIR=$(realpath ${1})
 OUTDIR="${TMP_DIR}/wise-test/"
@@ -199,7 +202,7 @@ fi
 
 echo "Starting WISE server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} (takes about 1 min.) ..."
 cd "${WISE_CODE_DIR}"
-LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
+FACE_TEXT_SEARCH_RRF=$FACE_TEXT_SEARCH_RRF LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
         --index-type "${FAISS_INDEX_TYPE}" \
         --project-dir "$WISE_PROJECT_DIR" & # to start the server in the background
 SERVER_PID=$!
@@ -210,7 +213,7 @@ trap cleanup EXIT
 SERVER_URL="http://${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT}/${TEST_ID}/"
 PROJECT_INFO_URL="${SERVER_URL}info"
 SLEEP_DURATION=5
-# Wait for the server to start  
+# Wait for the server to start
 # poll server every 5 seconds for 30 seconds
 for ((i=1; i<=MAX_POLL_SERVER_COUNT; i++)); do
     if curl -s --head --request GET "${PROJECT_INFO_URL}" | grep "200 OK" > /dev/null; then
@@ -328,7 +331,7 @@ validate_visual_response () {
 # Test 5.3 : check if the server returns correct results (including metadata) for query on video
 if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
     RESULT_COUNT=60
-    
+
 
     # The WISE server's JSON response for search query is as follows:
     # {
@@ -376,7 +379,7 @@ if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli
 
     SEARCH_QUERY="bees"
     RESULT_COUNT=60
-    
+
     SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
     response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
     validate_visual_response "5.3 (search)" "$response" "$expected_json"
@@ -492,7 +495,7 @@ if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ] || [
         }
     ]
     }'
-    
+
     RESULT_COUNT=3
     SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
     response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
@@ -506,7 +509,62 @@ if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ] || [
                     "${SEARCH_URL}")
 
     validate_face_response "5.5 (search2)" "$response" "$expected_json"
-    
+
+fi
+
+# Test 5.6 : face+text search
+if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; then
+    FACE_IMG_URL="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg/250px-Christy_Turlington_and_Edward_Burns_at_the_2024_Toronto_International_Film_Festival_%28cropped%29.jpg"
+    FACE_IMG_FILE="${QUERY_DATA_DIR}/Christy_Turlington_wikipedia_180x240.jpg"
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Downloading face image to ${FACE_IMG_FILE} ..."
+        curl -sLO "${FACE_IMG_URL}"
+        mv "$(basename "${FACE_IMG_URL}")" "${FACE_IMG_FILE}"
+    fi
+    if [ ! -f "${FACE_IMG_FILE}" ]; then
+        echo "Failed to download face image from ${FACE_IMG_URL}"
+        exit 1
+    fi
+    RESULT_COUNT=6
+    FACE_TEXT_QUERY="magazine%20cover"
+    SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}&text_queries=${FACE_TEXT_QUERY}"
+    response=$(curl -s -X POST "${SEARCH_URL}" -F "image_file_queries=@${FACE_IMG_FILE}")
+    response_selected_json=$(echo "$response" | jq -c '{
+    results: [
+        .video_results.unmerged_windows[:2][]
+        as $w
+        | {
+            filename: .video_results.videos[$w.media_id].filename,
+            ts: $w.ts,
+            te: $w.te
+        }
+    ]
+    }')
+    expected_json='{
+    "results": [
+        {
+        "filename": "Celebrities_Against_Smoking_Christy_Turlington_PSA.mp4",
+        "ts": 28,
+        "te": 32
+        },
+        {
+        "filename": "Celebrities_Against_Smoking_Christy_Turlington_PSA.mp4",
+        "ts": 3,
+        "te": 7
+        }
+    ]
+    }'
+
+    if diff <(echo "$expected_json" | jq -S .) <(echo "$response_selected_json" | jq -S .) > /dev/null; then
+        echo "Test 5.6 PASSED"
+    else
+        echo "Test 5.6 FAILED: unexpected face image search results"
+        echo "Expected:"
+        echo "$expected_json" | jq .
+        echo "Actual:"
+        echo "$response_selected_json" | jq .
+        exit 1
+    fi
 fi
 
 end_time=`date +%s`

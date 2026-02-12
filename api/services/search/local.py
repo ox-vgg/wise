@@ -33,12 +33,12 @@ class LocalSearchService:
     def __init__(self, project_service: LocalWiseProjectService, embedding_service: EmbeddingService):
         self.project_service = project_service
         self.embedding_service = embedding_service
-        
+
         self.wise_project: WiseProject = project_service.wise_project
         self.search_indices = self.wise_project.load_search_indices()
         logger.info('search indices: %s', self.search_indices)
         self._featured_ids = project_service.featured_vectors_for_targets()
-        
+
     def is_internal_search_supported(self, media_type: MediaType, feature_id: str) -> bool:
         search_index = self.search_indices[media_type][feature_id]
         return search_index.is_internal_search_supported
@@ -46,7 +46,7 @@ class LocalSearchService:
     def get_search_index_type(self, media_type: MediaType, feature_id: str) -> str:
         search_index = self.search_indices[media_type][feature_id]
         return search_index.index_type
-    
+
     def reconstruct_vectors(self, media_type: MediaType, feature_id: str, vector_ids: list[int]) -> list[np.ndarray]:
         search_index = self.search_indices[media_type][feature_id]
         reconstructed_features = search_index.index.reconstruct_batch(vector_ids)
@@ -59,14 +59,30 @@ class LocalSearchService:
         self,
         features: np.ndarray,
         media_type: MediaType,
-        feature_extractor_id: str, 
+        feature_extractor_id: str,
         start: int,
         end: int,
         filter_specs: dict,
+        vector_id_constraint: np.ndarray | None = None
     ):
         search_index = self.search_indices[media_type][feature_extractor_id]
-        if filter_specs:
-            filtered_ids = self.filter_vectors(media_type, feature_extractor_id, filter_specs)
+        if not filter_specs and vector_id_constraint is None:
+            # search on full index without any filtering
+            dist, ids = search_index.index.search(features, end)
+        else:
+            # search needs to be constrained by filter_specs and/or vector_id_constraint
+            filtered_ids = None
+            if filter_specs:
+                filtered_ids = self.filter_vectors(media_type, feature_extractor_id, filter_specs)
+
+            if vector_id_constraint is not None:
+                vector_id_constraint = np.array(vector_id_constraint, dtype=np.int64)
+                if filtered_ids is None:
+                    filtered_ids = vector_id_constraint
+                else:
+                    filtered_ids = np.intersect1d(filtered_ids, vector_id_constraint)
+            if filtered_ids is None or filtered_ids.size == 0:
+                return SearchOutput()
             sel = faiss.IDSelectorBatch(filtered_ids)
             if search_index.index_type == 'IndexFlatIP':
                 params = faiss.SearchParameters(sel=sel)
@@ -75,9 +91,7 @@ class LocalSearchService:
             else:
                 raise UnknownSearchIndexError(f"Unknown index type: {search_index.index_type}")
             dist, ids = search_index.index.search(features, end, params=params)
-        else:
-            dist, ids = search_index.index.search(features, end)
-        
+
         top_ids, top_dist = ids[0, start:end], dist[0, start:end]
 
         valid_ids_mask = top_ids != -1
@@ -88,7 +102,7 @@ class LocalSearchService:
         valid_dist = self.embedding_service.transform_distances(feature_extractor_id, valid_dist)
         if not valid_ids:
             return SearchOutput()
-        
+
         all_metadata = self.project_service.get_vector_and_media_metadata_for_ids(valid_ids)
         all_ext_metadata = self.project_service.get_vector_ext_metadata_for_ids(feature_extractor_id, valid_ids)
 
@@ -98,20 +112,27 @@ class LocalSearchService:
             metadata=all_metadata,
             ext_metadata=all_ext_metadata
         )
-    
+
     def search(
         self,
         q: Query,
         embedding_config: EmbeddingConfig,
         media_type: MediaType,
-        feature_extractor_id: str, 
+        feature_extractor_id: str,
         start: int,
         end: int,
         filter_specs: dict,
+        vector_id_constraint: np.ndarray | None = None
     ):
         features = self.embedding_service.embed(feature_extractor_id, embedding_config, q)
         return self.search_with_feature(
-            features, media_type, feature_extractor_id, start, end, filter_specs
+            features,
+            media_type,
+            feature_extractor_id,
+            start,
+            end,
+            filter_specs,
+            vector_id_constraint
         )
 
 
@@ -150,10 +171,10 @@ class LocalSearchService:
         if shot_scale_query:
             shot_scales = shot_scale_query["$in"]
             with project_engine.connect() as conn:
-    
-    
+
+
                 result = self.wise_project.get_vector_ids_for_shot_scale(
-                    shot_scales, media_type, feature_extractor_id, 
+                    shot_scales, media_type, feature_extractor_id,
                 )
                 shot_scale_constraint = np.array(result, dtype=np.int64)
                 id_constraint = (
@@ -166,8 +187,8 @@ class LocalSearchService:
     def featured(
             self,
             media_type: MediaType,
-            feature_extractor_id: str, 
-            start: int, 
+            feature_extractor_id: str,
+            start: int,
             end: int,
             random_seed: int = 42,
         ):
@@ -183,7 +204,7 @@ class LocalSearchService:
                 selected_ids = self._featured_ids[media_type][other_ids[0]].copy()
         else:
             selected_ids = self._featured_ids[media_type][feature_extractor_id].copy()
-        
+
         np.random.default_rng(seed=random_seed).shuffle(selected_ids)
         selected_ids = selected_ids[start:end]
 

@@ -42,6 +42,15 @@ from ..dependencies import (
     LocalWiseProjectService,
     LocalSearchService,
 )
+from ..services.search import SearchOutput
+from ..services.search.face_text_standalone import (
+    resolve_face_text_embedder,
+    run_face_text_search_standalone,
+)
+from ..services.search.segments import (
+    merge_close_segments as _merge_close_segments,
+    get_shots_from_segments as _get_shots_from_segments,
+)
 
 from src.data_models import MediaType, ModalityType, VectorAndMediaMetadata
 from src.search.fts import WISEFTSQuery
@@ -55,7 +64,6 @@ from fastapi import APIRouter, UploadFile, Form, File, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
 from pydantic import HttpUrl
 
-
 logger = logging.getLogger(__name__)
 
 def merge_close_segments(_keyframes: list[VideoSegment]):
@@ -63,56 +71,7 @@ def merge_close_segments(_keyframes: list[VideoSegment]):
     Takes a list of segments of a media file and merges them if they are close - within 4 seconds of each other
     The merged segment is represented by the best matching segment based on distance
     """
-    merged_segments: list[VideoSegment] = []
-    start = None
-    current = None
-    best = None
-    for k in _keyframes:
-        if start is None:
-            # Start a new group
-            start = k
-            current = k
-            best = k
-
-        elif (k.ts - current.te) <= 4:
-            current = k
-            if current.distance > best.distance:
-                best = current
-
-        else:
-            merged_segments.append(
-                common.VideoSegment(
-                    vector_id=best.vector_id,
-                    media_id=best.media_id,
-                    ts=start.ts,
-                    te=current.te,
-                    link=f"media/{best.media_id}#t={start.ts},{current.te}",
-                    distance=best.distance,
-                    thumbnail=best.thumbnail,
-                    thumbnail_ts=best.thumbnail_ts,
-                    bbox=best.bbox,
-                )
-            )
-            start = k
-            current = k
-            best = k
-
-    if start is not None:
-        merged_segments.append(
-            common.VideoSegment(
-                vector_id=best.vector_id,
-                media_id=best.media_id,
-                ts=start.ts,
-                te=current.te,
-                link=f"media/{best.media_id}#t={start.ts},{current.te}",
-                distance=best.distance,
-                thumbnail=best.thumbnail,
-                thumbnail_ts=best.thumbnail_ts,
-                bbox=best.bbox,
-            )
-        )
-
-    return merged_segments
+    return _merge_close_segments(_keyframes)
 
 def get_shots_from_segments(
         segments: list[VideoSegment],
@@ -124,28 +83,13 @@ def get_shots_from_segments(
 
     The merge function by default merges close segments
     """
-    # Sort by video_id, timestamp
-    sorted_segments = sorted(segments, key=lambda x: (x.media_id, x.ts))
-
-    # for each key, apply merge logic
-    all_merged_segments = []
-    for _, g in itertools.groupby(sorted_segments, key=lambda x: x.media_id):
-        merged_segments = merge_function(list(g))
-        all_merged_segments.extend(merged_segments)
-
-    # sort the merged segments by distance
-    all_merged_segments = sorted(
-        all_merged_segments,
-        key=lambda x: x.distance,
-        reverse=True,
-    )
-    return all_merged_segments
+    return _get_shots_from_segments(segments, merge_function=merge_function)
 
 def keyframes_to_shots(_keyframes: list[VideoSegment], project: WiseProject):
     """
     Get Shot corresponding to a keyframe
     """
-   
+
     # Assuming segment maps to only one shot (no duplicates)
     return list(
         next(
@@ -358,7 +302,7 @@ def get_prefix(config: APIConfig):
         MediaType.AV: "This is the sound of", # TODO add this to config
         MediaType.AUDIO: "This is the sound of",
     }
-    
+
 def get_media_type(search_in: Annotated[MediaType, fastapi.Query()]):
     media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
     return media_type
@@ -390,7 +334,7 @@ def reconstruct_vectors(
         vectors = np.array([])
         response = common.NPArray.from_array(vectors)
         return response
-    
+
     if cast(LocalSearchService, search_service).is_internal_search_supported(media_type, feature_extractor_id):
         try:
             # reconstruct features from faiss index
@@ -410,11 +354,10 @@ def reconstruct_vectors(
         return PlainTextResponse(
             status_code=500, content=f"Internal search not supported in this project"
         )
-    
+
     vectors = np.concatenate(vectors, axis=0)
     response = common.NPArray.from_array(vectors)
     return response
-
 
 def build_filter_specs(shot_scale: list[int], metadata_filter: list[str]):
     filter_specs = {}
@@ -425,74 +368,6 @@ def build_filter_specs(shot_scale: list[int], metadata_filter: list[str]):
             {"$match": " ".join(metadata_filter)}
         )
     return filter_specs
-
-
-@router.post("/search_with_feature", response_model=common.SearchResponse)
-@common.add_response_time
-async def handle_post_search_feature(
-    config: ConfigDep,
-    project_info: ProjectInfoDep,
-    project_service: ProjectServiceDep,
-    search_service: SearchServiceDep,
-    feature: common.NPArray,
-    # Which media type to search on
-    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
-    # "audio" refers to pure audio files, and "image" refers to images
-    search_in: Annotated[MediaType, Depends(validate_search_targets)],
-    feature_extractor_id: str = fastapi.Query(),
-    # Other parameters
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
-    thumbnails_to_send: int = fastapi.Query(0),
-    shot_scale: list[int] = fastapi.Query(default=[]),
-    metadata_filter: list[str] = fastapi.Query(default=[]),
-):
-    if feature_extractor_id == 'wise/metadata':
-        raise HTTPException(400, {
-            "message": "`wise/metadata` feature extractor cannot be used for feature-based search. Please use a different feature extractor."
-        })
-
-    end = min(end, project_info.num_vectors)
-    if start > end:
-        raise HTTPException(
-            400, {"message": "'start' cannot be greater than 'end'"}
-        )
-     
-    filter_specs = build_filter_specs(shot_scale, metadata_filter)
-    media_type = get_media_type(search_in)
-    vectors = feature.to_array()
-    search_output = cast(LocalSearchService, search_service).search_with_feature(
-        vectors,
-        media_type=media_type,
-        feature_extractor_id=feature_extractor_id,
-        start=start,
-        end=end,
-        filter_specs=filter_specs
-    )
-
-    if len(search_output.ids) == 0:
-        return common.SearchResponse(
-            time=0.0,
-            video_audio_results=None,
-            video_results=None,
-            image_results=None,
-        )
-
-    all_thumbs = cast(LocalWiseProjectService, project_service).get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
-    _get_shots_from_keyframes = functools.partial(get_shots_from_keyframes, cast(LocalWiseProjectService, project_service).wise_project)
-    # supports shots
-    is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
-    response = construct_search_response(
-        top_dist=search_output.distances,
-        all_metadata=search_output.metadata,
-        all_ext_metadata=search_output.ext_metadata,
-        all_thumbs=all_thumbs,
-        merge_function=_get_shots_from_keyframes if is_shot_merge_supported else merge_close_segments,
-        search_in=search_in,
-    )
-
-    return response
-
 
 def replace_vector_ids_with_search_embeddings(
     search_service,
@@ -531,12 +406,46 @@ def replace_vector_ids_with_search_embeddings(
         )
     return new_q
 
-
-def _search_metadata(
-    project_service: ProjectServiceDep,
-    search_service: SearchServiceDep,
+def search_output_to_response(
+    config: APIConfig,
+    project_service: LocalWiseProjectService,
     search_in: MediaType,
-    media_type: MediaType,
+    search_output: SearchOutput,
+    thumbnails_to_send: int,
+    merge_shots_if_supported: bool = True,
+):
+    if len(search_output.ids) == 0:
+        return common.SearchResponse(
+            time=0.0,
+            video_audio_results=None,
+            video_results=None,
+            image_results=None,
+        )
+
+    all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
+    merge_function = merge_close_segments
+    
+    # supports shots
+    is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
+    if merge_shots_if_supported and is_shot_merge_supported:
+        merge_function = functools.partial(get_shots_from_keyframes, project_service.wise_project)
+    
+    response = construct_search_response(
+        top_dist=search_output.distances,
+        all_metadata=search_output.metadata,
+        all_ext_metadata=search_output.ext_metadata,
+        all_thumbs=all_thumbs,
+        merge_function=merge_function,
+        search_in=search_in,
+    )
+
+    return response
+    
+def _search_metadata(
+    config: APIConfig,
+    project_service: LocalWiseProjectService,
+    search_service: LocalSearchService,
+    search_in: MediaType,
     q: Query,
     start: int,
     end: int,
@@ -552,38 +461,34 @@ def _search_metadata(
         raise HTTPException(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
-
+    
+    media_type = get_media_type(search_in)
     text_queries = [x.txt for x in q]
     # TODO escape special characters
     text = " ".join(text_queries)
     fts_q = WISEFTSQuery.model_validate({"$match": text})
     search_output = search_service.asr_search(fts_q, media_type, start, end)
-    if len(search_output.ids) == 0:
-        return common.SearchResponse(
-            time=0.0,
-            video_audio_results=None,
-            video_results=None,
-            image_results=None,
-        )
-    all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
-    return construct_search_response(
-        search_output.distances,
-        search_output.metadata,
-        search_output.ext_metadata,
-        all_thumbs,
-        search_in=search_in
+    
+    return search_output_to_response(
+        config,
+        project_service,
+        search_in,
+        search_output, 
+        thumbnails_to_send,
+        merge_shots_if_supported=False
     )
 
 
-def _search_multimodal(
+async def _search_rrf(
     config: ConfigDep,
     project_info: ProjectInfoDep,
-    project_service: ProjectServiceDep,
+    project_service: LocalWiseProjectService,
     embedding_service: EmbeddingServiceDep,
-    search_service: SearchServiceDep,
+    search_service: LocalSearchService,
     search_in: MediaType,
     media_type: MediaType,
     feature_extractor_id: str,
+    text_feature_extractor_id: str,
     q: Query,
     start: int,
     end: int,
@@ -592,52 +497,6 @@ def _search_multimodal(
     metadata_filter: list[str],
     add_prefix: bool,
 ) -> common.SearchResponse:
-    if (any([isinstance(x, VectorQueryTerm) for x in q])
-        and not search_service.is_internal_search_supported(media_type, feature_extractor_id)
-    ):
-        index_type = search_service.get_search_index_type(media_type, feature_extractor_id)
-        logger.exception(
-            "This faiss index does not support internal search. To enable "
-            "internal search, please re-create the index by running "
-            f"`python create-index.py --project-dir \"{config.project_dir}\" "
-            f"--media-type {media_type} --index-type {index_type} --overwrite`"
-        )
-        raise HTTPException(
-            status_code=500,
-            detail={"message": "Internal search not supported in this project"}
-        )
-
-    try:
-        q = replace_vector_ids_with_search_embeddings(
-            search_service, embedding_service, media_type, feature_extractor_id, q
-        )
-    except Exception as e:
-        logger.exception(e)
-        raise HTTPException(
-            status_code=500, detail={"message": "Error processing internal search query"}
-        )
-
-    if search_in == MediaType.IMAGE:
-        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
-            raise HTTPException(400, {
-                "message": "Cannot search on images using an audio query"
-            })
-    elif search_in == MediaType.VIDEO:
-        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
-            raise HTTPException(400, {
-                "message": "Cannot search on visual stream of video files using an audio query"
-            })
-    elif search_in == MediaType.AUDIO or search_in == MediaType.AV:
-        if any([isinstance(x, MediaQueryTerm) and x.qtype == "visual" for x in q]):
-            raise HTTPException(400, {
-                "message": "Cannot search on audio using a visual query"
-            })
-
-    end = min(end, project_info.num_vectors)
-    if start > end:
-        raise HTTPException(
-            400, {"message": "'start' cannot be greater than 'end'"}
-        )
 
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
 
@@ -649,41 +508,127 @@ def _search_multimodal(
         negative_queries_weight=config.negative_queries_weight,
     )
 
-    search_output = search_service.search(
+    face_text_options = config.face_text_search_options.get(feature_extractor_id)
+    # TODO: Split it into two functions
+    # - one that runs the face+text search
+    # - one that fuses results based on RRF and returns the final ranked list of results
+    text_k_target = max(end, config.face_text_search_text_k)
+    (
+        face_search_output,
+        text_search_output,
+        fused,
+    ) = await run_face_text_search_standalone(
         q,
-        embedding_config=embedding_config,
         media_type=media_type,
         feature_extractor_id=feature_extractor_id,
+        text_feature_extractor_id=text_feature_extractor_id,
+        embedding_config=embedding_config,
+        filter_specs=filter_specs,
         start=start,
         end=end,
-        filter_specs=filter_specs
+        num_vectors=project_info.num_vectors,
+        face_text_options=face_text_options,
+        text_k_target=text_k_target,
+        rrf_config=config.face_text_search_rrf,
+        face_score_threshold=(
+            face_text_options.get("score_threshold") if face_text_options else None
+        ),
+        embedding_service=embedding_service,
+        search_service=search_service,
+        project_service=project_service,
     )
 
-    if len(search_output.ids) == 0:
+    if not fused:
         return common.SearchResponse(
             time=0.0,
             video_audio_results=None,
             video_results=None,
             image_results=None,
         )
-    all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
-    _get_shots_from_keyframes = functools.partial(get_shots_from_keyframes, project_service.wise_project)
-    # supports shots
+
+    # Build the final ranked list of face results at frame granularity.
+    filtered = []
+    for (vid, meta, ext), rank_score in fused:
+        # Use integer rank-based scores (higher is better) to reflect RRF ordering.
+        filtered.append((vid, float(rank_score), meta, ext))
+
+    if not filtered:
+        return common.SearchResponse(
+            time=0.0,
+            video_audio_results=None,
+            video_results=None,
+            image_results=None,
+        )
+
+    filtered_ids, filtered_dist, filtered_metadata, filtered_ext_metadata = zip(
+        *filtered
+    )
+    all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(
+        list(filtered_metadata)
+    )
+    _get_shots_from_keyframes = functools.partial(
+        get_shots_from_keyframes, project_service.wise_project
+    )
     is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
     response = construct_search_response(
-        top_dist=search_output.distances,
-        all_metadata=search_output.metadata,
-        all_ext_metadata=search_output.ext_metadata,
+        top_dist=list(filtered_dist),
+        all_metadata=list(filtered_metadata),
+        all_ext_metadata=list(filtered_ext_metadata),
         all_thumbs=all_thumbs,
-        merge_function=_get_shots_from_keyframes if is_shot_merge_supported else merge_close_segments,
+        merge_function=_get_shots_from_keyframes
+        if is_shot_merge_supported
+        else merge_close_segments,
         search_in=search_in,
     )
-
     return response
 
 
+async def _search_multimodal(
+    config: ConfigDep,
+    project_service: LocalWiseProjectService,
+    embedding_service: EmbeddingServiceDep,
+    search_service: LocalSearchService,
+    search_in: MediaType,
+    feature_extractor_id: str,
+    q: Query,
+    start: int,
+    end: int,
+    thumbnails_to_send: int,
+    shot_scale: list[int],
+    metadata_filter: list[str],
+    add_prefix: bool,
+) -> common.SearchResponse:
 
-def _search(
+    _prefix = get_prefix(config)
+    prefix = _prefix[search_in] if add_prefix else ""
+    embedding_config = EmbeddingConfig(
+        query_prefix=prefix,
+        text_queries_weight=config.text_queries_weight,
+        negative_queries_weight=config.negative_queries_weight,
+    )
+    features = embedding_service.embed(feature_extractor_id, embedding_config, q)
+    
+    filter_specs = build_filter_specs(shot_scale, metadata_filter)
+    media_type = get_media_type(search_in)
+    search_output = search_service.search_with_feature(
+        features,
+        media_type=media_type,
+        feature_extractor_id=feature_extractor_id,
+        start=start,
+        end=end,
+        filter_specs=filter_specs,
+    )
+
+    return search_output_to_response(
+        config,
+        project_service,
+        search_in,
+        search_output,
+        thumbnails_to_send,
+    )
+
+
+async def _search(
     config: APIConfig,
     project_info: ProjectInfo,
     project_service: LocalWiseProjectService,
@@ -700,22 +645,99 @@ def _search(
     thumbnails_to_send: int,
     shot_scale: list[int],
     metadata_filter: list[str],
-    add_prefix: bool
+    add_prefix: bool,
 ):
-    media_type = get_media_type(search_in)
-    if feature_extractor_id == 'wise/metadata':
+    if feature_extractor_id == "wise/metadata":
         return _search_metadata(
+            config,
             project_service,
             search_service,
             search_in,
-            media_type,
             q,
             start,
             end,
             thumbnails_to_send,
         )
-    else:
-        return _search_multimodal(
+
+    if search_in == MediaType.IMAGE:
+        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
+            raise HTTPException(
+                400, {"message": "Cannot search on images using an audio query"}
+            )
+    elif search_in == MediaType.VIDEO:
+        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
+            raise HTTPException(
+                400,
+                {
+                    "message": "Cannot search on visual stream of video files using an audio query"
+                },
+            )
+    elif search_in == MediaType.AUDIO or search_in == MediaType.AV:
+        if any([isinstance(x, MediaQueryTerm) and x.qtype == "visual" for x in q]):
+            raise HTTPException(
+                400, {"message": "Cannot search on audio using a visual query"}
+            )
+
+    end = min(end, project_info.num_vectors)
+    if start > end:
+        raise HTTPException(400, {"message": "'start' cannot be greater than 'end'"})
+
+    media_type = get_media_type(search_in)
+
+    if any(
+        [isinstance(x, VectorQueryTerm) for x in q]
+    ) and not search_service.is_internal_search_supported(
+        media_type, feature_extractor_id
+    ):
+        index_type = search_service.get_search_index_type(
+            media_type, feature_extractor_id
+        )
+        logger.exception(
+            "This faiss index does not support internal search. To enable "
+            "internal search, please re-create the index by running "
+            f'`python create-index.py --project-dir "{config.project_dir}" '
+            f"--media-type {media_type} --index-type {index_type} --overwrite`"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Internal search not supported in this project"},
+        )
+
+    try:
+        q = replace_vector_ids_with_search_embeddings(
+            search_service, embedding_service, media_type, feature_extractor_id, q
+        )
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Error processing internal search query"},
+        )
+
+    # check for rrf query
+    search_targets = project_info.search_targets
+    text_feature_extractor_id, has_text_queries, has_image_queries, supports_text = (
+        resolve_face_text_embedder(
+            q,
+            media_type=media_type,
+            feature_extractor_id=feature_extractor_id,
+            search_targets=search_targets,
+            embedding_service=embedding_service,
+            preferred_id=config.face_text_search_text_embedder,
+        )
+    )
+    # if supported, respond with the face+text search results
+    if has_text_queries and has_image_queries and not supports_text:
+        # Select the text feature extractor for the face+text flow.
+        if text_feature_extractor_id is None:
+            raise HTTPException(
+                400,
+                {
+                    "message": "No text-capable feature extractor available for this modality"
+                },
+            )
+
+        return await _search_rrf(
             config,
             project_info,
             project_service,
@@ -724,6 +746,7 @@ def _search(
             search_in,
             media_type,
             feature_extractor_id,
+            text_feature_extractor_id,
             q,
             start,
             end,
@@ -732,6 +755,77 @@ def _search(
             metadata_filter,
             add_prefix,
         )
+
+    # or proceed as regular multimodal search
+
+    return await _search_multimodal(
+        config,
+        project_service,
+        embedding_service,
+        search_service,
+        search_in,
+        feature_extractor_id,
+        q,
+        start,
+        end,
+        thumbnails_to_send,
+        shot_scale,
+        metadata_filter,
+        add_prefix,
+    )
+
+@router.post("/search_with_feature", response_model=common.SearchResponse)
+@common.add_response_time
+async def handle_post_search_feature(
+    config: ConfigDep,
+    project_info: ProjectInfoDep,
+    project_service: ProjectServiceDep,
+    search_service: SearchServiceDep,
+    feature: common.NPArray,
+    # Which media type to search on
+    # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
+    # "audio" refers to pure audio files, and "image" refers to images
+    search_in: Annotated[MediaType, Depends(validate_search_targets)],
+    feature_extractor_id: str = fastapi.Query(),
+    # Other parameters
+    start: int = fastapi.Query(0, ge=0, le=980),
+    end: int = fastapi.Query(20, gt=0, le=1000),
+    thumbnails_to_send: int = fastapi.Query(0),
+    shot_scale: list[int] = fastapi.Query(default=[]),
+    metadata_filter: list[str] = fastapi.Query(default=[]),
+):
+    if feature_extractor_id == 'wise/metadata':
+        raise HTTPException(400, {
+            "message": "`wise/metadata` feature extractor cannot be used for feature-based search. Please use a different feature extractor."
+        })
+
+    end = min(end, project_info.num_vectors)
+    if start > end:
+        raise HTTPException(
+            400, {"message": "'start' cannot be greater than 'end'"}
+        )
+    
+    vectors = feature.to_array()
+
+    filter_specs = build_filter_specs(shot_scale, metadata_filter)
+    media_type = get_media_type(search_in)
+    
+    search_output = cast(LocalSearchService, search_service).search_with_feature(
+        vectors,
+        media_type=media_type,
+        feature_extractor_id=feature_extractor_id,
+        start=start,
+        end=end,
+        filter_specs=filter_specs,
+        vector_id_constraint=None
+    )
+    return search_output_to_response(
+        config,
+        cast(LocalWiseProjectService, project_service),
+        search_in,
+        search_output,
+        thumbnails_to_send,
+    )
 
 
 @router.post("/search", response_model=common.SearchResponse)
@@ -798,7 +892,7 @@ async def handle_post_search(
     elif len(q) > 5:
         raise HTTPException(400, {"message": "Too many query items"})
 
-    return _search(
+    return await _search(
         config=config,
         project_info=project_info,
         project_service=cast(LocalWiseProjectService, project_service),
@@ -851,7 +945,7 @@ async def handle_post_search2(
 
     q = common.merge_multipart_query_form(query_term, query_file)
 
-    return _search(
+    return await _search(
         config=config,
         project_info=project_info,
         project_service=cast(LocalWiseProjectService, project_service),
@@ -867,7 +961,6 @@ async def handle_post_search2(
         metadata_filter=metadata_filter,
         add_prefix=add_prefix
     )
-    
 
 @router.get("/featured", response_model=common.SearchResponse)
 @common.add_response_time
@@ -887,7 +980,7 @@ async def handle_get_featured(
     # This seed is used to randomly select the set of images used for the featured images
     random_seed: int = fastapi.Query(123),
 ):
-    modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in) 
+    modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in)
     search_output = search_service.featured(
         modality, feature_extractor_id, start, end, random_seed
     )

@@ -819,24 +819,54 @@ class WiseProject:
         media_ids: list[int],
         modality: MediaType,
         feature_extractor_id: str,
+        timestamps: list[float] | None = None,
     ):
-        """Get vector ids for the given media ids constraints."""
+        """Get vector ids for the given media ids constraints.
+
+        If timestamps are provided (aligned to media_ids), return vector ids
+        that match both media_id and timestamp.
+        """
         if not media_ids:
             return []
 
         _vtable = wise_db.vectors_table
-        media_cte = get_cte_from_ids(media_ids, label="media_id")
 
-        stmt = sa.select(_vtable.c.id).select_from(
-            media_cte.join(
-                _vtable,
-                sa.and_(
-                    _vtable.c.media_id == media_cte.c.media_id,
-                    _vtable.c.modality == modality,
-                    _vtable.c.feature_extractor_id == feature_extractor_id,
-                ),
+        if timestamps is not None:
+            if len(timestamps) != len(media_ids):
+                raise ValueError("media_ids and timestamps must have the same length")
+
+            cte = (
+                sa.values(
+                    sa.column("rank", sa.Integer),
+                    sa.column("media_id", sa.Integer),
+                    sa.column("timestamp", sa.Float),
+                )
+                .data([(i, mid, ts) for i, (mid, ts) in enumerate(zip(media_ids, timestamps))])
+                .cte("cte")
             )
-        ).order_by(media_cte.c.rank)
+            stmt = sa.select(_vtable.c.id).select_from(
+                cte.join(
+                    _vtable,
+                    sa.and_(
+                        _vtable.c.media_id == cte.c.media_id,
+                        _vtable.c.timestamp == cte.c.timestamp,
+                        _vtable.c.modality == modality,
+                        _vtable.c.feature_extractor_id == feature_extractor_id,
+                    ),
+                )
+            ).order_by(cte.c.rank)
+        else:
+            media_cte = get_cte_from_ids(media_ids, label="media_id")
+            stmt = sa.select(_vtable.c.id).select_from(
+                media_cte.join(
+                    _vtable,
+                    sa.and_(
+                        _vtable.c.media_id == media_cte.c.media_id,
+                        _vtable.c.modality == modality,
+                        _vtable.c.feature_extractor_id == feature_extractor_id,
+                    ),
+                )
+            ).order_by(media_cte.c.rank)
 
         with self.db_engine.connect() as conn:
             return conn.execute(stmt).scalars().all()
