@@ -121,17 +121,16 @@ class EmbeddingService:
         if feature_extractor is None:
             raise FeatureExtractorNotFoundError(f"Feature extractor {feature_extractor_id} not initialized!")
 
-        def extract_text_features(text: list[str]) -> np.ndarray:
+        def extract_text_features(text: str) -> np.ndarray:
             if feature_extractor.extract_text_features is None:
                 raise ModalityNotSupportedError("text modality not supported")
-            return feature_extractor.extract_text_features(text)
+            return feature_extractor.extract_text_features([text])
 
-        def extract_image_features(images: list[Image.Image]) -> np.ndarray:
+        def extract_image_features(image: Image.Image) -> np.ndarray:
             if feature_extractor.extract_image_features is None:
                 raise ModalityNotSupportedError("image modality not supported")
-            assert len(images) == 1
             features = feature_extractor.extract_image_features(
-                feature_extractor.preprocess_image(images)
+                feature_extractor.preprocess_image([image])
             )[0]
             if not len(features.vectors):
                 raise NoFeaturesFoundError("no features found on image")
@@ -153,14 +152,14 @@ class EmbeddingService:
                     if isinstance(qterm.src, bytes):
                         with Image.open(io.BytesIO(qterm.src)) as im:
                             im = im.convert('RGB')
-                            feature_vector = extract_image_features([im])
+                            feature_vector = extract_image_features(im)
                     elif _is_HttpUrl(qterm.src):
                         logger.info("Downloading %s to file", qterm.src)
                         with NamedTemporaryFile() as tmpfile:
                             download_url_to_file(qterm.src, tmpfile.name)
                             with Image.open(tmpfile.name) as im:
                                 im = im.convert('RGB')
-                                feature_vector = extract_image_features([im])
+                                feature_vector = extract_image_features(im)
                     elif isinstance(qterm.src, np.ndarray):
                         feature_vector = qterm.src
                     else:
@@ -197,7 +196,7 @@ class EmbeddingService:
                 else:
                     prefixed_queries = qterm.txt.strip()
 
-                feature_vector = extract_text_features([prefixed_queries])
+                feature_vector = extract_text_features(prefixed_queries)
 
             else:
                 raise ValueError(f"Unsupported query term: {type(qterm)}")
