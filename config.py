@@ -126,6 +126,11 @@ class APIConfig(BaseSettings):
     }
     # Target k for text search in face+text mode (before capping by available vectors).
     face_text_search_text_k: int = 500
+    # Optional: override IVF nprobe for face+text text search when using ID constraints
+    # as the default nprobe (which is small) may not be sufficient when the search is
+    # constrained to a small subset of the index (e.g. all faces matching a specific person).
+    # Set to None to disable, higher values may improve recall at the cost of latency.
+    face_text_search_nprobe_target: Optional[int] = 4096
 
     @model_validator(mode='after')
     def validate_feature_extractor_config(self) -> Self:

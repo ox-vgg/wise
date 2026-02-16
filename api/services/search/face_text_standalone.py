@@ -81,6 +81,7 @@ async def run_face_text_search_standalone(
     text_k_target: int,
     rrf_config: dict,
     face_score_threshold: float | None,
+    text_search_nprobe_override: int | None,
     embedding_service,
     search_service,
     project_service,
@@ -104,6 +105,7 @@ async def run_face_text_search_standalone(
             end=end_idx,
             filter_specs=_filter_specs,
             vector_id_constraint=vector_id_constraint,
+            nprobe_override=text_search_nprobe_override,
         )
 
     def _resolve_text_vector_ids(face_search_output):

@@ -63,7 +63,8 @@ class LocalSearchService:
         start: int,
         end: int,
         filter_specs: dict,
-        vector_id_constraint: np.ndarray | None = None
+        vector_id_constraint: np.ndarray | None = None,
+        nprobe_override: int | None = None,
     ):
         search_index = self.search_indices[media_type][feature_extractor_id]
         if not filter_specs and vector_id_constraint is None:
@@ -108,7 +109,14 @@ class LocalSearchService:
             if search_index.index_type == 'IndexFlatIP':
                 params = faiss.SearchParameters(sel=sel)
             elif search_index.index_type == 'IndexIVFFlat':
-                params = faiss.SearchParametersIVF(sel=sel, nprobe=search_index.index.nprobe)
+                nprobe = search_index.index.nprobe
+                if nprobe_override is not None and nprobe_override > 0:
+                    nlist = getattr(search_index.index, "nlist", None)
+                    if nlist is not None:
+                        nprobe = min(nprobe_override, nlist)
+                    else:
+                        nprobe = nprobe_override
+                params = faiss.SearchParametersIVF(sel=sel, nprobe=nprobe)
             else:
                 raise UnknownSearchIndexError(f"Unknown index type: {search_index.index_type}")
             logger.info(

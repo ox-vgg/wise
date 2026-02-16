@@ -513,6 +513,10 @@ async def _search_rrf(
     # - one that runs the face+text search
     # - one that fuses results based on RRF and returns the final ranked list of results
     text_k_target = max(end, config.face_text_search_text_k)
+    text_search_nprobe_override = None
+    nprobe_target = config.face_text_search_nprobe_target
+    if nprobe_target is not None and nprobe_target > 0:
+        text_search_nprobe_override = int(nprobe_target)
     (
         face_search_output,
         text_search_output,
@@ -533,6 +537,7 @@ async def _search_rrf(
         face_score_threshold=(
             face_text_options.get("score_threshold") if face_text_options else None
         ),
+        text_search_nprobe_override=text_search_nprobe_override,
         embedding_service=embedding_service,
         search_service=search_service,
         project_service=project_service,
