@@ -3,6 +3,7 @@ Summary of important user-visible changes for WISE
 
 Next version (unreleased)
 -------------------------
+* The WISE software has been described in [arXiv:2602.12819](https://arxiv.org/abs/2602.12819) paper.
 
 * Face search mode supports text query based filtering (e.g. chris.jpg + "in a taxi")
 

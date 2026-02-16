@@ -7,7 +7,7 @@
     WISE is a search engine for images, videos, and audio powered by multimodal AI, allowing you to quickly and easily search through large collections of audiovisual media. You can search using natural language, an uploaded image/audio file, or a combination of these modalities. Use WISE locally on your own collections of images/videos.
   </p>
   <p>
-    For more details, visit 
+    For more details, visit
     <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/" target="_blank">
       https://www.robots.ox.ac.uk/~vgg/software/wise/
     </a>
@@ -82,7 +82,7 @@ We are planning on implementing the following features soon. Stay tuned!
 
 ## Colab demo
 
-Try out WISE in Google Colab below (Google Colab is a free cloud service allowing you to run 
+Try out WISE in Google Colab below (Google Colab is a free cloud service allowing you to run
 machine learning models and code without installing anything locally):
 
 <a target="_blank" href="https://colab.research.google.com/github/ox-vgg/demo-notebooks/blob/main/notebooks/wise2-colab.ipynb">
@@ -114,6 +114,11 @@ Here are some documents for users and developers of WISE.
 Please submit any bug reports and feature requests on the [Issues page](https://gitlab.com/vgg/wise/wise/-/issues).
 
 For any queries or feedback related to the WISE software, contact [Prasanna Sridhar](mailto:prasanna@robots.ox.ac.uk), [Horace Lee](mailto:horacelee@robots.ox.ac.uk) or [Abhishek Dutta](mailto:adutta@robots.ox.ac.uk).
+
+## Citation
+The WISE software can be cited as follows:
+
+Prasanna Sridhar, Horace Lee, David M. S. Pinto, Andrew Zisserman, and Abhishek Dutta. (2026). WISE: A Multimodal Search Engine for Visual Scenes, Audio, Objects, Faces, Speech, and Metadata. [arXiv:2602.12819](https://arxiv.org/abs/2602.12819)
 
 ## Acknowledgements
 
