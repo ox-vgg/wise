@@ -223,6 +223,7 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
     ## CLAP supports text and audio (no image)
     preprocess_image = None
     extract_image_features = None
+    extract_image_region_features = None
 
     class Config(FeatureExtractor.Config):
         pass

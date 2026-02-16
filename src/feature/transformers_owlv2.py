@@ -637,6 +637,18 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
             )
         return features
 
+
+    def preprocess_image_region(
+        self, image: torch.Tensor | Image.Image, region: BBoxXYWH
+    ) -> torch.Tensor:
+        return self._preprocess_image_region_nocrop(image, region)
+
+    def extract_image_region_features(
+        self, image: torch.Tensor, region: BBoxXYWH
+    ) -> Features:
+        return self._extract_image_region_features_highest_iou(image, region)
+
+
     def preprocess_text(self, text_query: list[str]) -> dict:
         """
         Preprocess text queries for the OWLv2 model.

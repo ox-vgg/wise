@@ -77,5 +77,16 @@ class InsightFaceAverageFeatureExtractor(FeatureExtractor):
                 features.vectors = average_vector
         return face_features
 
+    def preprocess_image_region(
+        self, image: torch.Tensor | Image.Image, region: BBoxXYWH
+    ) -> torch.Tensor:
+        return self._proprocess_image_region_crop(image, region)
+
+    def extract_image_region_features(
+        self, image: torch.Tensor, region: BBoxXYWH
+    ) -> Features:
+        del region
+        return self.extract_image_features(image)
+
     def warmup(self, *args, **kwargs):
         return self._extractor.warmup(*args, **kwargs)

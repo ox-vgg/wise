@@ -18,7 +18,7 @@ import io
 import logging
 from tempfile import NamedTemporaryFile
 from .exceptions import ModalityNotSupportedError, FeatureExtractorNotFoundError, NoFeaturesFoundError
-from src.feature import FeatureExtractor, FeatureExtractorFactory
+from src.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
 from pydantic import BaseModel, HttpUrl
 import numpy as np
 from PIL import Image
@@ -153,6 +153,22 @@ class EmbeddingService:
                 logger.debug("multiple features found, will return vector for the top feature only")
             return features.vectors[0:1]
 
+        def extract_image_region_features(image: Image.Image, bbox) -> np.ndarray:
+            if feature_extractor.extract_image_region_features is None:
+                raise ModalityNotSupportedError("image region modality not supported")
+            ## bbox here is api.common.BBoxXYWH (pydantic model) but
+            ## we need BBoxXYWH from FeatureExtractor (NamedTuple).
+            ft_bbox = BBoxXYWH(bbox.x, bbox.y, bbox.w, bbox.h)
+            features = feature_extractor.extract_image_region_features(
+                feature_extractor.preprocess_image_region(image, ft_bbox),
+                ft_bbox
+            )
+            if not len(features.vectors):
+                raise NoFeaturesFoundError("no features found on image")
+            if len(features.vectors) > 1:
+                logger.debug("multiple features found, will return vector for the top feature only")
+            return features.vectors[0:1]
+
         def extract_audio_features(audio: torch.Tensor) -> np.ndarray:
             if feature_extractor.extract_audio_features is None:
                 raise ModalityNotSupportedError("audio modality not supported")
@@ -168,7 +184,13 @@ class EmbeddingService:
                 if qterm.qtype == "visual":
                     im = load_image(qterm)
                     im = im.convert("RGB")
-                    feature_vector = extract_image_features(im)
+                    if qterm.bbox:
+                        feature_vector = extract_image_region_features(
+                            im, qterm.bbox
+                        )
+                    else:
+                        feature_vector = extract_image_features(im)
+
                 elif qterm.qtype == "audio":
                     if isinstance(qterm.src, bytes):
                         au = io.BytesIO(qterm.src)

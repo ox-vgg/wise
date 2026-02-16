@@ -19,11 +19,14 @@ import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, NamedTuple, Optional, Type
+
 from pydantic import BaseModel, ConfigDict
 from PIL import Image
 import torch
+import torchvision.transforms.v2.functional as F
 import numpy as np
 import sqlalchemy as sa
+from torchvision.ops import box_iou
 
 
 class FeatureExtractorConfig(BaseModel):
@@ -95,6 +98,22 @@ class BBoxXYWH(NamedTuple):
     y: float
     w: float
     h: float
+
+
+def _box_iou_xywh(boxes1_xywh: Tensor, boxes2_xywh: Tensor) -> Tensor:
+    """box_iou implementation to support torchvision <0.24.
+
+    torchvision 0.24 added the fmt option to box_iou to support boxes
+    in xywh format (torchvision<0.24 only supported the xyxy format).
+    We are currently stuck on torchvision<0.24 (see comments on #175)
+    so we do it ourselves.
+
+    """
+    boxes1_xyxy = boxes1_xywh.detach().clone()
+    boxes1_xyxy[:,2:] = boxes1_xyxy[:,:2] + boxes1_xyxy[:,2:]
+    boxes2_xyxy = boxes2_xywh.detach().clone()
+    boxes2_xyxy[:,2:] = boxes2_xyxy[:,:2] + boxes2_xyxy[:,2:]
+    return box_iou(boxes1_xyxy, boxes2_xyxy)
 
 
 @dataclass(kw_only=True)
@@ -302,6 +321,54 @@ class FeatureExtractor:
         """
         raise NotImplementedError
 
+
+    def preprocess_image_region(
+        self, image: torch.Tensor | Image.Image, region: BBoxXYWH
+    ) -> torch.Tensor:
+        """Preprocess image to call :meth:`extract_image_region_features`.
+
+        Args:
+            image: unlike the other `preprocess_*` methods, this takes
+                only one image to be used with one region.
+            region: the bounding box that defines the image region
+                that will be processed.
+
+        .. seealso::
+
+            :meth:`_preprocess_image_region_crop` and
+            :meth:`_preprocess_image_region_nocrop` for drop-in
+            implementations of this method.
+
+        """
+        raise NotImplementedError
+
+    def extract_image_region_features(
+        self, image: torch.Tensor, region: BBoxXYWH
+    ) -> Features:
+        """Extract features for the given image region.
+
+        The meaning of "image region" is up to each FeatureExtractor
+        concrete implementation and should be done in concert with
+        :meth:`preprocess_image_region`:
+
+        * For feature extractors that return a single vector
+          representing the visual content, it may make sense to simply
+          crop the image and do the same as `extract_image_features`.
+          In that case, consider using
+          :meth:`_preprocess_image_region_crop` with
+          :meth:`extract_image_features`.
+
+        * For feature extractors that use a detector, it may make more
+          sense to process the whole image and then select one of the
+          regions using the `region` argument as hint.  In that case,
+          consider using :meth:`_preprocess_image_region_nocrop` and
+          look into
+          :meth:`_extract_image_region_features_highest_iou`.
+
+        """
+        raise NotImplementedError
+
+
     def preprocess_text(self, text: str) -> str:
         raise NotImplementedError
 
@@ -375,6 +442,66 @@ class FeatureExtractor:
         eagerly load them and allocate memory beforehand
         """
         pass
+
+    def _preprocess_image_region_crop(
+        self, image: torch.Tensor | Image.Image, region: BBoxXYWH
+    ) -> torch.Tensor:
+        """Implementation of :meth:`preprocess_image_region` that crops image.
+        """
+        if isinstance(image, torch.Tensor):
+            if image.ndim != 3 or image.shape[0] != 3:
+                raise ValueError("expect Tensor image to be RGB in CHW order")
+            crop = F.crop(
+                image,
+                round(region.y * image.shape[1]),
+                round(region.x * image.shape[2]),
+                round(region.h * image.shape[1]),
+                round(region.w * image.shape[2]),
+            )
+            return self.proprocess_image(crop.unsqueeze(0))
+        elif isinstance(image, Image.Image):
+            crop = image.crop(
+                round(region.x * image.width),
+                round(region.y * image.height),
+                round((region.x + region.w) * image.width),
+                round((region.y + region.h) * image.height),
+            )
+            return self.preprocess_image([crop])
+        else:
+            raise TypeError("unexpected input images of type %s" % type(images))
+
+    def _preprocess_image_region_nocrop(
+        self, image: torch.Tensor | Image.Image, region: BBoxXYWH
+    ) -> torch.Tensor:
+        """Implementation of :meth:`preprocess_image_region` that ignores region.
+        """
+        if isinstance(image, torch.Tensor):
+            if image.ndim != 3 or image.shape[0] != 3:
+                raise ValueError("expect Tensor image to be RGB in CHW order")
+            return self.preprocess_image(image.unsqueeze(0))
+        elif isinstance(image, Image.Image):
+            return self.preprocess_image([image])
+        else:
+            raise TypeError("unexpected input images of type %s" % type(images))
+
+    def _extract_image_region_features_highest_iou(
+        self, image: torch.Tensor, region: BBoxXYWH
+    ) -> Features:
+        """Implementation of :meth:`extract_image_region_features` that returns region with highest IoU.
+        """
+        features = self.extract_image_features(image)
+        assert len(features) == 1
+        ## FIXME: once we can depend on torchvision>0.24, we can
+        ## replace _box_iou_xywh() with box_iou(..., fmt="xywh")
+        iou = _box_iou_xywh(
+            torch.stack([torch.Tensor(x.bbox) for x in features[0].metadata]),
+            torch.Tensor(region).unsqueeze(0),
+        )
+        iou_max_idx = iou.argmax()
+        return Features(
+            vectors=features[0].vectors[[iou_max_idx],:],
+            metadata=[features[0].metadata[iou_max_idx]],
+        )
 
 
 def get_torch_device(device: str | torch.device | None = None):

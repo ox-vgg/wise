@@ -523,6 +523,18 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
         return features
 
+
+    def preprocess_image_region(
+        self, image: torch.Tensor | PIL.Image.Image, region: BBoxXYWH
+    ) -> torch.Tensor:
+        return self._preprocess_image_region_nocrop(image, region)
+
+    def extract_image_region_features(
+        self, image: torch.Tensor, region: BBoxXYWH
+    ) -> Features:
+        return self._extract_image_region_features_highest_iou(image, region)
+
+
     def warmup(self):
         random_image = torch.rand((1, 3, 768, 1024))
         features = self.extract_image_features(self.preprocess_image(random_image))
