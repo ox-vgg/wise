@@ -132,7 +132,7 @@ FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
   --project-dir /data/wise-projects/shard2
 
 # 3. Serve both shard1 and shard2 using aggregator
-REMOTE_PROJECTS='["http://localhost:10001/shard1/", "http://localhost:10002/shard2/"] \
+REMOTE_PROJECTS='["http://localhost:10001/shard1/", "http://localhost:10002/shard2/"]' \
   FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
   PORT=10000 \
   python3 serve.py \
