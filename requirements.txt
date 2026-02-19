@@ -1,4 +1,4 @@
-accelerate
+accelerate  # used by some HuggingFace models
 faiss-cpu>=1.7.4
 ## [all] required for Starlette's schema generation and multipart
 ## support, etc.
