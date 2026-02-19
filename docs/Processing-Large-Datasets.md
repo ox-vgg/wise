@@ -1,6 +1,6 @@
 # Processing Large Datasets
 
-This document describes a workflow for processing a large collection (e.g. 10,000 hours) 
+This document describes a workflow for processing a large collection (e.g. 10,000 hours)
 of videos using the WISE software tool.
 
 > **Warning:** This document is still in draft mode and work is ongoing. Some sections may be incomplete or subject to change.
@@ -108,4 +108,51 @@ python3 media-metadata.py \
     --from-csv /data/a-wise-project/thumbs-shot-scale.csv
 ```
 
-## 6. ...
+## 6. Use Triton Inference Server for Feature Extraction
+
+See [Using Triton Inference Server](using-triton-inference-server.md) to understand how better GPU memory utilisation can be achieved using the Triton Inference Server (maintained by NVIDIA) and running inference on optimised models (e.g. ONNX, TensorRT).
+
+## 7. Aggregator Mode
+WISE can operate in aggregator mode, where a large audiovisual collection is split up across multiple standalone nodes each covering a different subset. A central instance distributes search queries to all standalone nodes, gathers their results, and presents a unified response to the user. See [tests/test-aggregator.sh](tests/test-aggregator.sh) to understand the aggregator mode available in WISE.
+
+For the purpose of illustration, let us assume that we have split a large video dataset into two sub-sets called `shard1` and `shard2` each containing around 1000 videos and independently processed using WISE.
+
+```
+# We assume that a triton inference server is running at localhost:8801
+# 1. Start shard1
+FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
+  PORT="10001" \
+  python3 serve.py \
+  --project-dir /data/wise-projects/shard1
+
+# 2. Start shard2
+FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
+  PORT="10002" \
+  python3 serve.py \
+  --project-dir /data/wise-projects/shard2
+
+# 3. Serve both shard1 and shard2 using aggregator
+REMOTE_PROJECTS='["http://localhost:10001/shard1/", "http://localhost:10002/shard2/"] \
+  FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
+  PORT=10000 \
+  python3 serve.py \
+  --project-dir combined_shards
+```
+
+Now visit `http://localhost:10000/combined_shards` to search on across both shards.
+
+## 8. Adjust threshold for Object Feature Extractor
+
+The OWLv2 object feature extractor has the parameter `objectness_threshold` to control the number
+of objects that gets extracted and stored in the database. By default, the `objectness_threshold=0.02`
+which often results in a very large number of objects thereby increasing both compute and storage costs.
+These costs can be reduced by setting `objectness_threshold=0.10` which is known to give reasonably good
+coverage of objects. The parameter can be set as follows:
+
+```
+FEATURE_EXTRACTOR_CONFIG='{"transformers/owlv2/google/owlv2-large-patch14-ensemble":{"objectness_threshold":0.10}}' \
+  python3 extract-features.py \
+  --enable-autocast \          # this reduces memory and compute by using fp16
+  --video-feature-id "transformers/owlv2/google/owlv2-large-patch14-ensemble" \
+  ...
+```
