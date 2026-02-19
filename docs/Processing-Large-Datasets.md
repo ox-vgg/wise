@@ -117,7 +117,7 @@ WISE can operate in aggregator mode, where a large audiovisual collection is spl
 
 For the purpose of illustration, let us assume that we have split a large video dataset into two sub-sets called `shard1` and `shard2` each containing around 1000 videos and independently processed using WISE.
 
-```
+```bash
 # We assume that a triton inference server is running at localhost:8801
 # 1. Start shard1
 FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
@@ -149,7 +149,7 @@ which often results in a very large number of objects thereby increasing both co
 These costs can be reduced by setting `objectness_threshold=0.10` which is known to give reasonably good
 coverage of objects. The parameter can be set as follows:
 
-```
+```bash
 FEATURE_EXTRACTOR_CONFIG='{"transformers/owlv2/google/owlv2-large-patch14-ensemble":{"objectness_threshold":0.10}}' \
   python3 extract-features.py \
   --enable-autocast \          # this reduces memory and compute by using fp16
