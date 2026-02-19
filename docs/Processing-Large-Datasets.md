@@ -144,8 +144,8 @@ Now visit `http://localhost:10000/combined_shards` to search on across both shar
 ## 8. Adjust threshold for Object Feature Extractor
 
 The OWLv2 object feature extractor has the parameter `objectness_threshold` to control the number
-of objects that gets extracted and stored in the database. By default, the `objectness_threshold=0.02`
-which often results in a very large number of objects thereby increasing both compute and storage costs.
+of extracted objects that get stored in the database. By default, the `objectness_threshold=0.02`
+which often results in a very large number of objects thereby increasing storage costs.
 These costs can be reduced by setting `objectness_threshold=0.10` which is known to give reasonably good
 coverage of objects. The parameter can be set as follows:
 
