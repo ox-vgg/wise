@@ -3,9 +3,12 @@ Summary of important user-visible changes for WISE
 
 Next version (unreleased)
 -------------------------
-* The WISE software has been described in [arXiv:2602.12819](https://arxiv.org/abs/2602.12819) paper.
 
-* Face search mode supports text query based filtering (e.g. chris.jpg + "in a taxi")
+* The WISE software has been described in
+  [arXiv:2602.12819](https://arxiv.org/abs/2602.12819) paper.
+
+* Face search mode supports text query based filtering
+  (e.g. chris.jpg + "in a taxi")
 
 * Added face search (refer to `InsightFaceFeatureExtractor` and
   `InsightFaceAverageFeatureExtractor`), and object search (refer to
@@ -18,9 +21,10 @@ Next version (unreleased)
 * Removed the query blocklist feature because it was not effective, it
   was far too easy to bypass.
 
-* The new `/search2` API uses a different query structure. Consider switching to
-this new endpoint if you develop your own frontend. The older `/search` endpoint will be removed in the next
-major release (and `/search2` will become `/search`)
+* The new `/search2` API uses a different query structure.  Consider
+  switching to this new endpoint if you develop your own frontend.
+  The older `/search` endpoint will be removed in the next major
+  release (and `/search2` will become `/search`).
 
 
 2.1.0 (2025-02-04)
