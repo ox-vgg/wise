@@ -239,30 +239,13 @@ def get_dataloader(stream: torch.utils.data.Dataset, num_workers: int):
 
     return av_data_loader
 
-def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] = ['*'], include_filenames: list[str] = None):
 
-    # Get files matching extensions
-    input_files = sorted(
-        get_files_from_directory_with_extensions(media_dir, include_extensions),
-        key=lambda x: str(x),
-    )
-
-    if include_filenames is not None:
-        # Filter files based on the provided filenames
-        original_count = len(input_files)
-        input_files = [
-            f for f in input_files if f.name in include_filenames
-        ]
-        logger.info(f"Filtered {original_count - len(input_files)} files from {media_dir}")
-    logger.info(
-        f"Found {len(input_files)} in {media_dir} (extensions: {include_extensions})"
-    )
-
+def process_media_files(media_dir: Path, db_engine, media_files: list[Path]):
     # Get metadata and media datasets corresponding to the files
-    metadata, unknown_files = get_metadata_for_valid_files(input_files)
+    metadata, unknown_files = get_metadata_for_valid_files(media_files)
     if len(unknown_files) > 0:
-        logger.info(
-            f'Skipping {len(unknown_files)} files that are not valid media in directory "{media_dir}"'
+        logger.warning(
+            f"Skipping {len(unknown_files)} invalid media files in directory {media_dir}'"
         )
         logger.debug("\n".join(map(str, unknown_files)))
 
@@ -311,13 +294,24 @@ def process_media_dir(media_dir: Path, db_engine, include_extensions: list[str] 
     # return metadata and datasets to be chained
     return dataset_payload
 
+
 def validate_args(args):
     if args.num_workers <= 0:
         args.num_workers = 0
 
+    if args.media_files_from and args.media_include_list:
+        raise ValueError(
+            "--media-files-from and --media-include options are"
+            " mutually exclusive"
+        )
+    if args.media_files_from and len(args.media_dir_list) > 1:
+        raise ValueError(
+            "--media-files-from option can't be used with more than"
+            " one MEDIA_DIR"
+        )
+
     # sanity check: remove duplicate entries in command line args
-    n_extension = len(args.media_include_list)
-    if n_extension == 0:
+    if not args.media_include_list:
         setattr(args, 'media_include_list', ['*'])
     else:
         unique_media_include_list = list(set(args.media_include_list))
@@ -325,10 +319,15 @@ def validate_args(args):
 
     if len(args.media_dir_list) > 1:
         unique_media_dir_list = list(set(args.media_dir_list))
+        if len(unique_media_dir_list) != len(args.media_dir_list):
+            logger.warning(
+                "Ignoring duplicated MEDIA_DIR"
+            )
         setattr(args, 'media_dir_list', unique_media_dir_list)
 
-    assert all(Path(x).is_dir() for x in args.media_dir_list), "All values for media_dir_list must be directories"
-    
+    assert all(Path(x).is_dir() for x in args.media_dir_list), \
+        "All values for media_dir_list must be directories"
+
     # Feature Extractor IDs
     # Set default for {image,audio,video}_feature_id_map only if the argument was not provided
     if args.video_feature_id_map is None and args.image_feature_id_map is None and args.audio_feature_id_map is None:
@@ -432,22 +431,33 @@ def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, ar
     return feature_extractor_ids
 
 def get_media_files_for_dataset(mode: ExtractFeatureMode, project: WiseProject, args):
-    ## 1. Initialise internal metadata database with valid files
-    print('Initialising internal metadata database')
+    """Initialise internal metadata database with valid files."""
+    logger.info("Initialising internal metadata database")
     all_metadata: list[DatasetPayload] = []
     if mode == ExtractFeatureMode.add_feature_extractor:
         metadata = project.get_media_files()
         all_metadata.extend(metadata)
     else:
-        include_filenames = None
-        if args.media_filenames_from is not None:
-            logger.info(f"Reading filenames to be included from {args.media_filenames_from}")
-            include_filenames = []
-            with open(args.media_filenames_from, 'r') as f:
-                include_filenames = [line.strip() for line in f if line.strip()]
-        for media_dir in args.media_dir_list:
-            metadata = process_media_dir(Path(media_dir), db_engine, args.media_include_list, include_filenames)
+        media_files: list[Path] = []
+        if args.media_files_from:
+            assert len(args.media_dir_list) == 1  # checked in validate_args
+            media_dir = Path(args.media_dir_list[0])
+
+            logger.info(f"Reading filepaths to be included from '{args.media_files_from}'")
+            with open(args.media_files_from, "rt") as fh:
+                media_files = [media_dir / line.rstrip() for line in fh if line]
+            metadata = process_media_files(media_dir, db_engine, media_files)
             all_metadata.extend(metadata)
+        else:
+            for media_dir in args.media_dir_list:
+                media_dir = Path(media_dir)
+                media_files = sorted(
+                    get_files_from_directory_with_extensions(
+                        media_dir, args.media_include_list
+                    )
+                )
+                metadata = process_media_files(media_dir, db_engine, media_files)
+                all_metadata.extend(metadata)
 
     return all_metadata
 
@@ -475,11 +485,13 @@ if __name__ == "__main__":
         help="regular expression to include certain media files",
     )
 
+    ## TODO: implement alternative --media-files0-from option or a
+    ## `--from0` which modifies the behaviour of --*-from options.
     parser.add_argument(
-        "--media-filenames-from",
+        "--media-files-from",
         required=False,
         type=str,
-        help="only process the filenames contained in this text file (one filename per line).",
+        help="media files to extract features from; one file path per line (relative to MEDIA_DIR)",
     )
 
     parser.add_argument(

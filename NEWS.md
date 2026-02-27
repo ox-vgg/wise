@@ -26,6 +26,12 @@ Next version (unreleased)
   The older `/search` endpoint will be removed in the next major
   release (and `/search2` will become `/search`).
 
+* The `--media-filenames-from` option on extract-features.py was
+  replaced with a new `--media-files-from` option.  The previous
+  "filenames" option only compared file basenames.  The new "files"
+  option uses the whole filepath, relative to `MEDIA_DIR`, making it
+  useful when media files are in a structure of nested directories.
+
 
 2.1.0 (2025-02-04)
 ------------------
