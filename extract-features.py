@@ -381,6 +381,9 @@ def get_feature_extractor_ids_from_project(project: WiseProject):
     project_assets = project.discover_assets()
     feature_extractor_ids: dict[ModalityType, list] = {}
     for modality_type, feature_extractor_id_list in project_assets.items():
+        ## project_assets uses string for keys, convert to
+        ## ModalityType (see also merge request !127).
+        modality_type = ModalityType(modality_type)
         if modality_type not in [ModalityType.IMAGE, ModalityType.VIDEO, ModalityType.AUDIO]:
             continue
         feature_extractor_ids[modality_type] = list(feature_extractor_id_list.keys())
