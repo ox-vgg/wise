@@ -445,7 +445,8 @@ def get_media_files_for_dataset(mode: ExtractFeatureMode, project: WiseProject, 
 
             logger.info(f"Reading filepaths to be included from '{args.media_files_from}'")
             with open(args.media_files_from, "rt") as fh:
-                media_files = [media_dir / line.rstrip() for line in fh if line]
+                ## Remove *only* the \n at the end of each line
+                media_files = [media_dir / line[:-1] for line in fh if len(line) > 1]
             metadata = process_media_files(media_dir, db_engine, media_files)
             all_metadata.extend(metadata)
         else:
