@@ -27,6 +27,7 @@ from ..common import (
     MediaQueryTerm,
     Query,
     TextQueryTerm,
+    VectorIdQueryTerm,
     VectorQueryTerm,
     VideoSegment,
 )
@@ -380,7 +381,7 @@ def replace_vector_ids_with_search_embeddings(
     q_idx: list[int] = []
     vector_ids: list[str] = []
     for i, x in enumerate(q):
-        if isinstance(x, VectorQueryTerm):
+        if isinstance(x, VectorIdQueryTerm):
             q_idx.append(i)
             vector_ids.append(int(x.vector_id.rsplit("/", maxsplit=1)[-1]))
     if not vector_ids:
@@ -398,11 +399,10 @@ def replace_vector_ids_with_search_embeddings(
 
     new_q = q.copy()
     for idx, embedding in zip(q_idx, search_embeddings):
-        new_q[idx] = MediaQueryTerm(
+        new_q[idx] = VectorQueryTerm(
             term_id=q[idx].term_id,
             is_negative=q[idx].is_negative,
-            src=embedding,
-            qtype="visual",  # only search on visual internal vectors
+            vector=embedding,
         )
     return new_q
 
@@ -690,7 +690,7 @@ async def _search(
     media_type = get_media_type(search_in)
 
     if any(
-        [isinstance(x, VectorQueryTerm) for x in q]
+        [isinstance(x, VectorIdQueryTerm) for x in q]
     ) and not search_service.is_internal_search_supported(
         media_type, feature_extractor_id
     ):

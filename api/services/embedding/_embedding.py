@@ -28,7 +28,7 @@ import torchaudio
 import typing
 from fastapi import HTTPException
 
-from ...common import MediaQueryTerm, Query, TextQueryTerm
+from ...common import MediaQueryTerm, Query, TextQueryTerm, VectorQueryTerm
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,9 @@ class EmbeddingService:
 
         for qterm in q:
             feature_vector = None
-            if isinstance(qterm, MediaQueryTerm):
+            if isinstance(qterm, VectorQueryTerm):
+                feature_vector = qterm.vector
+            elif isinstance(qterm, MediaQueryTerm):
                 if qterm.qtype == "visual":
                     if isinstance(qterm.src, bytes):
                         with Image.open(io.BytesIO(qterm.src)) as im:
@@ -160,8 +162,6 @@ class EmbeddingService:
                             with Image.open(tmpfile.name) as im:
                                 im = im.convert('RGB')
                                 feature_vector = extract_image_features(im)
-                    elif isinstance(qterm.src, np.ndarray):
-                        feature_vector = qterm.src
                     else:
                         raise HTTPException(
                             400, {"message": "Unhandled query term"}
@@ -179,8 +179,6 @@ class EmbeddingService:
                                 feature_vector = extract_audio_features(
                                     load_audio([file_bytes_io])
                                 )
-                    elif isinstance(qterm.src, np.ndarray):
-                        feature_vector = qterm.src
                     else:
                         raise HTTPException(
                             400, {"message": "Unhandled qterm"}

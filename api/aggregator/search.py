@@ -19,7 +19,7 @@ from typing import Annotated, Literal, cast
 
 
 from .. import common
-from ..common import MediaQueryTerm, Query, VectorQueryTerm
+from ..common import MediaQueryTerm, Query, VectorIdQueryTerm, VectorQueryTerm
 from ..services.embedding import EmbeddingConfig
 from ..dependencies import (
     APIConfig,
@@ -87,7 +87,7 @@ async def replace_vector_ids_with_search_embeddings(
     q_idx: list[int] = []
     vector_ids: list[str] = []
     for i, x in enumerate(q):
-        if isinstance(x, VectorQueryTerm):
+        if isinstance(x, VectorIdQueryTerm):
             q_idx.append(i)
             vector_ids.append(x.vector_id)
     if not vector_ids:
@@ -105,11 +105,10 @@ async def replace_vector_ids_with_search_embeddings(
 
     new_q = q.copy()
     for idx, embedding in zip(q_idx, search_embeddings):
-        new_q[idx] = MediaQueryTerm(
+        new_q[idx] = VectorQueryTerm(
             term_id=q[idx].term_id,
             is_negative=q[idx].is_negative,
-            src=embedding,
-            qtype="visual",  # only search on visual internal vectors
+            vector=embedding,
         )
     return new_q
 

@@ -86,23 +86,24 @@ class MediaQueryTerm(BaseQueryTerm):
             a video segment.
 
     """
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    src: HttpUrl | bytes | int | np.ndarray
+    src: HttpUrl | bytes | int
     qtype: Literal["audio", "visual"]
     bbox: Optional[BBoxXYWH] = None
     ts: Optional[float] = None
     te: Optional[float] = None
 
-
-class VectorQueryTerm(BaseQueryTerm):
+class VectorIdQueryTerm(BaseQueryTerm):
     vector_id: str  # str because format is {shard_id}/{media_id}/{vector_id}
 
+class VectorQueryTerm(BaseQueryTerm):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    vector: np.ndarray
 
 class TextQueryTerm(BaseQueryTerm):
     txt: str
 
 
-Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm]
+Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm]
 
 
 ## Query's are an HTTP multipart/form-data request where the files
@@ -120,7 +121,7 @@ Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm]
 class MediaQueryTermInForm(MediaQueryTerm):
     src: HttpUrl | int | None  # None means bytes in another form part
 
-QueryTermInForm = MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm
+QueryTermInForm = MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm
 QueryTermInFormAdapter = TypeAdapter(QueryTermInForm)
 
 

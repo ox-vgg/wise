@@ -130,7 +130,7 @@ class TestHandlingMultipartForm(unittest.TestCase):
             api.common.TextQueryTerm(
                 term_id="foo", is_negative=True, txt="crane"
             ),
-            api.common.VectorQueryTerm(
+            api.common.VectorIdQueryTerm(
                 term_id="bar", is_negative=False, vector_id="0/0/0"
             )
         ]

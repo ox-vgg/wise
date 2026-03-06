@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from src.data_models import MediaType
 
-from ...common import MediaQueryTerm, Query, TextQueryTerm, VectorQueryTerm
+from ...common import MediaQueryTerm, Query, TextQueryTerm, VectorIdQueryTerm
 from .face_text import run_face_text_search
 
 
@@ -29,7 +29,7 @@ def describe_face_text_query(
     has_text_queries = any(isinstance(term, TextQueryTerm) for term in q)
     has_image_queries = any(
         (isinstance(term, MediaQueryTerm) and term.qtype == "visual")
-        or isinstance(term, VectorQueryTerm)
+        or isinstance(term, VectorIdQueryTerm)
         for term in q
     )
     extractor = embedding_service.feature_extractors.get(feature_extractor_id)
