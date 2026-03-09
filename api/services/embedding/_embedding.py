@@ -62,6 +62,21 @@ def initialize_feature_extractors(
     return feature_extractors
 
 
+def load_image(qterm: MediaQueryTerm) -> Image.Image:
+    assert qterm.qtype == "visual"
+    if isinstance(qterm.src, bytes):
+        return Image.open(io.BytesIO(qterm.src))
+    elif _is_HttpUrl(qterm.src):
+        logger.info("Downloading %s to file", qterm.src)
+        with NamedTemporaryFile() as tmpfile:
+            download_url_to_file(qterm.src, tmpfile.name)
+            return Image.open(tmpfile.name).load()
+    else:
+        raise HTTPException(
+            400, {"message": "Unhandled query term"}
+        )
+
+
 def load_audio(x: list[io.BytesIO]) -> torch.Tensor:
     # TODO add support for loading multiple audio files
     if len(x) == 0:
@@ -151,21 +166,9 @@ class EmbeddingService:
                 feature_vector = qterm.vector
             elif isinstance(qterm, MediaQueryTerm):
                 if qterm.qtype == "visual":
-                    if isinstance(qterm.src, bytes):
-                        with Image.open(io.BytesIO(qterm.src)) as im:
-                            im = im.convert('RGB')
-                            feature_vector = extract_image_features(im)
-                    elif _is_HttpUrl(qterm.src):
-                        logger.info("Downloading %s to file", qterm.src)
-                        with NamedTemporaryFile() as tmpfile:
-                            download_url_to_file(qterm.src, tmpfile.name)
-                            with Image.open(tmpfile.name) as im:
-                                im = im.convert('RGB')
-                                feature_vector = extract_image_features(im)
-                    else:
-                        raise HTTPException(
-                            400, {"message": "Unhandled query term"}
-                        )
+                    im = load_image(qterm)
+                    im = im.convert("RGB")
+                    feature_vector = extract_image_features(im)
                 elif qterm.qtype == "audio":
                     if isinstance(qterm.src, bytes):
                         au = io.BytesIO(qterm.src)
