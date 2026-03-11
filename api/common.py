@@ -35,6 +35,7 @@ from pydantic import (
 
 from config import APIConfig
 
+
 PRECISION = 5
 def round_float_(v: float) -> float:
     return round(v, PRECISION)
@@ -240,14 +241,10 @@ class VectorInfo(BaseModel):
     @field_validator("bbox", mode="before")
     @classmethod
     def cast_bbox(cls, v):
-        if v is None:
+        if isinstance(v, tuple):  # v is the NamedTuple in feature_extractor module
+           return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
+        else:
             return v
-        elif isinstance(v, BBoxXYWH):
-            return v
-        elif isinstance(v, dict):
-            return BBoxXYWH(**{k: v[k] for k in ['x', 'y', 'w', 'h']})
-        else:  # v is the NamedTuple in feature_extractor module
-            return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
 
 class VectorResult(VectorInfo):
     distance: round_float
