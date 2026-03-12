@@ -158,9 +158,17 @@ Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTer
 class MediaQueryTermInForm(MediaQueryTerm):
     src: HttpUrl | int | None  # None means bytes in another form part
 
+    @classmethod
+    def from_MediaQueryTerm(cls, q: MediaQueryTerm):
+        if isinstance(q.src, bytes):
+            return cls(**q.model_dump(exclude="src"), src=None)
+        else:
+            return cls(**q.model_dump())
+
+
 QueryTermInForm = MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm
 QueryTermInFormAdapter = TypeAdapter(QueryTermInForm)
-
+QueryInForm = list[MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm]
 
 def merge_multipart_query_form(
     query_form: list[str], query_form_files: list[UploadFile]
@@ -198,6 +206,29 @@ def merge_multipart_query_form(
         else:
             query.append(term_form)
     return query
+
+
+def build_response_query(original: Query, processed: Query) -> QueryInForm:
+    """Build the query to be included in the search response.
+
+    The original query is processed for the search.  We need to
+    process it back to be included in the response, e.g., strip the
+    media content, and convert vector query back into the vector id
+    query.
+
+    """
+    assert [x.term_id for x in original] == [x.term_id for x in processed]
+    r: QueryInForm = []
+    for o, p in zip(original, processed):
+        if isinstance(o, VectorIdQueryTerm):
+            assert isinstance(p, VectorQueryTerm)
+            r.append(o)
+        elif isinstance(o, MediaQueryTerm):
+            r.append(MediaQueryTermInForm.from_MediaQueryTerm(p))
+        else:
+            r.append(p)
+    return r
+
 
 def parse_old_api_query(
     # Positive queries
@@ -339,6 +370,7 @@ class FaceTextShardResults(BaseModel):
 
 class SearchResponse(BaseModel):
     time: float # backend search time in seconds
+    query: Query | QueryInForm
     video_audio_results: Optional[VideoAudioResults] # search results from audio stream of video files
     video_results: Optional[VideoResults] # search results from video stream of video files
     image_results: Optional[ImageResults] # search results from image files

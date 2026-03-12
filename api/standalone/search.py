@@ -252,13 +252,14 @@ def construct_image_search_response(
     )
 
 def construct_search_response(
+    query: Query,
     top_dist: list[float],
     all_metadata: list[VectorAndMediaMetadata],
     all_ext_metadata: list[FeatureExtMetadata],
     all_thumbs: Iterable[str],
     merge_function: Callable[[list[VideoSegment]], list[VideoSegment]] = merge_close_segments,
     search_in: MediaType | None = None,
-):
+) -> common.SearchResponse:
     video_audio_results = None
     video_results = None
     image_results = None
@@ -291,6 +292,7 @@ def construct_search_response(
 
     return common.SearchResponse(
         time=0.0, # Dummy value to be overwritten by the @add_response_time decorator function
+        query=query,
         video_audio_results=video_audio_results,
         video_results=video_results,
         image_results=image_results,
@@ -409,14 +411,16 @@ def replace_vector_ids_with_search_embeddings(
 def search_output_to_response(
     config: APIConfig,
     project_service: LocalWiseProjectService,
+    q: Query,
     search_in: MediaType,
     search_output: SearchOutput,
     thumbnails_to_send: int,
     merge_shots_if_supported: bool = True,
-):
+) -> common.SearchResponse:
     if len(search_output.ids) == 0:
         return common.SearchResponse(
             time=0.0,
+            query=q,
             video_audio_results=None,
             video_results=None,
             image_results=None,
@@ -424,13 +428,14 @@ def search_output_to_response(
 
     all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
     merge_function = merge_close_segments
-    
+
     # supports shots
     is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
     if merge_shots_if_supported and is_shot_merge_supported:
         merge_function = functools.partial(get_shots_from_keyframes, project_service.wise_project)
-    
+
     response = construct_search_response(
+        query=q,
         top_dist=search_output.distances,
         all_metadata=search_output.metadata,
         all_ext_metadata=search_output.ext_metadata,
@@ -438,9 +443,9 @@ def search_output_to_response(
         merge_function=merge_function,
         search_in=search_in,
     )
-
     return response
-    
+
+
 def _search_metadata(
     config: APIConfig,
     project_service: LocalWiseProjectService,
@@ -472,8 +477,9 @@ def _search_metadata(
     return search_output_to_response(
         config,
         project_service,
+        q,
         search_in,
-        search_output, 
+        search_output,
         thumbnails_to_send,
         merge_shots_if_supported=False
     )
@@ -546,6 +552,7 @@ async def _search_rrf(
     if not fused:
         return common.SearchResponse(
             time=0.0,
+            query=q,
             video_audio_results=None,
             video_results=None,
             image_results=None,
@@ -560,6 +567,7 @@ async def _search_rrf(
     if not filtered:
         return common.SearchResponse(
             time=0.0,
+            query=q,
             video_audio_results=None,
             video_results=None,
             image_results=None,
@@ -576,6 +584,7 @@ async def _search_rrf(
     )
     is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
     response = construct_search_response(
+        query=q,
         top_dist=list(filtered_dist),
         all_metadata=list(filtered_metadata),
         all_ext_metadata=list(filtered_ext_metadata),
@@ -627,6 +636,7 @@ async def _search_multimodal(
     return search_output_to_response(
         config,
         project_service,
+        q,
         search_in,
         search_output,
         thumbnails_to_send,
@@ -651,7 +661,7 @@ async def _search(
     shot_scale: list[int],
     metadata_filter: list[str],
     add_prefix: bool,
-):
+) -> common.SearchResponse:
     if feature_extractor_id == "wise/metadata":
         return _search_metadata(
             config,
@@ -742,7 +752,7 @@ async def _search(
                 },
             )
 
-        return await _search_rrf(
+        response = await _search_rrf(
             config,
             project_info,
             project_service,
@@ -761,23 +771,25 @@ async def _search(
             add_prefix,
         )
 
-    # or proceed as regular multimodal search
+    else:  # or proceed as regular multimodal search
+        response = await _search_multimodal(
+            config,
+            project_service,
+            embedding_service,
+            search_service,
+            search_in,
+            feature_extractor_id,
+            q,
+            start,
+            end,
+            thumbnails_to_send,
+            shot_scale,
+            metadata_filter,
+            add_prefix,
+        )
 
-    return await _search_multimodal(
-        config,
-        project_service,
-        embedding_service,
-        search_service,
-        search_in,
-        feature_extractor_id,
-        q,
-        start,
-        end,
-        thumbnails_to_send,
-        shot_scale,
-        metadata_filter,
-        add_prefix,
-    )
+    response.query = common.build_response_query(q, response.query)
+    return response
 
 @router.post("/search_with_feature", response_model=common.SearchResponse)
 @common.add_response_time
@@ -825,6 +837,7 @@ async def handle_post_search_feature(
     return search_output_to_response(
         config,
         cast(LocalWiseProjectService, project_service),
+        [vector_qterm],
         search_in,
         search_output,
         thumbnails_to_send,
@@ -989,6 +1002,7 @@ async def handle_get_featured(
     )
     all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(search_output.metadata)
     response = construct_search_response(
+        query=[],
         top_dist=search_output.distances,
         all_metadata=search_output.metadata,
         all_ext_metadata=search_output.ext_metadata,
