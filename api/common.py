@@ -29,6 +29,7 @@ from pydantic import (
     HttpUrl,
     PlainSerializer,
     TypeAdapter,
+    field_serializer,
     field_validator,
     ConfigDict
 )
@@ -48,6 +49,29 @@ class BBoxXYWH(BaseModel):
     y: round_float
     w: round_float
     h: round_float
+
+
+class NPArray(BaseModel):
+    """Utility to convert between numpy arrays and json for HTTP requests.
+    """
+    content: str
+    shape: list[int]
+    # assume we only exchange float32 arrays for now
+
+    @classmethod
+    def from_array(cls, x: np.ndarray) -> "NPArray":
+        np_bytes = x.tobytes()
+        base64_encoded = base64.b64encode(np_bytes)
+        return cls(
+            content=base64_encoded.decode('ascii'),
+            shape=list(x.shape)
+        )
+
+    def to_array(self) -> np.ndarray:
+        bytes_from_b64 = base64.b64decode(self.content.encode('ascii'))
+        arr = np.frombuffer(bytes_from_b64, dtype=np.float32)
+        arr = arr.reshape(self.shape)
+        return arr
 
 
 class BaseQueryTerm(BaseModel):
@@ -98,6 +122,19 @@ class VectorIdQueryTerm(BaseQueryTerm):
 class VectorQueryTerm(BaseQueryTerm):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     vector: np.ndarray
+
+    @field_validator("vector", mode="before")
+    @classmethod
+    def cast_vector(cls, v):
+        if isinstance(v, dict):  # v is NPArray from json
+            return NPArray.model_validate(v).to_array()
+        else:
+            return v
+
+    @field_serializer('vector', mode='plain')
+    def serialize_vector(self, value: np.ndarray) -> NPArray:
+        return NPArray.from_array(self.vector)
+
 
 class TextQueryTerm(BaseQueryTerm):
     txt: str
@@ -363,25 +400,6 @@ def split_query_terms(query: Query):
         negative_audio_url_queries,
     )
 
-class NPArray(BaseModel):
-    content: str
-    shape: list[int]
-    # assume we only exchange float32 arrays for now
-
-    @classmethod
-    def from_array(cls, x: np.ndarray) -> "NPArray":
-        np_bytes = x.tobytes()
-        base64_encoded = base64.b64encode(np_bytes)
-        return cls(
-            content=base64_encoded.decode('ascii'),
-            shape=list(x.shape)
-        )
-
-    def to_array(self) -> np.ndarray:
-        bytes_from_b64 = base64.b64decode(self.content.encode('ascii'))
-        arr = np.frombuffer(bytes_from_b64, dtype=np.float32)
-        arr = arr.reshape(self.shape)
-        return arr
 
 def patch_precision(config: APIConfig):
 

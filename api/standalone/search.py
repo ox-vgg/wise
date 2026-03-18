@@ -786,7 +786,7 @@ async def handle_post_search_feature(
     project_info: ProjectInfoDep,
     project_service: ProjectServiceDep,
     search_service: SearchServiceDep,
-    feature: common.NPArray,
+    vector_qterm: VectorQueryTerm,
     # Which media type to search on
     # "video" refers to the visual stream of videos, "av" refers to the audio stream of videos
     # "audio" refers to pure audio files, and "image" refers to images
@@ -809,14 +809,12 @@ async def handle_post_search_feature(
         raise HTTPException(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
-    
-    vectors = feature.to_array()
 
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
     media_type = get_media_type(search_in)
-    
+
     search_output = cast(LocalSearchService, search_service).search_with_feature(
-        vectors,
+        vector_qterm.vector,
         media_type=media_type,
         feature_extractor_id=feature_extractor_id,
         start=start,
