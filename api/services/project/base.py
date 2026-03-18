@@ -41,6 +41,19 @@ class ProjectInfo(BaseModel):
     shot_based_filters: ShotBasedFilters | None = None
     search_targets: dict[MediaType, list[str]] = {}
 
+    def normalized(self) -> "ProjectInfo":
+        """Return a copy with deterministic ordering for list fields."""
+        info = self.model_copy(deep=True)
+        info.models = {
+            media_type: sorted(model_list)
+            for media_type, model_list in info.models.items()
+        }
+        info.search_targets = {
+            media_type: sorted(targets)
+            for media_type, targets in info.search_targets.items()
+        }
+        return info
+
     @classmethod
     def reduce(cls, name, info: list["ProjectInfo"]) -> "ProjectInfo":
         def merge_(a: ProjectInfo, b: ProjectInfo) -> ProjectInfo:

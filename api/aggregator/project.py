@@ -65,4 +65,4 @@ async def forward(shard_id: str, full_path: str, request: Request,  projects: Pr
 
 @router.get("/info")
 async def get_info(info: ProjectInfoDep):
-    return info.model_dump(by_alias=True)
+    return info.normalized().model_dump(by_alias=True)

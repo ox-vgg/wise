@@ -306,4 +306,4 @@ def get_related_vectors(_vector_id: int, project_service: ProjectServiceDep):
 
 @router.get("/info")
 def get_info(project_info: ProjectInfoDep):
-    return project_info.model_dump(by_alias=True)
+    return project_info.normalized().model_dump(by_alias=True)
