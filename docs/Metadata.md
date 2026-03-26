@@ -40,7 +40,7 @@ cat wise-data/Kinetics-6c/metadata.csv
 media_path,media_category,media_description
 coughing/6XvsLPDioVA_000000_000010.mp4,"coughing","A person coughing while driving a car"
 coughing/7XXXwvatW1U_000051_000061.mp4,"coughing","A girl coughs while talking"
-coughing/ADHjOYdb450_000002_000012.mp4,"coughing","A baby coughts while opening a book" 
+coughing/ADHjOYdb450_000002_000012.mp4,"coughing","A baby coughts while opening a book"
 coughing/AFRoHj8B8DM_000116_000126.mp4,"coughing","Hillary Clinton coughts while speaking on stage"
 ...
 ```
@@ -58,7 +58,16 @@ Loading metadata from CSV file wise-data/Kinetics-6c/metadata.csv ...
 inserted 30 rows into table metadata-Kinetics-6c
 ```
 
-**TODO**: show how this metadata appears in the web based search user interface of WISE
+The metadata gets added to a table named `metadata-Kinetics-c` in the `wise-projects/Kinetics-6c/metadata/internal.db` SQLite database. To enable metadata search, we create an FTS index on the metadata as follows.
+
+```bash
+echo '{ "metadata-Kinetics-6c": [ "media_category", "media_description" ] }' > fts_config.json
+python3 create-index.py \
+  --media-type metadata \
+  --fts-config fts_config.json \
+  --project-dir wise-projects/Kinetics-6c/
+```
+
 
 ## Segment Metadata
 
