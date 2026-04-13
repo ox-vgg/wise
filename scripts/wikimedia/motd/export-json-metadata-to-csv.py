@@ -22,6 +22,8 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
+# Note: imageInfo[0].url and imageInfo[0].descriptionurl are
+# automatically included in the exported CSV.
 WANTED_FIELDS = [
     "ImageDescription",
     "DateTimeOriginal",
@@ -189,6 +191,17 @@ def export_metadata(
 
         extmetadata = imageinfo[0].get("extmetadata", {})
         row = {"media_id": media_id}
+        url = imageinfo[0].get("url", "")
+        descriptionurl = imageinfo[0].get("descriptionurl", "")
+        if url and descriptionurl:
+            row["DescriptionUrl"] = "<a href=\"" + descriptionurl.strip() + "\">" + descriptionurl.strip() + "</a>"
+            width = imageinfo[0].get("width", "")
+            height = imageinfo[0].get("height", "")
+            size = imageinfo[0].get("size", "")
+            file_info = ""
+            if width and height and size:
+                file_info = f" ({size/1024/1024:.2f} Mb, {width}x{height} pixels)"
+            row["MediaUrl"] = "<a href=\"" + url.strip() + "\">Original File" + file_info + "</a>"
         for field in WANTED_FIELDS:
             row[field] = extract_field(extmetadata, field)
         output_rows.append(row)
@@ -220,7 +233,7 @@ def export_metadata(
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with open(out_csv, "w", newline="") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=["media_id"] + WANTED_FIELDS, quoting=csv.QUOTE_ALL)
+        writer = csv.DictWriter(csv_file, fieldnames=["media_id", "MediaUrl", "DescriptionUrl"] + WANTED_FIELDS, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         for row in output_rows:
             writer.writerow(row)
