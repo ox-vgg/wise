@@ -54,7 +54,6 @@ nav:
       - docs/Evaluation.md
       - Frontend: frontend/README.md
       - docs/Grammar-of-Audiovisual-Search.md
-      - docs/Retrieval-Evaluation.md
       - docs/Search-Index-Evaluation.md
       - docs/SearchIndex.md
       - docs/Shot-Detection.md
@@ -70,5 +69,3 @@ nav:
       - docs/reference/datatables.md
       - docs/reference/featurestore.md
       - docs/reference/searchindex.md
-
-      
