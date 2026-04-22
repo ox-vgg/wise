@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WISE Explore</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        // Inject state from FastAPI
+        window.__INITIAL_STATE__ = {{ initial_state | safe }};
+    </script>
+    {% if main_js %}
+    <script type="module" src="{{ main_js }}"></script>
+    {% endif %}
+</body>
+</html>
