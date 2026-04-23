@@ -3,63 +3,52 @@
 > **Note:** The features described in this document are still being developed and therefore are not yet stable or ready for production usage.
 
 WISE Explore is a set of tools that allows exploration of a collection of
-videos using anchors such as face, objects, acoustic events. We create
-a WISE project based on the wise-test-dataset (private dataset
-with 236 videos) as follows.
+videos using anchors such as face, objects, acoustic events. 
+
+We demonstrate this feature using the [`wikimedia-commons-25`](http://thor.robots.ox.ac.uk/wise/assets/test/wikimedia-commons-25.zip) dataset which contains 25 videos taken from the Wikimedia Commons repository. First, we run the [tests/test-wikimedia-commons-25.sh](tests/test-wikimedia-commons-25.sh) script to create a sample WISE project based on this dataset. This script automatically downloads the dataset, extracts features from the videos and creates a WISE project that can be used as a visual search engine for these videos.
 
 ```bash
-FEATURE_EXTRACTOR_CONFIG='{"transformers/owlv2/google/owlv2-large-patch14-ensemble":{"objectness_threshold":0.13}}' \
-CUDA_VISIBLE_DEVICES=0 python extract-features.py \
-    "/data/videos/wise-test-dataset/mp4/v1" \
-    --shard-maxcount 16384 \
-    --num-workers 1 \
-    --feature-store faiss \
-    --audio-feature-id "microsoft/clap/2023/four-datasets" \
-    --video-feature-id "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" \
-    --video-feature-id "deepinsight/insightface/buffalo_l/_unknown" \
-    --video-feature-id "transformers/owlv2/google/owlv2-large-patch14-ensemble" \
-    --project-dir /data/wise-projects/wise-test-dataset/
-  Feature extraction completed in 22881 sec (381.35 min)
-
-python3 create-index.py \
-  --index-type IndexIVFFlat \
-  --project-dir /data/wise-projects/wise-test-dataset/
+cd $HOME
+git clone https://gitlab.com/vgg/wise/wise.git
+cd $HOME/wise
+./tests/test-wikimedia-commons-25.sh /tmp/wise/
 ```
+
+The resulting WISE project is stored in `/tmp/wise/wise-test/wise-project/wikimedia-commons-25/` folder which will be used for illustrations below.
 
 ## Face Facet
 A media collection can be explored using human faces based anchors as
 shown below.
 
 ```bash
-# 1. Fetch code and install dependencies
-cd $HOME
-git clone https://gitlab.com/vgg/wise/wise.git
+# 1. Install dependencies (assuming $HOME/wise/ contains WISE source)
 cd $HOME/wise/scripts/explore
 pip install -r requirements.txt
 
 # 2. Automatically cluster faces
 cd $HOME/wise/
 python3 scripts/explore/cluster_faces.py \
-  --project-dir /data/wise-projects/wise-test-dataset/\
+  --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
   --feature-extractor-id "deepinsight/insightface/buffalo_l/_unknown"
 
 # 3. Manually review the face clusters and set their status to "Reviewed"
 # if the cluster is well formed. Add other metadata such as "description"
 # "reference", etc. to the cluster and press "Publish" button in the
 # top-right corner. This creates the following three tables in the
-# $project_dir/metadata/internal.db SQLite database:
+# /tmp/wise/wise-test/wise-project/wikimedia-commons-25/metadata/internal.db
+# SQLite database:
 #     facets, cluster_metadata, facet_metadata
 cd $HOME/wise/scripts/explore/frontend
 npm install && npm run build # needs to be done only once
 
 cd $HOME/wise/
 python3 scripts/explore/explore.py \
-  --project-dir /data/wise-projects/wise-test-dataset/ \
+  --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
   --port 10101
 
 # 4. Serve project with facets enabled
-ENABLE_FACETS=true PORT=10101 python3 serve.py \
-  --project-dir /data/wise-projects/wise-test-dataset/
+ENABLE_FACETS=true PORT=10102 python3 serve.py \
+  --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/
 ```
 
 Click on the link titled "Facets" that appears beside the search input panel
