@@ -223,6 +223,7 @@ export interface ProjectInfo {
   };
   total_duration?: number;
   is_metadata_supported?: boolean;
+  enable_facets?: boolean;
 };
 
 export interface TourVariables {

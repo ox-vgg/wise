@@ -91,6 +91,12 @@ class APIConfig(BaseSettings):
     # enable profiling for development mode
     enable_profiling: bool = False
 
+    # Facets enable users to explore a dataset based on anchors such as as people,
+    # locations, acoustic events, etc. The facets must be first defined using the
+    # tools contained in scripts/explore/ folder.
+    # See docs/Explore.md for more details.
+    enable_facets: bool = False
+
     # feature extractor configuration
     # key must be the feature extractor id
     # value is a dictionary with the configuration for the feature extractor

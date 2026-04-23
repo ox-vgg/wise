@@ -15,13 +15,19 @@ export default defineConfig({
       '/related-vectors/': process.env.API_BASE_URL,
       '/search': process.env.API_BASE_URL,
       '/shard/': process.env.API_BASE_URL,
+      '/api/facets': process.env.API_BASE_URL,
     }
   },
   plugins: [react()],
   base: './',
   build: {
+    manifest: true,
     rollupOptions: {
-      external: ["./config.js"]
+      external: ["./config.js"],
+      input: {
+        main: './index.html',
+        facets: './facets.html'
+      }
     }
   },
 })

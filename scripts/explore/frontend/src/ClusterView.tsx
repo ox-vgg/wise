@@ -5,7 +5,7 @@ const VideoPlayerWithHighResPoster: React.FC<{ project_name: string, face: any }
   const lowResUrl = `/${project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`;
   const highResUrl = `/${project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}&high_res=true`;
   const [poster, setPoster] = useState(lowResUrl);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
 
   useEffect(() => {
     setPoster(lowResUrl);
@@ -16,18 +16,16 @@ const VideoPlayerWithHighResPoster: React.FC<{ project_name: string, face: any }
 
   return (
     <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
-      <video 
-        controls 
-        src={`/${project_name}/api/media/${face.media_id}#t=${face.timestamp}`} 
+      <video
+        controls
+        src={`/${project_name}/api/media/${face.media_id}#t=${face.timestamp}`}
         poster={poster}
-        style={{ width: '100%', height: 'auto', display: 'block' }} 
+        style={{ width: '100%', height: 'auto', display: 'block' }}
         autoPlay={false}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onEnded={() => setIsPlaying(false)}
+        onPlay={() => setHasPlayed(true)}
       />
-      {face.bbox && !isPlaying && (
-        <div 
+      {face.bbox && !hasPlayed && (
+        <div
           style={{
             position: 'absolute',
             border: '2px solid yellow',
@@ -50,7 +48,7 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
   const [pageSize, setPageSize] = useState(50);
   const [status, setStatus] = useState(state.cluster.status);
   const [selectedFace, setSelectedFace] = useState<any>(null);
-  
+
   // Metadata Panel State
   const [clusterLabel, setClusterLabel] = useState(state.cluster.cluster_label);
   const [schema, setSchema] = useState<any[]>([]);
@@ -150,7 +148,7 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
       {/* Metadata Panel */}
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <span style={{ fontWeight: 'bold', width: '150px' }}>Cluster ID</span>
             <span>{state.cluster.id}</span>
@@ -158,8 +156,8 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <span style={{ fontWeight: 'bold', width: '150px' }}>Cluster Label</span>
-            <Input 
-              value={clusterLabel} 
+            <Input
+              value={clusterLabel}
               onChange={e => setClusterLabel(e.target.value)}
               onBlur={handleLabelChange}
               onPressEnter={handleLabelChange}
@@ -172,7 +170,7 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
                <span style={{ fontWeight: 'bold', width: '150px', textTransform: 'capitalize' }}>
                  {field.key_name.replace(/_/g, ' ')}
                </span>
-               <Input 
+               <Input
                  type={field.data_type === 'number' ? 'number' : field.data_type === 'date' ? 'date' : 'text'}
                  value={metadataJson[field.key_name] || ''}
                  onChange={e => handleMetadataChange(field.key_name, e.target.value)}
@@ -183,7 +181,7 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
                />
              </div>
           ))}
-          
+
           <div style={{ marginTop: '8px' }}>
             <Button type="dashed" onClick={() => setIsSchemaModalOpen(true)}>
                + Add Metadata Field
@@ -192,14 +190,14 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
         </div>
       </Card>
 
-      <Card 
+      <Card
         title={
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Pagination 
-              current={page} 
-              onChange={(p, s) => { setPage(p); setPageSize(s); }} 
+            <Pagination
+              current={page}
+              onChange={(p, s) => { setPage(p); setPageSize(s); }}
               onShowSizeChange={(current, size) => { setPageSize(size); setPage(1); }}
-              total={state.cluster.size} 
+              total={state.cluster.size}
               pageSize={pageSize}
               size="small"
               style={{ margin: 0 }}
@@ -214,9 +212,9 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
                 font-weight: 500;
               }
             `}</style>
-            <Segmented 
+            <Segmented
               className="custom-segmented"
-              value={status} 
+              value={status}
               onChange={(val) => handleStatusChange(val as string)}
               options={[
                 { label: 'Draft', value: 'draft' },
@@ -233,14 +231,14 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
               <Card key={idx} hoverable bodyStyle={{ padding: 0 }} onClick={() => setSelectedFace(face)}>
                 <div style={{ position: 'relative', width: 120, height: 120, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   <div style={{ position: 'relative', width: '100%' }}>
-                    <img 
-                      src={`/${state.project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`} 
-                      style={{ width: '100%', height: 'auto', display: 'block' }} 
+                    <img
+                      src={`/${state.project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`}
+                      style={{ width: '100%', height: 'auto', display: 'block' }}
                       alt="face"
                       title={`Vector ID: ${face.vector_id}`}
                     />
                     {face.bbox && (
-                      <div 
+                      <div
                         style={{
                           position: 'absolute',
                           border: '2px solid yellow',
@@ -288,7 +286,7 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
         width={800}
         destroyOnClose
       >
-        {selectedFace && <VideoPlayerWithHighResPoster project_name={state.project_name} face={selectedFace} />}
+        {selectedFace && <VideoPlayerWithPoster project_name={state.project_name} face={selectedFace} />}
       </Modal>
     </div>
   );

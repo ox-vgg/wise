@@ -16,11 +16,14 @@
 
 import logging
 import io
+import json
+import sqlalchemy as sa
+from pathlib import Path
 from typing import BinaryIO
 
 from .. import common
 from ..services.project import (
-    MediaNotFoundException, ThumbnailNotFoundException,
+    MediaNotFoundException, ThumbnailNotFoundException, LocalWiseProjectService
 )
 
 from src.data_models import MediaMetadata, MediaType, SourceCollectionType
@@ -32,6 +35,7 @@ from fastapi.responses import (
     JSONResponse,
     RedirectResponse,
     StreamingResponse,
+    HTMLResponse,
 )
 from ..dependencies import ConfigDep, ProjectServiceDep, ProjectInfoDep
 
@@ -84,6 +88,10 @@ Provides
 
 router = APIRouter()
 
+@router.get("/info")
+def get_info(project_info: ProjectInfoDep):
+    return project_info.normalized().model_dump(by_alias=True)
+
 
 @router.api_route(
     "/media/{media_id}",
@@ -112,7 +120,7 @@ def get_media_file(media_id: int, request: Request, config: ConfigDep, project_s
             num_components = min(config.redirect_media_url_num_components, len(file_path.parts) - 1)
             parts = (config.redirect_media_url_prefix,) + file_path.parts[-num_components:]
             return RedirectResponse(f"{'/'.join(parts)}", status_code=302)
-        
+
         if metadata.media_type in {MediaType.VIDEO, MediaType.AV, MediaType.AUDIO}:
             file_size = file_path.stat().st_size
             range_header = request.headers.get("range")
@@ -143,7 +151,7 @@ def get_media_file(media_id: int, request: Request, config: ConfigDep, project_s
                 headers=headers,
                 status_code=status_code,
             )
-        
+
         else:
             # Image files
 
@@ -282,14 +290,13 @@ def get_metadata(_id: int, project_service: ProjectServiceDep):
 )
 def get_related_vectors(_vector_id: int, project_service: ProjectServiceDep):
     related_rows = project_service.related_vectors(_vector_id)
-        
+
     if not related_rows:
         vectors_ext_metadata = []
     else:
         vectors_ext_metadata = project_service.get_vector_ext_metadata_for_ids(
             related_rows[0].feature_extractor_id, [v.id for v in related_rows]
         )
-        
 
     vectors_info = []
     for row, extm in zip(related_rows, vectors_ext_metadata):
@@ -304,6 +311,409 @@ def get_related_vectors(_vector_id: int, project_service: ProjectServiceDep):
         )
     return vectors_info
 
-@router.get("/info")
-def get_info(project_info: ProjectInfoDep):
-    return project_info.normalized().model_dump(by_alias=True)
+def _get_facets_with_previews(project_service: LocalWiseProjectService):
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables import facets_table, cluster_metadata_table, facet_metadata_table
+        facets = conn.execute(sa.select(facets_table)).fetchall()
+
+        result = []
+        for f in facets:
+            # Get up to 4 clusters for this facet
+            clusters = conn.execute(
+                sa.select(cluster_metadata_table.c.cluster_id)
+                .where(cluster_metadata_table.c.facet_id == f.id)
+                .order_by(sa.func.random())
+                .limit(4)
+            ).fetchall()
+
+            reps = []
+            if clusters:
+                cluster_ids = [c[0] for c in clusters]
+                # For each cluster, get its assignments
+                assignments = conn.execute(
+                    sa.select(facet_metadata_table)
+                    .where(facet_metadata_table.c.cluster_id.in_(cluster_ids))
+                ).fetchall()
+
+                from collections import defaultdict
+                import random
+
+                cluster_to_vectors = defaultdict(list)
+                for a in assignments:
+                    cluster_to_vectors[a.cluster_id].append(a.vector_id)
+
+                all_vector_ids = []
+                for c_id, vids in cluster_to_vectors.items():
+                    if len(vids) > 20:
+                        vids = random.sample(vids, 20)
+                    all_vector_ids.extend(vids)
+
+                vector_info = {}
+                if all_vector_ids:
+                    metadata_list = project_service.wise_project.get_vector_media_metadata_for_ids(all_vector_ids)
+                    ext_metadata_list = project_service.wise_project.get_vector_ext_metadata_for_ids(f.feature_extractor_id, all_vector_ids)
+                    for m, ext in zip(metadata_list, ext_metadata_list):
+                        area = (ext.bbox.w * m.width) * (ext.bbox.h * m.height) if hasattr(ext, 'bbox') else 0
+                        vector_info[m.id] = {
+                            "media_id": m.media_id,
+                            "timestamp": m.timestamp,
+                            "bbox": {"x": ext.bbox.x, "y": ext.bbox.y, "w": ext.bbox.w, "h": ext.bbox.h} if hasattr(ext, 'bbox') else None,
+                            "area": area
+                        }
+
+                for c_id in cluster_ids:
+                    vids = cluster_to_vectors[c_id]
+                    vids_info = [vector_info[vid] for vid in vids if vid in vector_info]
+                    if vids_info:
+                        # Get the largest face region
+                        largest_face = max(vids_info, key=lambda x: x["area"])
+                        reps.append(largest_face)
+
+            result.append({
+                "id": f.id,
+                "name": f.name,
+                "feature_extractor_id": f.feature_extractor_id,
+                "preview_faces": reps
+            })
+
+    return result
+
+@router.get("/facets/", response_class=HTMLResponse)
+def get_facets_index(config: ConfigDep, project_info: ProjectInfoDep, project_service: ProjectServiceDep):
+    if not config.enable_facets:
+        raise HTTPException(status_code=404, detail="Facets feature is disabled.")
+    if not isinstance(project_service, LocalWiseProjectService):
+        return HTMLResponse("<h1>Facets Unavailable</h1><p>The Facets interface is not currently supported while WISE is running in Aggregator (Multi-Shard) Mode. Please run WISE in Standalone mode to access this feature.</p>", status_code=400)
+
+    facets_html_path = config.project_dir.parent.parent.parent / "frontend" / "dist" / "facets.html"
+    # Alternative path if running installed vs dev
+    if not facets_html_path.exists():
+        facets_html_path = Path(__file__).parent.parent.parent / "frontend" / "dist" / "facets.html"
+
+    try:
+        with open(facets_html_path, "r") as f:
+            html = f.read()
+    except FileNotFoundError:
+        return HTMLResponse("Facets UI not built. Please run npm run build in frontend.", status_code=500)
+
+    facets_data = _get_facets_with_previews(project_service)
+
+    initial_state = {
+        "view": "index",
+        "project_name": project_info.name,
+        "facets": facets_data
+    }
+
+    html = html.replace("<!-- INITIAL_STATE_PLACEHOLDER -->", f"<script>window.__INITIAL_STATE__ = {json.dumps(initial_state)};</script>")
+    html = html.replace('href="./', f'href="/{project_info.name}/')
+    html = html.replace('src="./', f'src="/{project_info.name}/')
+    return HTMLResponse(html)
+
+@router.get("/facets/{facet_name}/{feature_extractor_slug:path}/cluster/{cluster_id}/", response_class=HTMLResponse)
+def get_facets_cluster_detail(config: ConfigDep, project_info: ProjectInfoDep, project_service: ProjectServiceDep, facet_name: str, feature_extractor_slug: str, cluster_id: int):
+    if not config.enable_facets:
+        raise HTTPException(status_code=404, detail="Facets feature is disabled.")
+    if not isinstance(project_service, LocalWiseProjectService):
+        return HTMLResponse("<h1>Facets Unavailable</h1><p>The Facets interface is not currently supported while WISE is running in Aggregator (Multi-Shard) Mode. Please run WISE in Standalone mode to access this feature.</p>", status_code=400)
+
+    facets_html_path = config.project_dir.parent.parent.parent / "frontend" / "dist" / "facets.html"
+    if not facets_html_path.exists():
+        facets_html_path = Path(__file__).parent.parent.parent / "frontend" / "dist" / "facets.html"
+
+    try:
+        with open(facets_html_path, "r") as f:
+            html = f.read()
+    except FileNotFoundError:
+        return HTMLResponse("Facets UI not built. Please run npm run build in frontend.", status_code=500)
+
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables import facets_table, cluster_metadata_table, facet_metadata_table
+        facet = conn.execute(
+            sa.select(facets_table).where(
+                facets_table.c.name.ilike(facet_name),
+                facets_table.c.feature_extractor_id.contains(feature_extractor_slug)
+            )
+        ).first()
+
+        if not facet:
+            raise HTTPException(status_code=404, detail="Facet not found")
+
+        cluster_info = conn.execute(
+            sa.select(cluster_metadata_table).where(
+                cluster_metadata_table.c.cluster_id == cluster_id,
+                cluster_metadata_table.c.facet_id == facet.id
+            )
+        ).first()
+
+        if not cluster_info:
+            raise HTTPException(status_code=404, detail="Cluster not found")
+
+        cluster_size = conn.execute(
+            sa.select(sa.func.count()).select_from(facet_metadata_table).where(facet_metadata_table.c.cluster_id == cluster_info.cluster_id)
+        ).scalar()
+
+    initial_state = {
+        "view": "cluster",
+        "project_name": project_info.name,
+        "facet": {"id": facet.id, "name": facet.name, "feature_extractor_id": facet.feature_extractor_id},
+        "cluster": {"id": cluster_info.cluster_id, "cluster_label": cluster_info.cluster_label, "metadata": cluster_info.metadata_json, "size": cluster_size}
+    }
+
+    html = html.replace("<!-- INITIAL_STATE_PLACEHOLDER -->", f"<script>window.__INITIAL_STATE__ = {json.dumps(initial_state)};</script>")
+    html = html.replace('href="./', f'href="/{project_info.name}/')
+    html = html.replace('src="./', f'src="/{project_info.name}/')
+    return HTMLResponse(html)
+
+@router.get("/facets/{facet_name}/{feature_extractor_slug:path}/", response_class=HTMLResponse)
+def get_facets_cluster_overview(config: ConfigDep, project_info: ProjectInfoDep, project_service: ProjectServiceDep, facet_name: str, feature_extractor_slug: str):
+    if not isinstance(project_service, LocalWiseProjectService):
+        raise HTTPException(status_code=400, detail="Facets only supported on local projects")
+
+    facets_html_path = config.project_dir.parent.parent.parent / "frontend" / "dist" / "facets.html"
+    if not facets_html_path.exists():
+        facets_html_path = Path(__file__).parent.parent.parent / "frontend" / "dist" / "facets.html"
+
+    try:
+        with open(facets_html_path, "r") as f:
+            html = f.read()
+    except FileNotFoundError:
+        return HTMLResponse("Facets UI not built. Please run npm run build in frontend.", status_code=500)
+
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables import facets_table, cluster_metadata_table
+        facet = conn.execute(
+            sa.select(facets_table).where(
+                facets_table.c.name.ilike(facet_name),
+                facets_table.c.feature_extractor_id.contains(feature_extractor_slug)
+            )
+        ).first()
+
+        if not facet:
+            raise HTTPException(status_code=404, detail="Facet not found")
+
+        total_clusters = conn.execute(
+            sa.select(sa.func.count()).select_from(cluster_metadata_table).where(cluster_metadata_table.c.facet_id == facet.id)
+        ).scalar()
+
+    initial_state = {
+        "view": "facet",
+        "project_name": project_info.name,
+        "facet": {"id": facet.id, "name": facet.name, "feature_extractor_id": facet.feature_extractor_id},
+        "total_clusters": total_clusters
+    }
+
+    html = html.replace("<!-- INITIAL_STATE_PLACEHOLDER -->", f"<script>window.__INITIAL_STATE__ = {json.dumps(initial_state)};</script>")
+    html = html.replace('href="./', f'href="/{project_info.name}/')
+    html = html.replace('src="./', f'src="/{project_info.name}/')
+    return HTMLResponse(html)
+
+@router.get("/api/facets")
+def get_facets_list_api(config: ConfigDep, project_service: ProjectServiceDep):
+    if not config.enable_facets:
+        raise HTTPException(status_code=404, detail="Facets feature is disabled.")
+    if not isinstance(project_service, LocalWiseProjectService):
+        raise HTTPException(status_code=400, detail="Facets only supported on local projects")
+    return _get_facets_with_previews(project_service)
+
+@router.get("/api/facets/{facet_name}/{feature_extractor_slug:path}/cluster/{cluster_id}/info")
+def get_facet_cluster_info_api(facet_name: str, feature_extractor_slug: str, cluster_id: int, project_service: ProjectServiceDep):
+    if not isinstance(project_service, LocalWiseProjectService):
+        return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables import facets_table, cluster_metadata_table, facet_metadata_table
+        facet = conn.execute(
+            sa.select(facets_table).where(
+                facets_table.c.name.ilike(facet_name),
+                facets_table.c.feature_extractor_id.contains(feature_extractor_slug)
+            )
+        ).first()
+        if not facet:
+            raise HTTPException(status_code=404, detail="Facet not found")
+        cluster_info = conn.execute(
+            sa.select(cluster_metadata_table).where(
+                cluster_metadata_table.c.cluster_id == cluster_id,
+                cluster_metadata_table.c.facet_id == facet.id
+            )
+        ).first()
+        if not cluster_info:
+            raise HTTPException(status_code=404, detail="Cluster not found")
+        cluster_size = conn.execute(
+            sa.select(sa.func.count()).select_from(facet_metadata_table).where(facet_metadata_table.c.cluster_id == cluster_info.cluster_id)
+        ).scalar()
+
+    return {
+        "id": cluster_info.cluster_id,
+        "cluster_label": cluster_info.cluster_label,
+        "metadata": cluster_info.metadata_json,
+        "size": cluster_size,
+        "facet": {"id": facet.id, "name": facet.name, "feature_extractor_id": facet.feature_extractor_id}
+    }
+
+@router.get("/api/facets/{facet_name}/{feature_extractor_slug:path}/info")
+def get_facet_info_api(config: ConfigDep, facet_name: str, feature_extractor_slug: str, project_service: ProjectServiceDep):
+    if not config.enable_facets:
+        raise HTTPException(status_code=404, detail="Facets feature is disabled.")
+    if not isinstance(project_service, LocalWiseProjectService):
+        raise HTTPException(status_code=400, detail="Facets only supported on local projects")
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables import facets_table, cluster_metadata_table
+        facet = conn.execute(
+            sa.select(facets_table).where(
+                facets_table.c.name.ilike(facet_name),
+                facets_table.c.feature_extractor_id.contains(feature_extractor_slug)
+            )
+        ).first()
+        if not facet:
+            raise HTTPException(status_code=404, detail="Facet not found")
+        total_clusters = conn.execute(
+            sa.select(sa.func.count()).select_from(cluster_metadata_table).where(cluster_metadata_table.c.facet_id == facet.id)
+        ).scalar()
+    return {
+        "id": facet.id, "name": facet.name, "feature_extractor_id": facet.feature_extractor_id,
+        "total_clusters": total_clusters
+    }
+
+@router.get("/api/facets/{facet_id}/clusters")
+def get_published_clusters(config: ConfigDep, facet_id: int, project_service: ProjectServiceDep, page: int = 1, page_size: int = 10):
+    if not config.enable_facets:
+        raise HTTPException(status_code=404, detail="Facets feature is disabled.")
+    if not isinstance(project_service, LocalWiseProjectService):
+        return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
+
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables import cluster_metadata_table, facet_metadata_table
+
+        # Paginated clusters
+        query = (
+            sa.select(cluster_metadata_table)
+            .select_from(
+                cluster_metadata_table.outerjoin(
+                    facet_metadata_table,
+                    cluster_metadata_table.c.cluster_id == facet_metadata_table.c.cluster_id
+                )
+            )
+            .where(cluster_metadata_table.c.facet_id == facet_id)
+            .group_by(
+                cluster_metadata_table.c.id,
+                cluster_metadata_table.c.cluster_id,
+                cluster_metadata_table.c.facet_id,
+                cluster_metadata_table.c.cluster_label,
+                cluster_metadata_table.c.metadata_json
+            )
+            .order_by(sa.func.count(facet_metadata_table.c.id).desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        clusters = conn.execute(query).fetchall()
+
+        total_clusters = conn.execute(
+            sa.select(sa.func.count()).select_from(cluster_metadata_table).where(cluster_metadata_table.c.facet_id == facet_id)
+        ).scalar()
+
+        if not clusters:
+            return {"clusters": [], "total": total_clusters}
+
+        cluster_ids = [c.cluster_id for c in clusters]
+
+        # Fetch vector assignments
+        assignments = conn.execute(
+            sa.select(facet_metadata_table).where(facet_metadata_table.c.cluster_id.in_(cluster_ids))
+        ).fetchall()
+
+    from collections import defaultdict
+    cluster_to_vectors = defaultdict(list)
+    for a in assignments:
+        cluster_to_vectors[a.cluster_id].append(a.vector_id)
+
+    # Limit to 9 representatives
+    import random
+    all_vector_ids = []
+    for c_id, vids in cluster_to_vectors.items():
+        if len(vids) > 100:
+            vids = random.sample(vids, 100)
+        cluster_to_vectors[c_id] = vids
+        all_vector_ids.extend(vids)
+
+    vector_info = {}
+    if all_vector_ids:
+        metadata_list = project_service.wise_project.get_vector_media_metadata_for_ids(all_vector_ids)
+        with project_service.wise_project.db_engine.connect() as conn:
+            from src.db.tables import facets_table
+            facet = conn.execute(sa.select(facets_table).where(facets_table.c.id == facet_id)).first()
+        ext_metadata_list = project_service.wise_project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, all_vector_ids)
+
+        for m, ext in zip(metadata_list, ext_metadata_list):
+            area = (ext.bbox.w * m.width) * (ext.bbox.h * m.height) if hasattr(ext, 'bbox') else 0
+            vector_info[m.id] = {
+                "media_id": m.media_id,
+                "timestamp": m.timestamp,
+                "bbox": {"x": ext.bbox.x, "y": ext.bbox.y, "w": ext.bbox.w, "h": ext.bbox.h} if hasattr(ext, 'bbox') else None,
+                "area": area
+            }
+
+    clusters_data = []
+    for c in clusters:
+        vids = cluster_to_vectors[c.cluster_id]
+        vids_info = [vector_info[vid] for vid in vids if vid in vector_info]
+        vids_info.sort(key=lambda x: x["area"], reverse=True)
+
+        reps = []
+        seen_media_ids = set()
+        for info in vids_info:
+            if info["media_id"] not in seen_media_ids:
+                reps.append(info)
+                seen_media_ids.add(info["media_id"])
+                if len(reps) == 9:
+                    break
+
+        if len(reps) < 9:
+            for info in vids_info:
+                if info not in reps:
+                    reps.append(info)
+                    if len(reps) == 9:
+                        break
+
+        clusters_data.append({
+            "id": c.cluster_id,
+            "cluster_label": c.cluster_label,
+            "metadata_json": c.metadata_json,
+            "size": len(vids),
+            "representative_faces": reps
+        })
+
+    return {"clusters": clusters_data, "total": total_clusters}
+
+@router.get("/api/facets/cluster/{cluster_id}/faces")
+def get_facets_cluster_faces(config: ConfigDep, cluster_id: int, project_service: ProjectServiceDep, page: int = 1, page_size: int = 50):
+    if not config.enable_facets:
+        raise HTTPException(status_code=404, detail="Facets feature is disabled.")
+    if not isinstance(project_service, LocalWiseProjectService):
+        return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
+
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables import facet_metadata_table, cluster_metadata_table, facets_table
+
+        assignments = conn.execute(
+            sa.select(facet_metadata_table).where(facet_metadata_table.c.cluster_id == cluster_id).offset((page - 1) * page_size).limit(page_size)
+        ).fetchall()
+        vector_ids = [a.vector_id for a in assignments]
+        if not vector_ids:
+            return []
+
+        cluster_row = conn.execute(sa.select(cluster_metadata_table).where(cluster_metadata_table.c.cluster_id == cluster_id)).first()
+        facet = conn.execute(sa.select(facets_table).where(facets_table.c.id == cluster_row.facet_id)).first()
+
+    # Get metadata from internal.db
+    metadata = project_service.wise_project.get_vector_media_metadata_for_ids(vector_ids)
+    ext_metadata = project_service.wise_project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, vector_ids)
+
+    results = []
+    for m, ext in zip(metadata, ext_metadata):
+        results.append({
+            "vector_id": m.id,
+            "media_id": m.media_id,
+            "filename": Path(m.path).name,
+            "timestamp": m.timestamp,
+            "bbox": {"x": ext.bbox.x, "y": ext.bbox.y, "w": ext.bbox.w, "h": ext.bbox.h} if hasattr(ext, 'bbox') else None
+        })
+    return results

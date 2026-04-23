@@ -70,7 +70,7 @@ class LocalWiseProjectService(WiseProjectService):
         if config.use_shots:
             if self.wise_project.num_shots == 0:
                 logger.warning('use_shots is set to True, but shots table is empty! Please make sure to populate the shots table before using this feature.')
-            
+
             shot_scales = self.wise_project.shot_scales()
             if shot_scales:
                 logger.info("shot_scale filter enabled with values =%s", shot_scales)
@@ -84,7 +84,7 @@ class LocalWiseProjectService(WiseProjectService):
                 logger.warning("No shot_scale values found in shots table!")
 
         self.shot_based_filters = shot_based_filters
-    
+
     @property
     def name(self) -> str:
         return self.wise_project.name
@@ -108,23 +108,24 @@ class LocalWiseProjectService(WiseProjectService):
             models=models,
             search_targets=self.get_active_search_targets(search_target_order),
             shot_based_filters=self.shot_based_filters,
+            enable_facets=self.config.enable_facets,
         )
-    
+
     def metadata(self, media_id: str):
         # Implement logic to retrieve metadata for a given media_id from local files
         metadata = self.wise_project.metadata(media_id)
         if metadata is None:
             raise MediaNotFoundException(f"Media with ID {media_id} not found")
-        
+
         return metadata
-    
+
     def thumbnail(self, media_id: str, timestamp: float, get_id_only:bool = False, highres: bool = False) -> bytes | int:
         # Implement logic to retrieve thumbnail for a given media_id and timestamp from local files
         thumbnail = self.wise_project.thumbnail(media_id, timestamp, get_id_only=get_id_only, highres=highres)
         if thumbnail is None:
             raise ThumbnailNotFoundException(f"Thumbnail for media ID {media_id} at timestamp {timestamp} not found")
         return thumbnail
-    
+
     def get_thumbnail_reader(self, thumbnails_to_send: int = 0):
         project = self.wise_project
         def _thumbnail_url(_m: VectorAndMediaMetadata):
@@ -148,10 +149,10 @@ class LocalWiseProjectService(WiseProjectService):
             return thumbs
 
         return inner
-    
+
     def related_vectors(self, vector_id: int) -> list:
         return self.wise_project.related_vectors(vector_id)
-    
+
     def featured_vectors_for_targets(self) -> dict[str, dict[str, list[int]]]:
         project_engine = self.wise_project.db_engine
         # Generate a list of random featured images for each modality and feature extractor
@@ -163,7 +164,7 @@ class LocalWiseProjectService(WiseProjectService):
                 for feature_extractor_id in search_targets[modality]:
                     if feature_extractor_id == 'wise/metadata':
                         continue
-                    
+
                     this_ids = get_featured_images(
                         conn,
                         modality,
@@ -216,7 +217,7 @@ class LocalWiseProjectService(WiseProjectService):
             raise ThumbnailNotFoundException(f"No thumbnails found for media {media_id}!")
 
         w, h = self.wise_project.thumbnail_size_for_media_id(media_id)
-        
+
         # Create storyboard
         num_columns = 10
         vtt = WebVTT()
@@ -240,7 +241,7 @@ class LocalWiseProjectService(WiseProjectService):
             )
 
         return vtt.content
-    
+
     def get_active_search_targets(
        self, search_target_order: list[str] | None = None
     ):
@@ -282,7 +283,7 @@ class LocalWiseProjectService(WiseProjectService):
         return self.wise_project.get_vector_media_metadata_for_ids(
             ids, _external_metadata_tables
         )
-    
+
     def get_vector_ext_metadata_for_ids(
         self, feature_extractor_id: str, ids: list[int]
     ) -> list[Any]:

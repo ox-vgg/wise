@@ -40,6 +40,7 @@ class ProjectInfo(BaseModel):
     models: dict[MediaType, list[str]]
     shot_based_filters: ShotBasedFilters | None = None
     search_targets: dict[MediaType, list[str]] = {}
+    enable_facets: bool = False
 
     def normalized(self) -> "ProjectInfo":
         """Return a copy with deterministic ordering for list fields."""
@@ -80,8 +81,9 @@ class ProjectInfo(BaseModel):
                     a.search_targets[media_type] = targets
 
             a.shot_based_filters = a.shot_based_filters or b.shot_based_filters
+            a.enable_facets = a.enable_facets or b.enable_facets
             return a
-        
+
         merged = reduce(merge_, info)
         merged.name = name
         return merged
@@ -95,7 +97,7 @@ class WiseProjectService(ABC):
     @abstractmethod
     def name(self) -> str:
         raise NotImplementedError
-    
+
     @property
     @abstractmethod
     def info(self) -> ProjectInfo:

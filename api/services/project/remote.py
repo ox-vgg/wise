@@ -37,14 +37,14 @@ class RemoteWiseProjectService(WiseProjectService):
     @cached_property
     def client(self):
         return httpx.AsyncClient(base_url=self.project_uri, timeout=30.0)
-    
+
     @cached_property
     def sync_client(self):
         return httpx.Client(base_url=self.project_uri, timeout=30.0)
     @property
     def name(self) -> str:
         return self.project_uri.strip('/').split("/")[-1]
-    
+
     @property
     def info(self) -> ProjectInfo:
         # Implement logic to retrieve project info from remote service
@@ -56,7 +56,7 @@ class RemoteWiseProjectService(WiseProjectService):
             raise ValueError("Failed to retrieve project info from remote service")
         # Parse and return ProjectInfo object
         return ProjectInfo.model_validate(data)
-    
+
     async def forward(self, full_path: str, request: Request):
         # see https://github.com/fastapi/fastapi/discussions/7382#discussioncomment-5136466
         url = httpx.URL(
@@ -75,12 +75,12 @@ class RemoteWiseProjectService(WiseProjectService):
             headers=rp_resp.headers,
             background=BackgroundTask(rp_resp.aclose),
         )
-    
+
     async def featured(
             self,
             media_type: MediaType,
-            feature_extractor_id: str, 
-            start: int, 
+            feature_extractor_id: str,
+            start: int,
             end: int,
             random_seed: int = 42,
         ):
@@ -103,7 +103,7 @@ class RemoteWiseProjectService(WiseProjectService):
         response = self.modify_response(response)
 
         return response
-    
+
     async def search(
             self,
             request: Request,
@@ -127,13 +127,13 @@ class RemoteWiseProjectService(WiseProjectService):
         response = self.modify_response(response)
 
         return response
-    
+
     async def search_with_feature(
             self,
             features: np.ndarray,
             search_in: MediaType,
-            feature_extractor_id: str, 
-            start: int = 0, 
+            feature_extractor_id: str,
+            start: int = 0,
             end: int = 20,
             thumbnails_to_send: int = 0,
             shot_scale: list[int] | None = None,
@@ -161,7 +161,7 @@ class RemoteWiseProjectService(WiseProjectService):
         response = self.modify_response(response)
 
         return response
-    
+
     async def related_vectors(self, vector_id: int) -> list[common.VectorInfo]:
         resp = await self.client.get(
             f"/related-vectors/{vector_id}",
@@ -187,11 +187,11 @@ class RemoteWiseProjectService(WiseProjectService):
         data = resp.json()
         if not data:
             raise ValueError("Failed to retrieve vectors from remote service")
-        
+
         arr_obj = common.NPArray.model_validate(data)  # validate the response
         vectors = arr_obj.to_array()
         return [np.expand_dims(x, axis=0) for x in vectors]
-        
+
     def modify_vector_info(self, vectors: list[common.VectorInfo]) -> list[common.VectorInfo]:
         for item in vectors:
             item.media_id = f"{self.name}/{item.media_id}"
@@ -208,7 +208,7 @@ class RemoteWiseProjectService(WiseProjectService):
         results.images = images
         results.vectors = self.modify_vector_info(results.vectors)
         return results
-        
+
     def modify_video_results(self, results: common.VideoResults | common.VideoAudioResults) -> common.VideoResults | common.VideoAudioResults:
         videos = {}
         for item in results.videos.values():
@@ -216,11 +216,11 @@ class RemoteWiseProjectService(WiseProjectService):
             item.timeline_hover_thumbnails = f"shard/{self.name}/{item.timeline_hover_thumbnails}"
             videos[item.id] = item
         results.videos = videos
-        
+
         results.unmerged_windows = self.modify_vector_info(results.unmerged_windows)
         results.merged_windows = self.modify_vector_info(results.merged_windows)
         return results
-        
+
     def modify_response(self, response: common.SearchResponse) -> common.SearchResponse:
         # Modify the response to adjust thumbnail URLs
         if response.image_results is not None:
@@ -228,12 +228,12 @@ class RemoteWiseProjectService(WiseProjectService):
 
         if response.video_results is not None:
             response.video_results = self.modify_video_results(response.video_results)
-            
+
         if response.video_audio_results is not None:
             response.video_audio_results = self.modify_video_results(response.video_audio_results)
-        
+
         return response
-    
+
     def get_thumbnail_reader(self):
         def _thumbnail_url(_m: VectorAndMediaMetadata):
             return f"shard/{self.name}/thumbnail?media_id={_m.media_id}&timestamp={_m.timestamp}"
@@ -246,9 +246,10 @@ class RemoteWiseProjectService(WiseProjectService):
             return thumbs
 
         return inner
-    
+
     @classmethod
     def get_info(cls, projects: dict[str, "RemoteWiseProjectService"], name: str):
         infos = [p.info for p in projects.values()]
         merged_info = ProjectInfo.reduce(name, infos)
+        merged_info.enable_facets = False
         return merged_info

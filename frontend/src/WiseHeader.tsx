@@ -338,7 +338,7 @@ const SearchExamples: React.FunctionComponent<SearchExamplesProps> = ({
     onFinish={onFormSubmit}
   >
     {
-      multimodalQueries.map(example => 
+      multimodalQueries.map(example =>
         <div className="wise-multimodal-example-query"
           onClick={() => handleExampleMultimodalQueryClick(example)}
           key={example.url}
@@ -559,7 +559,7 @@ const SearchDropdown = forwardRef<SearchDropdownRefAttributes, SearchDropdownPro
         {/* TODO remove this <br /> */}
         <br />
         {/* <Flex style={{marginBottom: 10, width: '100%'}}>
-          
+
           <span className="wise-spacer"></span>
           <Space>
             <Dropdown.Button
@@ -942,6 +942,11 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
             </Form>
           </Dropdown>
         </div>
+        {projectInfo.enable_facets && (
+          <div className="wise-header-row" style={{ marginLeft: '24px' }}>
+            <a href={import.meta.env.DEV ? '/facets.html' : `/${projectInfo.project_name}/facets/`} style={{ fontWeight: 500, fontSize: '16px', color: 'inherit' }}>Facets</a>
+          </div>
+        )}
         <span className="wise-spacer"></span>
       </div>
     </Header>
