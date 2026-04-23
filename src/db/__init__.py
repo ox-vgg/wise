@@ -76,7 +76,8 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 def _init(dburi: str, metadata_obj: MetaData, **kwargs) -> Engine:
     engine = create_engine(dburi, **kwargs)
-    metadata_obj.create_all(engine)
+    if "mode=ro" not in dburi:
+        metadata_obj.create_all(engine)
     return engine
 
 
