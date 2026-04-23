@@ -49,8 +49,10 @@ class ProjectInfo(BaseModel):
             media_type: sorted(model_list)
             for media_type, model_list in info.models.items()
         }
+        # Do not sort search_targets here, as their order is explicitly
+        # defined by config.search_target_order and sorted in the LocalProjectService.
         info.search_targets = {
-            media_type: sorted(targets)
+            media_type: targets
             for media_type, targets in info.search_targets.items()
         }
         return info
