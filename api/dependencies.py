@@ -67,7 +67,7 @@ def get_project_service(config: ConfigDep):
                     )
                 from src.wise_project import WiseProject
                 from .services.project import LocalWiseProjectService
-                project = WiseProject(project_path)
+                project = WiseProject(project_path, read_only=True)
                 project.load_search_indices(config.index_type, config.nprobe)
                 _project_service = LocalWiseProjectService(project, config)
 

@@ -74,12 +74,13 @@ class WiseProject:
 
 
     """
-    def __init__(self, project_dir: Path, *, create_project=False, **kwargs):
+    def __init__(self, project_dir: Path, *, create_project=False, read_only=False, **kwargs):
         self.project_dir = Path(project_dir)
         self.store_dir = self.project_dir / "store"
         self.media_dir = self.project_dir / "media"
         self.metadata_dir = self.project_dir / "metadata"
         self.media_type_list = ["image", "video", "audio"]
+        self.read_only = read_only
 
         if not self.project_dir.exists():
             if create_project:
@@ -109,6 +110,8 @@ class WiseProject:
         Return the SQLAlchemy URI for the thumbnails database.
 
         """
+        if self.read_only:
+            return f"{DB_SCHEME}/file:{self.project_dir.absolute()}/thumbs.db?mode=ro&uri=true"
         return f"{DB_SCHEME}/{self.project_dir.absolute()}/thumbs.db"
 
     @property
@@ -116,6 +119,8 @@ class WiseProject:
         """
         Return the SQLAlchemy URI for the main project database.
         """
+        if self.read_only:
+            return f"{DB_SCHEME}/file:{self.metadata_dir.absolute()}/internal.db?mode=ro&uri=true"
         return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
 
     @cached_property
