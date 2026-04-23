@@ -313,7 +313,7 @@ def get_related_vectors(_vector_id: int, project_service: ProjectServiceDep):
 
 def _get_facets_with_previews(project_service: LocalWiseProjectService):
     with project_service.wise_project.db_engine.connect() as conn:
-        from src.db.tables import facets_table, cluster_metadata_table, facet_metadata_table
+        from src.db.tables.facets import facets_table, cluster_metadata_table, facet_metadata_table
         facets = conn.execute(sa.select(facets_table)).fetchall()
 
         result = []
@@ -427,7 +427,7 @@ def get_facets_cluster_detail(config: ConfigDep, project_info: ProjectInfoDep, p
         return HTMLResponse("Facets UI not built. Please run npm run build in frontend.", status_code=500)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from src.db.tables import facets_table, cluster_metadata_table, facet_metadata_table
+        from src.db.tables.facets import facets_table, cluster_metadata_table, facet_metadata_table
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -520,7 +520,7 @@ def get_facet_cluster_info_api(facet_name: str, feature_extractor_slug: str, clu
     if not isinstance(project_service, LocalWiseProjectService):
         return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
     with project_service.wise_project.db_engine.connect() as conn:
-        from src.db.tables import facets_table, cluster_metadata_table, facet_metadata_table
+        from src.db.tables.facets import facets_table, cluster_metadata_table, facet_metadata_table
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -691,7 +691,7 @@ def get_facets_cluster_faces(config: ConfigDep, cluster_id: int, project_service
         return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from src.db.tables import facet_metadata_table, cluster_metadata_table, facets_table
+        from src.db.tables.facets import facet_metadata_table, cluster_metadata_table, facets_table
 
         assignments = conn.execute(
             sa.select(facet_metadata_table).where(facet_metadata_table.c.cluster_id == cluster_id).offset((page - 1) * page_size).limit(page_size)

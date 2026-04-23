@@ -22,7 +22,7 @@ from src.wise_project import WiseProject
 from src.data_models import MediaType, SourceCollectionType
 from scripts.explore.db import init_explore_db
 from scripts.explore.models import Facet, Cluster, Assignment, ClusterStatus, FacetMetadataSchema
-import src.db.tables as wise_tables
+import src.db.tables.facets as wise_tables
 import sqlalchemy as sa
 
 logging.basicConfig(level=logging.INFO)
@@ -558,7 +558,11 @@ def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):
         return {"status": "no reviewed clusters to publish"}
         
     internal_engine = app_state.project.db_engine
-    
+
+    # Ensure facet tables are created in internal.db before publishing
+    from src.db.base import facets_metadata_obj
+    facets_metadata_obj.create_all(internal_engine)
+
     with internal_engine.begin() as conn:
         # Sync facet to internal.db first
         existing_facet = conn.execute(

@@ -15,7 +15,7 @@
 ## limitations under the License.
 
 import sqlalchemy as sa
-from ..base import project_metadata_obj, thumbs_metadata_obj
+from ..base import project_metadata_obj, thumbs_metadata_obj, facets_metadata_obj
 from ...data_models import SourceCollectionType, MediaType, ModalityType
 
 source_collections_table = sa.Table(
@@ -108,36 +108,4 @@ shots_table = sa.Table(
     sa.Column("ts", sa.Float, nullable=False, index=True),
     sa.Column("te", sa.Float, nullable=False, index=True),
     sa.Column("shot_scale", sa.Integer, default=None, index=True),
-)
-
-facets_table = sa.Table(
-    "facets",
-    project_metadata_obj,
-    sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
-    sa.Column("name", sa.Unicode(255), nullable=False, unique=True),
-    sa.Column("feature_extractor_id", sa.Unicode(255), nullable=False),
-)
-
-facet_metadata_table = sa.Table(
-    "facet_metadata",
-    project_metadata_obj,
-    sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
-    sa.Column(
-        "vector_id",
-        sa.Integer,
-        sa.ForeignKey("vectors.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
-    ),
-    sa.Column("cluster_id", sa.Integer, nullable=False, index=True),
-)
-
-cluster_metadata_table = sa.Table(
-    "cluster_metadata",
-    project_metadata_obj,
-    sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
-    sa.Column("cluster_id", sa.Integer, nullable=False, index=True, unique=True),
-    sa.Column("facet_id", sa.Integer, sa.ForeignKey("facets.id", ondelete="CASCADE"), nullable=False, index=True),
-    sa.Column("cluster_label", sa.Unicode(255), nullable=False),
-    sa.Column("metadata_json", sa.JSON, nullable=False, default={}),
 )
