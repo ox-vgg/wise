@@ -129,12 +129,12 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
     app.include_router(setup_routers(config))
 
     app.mount(
-        f"/{config.project_dir.stem}/",
+        f"/{config.project_dir.name}/",
         StaticFiles(directory=theme_asset_dir, html=True),
         name="assets",
     )
     log_custom_format(
-        f"Open http://{config.listen_address}:{config.port}/{config.project_dir.stem}/ in your browser"
+        f"Open http://{config.listen_address}:{config.port}/{config.project_dir.name}/ in your browser"
     )
 
     return app
