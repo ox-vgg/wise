@@ -1,8 +1,23 @@
 import enum
 import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.types import TypeDecorator, BLOB
+import numpy as np
 
 Base = declarative_base()
+
+class NumpyArray(TypeDecorator):
+    impl = BLOB
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return value.astype(np.float32).tobytes()
+        return None
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            return np.frombuffer(value, dtype=np.float32)
+        return None
 
 class Facet(Base):
     __tablename__ = 'facets'
@@ -40,3 +55,10 @@ class Assignment(Base):
     cluster_id = sa.Column(sa.Integer, sa.ForeignKey('clusters.id', ondelete='CASCADE'), nullable=False, index=True)
     confidence_score = sa.Column(sa.Float, nullable=True)
     is_manual_override = sa.Column(sa.Boolean, nullable=False, default=False)
+
+class KnownFaceCluster(Base):
+    __tablename__ = 'known_face_clusters'
+    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    cluster_id = sa.Column(sa.Integer, sa.ForeignKey('clusters.id', ondelete='CASCADE'))
+    vector_id = sa.Column(sa.Integer, index=True)
+    centroid = sa.Column(NumpyArray, nullable=False)

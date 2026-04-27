@@ -3,7 +3,3 @@
 # Minimum face size in pixels (width, height)
 # Faces smaller than this will be excluded from clustering to reduce noise
 MIN_FACE_SIZE = (32, 32)
-
-# Similarity threshold for InsightFace features. 
-# Cosine similarity is used. Values > 0.4 usually represent the same person.
-FACE_SIMILARITY_THRESHOLD = 0.4

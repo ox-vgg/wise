@@ -451,6 +451,12 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         cluster_label = c.cluster_label if c.cluster_label else f"{facet.name} {c.id}"
         
         vids = cluster_to_vectors[c.id]
+
+        unique_media_count = 0
+        if vids:
+            media_metadata = app_state.project.get_vector_media_metadata_for_ids(vids)
+            unique_media_count = len(set(m.media_id for m in media_metadata))
+
         vids_info = [vector_info[vid] for vid in vids if vid in vector_info]
         vids_info.sort(key=lambda x: x["area"], reverse=True)
         
@@ -477,6 +483,7 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
             "status": c.status.value, 
             "size": size,
             "starred": c.is_starred,
+            "unique_media_count": unique_media_count,
             "representative_faces": reps
         })
         
@@ -513,6 +520,50 @@ def get_cluster_faces(project_name: str, cluster_id: int, page: int = 1, page_si
         })
     return results
 
+@app.get("/{project_name}/api/cluster/{cluster_id}/faces_by_media")
+def get_cluster_faces_by_media(project_name: str, cluster_id: int, db = Depends(get_db)):
+    if project_name != app_state.project.name:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    cluster = db.query(Cluster).filter_by(id=cluster_id).first()
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    facet = db.query(Facet).filter_by(id=cluster.facet_id).first()
+    if not facet:
+        raise HTTPException(status_code=500, detail="Parent facet not found for cluster.")
+
+    assignments = db.query(Assignment).filter_by(cluster_id=cluster_id).all()
+    vector_ids = [a.vector_id for a in assignments]
+
+    if not vector_ids:
+        return {}
+
+    # Get metadata from internal.db
+    metadata = app_state.project.get_vector_media_metadata_for_ids(vector_ids)
+    ext_metadata = app_state.project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, vector_ids)
+
+    # Group by media_id
+    grouped_faces = {}
+    for m, ext in zip(metadata, ext_metadata):
+        if m.media_id not in grouped_faces:
+            grouped_faces[m.media_id] = {
+                "filename": Path(m.path).name,
+                "faces": []
+            }
+
+        grouped_faces[m.media_id]["faces"].append({
+            "vector_id": m.id,
+            "timestamp": m.timestamp,
+            "bbox": {"x": ext.bbox.x, "y": ext.bbox.y, "w": ext.bbox.w, "h": ext.bbox.h} if hasattr(ext, 'bbox') else None
+        })
+
+    # Sort faces within each group by timestamp
+    for media_id in grouped_faces:
+        grouped_faces[media_id]["faces"].sort(key=lambda x: x["timestamp"])
+
+    return grouped_faces
+
 @app.put("/{project_name}/api/cluster/{cluster_id}")
 def update_cluster(project_name: str, cluster_id: int, update: ClusterUpdate, db = Depends(get_db)):
     if project_name != app_state.project.name:
@@ -528,6 +579,71 @@ def update_cluster(project_name: str, cluster_id: int, update: ClusterUpdate, db
     if update.status is not None:
         cluster.status = ClusterStatus(update.status)
         
+        if cluster.status == ClusterStatus.reviewed:
+            # Populate the known_face_clusters table
+            logger.info(f"Populating known-face-clusters for cluster {cluster_id}")
+            from scripts.explore.models import KnownFaceCluster
+            import faiss
+            import numpy as np
+            from src.data_models import ModalityType
+
+            # Get all vectors for this cluster
+            assignments = db.query(Assignment).filter_by(cluster_id=cluster_id).all()
+            vector_ids = [a.vector_id for a in assignments]
+
+            if vector_ids:
+                # First, get the facet to find the feature_extractor_id
+                facet = db.query(Facet).filter_by(id=cluster.facet_id).first()
+                if not facet:
+                    logger.error(f"Could not find parent facet for cluster {cluster_id}")
+                    raise HTTPException(status_code=500, detail="Parent facet not found for cluster.")
+
+                try:
+                    # Load the main FAISS index to reconstruct vectors
+                    logger.info("Loading FAISS index to reconstruct vectors for centroid calculation...")
+                    index_path = app_state.project.index_dir(facet.feature_extractor_id) / f"{ModalityType.VIDEO.value}-IndexFlatIP.faiss"
+                    if not index_path.exists():
+                        logger.error(f"Cannot populate known clusters: FAISS index not found at {index_path}")
+                        raise HTTPException(status_code=500, detail="FAISS index not found.")
+
+                    index = faiss.read_index(str(index_path))
+                    if not hasattr(index, 'reconstruct'):
+                        logger.error("Cannot populate known clusters: FAISS index does not support vector reconstruction.")
+                        raise HTTPException(status_code=500, detail="FAISS index does not support reconstruction.")
+
+                    logger.info(f"Reconstructing {len(vector_ids)} vectors for cluster {cluster_id}...")
+                    embeddings = np.array([index.reconstruct(int(vid)) for vid in vector_ids]).astype(np.float32)
+                    logger.info("Vector reconstruction successful.")
+
+                    if len(embeddings) > 0:
+                        logger.info("Calculating centroid...")
+                        centroid = np.mean(embeddings, axis=0)
+                        logger.info("Centroid calculation successful.")
+
+                        # Clear old entries and insert new ones
+                        logger.info(f"Updating known_face_clusters table for cluster {cluster_id}...")
+                        db.query(KnownFaceCluster).filter_by(cluster_id=cluster_id).delete()
+                        db.flush()
+
+                        new_known_clusters = []
+                        for vid in vector_ids:
+                            new_known_clusters.append(KnownFaceCluster(
+                                cluster_id=cluster_id,
+                                vector_id=vid,
+                                centroid=centroid
+                            ))
+                        db.bulk_save_objects(new_known_clusters)
+                        logger.info("Successfully updated known_face_clusters table.")
+                except Exception as e:
+                    logger.error(f"An unexpected error occurred while processing cluster {cluster_id} for review: {e}", exc_info=True)
+                    # Raise an HTTPException to provide feedback to the frontend
+                    raise HTTPException(status_code=500, detail=f"Failed to process reviewed cluster: {e}")
+
+        elif cluster.status == ClusterStatus.draft:
+            # If user reverts a cluster back to draft, remove it from known clusters
+            from scripts.explore.models import KnownFaceCluster
+            db.query(KnownFaceCluster).filter_by(cluster_id=cluster_id).delete()
+
     db.commit()
     return {"status": "success"}
 
@@ -542,6 +658,58 @@ def update_assignments(project_name: str, update: AssignmentUpdate, db = Depends
         
     db.commit()
     return {"status": "success"}
+
+class MergeClustersRequest(BaseModel):
+    primary_cluster_id: int
+    secondary_cluster_ids: List[int]
+    new_cluster_label: str
+
+@app.post("/{project_name}/api/clusters/merge")
+def merge_clusters(project_name: str, request: MergeClustersRequest, db = Depends(get_db)):
+    if project_name != app_state.project.name:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Verify primary cluster exists
+    primary_cluster = db.query(Cluster).filter_by(id=request.primary_cluster_id).first()
+    if not primary_cluster:
+        raise HTTPException(status_code=404, detail=f"Primary cluster with id {request.primary_cluster_id} not found.")
+
+    # Update assignments from secondary clusters to the primary one
+    db.query(Assignment).filter(Assignment.cluster_id.in_(request.secondary_cluster_ids)).update({
+        'cluster_id': request.primary_cluster_id
+    }, synchronize_session=False)
+
+    # Delete the now-empty secondary clusters
+    db.query(Cluster).filter(Cluster.id.in_(request.secondary_cluster_ids)).delete(synchronize_session=False)
+
+    # Update the primary cluster's label
+    primary_cluster.cluster_label = request.new_cluster_label
+
+    # After merging, the primary cluster is implicitly reviewed, so we should update its known_cluster entry
+    try:
+        logger.info(f"Updating known-face-clusters for merged cluster {primary_cluster.id}")
+        assignments = db.query(Assignment).filter_by(cluster_id=primary_cluster.id).all()
+        vector_ids = [a.vector_id for a in assignments]
+        if vector_ids:
+            facet = db.query(Facet).filter_by(id=primary_cluster.facet_id).first()
+            if facet:
+                index_path = app_state.project.index_dir(facet.feature_extractor_id) / f"{ModalityType.VIDEO.value}-IndexFlatIP.faiss"
+                if index_path.exists():
+                    index = faiss.read_index(str(index_path))
+                    if hasattr(index, 'reconstruct'):
+                        embeddings = np.array([index.reconstruct(int(vid)) for vid in vector_ids]).astype(np.float32)
+                        if len(embeddings) > 0:
+                            centroid = np.mean(embeddings, axis=0)
+                            db.query(KnownFaceCluster).filter_by(cluster_id=primary_cluster.id).delete()
+                            db.flush()
+                            new_known_clusters = [KnownFaceCluster(cluster_id=primary_cluster.id, vector_id=vid, centroid=centroid) for vid in vector_ids]
+                            db.bulk_save_objects(new_known_clusters)
+    except Exception as e:
+        logger.error(f"Failed to update known clusters after merge for cluster {primary_cluster.id}: {e}", exc_info=True)
+
+    db.commit()
+
+    return {"status": "success", "merged_into": request.primary_cluster_id}
 
 @app.post("/{project_name}/api/facet/{facet_id}/publish")
 def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):

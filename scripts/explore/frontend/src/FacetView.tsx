@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Tag, Button, Pagination, Spin, Select, message, Segmented, Tooltip } from 'antd';
-import { StarOutlined, StarFilled } from '@ant-design/icons';
+import { Card, Button, Pagination, Spin, Select, message, Modal, Tooltip, Typography, Form, Input, Segmented } from 'antd';
+import { PlusOutlined, CloseCircleFilled, MergeCellsOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 
 const FacetView: React.FC<{ state: any }> = ({ state }) => {
   const [clusters, setClusters] = useState<any[]>([]);
@@ -17,6 +17,19 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
   const [layout, setLayout] = useState('2x2');
   const [statusFilter, setStatusFilter] = useState('All');
   const [totalClusters, setTotalClusters] = useState(state.total_clusters);
+
+  const [mergeQueue, setMergeQueue] = useState<any[]>(() => {
+    const saved = sessionStorage.getItem(`merge_queue_${state.project_name}_${state.facet.id}`);
+    try { return saved ? JSON.parse(saved) : []; } catch (e) { return []; }
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(`merge_queue_${state.project_name}_${state.facet.id}`, JSON.stringify(mergeQueue));
+  }, [mergeQueue, state.project_name, state.facet.id]);
+
+  const [isMergeModalVisible, setIsMergeModalVisible] = useState(false);
+  const [primaryClusterId, setPrimaryClusterId] = useState<number | null>(null);
+  const [newClusterLabel, setNewClusterLabel] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -61,6 +74,57 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
     });
   };
 
+  const handleAddToMergeQueue = (cluster: any) => {
+    if (!mergeQueue.some(c => c.id === cluster.id)) {
+      setMergeQueue([...mergeQueue, cluster]);
+    }
+  };
+
+  const handleRemoveFromMergeQueue = (clusterId: number) => {
+    setMergeQueue(mergeQueue.filter(c => c.id !== clusterId));
+  };
+
+  const handleInitiateMerge = () => {
+    if (mergeQueue.length < 2) {
+      message.error('Please select at least two clusters to merge.');
+      return;
+    }
+    const largestCluster = mergeQueue.reduce((prev, current) => (prev.size > current.size) ? prev : current);
+    setPrimaryClusterId(largestCluster.id);
+    setNewClusterLabel(largestCluster.cluster_label || `Cluster ${largestCluster.id}`);
+    setIsMergeModalVisible(true);
+  };
+
+  const handleConfirmMerge = () => {
+    const secondary_cluster_ids = mergeQueue.filter(c => c.id !== primaryClusterId).map(c => c.id);
+    const payload = { primary_cluster_id: primaryClusterId, secondary_cluster_ids, new_cluster_label: newClusterLabel };
+
+    fetch(`/${state.project_name}/api/clusters/merge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(res => {
+      if (res.ok) {
+        message.success('Clusters merged successfully!');
+        setMergeQueue([]);
+        setIsMergeModalVisible(false);
+        setLoading(true);
+        fetch(`/${state.project_name}/api/facet/${state.facet.id}/clusters?page=${page}&page_size=${pageSize}&status_filter=${statusFilter}`)
+          .then(r => r.json()).then(d => {
+            if (Array.isArray(d)) {
+              setClusters(d);
+            } else {
+              setClusters(d.clusters);
+              setTotalClusters(d.total);
+            }
+            setLoading(false);
+          });
+      } else {
+        message.error('Failed to merge clusters.');
+      }
+    });
+  };
+
   const getSlug = (feature_extractor_id: string) => {
     const parts = feature_extractor_id.split('/');
     return parts.length > 1 ? parts[1] : feature_extractor_id;
@@ -79,7 +143,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
   const gridConfig = getGridLayout();
 
   return (
-    <div>
+    <div style={{ paddingBottom: mergeQueue.length > 0 ? '160px' : '0' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, alignItems: 'center', gap: '16px' }}>
         <Pagination 
           current={page} 
@@ -103,18 +167,22 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
           <Select.Option value="starred">Starred</Select.Option>
         </Select>
       </div>
+
       {loading ? <Spin /> : (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center' }}>
           {clusters.map((cluster: any) => (
             <Card 
               key={cluster.id} 
-              title={`${cluster.cluster_label} (${cluster.size} ${cluster.size === 1 ? 'instance' : 'instances'})`} 
+              title={`${cluster.cluster_label || `Cluster ${cluster.id}`} (${cluster.size} instance${cluster.size === 1 ? '' : 's'} in ${cluster.unique_media_count} ${cluster.unique_media_count === 1 ? 'video' : 'videos'})`}
               extra={
-                <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Tooltip title="Star this cluster so that its metadata can be updated in batch alongside all other starred clusters">
-                    <div style={{ cursor: 'pointer', fontSize: '20px' }} onClick={() => handleStarToggle(cluster.id, cluster.starred)}>
+                    <div style={{ cursor: 'pointer', fontSize: '20px' }} onClick={(e) => { e.stopPropagation(); handleStarToggle(cluster.id, cluster.starred); }}>
                       {cluster.starred ? <StarFilled style={{ color: '#fadb14' }} /> : <StarOutlined />}
                     </div>
+                  </Tooltip>
+                  <Tooltip title="Add to Merge Queue">
+                    <Button shape="circle" icon={<PlusOutlined />} onClick={(e) => { e.stopPropagation(); handleAddToMergeQueue(cluster); }} />
                   </Tooltip>
                 </div>
               }
@@ -171,6 +239,52 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
           ))}
         </div>
       )}
+
+      {mergeQueue.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#f0f2f5', padding: '16px 24px', boxShadow: '0 -2px 8px rgba(0,0,0,0.1)', zIndex: 1000 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography.Title level={4} style={{ margin: 0 }}>Merge Queue ({mergeQueue.length})</Typography.Title>
+            <div>
+              <Button onClick={() => setMergeQueue([])} style={{ marginRight: 8 }}>Clear</Button>
+              <Button type="primary" icon={<MergeCellsOutlined />} onClick={handleInitiateMerge}>Merge</Button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: 12, overflowX: 'auto', paddingBottom: 8 }}>
+            {mergeQueue.map(c => (
+              <Tooltip key={c.id} title={`${c.cluster_label || `Cluster ${c.id}`} (${c.size} instances)`}>
+                <Card size="small" style={{ flexShrink: 0, width: 200, position: 'relative' }}>
+                  {c.cluster_label || `Cluster ${c.id}`}
+                  <Button icon={<CloseCircleFilled />} size="small" shape="circle" style={{ position: 'absolute', top: 4, right: 4 }} onClick={() => handleRemoveFromMergeQueue(c.id)} />
+                </Card>
+              </Tooltip>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Modal
+        title="Confirm Cluster Merge"
+        open={isMergeModalVisible}
+        onOk={handleConfirmMerge}
+        onCancel={() => setIsMergeModalVisible(false)}
+        okText="Confirm Merge"
+      >
+        <p>Please select the primary cluster and confirm the new label.</p>
+        <Form layout="vertical">
+          <Form.Item label="Primary Cluster (to merge into)">
+            <Select value={primaryClusterId} onChange={val => {
+              setPrimaryClusterId(val);
+              const selected = mergeQueue.find(c => c.id === val);
+              if(selected) setNewClusterLabel(selected.cluster_label || `Cluster ${selected.id}`);
+            }}>
+              {mergeQueue.map(c => <Select.Option key={c.id} value={c.id}>{`${c.cluster_label || `Cluster ${c.id}`} (${c.size} instances)`}</Select.Option>)}
+            </Select>
+          </Form.Item>
+          <Form.Item label="New Cluster Label">
+            <Input value={newClusterLabel} onChange={e => setNewClusterLabel(e.target.value)} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

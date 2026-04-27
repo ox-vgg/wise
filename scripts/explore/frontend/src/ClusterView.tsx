@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Pagination, Spin, Select, message, Modal, Segmented, Typography, Input, Form } from 'antd';
+import { Card, Button, Spin, Collapse, Modal, Typography, Form, Input, Select, message, Segmented, Tooltip } from 'antd';
+import { EditOutlined, SaveOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 
-const VideoPlayerWithHighResPoster: React.FC<{ project_name: string, face: any }> = ({ project_name, face }) => {
-  const lowResUrl = `/${project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`;
-  const highResUrl = `/${project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}&high_res=true`;
-  const [poster, setPoster] = useState(lowResUrl);
+const VideoPlayerWithPoster: React.FC<{ project_name: string, face: any }> = ({ project_name, face }) => {
+  const [poster, setPoster] = useState(`/${project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`);
   const [hasPlayed, setHasPlayed] = useState(false);
 
   useEffect(() => {
-    setPoster(lowResUrl);
+    const highResUrl = `/${project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}&high_res=true`;
     const img = new Image();
     img.src = highResUrl;
     img.onload = () => setPoster(highResUrl);
-  }, [lowResUrl, highResUrl]);
+  }, [face.media_id, face.timestamp, project_name]);
 
   return (
     <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
@@ -25,7 +24,7 @@ const VideoPlayerWithHighResPoster: React.FC<{ project_name: string, face: any }
         onPlay={() => setHasPlayed(true)}
       />
       {face.bbox && !hasPlayed && (
-        <div
+        <div 
           style={{
             position: 'absolute',
             border: '2px solid yellow',
@@ -42,82 +41,46 @@ const VideoPlayerWithHighResPoster: React.FC<{ project_name: string, face: any }
 };
 
 const ClusterView: React.FC<{ state: any }> = ({ state }) => {
-  const [faces, setFaces] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
-  const [status, setStatus] = useState(state.cluster.status);
+  const [loading, setLoading] = useState(true);
   const [selectedFace, setSelectedFace] = useState<any>(null);
+  const [groupedFaces, setGroupedFaces] = useState<any>({});
 
-  // Metadata Panel State
   const [clusterLabel, setClusterLabel] = useState(state.cluster.cluster_label);
-  const [schema, setSchema] = useState<any[]>([]);
+  const [isEditingLabel, setIsEditingLabel] = useState(false);
+  const [status, setStatus] = useState(state.cluster.status);
   const [metadataJson, setMetadataJson] = useState<any>(state.cluster.metadata || {});
+  const [schema, setSchema] = useState<any[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [schemaForm] = Form.useForm();
 
   useEffect(() => {
-    setLoading(true);
-    fetch(`/${state.project_name}/api/cluster/${state.cluster.id}/faces?page=${page}&page_size=${pageSize}`)
+    fetch(`/${state.project_name}/api/cluster/${state.cluster.id}/faces_by_media`)
       .then(res => res.json())
       .then(data => {
-        setFaces(data);
+        setGroupedFaces(data);
         setLoading(false);
       });
-  }, [state.cluster.id, page, pageSize, state.project_name]);
 
-  useEffect(() => {
-    // Load Facet Metadata Schema
     fetch(`/${state.project_name}/api/facet/${state.facet.id}/schema`)
       .then(res => res.json())
-      .then(data => setSchema(data))
-      .catch(console.error);
-  }, [state.facet.id, state.project_name]);
+      .then(data => setSchema(data));
+  }, [state.cluster.id, state.project_name, state.facet.id]);
 
-  const handleStatusChange = (newStatus: string) => {
+  const handleSaveAll = () => {
+    const payload = {
+      cluster_label: clusterLabel,
+      status: status,
+      metadata_json: metadataJson
+    };
     fetch(`/${state.project_name}/api/cluster/${state.cluster.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus })
+      body: JSON.stringify(payload)
     }).then(res => {
-      if(res.ok) {
-        setStatus(newStatus);
-        message.success('Status updated');
-      }
-    });
-  };
-
-  const handleLabelChange = () => {
-    if (!clusterLabel.trim()) return;
-    fetch(`/${state.project_name}/api/cluster/${state.cluster.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cluster_label: clusterLabel.trim(), status: 'reviewed' })
-    }).then(res => {
-      if(res.ok) {
-        setStatus('reviewed');
-        message.success('Label updated and marked as reviewed');
+      if (res.ok) {
+        message.success('All changes saved successfully!');
       } else {
-        message.error('Failed to update label');
-      }
-    }).catch(() => message.error('Failed to update label'));
-  };
-
-  const handleMetadataChange = (key: string, value: any) => {
-    setMetadataJson({ ...metadataJson, [key]: value });
-  };
-
-  const handleMetadataSave = () => {
-    fetch(`/${state.project_name}/api/cluster/${state.cluster.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metadata_json: metadataJson, status: 'reviewed' })
-    }).then(res => {
-      if(res.ok) {
-        setStatus('reviewed');
-        message.success('Metadata updated and marked as reviewed');
-      } else {
-        message.error('Failed to save metadata');
+        message.error('Failed to save changes.');
       }
     });
   };
@@ -127,166 +90,100 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
       fetch(`/${state.project_name}/api/facet/${state.facet.id}/schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key_name: values.key_name, data_type: values.data_type })
-      }).then(async res => {
-        if(res.ok) {
-          const newField = await res.json();
-          setSchema([...schema, newField]);
-          setIsSchemaModalOpen(false);
-          schemaForm.resetFields();
-          message.success('Field added');
-        } else {
-          const data = await res.json();
-          message.error(data.detail || 'Failed to add field');
-        }
+        body: JSON.stringify(values)
+      }).then(res => res.json()).then(newField => {
+        setSchema([...schema, newField]);
+        setIsSchemaModalOpen(false);
+        schemaForm.resetFields();
       });
     });
   };
 
   return (
     <div>
-      {/* Metadata Panel */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontWeight: 'bold', width: '150px' }}>Cluster ID</span>
-            <span>{state.cluster.id}</span>
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            {isEditingLabel ? (
+              <Input
+                value={clusterLabel}
+                onChange={(e) => setClusterLabel(e.target.value)}
+                onPressEnter={() => setIsEditingLabel(false)}
+                style={{ fontSize: 24, width: 300 }}
+              />
+            ) : (
+              <Typography.Title level={2} style={{ margin: 0 }}>
+                {clusterLabel || `Cluster ${state.cluster.id}`}
+                <Tooltip title="Edit Label">
+                  <Button type="text" icon={<EditOutlined />} onClick={() => setIsEditingLabel(true)} />
+                </Tooltip>
+              </Typography.Title>
+            )}
+            <Segmented value={status} onChange={(val) => setStatus(val as string)} options={['draft', 'reviewed', 'published']} style={{ marginTop: 8 }} />
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontWeight: 'bold', width: '150px' }}>Cluster Label</span>
-            <Input
-              value={clusterLabel}
-              onChange={e => setClusterLabel(e.target.value)}
-              onBlur={handleLabelChange}
-              onPressEnter={handleLabelChange}
-              style={{ maxWidth: '400px' }}
-            />
+          <div style={{ flex: 1, marginLeft: 24, maxWidth: 600 }}>
+            <Form layout="vertical">
+              {schema.map(field => (
+                <Form.Item label={field.key_name} key={field.id}>
+                  <Input
+                    value={metadataJson[field.key_name] || ''}
+                    onChange={e => setMetadataJson({...metadataJson, [field.key_name]: e.target.value})}
+                  />
+                </Form.Item>
+              ))}
+            </Form>
+            <Button onClick={() => setIsSchemaModalOpen(true)}>Add Metadata Field</Button>
           </div>
-
-          {schema.map(field => (
-             <div key={field.key_name} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-               <span style={{ fontWeight: 'bold', width: '150px', textTransform: 'capitalize' }}>
-                 {field.key_name.replace(/_/g, ' ')}
-               </span>
-               <Input
-                 type={field.data_type === 'number' ? 'number' : field.data_type === 'date' ? 'date' : 'text'}
-                 value={metadataJson[field.key_name] || ''}
-                 onChange={e => handleMetadataChange(field.key_name, e.target.value)}
-                 onBlur={handleMetadataSave}
-                 onPressEnter={handleMetadataSave}
-                 style={{ maxWidth: '400px' }}
-                 placeholder={`Enter ${field.data_type}...`}
-               />
-             </div>
-          ))}
-
-          <div style={{ marginTop: '8px' }}>
-            <Button type="dashed" onClick={() => setIsSchemaModalOpen(true)}>
-               + Add Metadata Field
-            </Button>
+          <div>
+            <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveAll}>Save All Changes</Button>
           </div>
         </div>
       </Card>
 
-      <Card
-        title={
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Pagination
-              current={page}
-              onChange={(p, s) => { setPage(p); setPageSize(s); }}
-              onShowSizeChange={(current, size) => { setPageSize(size); setPage(1); }}
-              total={state.cluster.size}
-              pageSize={pageSize}
-              size="small"
-              style={{ margin: 0 }}
-            />
-          </div>
-        }
-        extra={
-          <>
-            <style>{`
-              .custom-segmented .ant-segmented-item-selected {
-                background-color: #bae0ff !important;
-                font-weight: 500;
-              }
-            `}</style>
-            <Segmented
-              className="custom-segmented"
-              value={status}
-              onChange={(val) => handleStatusChange(val as string)}
-              options={[
-                { label: 'Draft', value: 'draft' },
-                { label: 'Reviewed', value: 'reviewed' },
-                { label: 'Published', value: 'published' }
-              ]}
-            />
-          </>
-        }
-      >
+      <Card>
         {loading ? <Spin /> : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {faces.map((face, idx) => (
-              <Card key={idx} hoverable bodyStyle={{ padding: 0 }} onClick={() => setSelectedFace(face)}>
-                <div style={{ position: 'relative', width: 120, height: 120, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  <div style={{ position: 'relative', width: '100%' }}>
-                    <img
-                      src={`/${state.project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`}
-                      style={{ width: '100%', height: 'auto', display: 'block' }}
-                      alt="face"
-                      title={`Vector ID: ${face.vector_id}`}
-                    />
-                    {face.bbox && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          border: '2px solid yellow',
-                          left: `${face.bbox.x * 100}%`,
-                          top: `${face.bbox.y * 100}%`,
-                          width: `${face.bbox.w * 100}%`,
-                          height: `${face.bbox.h * 100}%`,
-                          pointerEvents: 'none'
-                        }}
-                      />
-                    )}
-                  </div>
+          <Collapse accordion>
+            {Object.entries(groupedFaces || {}).sort(([, a]: [string, any], [, b]: [string, any]) => b.faces.length - a.faces.length).map(([mediaId, mediaData]: [string, any]) => (
+              <Collapse.Panel header={`${mediaData.filename} (${mediaData.faces.length} instances)`} key={mediaId}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {mediaData.faces.map((face: any, idx: number) => (
+                      <Card key={idx} hoverable bodyStyle={{ padding: 0 }} onClick={() => setSelectedFace({ ...face, media_id: mediaId, filename: mediaData.filename })}>
+                        <div style={{ position: 'relative', width: 120, height: 120, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                          <div style={{ position: 'relative', width: '100%' }}>
+                            <img
+                              src={`/${state.project_name}/api/thumbnail?media_id=${mediaId}&timestamp=${face.timestamp}`}
+                              style={{ width: '100%', height: 'auto', display: 'block' }}
+                              alt="face"
+                              title={`Vector ID: ${face.vector_id}`}
+                            />
+                            {face.bbox && <div style={{ position: 'absolute', border: '2px solid yellow', left: `${face.bbox.x*100}%`, top: `${face.bbox.y*100}%`, width: `${face.bbox.w*100}%`, height: `${face.bbox.h*100}%`, pointerEvents: 'none' }} />}
+                          </div>
+                        </div>
+                      </Card>
+                  ))}
                 </div>
-              </Card>
+              </Collapse.Panel>
             ))}
-          </div>
+          </Collapse>
         )}
       </Card>
 
-      <Modal
-        title="Add New Metadata Field"
-        open={isSchemaModalOpen}
-        onOk={handleAddSchemaField}
-        onCancel={() => { setIsSchemaModalOpen(false); schemaForm.resetFields(); }}
-      >
+      <Modal open={!!selectedFace} onCancel={() => setSelectedFace(null)} footer={null} width={800} destroyOnClose title={selectedFace?.filename || "Video Frame Context"}>
+        {selectedFace && <VideoPlayerWithPoster project_name={state.project_name} face={selectedFace} />}
+      </Modal>
+      <Modal title="Add New Metadata Field" open={isSchemaModalOpen} onOk={handleAddSchemaField} onCancel={() => setIsSchemaModalOpen(false)}>
         <Form form={schemaForm} layout="vertical">
-          <Form.Item name="key_name" label="Field Name (e.g. reference_url)" rules={[{ required: true, message: 'Please enter a field name' }]}>
-            <Input placeholder="Enter field name (no spaces)" />
+          <Form.Item name="key_name" label="Field Name" rules={[{ required: true }]}>
+            <Input />
           </Form.Item>
-          <Form.Item name="data_type" label="Data Type" initialValue="string" rules={[{ required: true }]}>
+          <Form.Item name="data_type" label="Data Type" initialValue="text">
             <Select>
-              <Select.Option value="string">Text (String)</Select.Option>
+              <Select.Option value="text">Text</Select.Option>
               <Select.Option value="number">Number</Select.Option>
-              <Select.Option value="date">Date</Select.Option>
+              <Select.Option value="url">URL</Select.Option>
             </Select>
           </Form.Item>
         </Form>
-      </Modal>
-
-      <Modal
-        title={selectedFace?.filename || "Video Frame Context"}
-        open={!!selectedFace}
-        onCancel={() => setSelectedFace(null)}
-        footer={null}
-        width={800}
-        destroyOnClose
-      >
-        {selectedFace && <VideoPlayerWithPoster project_name={state.project_name} face={selectedFace} />}
       </Modal>
     </div>
   );
