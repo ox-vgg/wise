@@ -3,9 +3,10 @@ from pathlib import Path
 import logging
 import numpy as np
 import faiss
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, lil_matrix
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors import sort_graph_by_row_values
+import collections
 
 import sys
 import os
@@ -21,7 +22,7 @@ import sqlalchemy as sa
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int, similarity_threshold: float):
+def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int, fallback_similarity_threshold: float):
     logger.info(f"Loading WISE project from {project_dir}")
     project = WiseProject(project_dir)
     
@@ -47,115 +48,245 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
         logger.info("Loading known face clusters from database...")
         known_clusters_data = session.query(KnownFaceCluster).all()
         
-    known_vector_ids = {kc.vector_id for kc in known_clusters_data}
-    known_centroids = {}
-    if known_clusters_data:
-        for kc in known_clusters_data:
-            if kc.cluster_id not in known_centroids:
-                known_centroids[kc.cluster_id] = kc.centroid
-        logger.info(f"Loaded {len(known_vector_ids)} vectors from {len(known_centroids)} known clusters.")
+    known_vector_to_cluster = {kc.vector_id: kc.cluster_id for kc in known_clusters_data}
+    cluster_to_known_vectors = collections.defaultdict(list)
+    for kc in known_clusters_data:
+        cluster_to_known_vectors[kc.cluster_id].append(kc.vector_id)
 
-    logger.info("Filtering vectors by minimum face size...")
+    logger.info(f"Loaded {len(known_vector_to_cluster)} vectors from {len(cluster_to_known_vectors)} reviewed clusters.")
+
+    logger.info("Filtering ALL valid vectors by minimum face size...")
+    vector_metadata = {}
+    all_valid_vector_ids = set()
     with project.db_engine.connect() as conn:
         query = sa.text('''
-            SELECT v.id FROM vectors v
+            SELECT v.id, v.media_id, v.timestamp, (vmi.bbox_w * m.width), (vmi.bbox_h * m.height) 
+            FROM vectors v
             JOIN media m ON v.media_id = m.id
             JOIN vector_metadata_insightface vmi ON v.id = vmi.vector_id
-            WHERE (vmi.bbox_w * m.width) >= :min_w AND (vmi.bbox_h * m.height) >= :min_h
-              AND v.feature_extractor_id = :fe_id
+            WHERE v.feature_extractor_id = :fe_id
         ''')
-        valid_vector_ids = set(conn.execute(query, {"min_w": MIN_FACE_SIZE[0], "min_h": MIN_FACE_SIZE[1], "fe_id": feature_extractor_id}).scalars().all())
+        rows = conn.execute(query, {"fe_id": feature_extractor_id}).fetchall()
+        for row in rows:
+            vid, mid, ts, w, h = row[0], row[1], row[2], row[3], row[4]
+            vector_metadata[vid] = (mid, ts)
+            if w >= MIN_FACE_SIZE[0] and h >= MIN_FACE_SIZE[1]:
+                all_valid_vector_ids.add(vid)
 
-    unknown_vector_ids = valid_vector_ids - known_vector_ids
-    logger.info(f"Found {len(unknown_vector_ids)} unknown vectors to cluster.")
+    # Ensure all known vectors are included
+    all_vector_ids = list(all_valid_vector_ids.union(set(known_vector_to_cluster.keys())))
+    logger.info(f"Total vectors to cluster (known + unknown): {len(all_vector_ids)}")
 
-    if not unknown_vector_ids:
-        logger.info("No new vectors to cluster. Exiting.")
+    if not all_vector_ids:
+        logger.info("No vectors to cluster. Exiting.")
         return
 
     index_path = project.index_dir(feature_extractor_id) / f"{ModalityType.VIDEO.value}-IndexFlatIP.faiss"
     if not index_path.exists():
         logger.error(f"FAISS index not found at {index_path}")
-        logger.error("Please run the create-index.py script first.")
         return
 
-    logger.info(f"Loading existing FAISS index from {index_path}...")
+    logger.info(f"Loading FAISS index from {index_path}...")
     index = faiss.read_index(str(index_path))
 
     if not hasattr(index, 'reconstruct'):
-        logger.error("The existing FAISS index does not support vector reconstruction. Please rebuild it with a compatible index type (e.g., IndexIDMap2 or by adding vectors with their IDs).")
+        logger.error("The existing FAISS index does not support vector reconstruction.")
         return
 
-    logger.info("Reconstructing unknown vectors from FAISS index...")
-    loaded_unknown_ids = list(unknown_vector_ids)
-    unknown_embeddings = np.array([index.reconstruct(int(vid)) for vid in loaded_unknown_ids]).astype(np.float32)
+    logger.info("Reconstructing all valid vectors from FAISS index...")
+    # Doing this one-by-one is slow but safe for 1.3M if memory is a concern.
+    # With 300GB RAM, we could theoretically do index.reconstruct_n(0, index.ntotal) and slice it, 
+    # but let's stick to the robust method that matches the exact IDs we validated.
+    all_embeddings = np.array([index.reconstruct(int(vid)) for vid in all_vector_ids]).astype(np.float32)
+    faiss.normalize_L2(all_embeddings)
 
-    if len(unknown_embeddings) == 0:
-        logger.warning("No features found for unknown vectors.")
-        return
+    # --- 1. Automated Threshold Calibration ---
+    calibrated_eps = 1.0 - fallback_similarity_threshold
+    if len(cluster_to_known_vectors) > 0:
+        logger.info("Calibrating DBSCAN epsilon based on intra-cluster distances of reviewed clusters...")
+        intra_distances = []
+        local_vid_to_idx = {vid: idx for idx, vid in enumerate(all_vector_ids)}
         
-    faiss.normalize_L2(unknown_embeddings)
+        for cid, vids in cluster_to_known_vectors.items():
+            if len(vids) > 1:
+                indices = [local_vid_to_idx[vid] for vid in vids if vid in local_vid_to_idx]
+                if len(indices) > 1:
+                    cluster_embs = all_embeddings[indices]
+                    sim_matrix = np.dot(cluster_embs, cluster_embs.T)
+                    dists = 1.0 - sim_matrix[np.triu_indices(len(indices), k=1)]
+                    intra_distances.extend(dists)
 
-    logger.info("Building FAISS index for unknown vectors...")
-    dim = unknown_embeddings.shape[1]
-    index_unknowns = faiss.IndexFlatIP(dim)
-    index_unknowns.add(unknown_embeddings)
+        if intra_distances:
+            # 90th percentile ensures most valid intra-person variance is captured, while discarding extreme outliers
+            calibrated_eps = float(np.percentile(intra_distances, 90))
+            calibrated_eps = max(0.1, min(0.5, calibrated_eps))
+            logger.info(f"Calibration complete. Derived eps: {calibrated_eps:.4f} (Equivalent similarity: {1.0 - calibrated_eps:.4f})")
+        else:
+            logger.info("Not enough intra-cluster pairs to calibrate. Using fallback threshold.")
+
+    # --- 2. Graph Construction ---
+    logger.info("Building FAISS index for all vectors to compute KNN graph...")
+    dim = all_embeddings.shape[1]
+    index_all = faiss.IndexFlatIP(dim)
+    index_all.add(all_embeddings)
     
-    k_nn = min(k_neighbors, len(unknown_embeddings))
-    logger.info(f"Searching for {k_nn} nearest neighbors among unknown vectors...")
-    similarities, indices = index_unknowns.search(unknown_embeddings, k_nn)
+    k_nn = min(k_neighbors * 2, len(all_embeddings))
+    logger.info(f"Searching for {k_nn} nearest neighbors...")
+    similarities, knn_indices = index_all.search(all_embeddings, k_nn)
     
-    logger.info("Constructing sparse distance matrix for unknowns...")
+    logger.info("Constructing constraint-aware sparse distance matrix...")
+    n_samples = len(all_embeddings)
     distances = 1.0 - np.clip(similarities, -1.0, 1.0)
-    rows = np.repeat(np.arange(len(unknown_embeddings)), k_nn)
-    cols = indices.flatten()
-    mask = cols != -1
-    sparse_dist_matrix = csr_matrix((distances.flatten()[mask], (rows[mask], cols[mask])), shape=(len(unknown_embeddings), len(unknown_embeddings)))
-    sparse_dist_matrix = sort_graph_by_row_values(sparse_dist_matrix)
     
-    epsilon = 1.0 - similarity_threshold
-    logger.info(f"Clustering unknowns with DBSCAN (eps={epsilon:.3f})...")
-    dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='precomputed', n_jobs=-1)
-    draft_labels = dbscan.fit_predict(sparse_dist_matrix)
+    sparse_graph = lil_matrix((n_samples, n_samples), dtype=np.float32)
 
+    for i in range(n_samples):
+        for j, neighbor_idx in enumerate(knn_indices[i]):
+            if neighbor_idx != -1 and neighbor_idx != i:
+                sparse_graph[i, neighbor_idx] = distances[i, j]
+
+    # --- 3. Apply Constraints (Must-Link & Cannot-Link) ---
+    if known_vector_to_cluster:
+        logger.info("Injecting Must-Link and Cannot-Link constraints into the graph...")
+        idx_to_cluster_id = {}
+        for i, vid in enumerate(all_vector_ids):
+            if vid in known_vector_to_cluster:
+                idx_to_cluster_id[i] = known_vector_to_cluster[vid]
+
+        known_indices = list(idx_to_cluster_id.keys())
+        for i in range(len(known_indices)):
+            idx_a = known_indices[i]
+            cid_a = idx_to_cluster_id[idx_a]
+            for j in range(i + 1, len(known_indices)):
+                idx_b = known_indices[j]
+                cid_b = idx_to_cluster_id[idx_b]
+
+                if cid_a == cid_b:
+                    # Must-Link: Force a tiny epsilon distance
+                    sparse_graph[idx_a, idx_b] = 1e-6
+                    sparse_graph[idx_b, idx_a] = 1e-6
+                else:
+                    # Cannot-Link: Sever the edge
+                    sparse_graph[idx_a, idx_b] = 0.0
+                    sparse_graph[idx_b, idx_a] = 0.0
+
+    sparse_graph = sparse_graph.tocsr()
+    sparse_graph = sort_graph_by_row_values(sparse_graph)
+
+    # --- 4. Clustering ---
+    logger.info(f"Running DBSCAN on constrained graph (eps={calibrated_eps:.4f})...")
+    dbscan = DBSCAN(eps=calibrated_eps, min_samples=2, metric='precomputed', n_jobs=-1)
+    dbscan_labels = dbscan.fit_predict(sparse_graph)
+
+    # --- 5. Assignment & Label Resolution ---
+    logger.info("Resolving cluster assignments...")
     final_assignments = {}
-    if known_centroids:
-        logger.info("Building FAISS index for known cluster centroids...")
-        centroid_matrix = np.vstack(list(known_centroids.values())).astype(np.float32)
-        faiss.normalize_L2(centroid_matrix)
-        index_centroids = faiss.IndexFlatIP(dim)
-        index_centroids.add(centroid_matrix)
-        centroid_cluster_ids = list(known_centroids.keys())
+    label_to_vectors = collections.defaultdict(list)
+    for i, label in enumerate(dbscan_labels):
+        label_to_vectors[label].append(all_vector_ids[i])
 
-        logger.info("Searching for closest known cluster for each unknown vector...")
-        sims_to_known, closest_centroid_indices = index_centroids.search(unknown_embeddings, 1)
+    absorbed_count = 0
 
-        for i, unknown_vec_id in enumerate(loaded_unknown_ids):
-            closest_cluster_id = centroid_cluster_ids[closest_centroid_indices[i][0]]
-            similarity = sims_to_known[i][0]
-            if similarity >= similarity_threshold:
-                final_assignments[unknown_vec_id] = closest_cluster_id
-            else:
-                final_assignments[unknown_vec_id] = f"draft_{draft_labels[i]}"
-    else:
-        for i, unknown_vec_id in enumerate(loaded_unknown_ids):
-            final_assignments[unknown_vec_id] = f"draft_{draft_labels[i]}"
+    # Track how known clusters are distributed across DBSCAN labels
+    known_cid_to_dbscan_labels = collections.defaultdict(set)
+    dbscan_label_to_known_cids = collections.defaultdict(set)
+
+    for label, vids in label_to_vectors.items():
+        if label == -1:
+            for vid in vids:
+                if vid not in known_vector_to_cluster:
+                    final_assignments[vid] = "draft_-1"
+            continue
+
+        known_cids_in_cluster = {known_vector_to_cluster[vid] for vid in vids if vid in known_vector_to_cluster}
+
+        for cid in known_cids_in_cluster:
+            known_cid_to_dbscan_labels[cid].add(label)
+            dbscan_label_to_known_cids[label].add(cid)
+
+        if len(known_cids_in_cluster) == 0:
+            draft_label = f"draft_{label}"
+            for vid in vids:
+                final_assignments[vid] = draft_label
+        elif len(known_cids_in_cluster) == 1:
+            target_cid = list(known_cids_in_cluster)[0]
+            for vid in vids:
+                if vid not in known_vector_to_cluster:
+                    final_assignments[vid] = target_cid
+                    absorbed_count += 1
+        else:
+            logger.warning(f"DBSCAN label {label} merged multiple known identities: {known_cids_in_cluster}. Falling back.")
+            sorted_cids = sorted(list(known_cids_in_cluster))
+            boundary_label = f"uncertain_boundary_" + "_".join(map(str, sorted_cids))
+            for vid in vids:
+                if vid not in known_vector_to_cluster:
+                     final_assignments[vid] = boundary_label
+
+    # Analyze Fragmentation and Merges
+    fragmented_known_clusters = {cid: labels for cid, labels in known_cid_to_dbscan_labels.items() if len(labels) > 1}
+
+    # Identify unreviewed clusters that were merged because they share a DBSCAN label with a known cluster
+    # This logic is already handled implicitly by the absorption, but we want to quantify it.
+    # To quantify it perfectly against Iteration 1 is hard without storing Iteration 1's state.
+    # However, we CAN report how many distinct draft clusters the absorbed vectors WOULD have formed.
+    # Since we can't easily do that retroactively, let's report the structural changes we CAN see.
 
     logger.info("Saving new cluster assignments to explore.db...")
+
+    cluster_to_final_vids = collections.defaultdict(list)
+    for vid, assigned_label in final_assignments.items():
+        cluster_to_final_vids[assigned_label].append(vid)
+
     with SessionLocal() as session:
-        new_draft_labels = {val for val in final_assignments.values() if isinstance(val, str) and val.startswith('draft_')}
+        new_draft_labels = {val for val in final_assignments.values() if isinstance(val, str) and val.startswith(('draft_', 'uncertain_boundary_'))}
         label_to_cluster_id = {}
         for label in new_draft_labels:
-            is_noise = (label == "draft_-1")
-            cluster = Cluster(facet_id=facet_id, cluster_label="Noise" if is_noise else "", status=ClusterStatus.draft)
+            feedbacks = []
+            if label.startswith('uncertain_boundary_'):
+                feedbacks.append("Uncertain Boundary")
+
+            machine_feedback_str = ", ".join(feedbacks) if feedbacks else None
+
+            if label.startswith('draft_'):
+                is_noise = (label == "draft_-1")
+                cluster = Cluster(facet_id=facet_id, cluster_label="Noise" if is_noise else "", status=ClusterStatus.draft, machine_feedback=machine_feedback_str)
+            elif label.startswith('uncertain_boundary_'):
+                cluster = Cluster(facet_id=facet_id, cluster_label=label, status=ClusterStatus.draft, machine_feedback=machine_feedback_str)
+
             session.add(cluster)
             session.flush()
             label_to_cluster_id[label] = cluster.id
+
+        # Update feedback on existing known clusters
+        for cid in known_cid_to_dbscan_labels.keys():
+            feedbacks = []
+            if cid in fragmented_known_clusters:
+                feedbacks.append("Fragmented Ground Truth")
+
+            machine_feedback_str = ", ".join(feedbacks) if feedbacks else None
+            session.query(Cluster).filter_by(id=cid).update({"machine_feedback": machine_feedback_str})
             
+
+        # Build the set of IDs of known clusters that received new assignments
+        known_cids_receiving_vectors = {
+            assigned_label for assigned_label in final_assignments.values()
+            if isinstance(assigned_label, int)
+        }
+
+        # Only query existing assignments for known clusters involved in this iteration
+        existing_assignments = set()
+        if known_cids_receiving_vectors:
+            existing_pairs = session.query(Assignment.vector_id, Assignment.cluster_id).filter(
+                Assignment.cluster_id.in_(list(known_cids_receiving_vectors))
+            ).all()
+            existing_assignments = set(existing_pairs)
+
         assignments_to_insert = []
         for vec_id, assigned_label in final_assignments.items():
             cluster_id = label_to_cluster_id[assigned_label] if isinstance(assigned_label, str) else assigned_label
-            assignments_to_insert.append(Assignment(vector_id=int(vec_id), cluster_id=cluster_id))
+            # Only insert if this exact assignment doesn't already exist
+            if (int(vec_id), int(cluster_id)) not in existing_assignments:
+                assignments_to_insert.append(Assignment(vector_id=int(vec_id), cluster_id=cluster_id))
             
         session.bulk_save_objects(assignments_to_insert)
         session.commit()
@@ -164,15 +295,40 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
     for assigned_label in final_assignments.values():
         if isinstance(assigned_label, int):
             all_assigned_cluster_ids.add(assigned_label)
-    logger.info(f"Total unique clusters involved in this iteration: {len(all_assigned_cluster_ids)}")
-    logger.info("Iterative clustering completed successfully.")
+
+    logger.info(f"Summary:")
+    logger.info(f" - Unknown vectors absorbed into reviewed clusters: {absorbed_count}")
+    logger.info(f" - Total unique draft clusters created: {len(label_to_cluster_id)}")
+
+    with SessionLocal() as session:
+        all_clusters = session.query(Cluster).filter(Cluster.id.in_(list(known_cid_to_dbscan_labels.keys()))).all()
+        cid_to_label = {c.id: c.cluster_label for c in all_clusters}
+
+    logger.info(f" - Reviewed Cluster Survival & Fragmentation:")
+    survived_intact = 0
+    fragmented = 0
+    for cid, labels in known_cid_to_dbscan_labels.items():
+        label_name = cid_to_label.get(cid, f"Cluster {cid}")
+        if -1 in labels: labels.remove(-1) # Ignore noise fragments
+
+        if len(labels) <= 1:
+            survived_intact += 1
+        else:
+            fragmented += 1
+            logger.info(f"     * '{label_name}' (ID {cid}) was fragmented across {len(labels)} internal DBSCAN groups.")
+
+    logger.info(f"     * {survived_intact} reviewed clusters formed cohesive, unbroken groups.")
+    if fragmented > 0:
+        logger.warning(f"     * {fragmented} reviewed clusters fragmented. Consider loosening --similarity-threshold or adding more examples.")
+
+    logger.info("Semi-supervised iterative clustering completed successfully.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Perform iterative face clustering using existing reviewed clusters as seeds.")
+    parser = argparse.ArgumentParser(description="Perform semi-supervised face clustering using existing reviewed clusters as constraints.")
     parser.add_argument("--project-dir", type=str, required=True, help="WISE project directory")
     parser.add_argument("--feature-extractor-id", type=str, default="deepinsight/insightface/buffalo_l/_unknown", help="Feature extractor ID for face embeddings.")
     parser.add_argument("--k-neighbors", type=int, default=50, help="Number of nearest neighbors to build the sparse graph for DBSCAN.")
-    parser.add_argument("--similarity-threshold", type=float, default=0.7, help="Cosine similarity threshold for a vector to be absorbed into a known cluster or for DBSCAN's epsilon.")
+    parser.add_argument("--similarity-threshold", type=float, default=0.7, help="Fallback cosine similarity threshold if automatic calibration fails.")
     args = parser.parse_args()
     
     cluster_faces(Path(args.project_dir), args.feature_extractor_id, args.k_neighbors, args.similarity_threshold)

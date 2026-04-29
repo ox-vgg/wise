@@ -45,6 +45,7 @@ class Cluster(Base):
     cluster_label = sa.Column(sa.String(255), nullable=True)
     metadata_json = sa.Column(sa.JSON, nullable=False, default={})
     status = sa.Column(sa.Enum(ClusterStatus), nullable=False, default=ClusterStatus.draft)
+    machine_feedback = sa.Column(sa.String(255), nullable=True)
     is_starred = sa.Column(sa.Boolean, nullable=False, default=False)
 
 class Assignment(Base):

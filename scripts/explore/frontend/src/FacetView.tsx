@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button, Pagination, Spin, Select, message, Modal, Tooltip, Typography, Form, Input, Segmented } from 'antd';
-import { PlusOutlined, CloseCircleFilled, MergeCellsOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
+import { PlusOutlined, CloseCircleFilled, MergeCellsOutlined, StarFilled, StarOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 
 const FacetView: React.FC<{ state: any }> = ({ state }) => {
   const [clusters, setClusters] = useState<any[]>([]);
@@ -16,6 +16,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
   const [pageSize, setPageSize] = useState(10);
   const [layout, setLayout] = useState('2x2');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [machineFeedbackFilter, setMachineFeedbackFilter] = useState('All');
   const [totalClusters, setTotalClusters] = useState(state.total_clusters);
 
   const [mergeQueue, setMergeQueue] = useState<any[]>(() => {
@@ -33,7 +34,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/${state.project_name}/api/facet/${state.facet.id}/clusters?page=${page}&page_size=${pageSize}&status_filter=${statusFilter}`)
+    fetch(`/${state.project_name}/api/facet/${state.facet.id}/clusters?page=${page}&page_size=${pageSize}&status_filter=${statusFilter}&machine_feedback=${machineFeedbackFilter}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -44,7 +45,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
         }
         setLoading(false);
       });
-  }, [state.facet.id, page, pageSize, statusFilter, state.project_name]);
+  }, [state.facet.id, page, pageSize, statusFilter, machineFeedbackFilter, state.project_name]);
 
   const handleStatusChange = (clusterId: number, newStatus: string) => {
     fetch(`/${state.project_name}/api/cluster/${clusterId}`, {
@@ -109,7 +110,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
         setMergeQueue([]);
         setIsMergeModalVisible(false);
         setLoading(true);
-        fetch(`/${state.project_name}/api/facet/${state.facet.id}/clusters?page=${page}&page_size=${pageSize}&status_filter=${statusFilter}`)
+        fetch(`/${state.project_name}/api/facet/${state.facet.id}/clusters?page=${page}&page_size=${pageSize}&status_filter=${statusFilter}&machine_feedback=${machineFeedbackFilter}`)
           .then(r => r.json()).then(d => {
             if (Array.isArray(d)) {
               setClusters(d);
@@ -166,16 +167,57 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
           <Select.Option value="published">Published</Select.Option>
           <Select.Option value="starred">Starred</Select.Option>
         </Select>
+        <span style={{ marginLeft: 16 }}>
+          Machine Feedback
+          <Tooltip title={
+            <div style={{ fontSize: '12px' }}>
+              <p><b>Uncertain Boundary:</b> The algorithm found ambiguous connections between known identities here. Needs manual review.</p>
+              <p><b>Fragmented Ground Truth:</b> The algorithm disagrees with a 'Reviewed' cluster and believes it contains multiple distinct people.</p>
+            </div>
+          }>
+            <QuestionCircleOutlined style={{ marginLeft: 4, cursor: 'help' }} />
+          </Tooltip>:
+        </span>
+        <Select value={machineFeedbackFilter} onChange={(val) => { setMachineFeedbackFilter(val); setPage(1); }} style={{ width: 220 }}>
+          <Select.Option value="All">All Feedbacks</Select.Option>
+          <Select.Option value="Uncertain Boundary">Uncertain Boundary</Select.Option>
+          <Select.Option value="Fragmented Ground Truth">Fragmented Ground Truth</Select.Option>
+        </Select>
       </div>
 
-      {loading ? <Spin /> : (
+        {loading ? <Spin /> : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center' }}>
           {clusters.map((cluster: any) => (
             <Card 
               key={cluster.id} 
-              title={`${cluster.cluster_label || `Cluster ${cluster.id}`} (${cluster.size} instance${cluster.size === 1 ? '' : 's'} in ${cluster.unique_media_count} ${cluster.unique_media_count === 1 ? 'video' : 'videos'})`}
+              title={
+                <div>
+                  {cluster.cluster_label || `Cluster ${cluster.id}`} 
+                  <div style={{ fontSize: '12px', fontWeight: 'normal', color: '#888' }}>
+                    ({cluster.size} instances in {cluster.unique_media_count} videos)
+                  </div>
+                </div>
+              }
               extra={
                 <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {cluster.machine_feedback && (
+                    <Tooltip title={
+                      <div style={{ fontSize: '13px' }}>
+                        <strong>Machine Feedback:</strong>
+                        <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
+                          {cluster.machine_feedback.split(', ').map((feedback: string) => (
+                            <li key={feedback}>{feedback}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    }>
+                      <div style={{ cursor: 'help', fontSize: '18px', color: '#faad14', display: 'flex', alignItems: 'center' }}>
+                        <svg viewBox="64 64 896 896" focusable="false" data-icon="robot" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+                          <path d="M840 478c0-4.4-3.6-8-8-8h-36v-66c0-39.8-32.2-72-72-72h-74V224c0-35.3-28.7-64-64-64H438c-35.3 0-64 28.7-64 64v108h-74c-39.8 0-72 32.2-72 72v66h-36c-4.4 0-8 3.6-8 8v164c0 4.4 3.6 8 8 8h36v122c0 39.8 32.2 72 72 72h424c39.8 0 72-32.2 72-72V650h36c4.4 0 8-3.6 8-8V478zM438 232h148v100H438V232zm316 540H270V396h484v376zm-388-212a40 40 0 1 1 80 0 40 40 0 1 1-80 0zm292 0a40 40 0 1 1 80 0 40 40 0 1 1-80 0z"></path>
+                        </svg>
+                      </div>
+                    </Tooltip>
+                  )}
                   <Tooltip title="Star this cluster so that its metadata can be updated in batch alongside all other starred clusters">
                     <div style={{ cursor: 'pointer', fontSize: '20px' }} onClick={(e) => { e.stopPropagation(); handleStarToggle(cluster.id, cluster.starred); }}>
                       {cluster.starred ? <StarFilled style={{ color: '#fadb14' }} /> : <StarOutlined />}

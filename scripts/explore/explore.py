@@ -380,7 +380,7 @@ def get_facets(project_name: str, db = Depends(get_db)):
     return [{"id": f.id, "name": f.name, "feature_extractor_id": f.feature_extractor_id} for f in facets]
 
 @app.get("/{project_name}/api/facet/{facet_id}/clusters")
-def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int = 10, status_filter: str = "All", db = Depends(get_db)):
+def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int = 10, status_filter: str = "All", machine_feedback: str = "All", db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
         
@@ -389,6 +389,10 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         total_query = total_query.filter(Cluster.is_starred == True)
     elif status_filter != "All":
         total_query = total_query.filter(Cluster.status == ClusterStatus(status_filter))
+
+    if machine_feedback != "All":
+        total_query = total_query.filter(Cluster.machine_feedback.contains(machine_feedback))
+
     total_count = total_query.count()
         
     # Get paginated clusters sorted by number of faces (descending)
@@ -403,6 +407,9 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
     elif status_filter != "All":
         query = query.filter(Cluster.status == ClusterStatus(status_filter))
         
+    if machine_feedback != "All":
+        query = query.filter(Cluster.machine_feedback == machine_feedback)
+
     clusters_with_counts = (
         query.group_by(Cluster.id)
         .order_by(sa.func.count(Assignment.id).desc())
@@ -480,7 +487,8 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         clusters_data.append({
             "id": c.id, 
             "cluster_label": cluster_label, 
-            "status": c.status.value, 
+            "status": c.status.value,
+            "machine_feedback": c.machine_feedback,
             "size": size,
             "starred": c.is_starred,
             "unique_media_count": unique_media_count,

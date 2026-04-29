@@ -18,7 +18,9 @@ The resulting WISE project is stored in `/tmp/wise/wise-test/wise-project/wikime
 
 ## Face Facet
 A media collection can be explored using human faces based anchors as
-shown below.
+shown below. See [scripts/explore/README.md](../scripts/explore/README.md)
+for more details about the semi-supervised, iterative clustering approach
+to group face embeddings into distinct identities
 
 ```bash
 # 1. Install dependencies (assuming $HOME/wise/ contains WISE source)
@@ -29,7 +31,9 @@ pip install -r requirements.txt
 cd $HOME/wise/
 python3 scripts/explore/cluster_faces.py \
   --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
-  --feature-extractor-id "deepinsight/insightface/buffalo_l/_unknown"
+  --feature-extractor-id "deepinsight/insightface/buffalo_l/_unknown"\
+  --k-neighbors 50 \
+  --similarity-threshold 0.7
 
 # 3. Manually review the face clusters and set their status to "Reviewed"
 # if the cluster is well formed. Add other metadata such as "description"
@@ -46,7 +50,25 @@ python3 scripts/explore/explore.py \
   --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
   --port 10101
 
-# 4. Serve project with facets enabled
+# [Optional] 3b. Re-run the clustering algorithm to improve clusters based
+# on manually reviewed clusters.
+cd $HOME/wise/
+python3 scripts/explore/cluster_faces.py \
+  --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
+  --feature-extractor-id "deepinsight/insightface/buffalo_l/_unknown"\
+  --k-neighbors 50 \
+  --similarity-threshold 0.7
+
+# [Optional] 3c. Review updated face clusters and see if new face clusters
+# can be published.
+python3 scripts/explore/explore.py \
+  --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
+  --port 10101
+
+# 4. [Optional] Repeat Steps 3b and 3c as required.
+# See scripts/explore/README.md for more details about the iterative workflow
+
+# 5. Serve project with facets enabled
 ENABLE_FACETS=true PORT=10102 python3 serve.py \
   --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/
 ```
