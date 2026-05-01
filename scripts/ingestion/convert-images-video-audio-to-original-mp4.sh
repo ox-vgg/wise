@@ -14,6 +14,11 @@
 #   - Videos  -> re-encoded MP4 with yuv420p + faststart for web playback compatibility
 #
 # Output paths preserve relative structure and base filenames from FILELIST.
+#
+# CPU control:
+#   - MAX_JOBS controls parallel files processed via xargs (default: 16)
+#   - FFMPEG_THREADS controls ffmpeg threads per file (default: 4)
+#   - Approx max CPU threads used: MAX_JOBS * FFMPEG_THREADS
 
 start_time=$(date +%s)
 echo "Script started at: $(date '+%Y-%m-%d %H:%M:%S')"
@@ -30,6 +35,18 @@ FILELIST=$1
 INDIR=$2
 OUT_BASEDIR=$3
 OUTDIR="${OUT_BASEDIR}/"
+MAX_JOBS="${MAX_JOBS:-16}"
+FFMPEG_THREADS="${FFMPEG_THREADS:-4}"
+
+if ! [[ "$MAX_JOBS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: MAX_JOBS must be a positive integer, got: $MAX_JOBS" >&2
+    exit 1
+fi
+
+if ! [[ "$FFMPEG_THREADS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: FFMPEG_THREADS must be a positive integer, got: $FFMPEG_THREADS" >&2
+    exit 1
+fi
 
 mkdir -p "$OUTDIR"
 
@@ -67,8 +84,9 @@ process_file() {
             -loop 1 -framerate 2 \
             -i "$infile" \
             -frames:v 1 -r 2 \
-            -vf "format=yuv420p" \
+            -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" \
             -an \
+            -threads "$FFMPEG_THREADS" \
             -c:v libx264 -preset slow -crf 23 \
             -movflags +faststart \
             -f mp4 \
@@ -85,6 +103,7 @@ process_file() {
             -fflags +genpts+discardcorrupt -err_detect ignore_err \
             -i "$infile" \
             -vn \
+            -threads "$FFMPEG_THREADS" \
             -c:a aac -b:a 128k \
             -movflags +faststart \
             -f mp4 \
@@ -98,8 +117,9 @@ process_file() {
         if ! </dev/null ffmpeg -hide_banner -loglevel warning \
             -fflags +genpts+discardcorrupt -err_detect ignore_err \
             -i "$infile" \
-            -vf "format=yuv420p" \
+            -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" \
             -ac 2 \
+            -threads "$FFMPEG_THREADS" \
             -c:v libx264 -preset slow -crf 23 \
             -c:a aac -b:a 128k \
             -movflags +faststart \
@@ -115,9 +135,9 @@ process_file() {
 }
 
 export -f process_file
-export INDIR OUTDIR
+export INDIR OUTDIR FFMPEG_THREADS
 
-xargs -0 -n1 -P 16 bash -c 'process_file "$1"' _ < "$FILELIST"
+xargs -0 -n1 -P "$MAX_JOBS" bash -c 'process_file "$1"' _ < "$FILELIST"
 
 end_time=$(date +%s)
 echo "Script ended at:   $(date '+%Y-%m-%d %H:%M:%S')"
