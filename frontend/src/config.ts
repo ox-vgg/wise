@@ -20,7 +20,6 @@ type ConfigType = {
   NUM_PAGES_PER_REQUEST: number;
   FETCH_THUMBS: number;
   FETCH_TIMEOUT: number;
-  REPO_URL: string;
   WISE_OVERVIEW_CARD: {
     OVERVIEW?: string;
     ABOUT: string;
