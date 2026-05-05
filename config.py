@@ -76,6 +76,22 @@ class APIConfig(BaseSettings):
     # The file_path can either be just the filename (media.path) or
     # redirect_media_url_num_components from the end of the absolute path
     # i.e. (source_collection.location / media.path)
+    #
+    # The redirect_media_url_num_components controls the number of
+    # filepath parts to use.  A positive counts the number of elements
+    # from the filename, a negative counts from the root of the
+    # filepath.  For example:
+    #
+    #    Filepath                num_components = 3   num_components = -2
+    #    ---------------------   ------------------   -------------------
+    #    /srv/data/c/d/e.jpg     c/d/e.jpg            c/d/e.jpg
+    #    /srv/data/c/f.jpg       data/c/f.jpg         c/f.jpg
+    #    /srv/data/g/x/y/z.jpg   x/y/z.jpg            g/x/y/z.jpg
+    #
+    # So, if all your media have roughly the same number of elements
+    # in the source_collection path, use a negative number to remove
+    # it.  If instead, all you media have the same number of parts in
+    # the media.path, use a positive number.
     redirect_media_url_by_path: bool = False
     redirect_media_url_prefix: str = "."
     redirect_media_url_num_components: int = 1
@@ -172,15 +188,4 @@ class APIConfig(BaseSettings):
                 f"Local project does not exist or is not a directory: {self.project_dir}"
             )
 
-        return self
-
-    @model_validator(mode="after")
-    def check_redirect_config(self) -> Self:
-        if (
-            self.redirect_media_url_by_path
-            and self.redirect_media_url_num_components < 1
-        ):
-            raise ValueError(
-                "redirect_media_url_num_components must be greater than 0 when redirect_media_url_by_path is True"
-            )
         return self
