@@ -23,11 +23,11 @@ from typing import BinaryIO
 
 from .. import common
 from ..services.project import (
-    MediaNotFoundException, ThumbnailNotFoundException, LocalWiseProjectService
+    MediaNotFoundException, ThumbnailNotFoundException, LocalWiseProjectService, WiseProjectService
 )
 
 from src.data_models import MediaMetadata, MediaType, SourceCollectionType
-from fastapi import HTTPException, status, APIRouter, Request
+from fastapi import HTTPException, status, APIRouter, Request, Depends
 from fastapi.responses import (
     Response,
     FileResponse,
@@ -717,3 +717,61 @@ def get_facets_cluster_faces(config: ConfigDep, cluster_id: int, project_service
             "bbox": {"x": ext.bbox.x, "y": ext.bbox.y, "w": ext.bbox.w, "h": ext.bbox.h} if hasattr(ext, 'bbox') else None
         })
     return results
+
+@router.get("/api/facets/cluster/{cluster_id}/faces_by_media")
+async def get_published_cluster_faces_by_media(cluster_id: int, request: Request, project_service: ProjectServiceDep):
+    config = project_service.config
+    if not config.enable_facets:
+        raise HTTPException(status_code=404, detail="Facets feature is disabled.")
+    if not isinstance(project_service, LocalWiseProjectService):
+        return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
+
+    with project_service.wise_project.db_engine.connect() as conn:
+        from src.db.tables.facets import facet_metadata_table, cluster_metadata_table, facets_table
+
+        # 1. Verify cluster exists and get its facet
+        cluster_row = conn.execute(
+            sa.select(cluster_metadata_table).where(cluster_metadata_table.c.cluster_id == cluster_id)
+        ).first()
+
+        if not cluster_row:
+            return {}
+
+        facet = conn.execute(sa.select(facets_table).where(facets_table.c.id == cluster_row.facet_id)).first()
+
+        # 2. Get all assigned vectors
+        assignments = conn.execute(
+            sa.select(facet_metadata_table.c.vector_id)
+            .where(facet_metadata_table.c.cluster_id == cluster_id)
+        ).fetchall()
+
+        vector_ids = [a.vector_id for a in assignments]
+
+        if not vector_ids:
+            return {}
+
+    # 3. Get metadata from the main DB
+    metadata = project_service.wise_project.get_vector_media_metadata_for_ids(vector_ids)
+    ext_metadata = project_service.wise_project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, vector_ids)
+
+    # 4. Group by media_id
+    grouped_faces = {}
+    from pathlib import Path
+    for m, ext in zip(metadata, ext_metadata):
+        if m.media_id not in grouped_faces:
+            grouped_faces[m.media_id] = {
+                "filename": Path(m.path).name,
+                "faces": []
+            }
+
+        grouped_faces[m.media_id]["faces"].append({
+            "vector_id": m.id,
+            "timestamp": m.timestamp,
+            "bbox": {"x": ext.bbox.x, "y": ext.bbox.y, "w": ext.bbox.w, "h": ext.bbox.h} if hasattr(ext, 'bbox') else None
+        })
+
+    # Sort faces within each group by timestamp
+    for media_id in grouped_faces:
+        grouped_faces[media_id]["faces"].sort(key=lambda x: x["timestamp"])
+
+    return grouped_faces

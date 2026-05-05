@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Pagination, Spin, Descriptions, Modal } from 'antd';
+import { Card, Spin, Descriptions, Modal, Collapse } from 'antd';
 
 const VideoPlayerWithPoster: React.FC<{ project_name: string, face: any }> = ({ project_name, face }) => {
   const baseUrl = project_name ? `/${project_name}` : '';
@@ -34,21 +34,19 @@ const VideoPlayerWithPoster: React.FC<{ project_name: string, face: any }> = ({ 
 };
 
 const FacetsClusterDetailView: React.FC<{ state: any }> = ({ state }) => {
-  const [faces, setFaces] = useState<any[]>([]);
+  const [groupedFaces, setGroupedFaces] = useState<any>({});
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
   const [selectedFace, setSelectedFace] = useState<any>(null);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${state.project_name ? '/' + state.project_name : ''}/api/facets/cluster/${state.cluster.id}/faces?page=${page}&page_size=${pageSize}`)
+    fetch(`${state.project_name ? '/' + state.project_name : ''}/api/facets/cluster/${state.cluster.id}/faces_by_media`)
       .then(res => res.json())
       .then(data => {
-        setFaces(data);
+        setGroupedFaces(data);
         setLoading(false);
       });
-  }, [state.cluster.id, page, pageSize, state.project_name]);
+  }, [state.cluster.id, state.project_name]);
 
   return (
     <div>
@@ -74,51 +72,31 @@ const FacetsClusterDetailView: React.FC<{ state: any }> = ({ state }) => {
         </Card>
       )}
 
-      <Card
-        title={
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Pagination
-              current={page}
-              onChange={(p, s) => { setPage(p); setPageSize(s); }}
-              onShowSizeChange={(_, size) => { setPageSize(size); setPage(1); }}
-              total={state.cluster.size}
-              pageSize={pageSize}
-              size="small"
-              style={{ margin: 0 }}
-            />
-          </div>
-        }
-      >
+      <Card>
         {loading ? <Spin /> : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {faces.map((face, idx) => (
-              <Card key={idx} hoverable bodyStyle={{ padding: 0 }} onClick={() => setSelectedFace(face)}>
-                <div style={{ position: 'relative', width: 120, height: 120, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  <div style={{ position: 'relative', width: '100%' }}>
-                    <img
-                      src={`${state.project_name ? '/' + state.project_name : ''}/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`}
-                      style={{ width: '100%', height: 'auto', display: 'block' }}
-                      alt="face"
-                      title={`Vector ID: ${face.vector_id}`}
-                    />
-                    {face.bbox && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          border: '2px solid yellow',
-                          left: `${face.bbox.x * 100}%`,
-                          top: `${face.bbox.y * 100}%`,
-                          width: `${face.bbox.w * 100}%`,
-                          height: `${face.bbox.h * 100}%`,
-                          pointerEvents: 'none'
-                        }}
-                      />
-                    )}
-                  </div>
+          <Collapse accordion>
+            {Object.entries(groupedFaces || {}).sort(([, a]: [string, any], [, b]: [string, any]) => b.faces.length - a.faces.length).map(([mediaId, mediaData]: [string, any]) => (
+              <Collapse.Panel header={`${mediaData.filename} (${mediaData.faces.length} instances)`} key={mediaId}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {mediaData.faces.map((face: any, idx: number) => (
+                    <Card key={idx} hoverable bodyStyle={{ padding: 0 }} onClick={() => setSelectedFace({ ...face, media_id: mediaId, filename: mediaData.filename })}>
+                      <div style={{ position: 'relative', width: 120, height: 120, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                          <img
+                            src={`${state.project_name ? '/' + state.project_name : ''}/thumbnail?media_id=${mediaId}&timestamp=${face.timestamp}`}
+                            style={{ width: '100%', height: 'auto', display: 'block' }}
+                            alt="face"
+                            title={`Vector ID: ${face.vector_id}`}
+                          />
+                          {face.bbox && <div style={{ position: 'absolute', border: '2px solid yellow', left: `${face.bbox.x*100}%`, top: `${face.bbox.y*100}%`, width: `${face.bbox.w*100}%`, height: `${face.bbox.h*100}%`, pointerEvents: 'none' }} />}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              </Card>
+              </Collapse.Panel>
             ))}
-          </div>
+          </Collapse>
         )}
       </Card>
 
