@@ -5,7 +5,6 @@ const productionConfig = {
   NUM_PAGES_PER_REQUEST: 1, // Number of pages (each with having size PAGE_SIZE) to fetch in each API call
   FETCH_THUMBS: 1,
   FETCH_TIMEOUT: 60000, // Number of milliseconds to wait when fetching search results / featured images
-  REPO_URL: "https://gitlab.com/vgg/wise/wise",
   WISE_OVERVIEW_CARD: {
     OVERVIEW: `This audiovisual search engine is based on the <a href="https://www.robots.ox.ac.uk/~vgg/software/wise/">WISE</a> software.`,
     ABOUT: `
