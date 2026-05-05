@@ -45,7 +45,7 @@ python3 scripts/explore/cluster_faces.py \
 
 ```bash
 python3 scripts/explore/explore.py \
-   --project-dir /data/shared/home/adutta/d/wise/explore/wise-projects/wise-test-dataset/ \
+   --project-dir /data/wise-projects/wise-test-dataset/ \
    --port 10101
 ```
 

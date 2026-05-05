@@ -46,6 +46,7 @@ class Cluster(Base):
     metadata_json = sa.Column(sa.JSON, nullable=False, default={})
     status = sa.Column(sa.Enum(ClusterStatus), nullable=False, default=ClusterStatus.draft)
     machine_feedback = sa.Column(sa.String(255), nullable=True)
+    unique_media_count = sa.Column(sa.Integer, nullable=False, default=0)
     is_starred = sa.Column(sa.Boolean, nullable=False, default=False)
 
 class Assignment(Base):

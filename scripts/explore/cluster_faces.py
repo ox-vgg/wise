@@ -138,39 +138,49 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
     n_samples = len(all_embeddings)
     distances = 1.0 - np.clip(similarities, -1.0, 1.0)
     
-    sparse_graph = lil_matrix((n_samples, n_samples), dtype=np.float32)
+    # Vectorized edge extraction
+    rows_arr = np.repeat(np.arange(n_samples), k_nn)
+    cols_arr = knn_indices.flatten()
+    data_arr = distances.flatten()
 
-    for i in range(n_samples):
-        for j, neighbor_idx in enumerate(knn_indices[i]):
-            if neighbor_idx != -1 and neighbor_idx != i:
-                sparse_graph[i, neighbor_idx] = distances[i, j]
+    # Filter out invalid FAISS edges (-1) and self-loops
+    valid_mask = (cols_arr != -1) & (cols_arr != rows_arr)
+    rows_arr = rows_arr[valid_mask]
+    cols_arr = cols_arr[valid_mask]
+    data_arr = data_arr[valid_mask]
 
     # --- 3. Apply Constraints (Must-Link & Cannot-Link) ---
-    if known_vector_to_cluster:
-        logger.info("Injecting Must-Link and Cannot-Link constraints into the graph...")
-        idx_to_cluster_id = {}
-        for i, vid in enumerate(all_vector_ids):
-            if vid in known_vector_to_cluster:
-                idx_to_cluster_id[i] = known_vector_to_cluster[vid]
+    logger.info("Injecting Must-Link and Cannot-Link constraints into the graph...")
 
-        known_indices = list(idx_to_cluster_id.keys())
-        for i in range(len(known_indices)):
-            idx_a = known_indices[i]
-            cid_a = idx_to_cluster_id[idx_a]
-            for j in range(i + 1, len(known_indices)):
-                idx_b = known_indices[j]
-                cid_b = idx_to_cluster_id[idx_b]
+    # Map array index to cluster_id (-1 for unknown)
+    idx_to_cid_arr = np.full(n_samples, -1, dtype=np.int32)
+    local_vid_to_idx = {vid: idx for idx, vid in enumerate(all_vector_ids)}
 
-                if cid_a == cid_b:
-                    # Must-Link: Force a tiny epsilon distance
-                    sparse_graph[idx_a, idx_b] = 1e-6
-                    sparse_graph[idx_b, idx_a] = 1e-6
-                else:
-                    # Cannot-Link: Sever the edge
-                    sparse_graph[idx_a, idx_b] = 0.0
-                    sparse_graph[idx_b, idx_a] = 0.0
+    for vid, cid in known_vector_to_cluster.items():
+        if vid in local_vid_to_idx:
+            idx_to_cid_arr[local_vid_to_idx[vid]] = cid
 
-    sparse_graph = sparse_graph.tocsr()
+    cid_rows = idx_to_cid_arr[rows_arr]
+    cid_cols = idx_to_cid_arr[cols_arr]
+
+    # Cannot-Link Mask: KEEP edge if either node is unknown (-1) OR they belong to the SAME known cluster
+    keep_mask = (cid_rows == -1) | (cid_cols == -1) | (cid_rows == cid_cols)
+
+    rows = rows_arr[keep_mask].tolist()
+    cols = cols_arr[keep_mask].tolist()
+    data = data_arr[keep_mask].tolist()
+
+    # Must-Link: Connect all vectors in the same known cluster as a chain (requires only N edges, not N^2)
+    for cid, vids in cluster_to_known_vectors.items():
+        indices = [local_vid_to_idx[vid] for vid in vids if vid in local_vid_to_idx]
+        for k in range(len(indices) - 1):
+            idx_a = indices[k]
+            idx_b = indices[k+1]
+            rows.extend([idx_a, idx_b])
+            cols.extend([idx_b, idx_a])
+            data.extend([1e-6, 1e-6])
+
+    sparse_graph = csr_matrix((data, (rows, cols)), shape=(n_samples, n_samples))
     sparse_graph = sort_graph_by_row_values(sparse_graph)
 
     # --- 4. Clustering ---
@@ -245,13 +255,22 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
             if label.startswith('uncertain_boundary_'):
                 feedbacks.append("Uncertain Boundary")
 
+            # Calculate unique_media_count
+            media_ids = set()
+            for vid in cluster_to_final_vids[label]:
+                if vid in vector_metadata:
+                    mid, _ = vector_metadata[vid]
+                    media_ids.add(mid)
+
+            unique_media_count = len(media_ids)
+
             machine_feedback_str = ", ".join(feedbacks) if feedbacks else None
 
             if label.startswith('draft_'):
                 is_noise = (label == "draft_-1")
-                cluster = Cluster(facet_id=facet_id, cluster_label="Noise" if is_noise else "", status=ClusterStatus.draft, machine_feedback=machine_feedback_str)
+                cluster = Cluster(facet_id=facet_id, cluster_label="Noise" if is_noise else "", status=ClusterStatus.draft, machine_feedback=machine_feedback_str, unique_media_count=unique_media_count)
             elif label.startswith('uncertain_boundary_'):
-                cluster = Cluster(facet_id=facet_id, cluster_label=label, status=ClusterStatus.draft, machine_feedback=machine_feedback_str)
+                cluster = Cluster(facet_id=facet_id, cluster_label=label, status=ClusterStatus.draft, machine_feedback=machine_feedback_str, unique_media_count=unique_media_count)
 
             session.add(cluster)
             session.flush()
@@ -263,8 +282,21 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
             if cid in fragmented_known_clusters:
                 feedbacks.append("Fragmented Ground Truth")
 
+            # Calculate unique_media_count for known clusters
+            media_ids = set()
+            all_c_vids = cluster_to_known_vectors.get(cid, []) + cluster_to_final_vids.get(cid, [])
+            for vid in all_c_vids:
+                if vid in vector_metadata:
+                    mid, _ = vector_metadata[vid]
+                    media_ids.add(mid)
+
+            unique_media_count = len(media_ids)
+
             machine_feedback_str = ", ".join(feedbacks) if feedbacks else None
-            session.query(Cluster).filter_by(id=cid).update({"machine_feedback": machine_feedback_str})
+            session.query(Cluster).filter_by(id=cid).update({
+                "machine_feedback": machine_feedback_str,
+                "unique_media_count": unique_media_count
+            })
             
 
         # Build the set of IDs of known clusters that received new assignments

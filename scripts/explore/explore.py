@@ -423,27 +423,31 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         
     cluster_ids = [c.Cluster.id for c in clusters_with_counts]
     
-    # Fetch representative faces for each cluster efficiently
+    # Fetch assignments for each cluster efficiently
     assignments = db.query(Assignment).filter(Assignment.cluster_id.in_(cluster_ids)).all()
     from collections import defaultdict
     import random
     
-    cluster_to_vectors = defaultdict(list)
+    cluster_to_all_vectors = defaultdict(list)
     for a in assignments:
-        cluster_to_vectors[a.cluster_id].append(a.vector_id)
+        cluster_to_all_vectors[a.cluster_id].append(a.vector_id)
         
-    all_vector_ids = []
-    for c_id, vids in cluster_to_vectors.items():
+    all_sampled_vector_ids = []
+    cluster_to_sampled_vectors = {}
+
+    for c_id, vids in cluster_to_all_vectors.items():
         if len(vids) > 100:
-            vids = random.sample(vids, 100)
-        cluster_to_vectors[c_id] = vids
-        all_vector_ids.extend(vids)
+            sampled_vids = random.sample(vids, 100)
+        else:
+            sampled_vids = vids
+        cluster_to_sampled_vectors[c_id] = sampled_vids
+        all_sampled_vector_ids.extend(sampled_vids)
     
     vector_info = {}
-    if all_vector_ids:
-        metadata_list = app_state.project.get_vector_media_metadata_for_ids(all_vector_ids)
+    if all_sampled_vector_ids:
+        metadata_list = app_state.project.get_vector_media_metadata_for_ids(all_sampled_vector_ids)
         facet = db.query(Facet).filter_by(id=facet_id).first()
-        ext_metadata_list = app_state.project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, all_vector_ids)
+        ext_metadata_list = app_state.project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, all_sampled_vector_ids)
         for m, ext in zip(metadata_list, ext_metadata_list):
             area = (ext.bbox.w * m.width) * (ext.bbox.h * m.height) if hasattr(ext, 'bbox') else 0
             vector_info[m.id] = {
@@ -457,14 +461,10 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
     for c, size in clusters_with_counts:
         cluster_label = c.cluster_label if c.cluster_label else f"{facet.name} {c.id}"
         
-        vids = cluster_to_vectors[c.id]
+        sampled_vids = cluster_to_sampled_vectors.get(c.id, [])
+        unique_media_count = c.unique_media_count # READ FROM DB directly!
 
-        unique_media_count = 0
-        if vids:
-            media_metadata = app_state.project.get_vector_media_metadata_for_ids(vids)
-            unique_media_count = len(set(m.media_id for m in media_metadata))
-
-        vids_info = [vector_info[vid] for vid in vids if vid in vector_info]
+        vids_info = [vector_info[vid] for vid in sampled_vids if vid in vector_info]
         vids_info.sort(key=lambda x: x["area"], reverse=True)
         
         reps = []
@@ -693,8 +693,24 @@ def merge_clusters(project_name: str, request: MergeClustersRequest, db = Depend
     # Update the primary cluster's label
     primary_cluster.cluster_label = request.new_cluster_label
 
-    # After merging, the primary cluster is implicitly reviewed, so we should update its known_cluster entry
+    # Recalculate unique_media_count for the newly merged primary cluster
     try:
+        logger.info(f"Recalculating unique_media_count for merged cluster {primary_cluster.id}")
+        all_assignments = db.query(Assignment).filter_by(cluster_id=primary_cluster.id).all()
+        all_vector_ids = [a.vector_id for a in all_assignments]
+        if all_vector_ids:
+            chunk_size = 900
+            all_metadata = []
+            for i in range(0, len(all_vector_ids), chunk_size):
+                chunk = all_vector_ids[i:i + chunk_size]
+                all_metadata.extend(app_state.project.get_vector_media_metadata_for_ids(chunk))
+
+            unique_media_ids = {m.media_id for m in all_metadata}
+            primary_cluster.unique_media_count = len(unique_media_ids)
+    except Exception as e:
+        logger.error(f"Failed to recalculate unique_media_count after merge for cluster {primary_cluster.id}: {e}", exc_info=True)
+
+    # After merging, the primary cluster is implicitly reviewed, so we should update its known_cluster entry    try:
         logger.info(f"Updating known-face-clusters for merged cluster {primary_cluster.id}")
         assignments = db.query(Assignment).filter_by(cluster_id=primary_cluster.id).all()
         vector_ids = [a.vector_id for a in assignments]

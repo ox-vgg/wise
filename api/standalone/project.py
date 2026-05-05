@@ -480,7 +480,7 @@ def get_facets_cluster_overview(config: ConfigDep, project_info: ProjectInfoDep,
         return HTMLResponse("Facets UI not built. Please run npm run build in frontend.", status_code=500)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from src.db.tables import facets_table, cluster_metadata_table
+        from src.db.tables.facets import facets_table, cluster_metadata_table
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -556,7 +556,7 @@ def get_facet_info_api(config: ConfigDep, facet_name: str, feature_extractor_slu
     if not isinstance(project_service, LocalWiseProjectService):
         raise HTTPException(status_code=400, detail="Facets only supported on local projects")
     with project_service.wise_project.db_engine.connect() as conn:
-        from src.db.tables import facets_table, cluster_metadata_table
+        from src.db.tables.facets import facets_table, cluster_metadata_table
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -581,7 +581,7 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
         return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from src.db.tables import cluster_metadata_table, facet_metadata_table
+        from src.db.tables.facets import cluster_metadata_table, facet_metadata_table
 
         # Paginated clusters
         query = (
@@ -638,7 +638,7 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
     if all_vector_ids:
         metadata_list = project_service.wise_project.get_vector_media_metadata_for_ids(all_vector_ids)
         with project_service.wise_project.db_engine.connect() as conn:
-            from src.db.tables import facets_table
+            from src.db.tables.facets import facets_table
             facet = conn.execute(sa.select(facets_table).where(facets_table.c.id == facet_id)).first()
         ext_metadata_list = project_service.wise_project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, all_vector_ids)
 
