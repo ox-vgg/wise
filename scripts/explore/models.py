@@ -40,6 +40,11 @@ class ClusterStatus(enum.Enum):
 
 class Cluster(Base):
     __tablename__ = 'clusters'
+    __table_args__ = (
+        sa.Index('idx_clusters_size', 'size'),
+        sa.Index('idx_clusters_facet_status_size', 'facet_id', 'status', 'size'),
+        sa.Index('idx_clusters_facet_feedback_size', 'facet_id', 'machine_feedback', 'size'),
+    )
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     facet_id = sa.Column(sa.Integer, sa.ForeignKey('facets.id', ondelete='CASCADE'), nullable=False)
     cluster_label = sa.Column(sa.String(255), nullable=True)
@@ -47,6 +52,7 @@ class Cluster(Base):
     status = sa.Column(sa.Enum(ClusterStatus), nullable=False, default=ClusterStatus.draft)
     machine_feedback = sa.Column(sa.String(255), nullable=True)
     unique_media_count = sa.Column(sa.Integer, nullable=False, default=0)
+    size = sa.Column(sa.Integer, nullable=False, default=0)
     is_starred = sa.Column(sa.Boolean, nullable=False, default=False)
 
 class Assignment(Base):

@@ -35,9 +35,20 @@ def recompute_unique_media_count(project_dir: Path):
             logger.info("Column 'unique_media_count' not found. Adding it to the clusters table...")
             conn.execute(sa.text("ALTER TABLE clusters ADD COLUMN unique_media_count INTEGER NOT NULL DEFAULT 0;"))
             conn.commit()
-            logger.info("Column added successfully.")
+            logger.info("Column unique_media_count added successfully.")
+
+        has_size_column = False
+        for col in result:
+            if col[1] == 'size':
+                has_size_column = True
+                break
+        if not has_size_column:
+            logger.info("Column 'size' not found. Adding it to the clusters table...")
+            conn.execute(sa.text("ALTER TABLE clusters ADD COLUMN size INTEGER NOT NULL DEFAULT 0;"))
+            conn.commit()
+            logger.info("Column size added successfully.")
             
-    logger.info("Recomputing unique media counts...")
+    logger.info("Recomputing unique media counts and sizes...")
     
     with SessionLocal() as session:
         # 1. Fetch all assignments
@@ -71,13 +82,14 @@ def recompute_unique_media_count(project_dir: Path):
             if (i > 0) and (i % 90000 == 0):
                 logger.info(f"  Fetched metadata for {i}/{len(all_unique_vids_list)} vectors...")
 
-        # 3. Calculate unique counts in memory
-        logger.info("Calculating unique media counts in memory...")
+        # 3. Calculate unique counts and sizes in memory
+        logger.info("Calculating unique media counts and sizes in memory...")
         updates = []
         for cid, vids in cluster_to_vids.items():
             unique_media_ids = {vid_to_media_id[vid] for vid in vids if vid in vid_to_media_id}
             count = len(unique_media_ids)
-            updates.append({"id": cid, "unique_media_count": count})
+            size = len(vids)
+            updates.append({"id": cid, "unique_media_count": count, "size": size})
 
         # 4. Perform bulk update
         logger.info(f"Executing bulk update for {len(updates)} clusters...")

@@ -60,7 +60,14 @@ const FacetsClusterOverviewView: React.FC<{ state: any }> = ({ state }) => {
           {clusters.map((cluster: any) => (
             <Card
               key={cluster.id}
-              title={`${cluster.cluster_label} (${cluster.size} ${cluster.size === 1 ? 'instance' : 'instances'})`}
+              title={
+                <div>
+                  {cluster.cluster_label}
+                  <div style={{ fontSize: '12px', fontWeight: 'normal', color: '#888' }}>
+                    ({cluster.size} instance{cluster.size === 1 ? '' : 's'} in {cluster.unique_media_count || '?'} video{cluster.unique_media_count === 1 ? '' : 's'})
+                  </div>
+                </div>
+              }
               style={{ width: gridConfig.cardWidth, minWidth: 300, cursor: 'pointer' }}
               hoverable
               onClick={() => {

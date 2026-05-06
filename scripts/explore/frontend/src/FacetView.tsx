@@ -11,12 +11,17 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
     const p = params.get('page');
     return p ? parseInt(p, 10) : 1;
   };
+
+  const getInitialFilter = (param: string, defaultVal: string) => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(param) || defaultVal;
+  };
   
   const [page, setPage] = useState(getInitialPage());
   const [pageSize, setPageSize] = useState(10);
   const [layout, setLayout] = useState('2x2');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [machineFeedbackFilter, setMachineFeedbackFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(getInitialFilter('status_filter', 'All'));
+  const [machineFeedbackFilter, setMachineFeedbackFilter] = useState(getInitialFilter('machine_feedback', 'All'));
   const [totalClusters, setTotalClusters] = useState(state.total_clusters);
 
   const [mergeQueue, setMergeQueue] = useState<any[]>(() => {
@@ -173,6 +178,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
             <div style={{ fontSize: '12px' }}>
               <p><b>Uncertain Boundary:</b> The algorithm found ambiguous connections between known identities here. Needs manual review.</p>
               <p><b>Fragmented Ground Truth:</b> The algorithm disagrees with a 'Reviewed' cluster and believes it contains multiple distinct people.</p>
+              <p><b>Identity Proposed:</b> The algorithm has found a high-confidence match based on a database of known identities. Click into the cluster to accept or reject the proposed name.</p>
             </div>
           }>
             <QuestionCircleOutlined style={{ marginLeft: 4, cursor: 'help' }} />
@@ -182,6 +188,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
           <Select.Option value="All">All Feedbacks</Select.Option>
           <Select.Option value="Uncertain Boundary">Uncertain Boundary</Select.Option>
           <Select.Option value="Fragmented Ground Truth">Fragmented Ground Truth</Select.Option>
+          <Select.Option value="Identity Proposed">Identity Proposed</Select.Option>
         </Select>
       </div>
 
@@ -230,7 +237,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
               }
               style={{ width: gridConfig.cardWidth, minWidth: 250, cursor: 'pointer' }}
               hoverable
-              onClick={() => window.location.href = `/${state.project_name}/explore/${state.facet.name.toLowerCase()}/${getSlug(state.facet.feature_extractor_id)}/cluster/${cluster.id}?from_page=${page}`}
+              onClick={() => window.location.href = `/${state.project_name}/explore/${state.facet.name.toLowerCase()}/${getSlug(state.facet.feature_extractor_id)}/cluster/${cluster.id}?from_page=${page}&status_filter=${encodeURIComponent(statusFilter)}&machine_feedback=${encodeURIComponent(machineFeedbackFilter)}`}
             >
               <div style={{ display: 'grid', gridTemplateColumns: gridConfig.gridTemplateColumns, gap: '4px' }}>
                 {cluster.representative_faces?.slice(0, gridConfig.limit).map((face: any, idx: number) => (

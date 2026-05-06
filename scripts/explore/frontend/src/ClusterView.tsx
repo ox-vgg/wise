@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button, Spin, Collapse, Modal, Typography, Form, Input, Select, message, Segmented, Tooltip } from 'antd';
-import { EditOutlined, SaveOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 
 const VideoPlayerWithPoster: React.FC<{ project_name: string, face: any }> = ({ project_name, face }) => {
   const [poster, setPoster] = useState(`/${project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`);
@@ -99,8 +99,93 @@ const ClusterView: React.FC<{ state: any }> = ({ state }) => {
     });
   };
 
+  const handleAcceptProposal = () => {
+    const proposal = metadataJson._proposed_identity;
+    if (!proposal) return;
+
+    const newMetadata = { ...metadataJson };
+    delete newMetadata._proposed_identity;
+
+    // Move proposed metadata into actual metadata
+    Object.keys(proposal).forEach(key => {
+        if (key !== 'similarity' && key !== 'name') {
+            newMetadata[key] = proposal[key];
+        }
+    });
+
+    setClusterLabel(proposal.name);
+    setMetadataJson(newMetadata);
+    setStatus('reviewed'); // Automatically mark as reviewed when a proposal is accepted
+
+    // Save immediately
+    fetch(`/${state.project_name}/api/cluster/${state.cluster.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cluster_label: proposal.name,
+        metadata_json: newMetadata,
+        status: 'reviewed'
+      })
+    }).then(res => {
+      if (res.ok) {
+        message.success(`Identity resolved to ${proposal.name}!`);
+      }
+    });
+  };
+
+  const handleRejectProposal = () => {
+    const newMetadata = { ...metadataJson };
+    delete newMetadata._proposed_identity;
+    setMetadataJson(newMetadata);
+
+    fetch(`/${state.project_name}/api/cluster/${state.cluster.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        metadata_json: newMetadata
+      })
+    }).then(res => {
+      if (res.ok) {
+        message.info('Proposal rejected.');
+      }
+    });
+  };
+
   return (
     <div>
+      {metadataJson._proposed_identity && (
+        <Card style={{ marginBottom: 16, backgroundColor: '#f6ffed', borderColor: '#ffe58f' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                    <Typography.Title level={4} style={{ margin: 0, color: '#faad14' }}>
+                        Identity Proposal: {metadataJson._proposed_identity.name}
+                    </Typography.Title>
+                    <div style={{ margin: '4px 0 0 0', color: '#666', fontSize: '13px' }}>
+                        <strong>Match Confidence:</strong> {(metadataJson._proposed_identity.similarity * 100).toFixed(1)}% <br/>
+                        {Object.entries(metadataJson._proposed_identity).map(([key, value]) => {
+                          if (key === 'similarity' || key === 'name' || value === null || value === '') return null;
+                          const strValue = String(value);
+                          const isUrl = strValue.startsWith('http://') || strValue.startsWith('https://');
+                          return (
+                            <span key={key} style={{ marginRight: '16px' }}>
+                              <strong>{key.replace(/_/g, ' ')}:</strong> {isUrl ? <a href={strValue} target="_blank" rel="noreferrer">Link</a> : strValue}
+                            </span>
+                          );
+                        })}
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button type="primary" style={{ backgroundColor: '#52c41a' }} icon={<CheckCircleOutlined />} onClick={handleAcceptProposal}>
+                        Accept
+                    </Button>
+                    <Button danger icon={<CloseCircleOutlined />} onClick={handleRejectProposal}>
+                        Reject
+                    </Button>
+                </div>
+            </div>
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>

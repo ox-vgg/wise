@@ -582,25 +582,34 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
 
     with project_service.wise_project.db_engine.connect() as conn:
         from src.db.tables.facets import cluster_metadata_table, facet_metadata_table
+        from src.db.tables import vectors_table
 
         # Paginated clusters
         query = (
-            sa.select(cluster_metadata_table)
+            sa.select(
+                cluster_metadata_table.c.id,
+                cluster_metadata_table.c.cluster_id,
+                cluster_metadata_table.c.cluster_label,
+                cluster_metadata_table.c.metadata_json,
+                sa.func.count(facet_metadata_table.c.vector_id).label('size'),
+                sa.func.count(sa.distinct(vectors_table.c.media_id)).label('unique_media_count')
+            )
             .select_from(
                 cluster_metadata_table.outerjoin(
                     facet_metadata_table,
                     cluster_metadata_table.c.cluster_id == facet_metadata_table.c.cluster_id
+                ).outerjoin(
+                    vectors_table,
+                    facet_metadata_table.c.vector_id == vectors_table.c.id
                 )
             )
             .where(cluster_metadata_table.c.facet_id == facet_id)
             .group_by(
                 cluster_metadata_table.c.id,
                 cluster_metadata_table.c.cluster_id,
-                cluster_metadata_table.c.facet_id,
-                cluster_metadata_table.c.cluster_label,
-                cluster_metadata_table.c.metadata_json
+                cluster_metadata_table.c.cluster_label
             )
-            .order_by(sa.func.count(facet_metadata_table.c.id).desc())
+            .order_by(sa.desc('size'))
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
@@ -615,24 +624,29 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
 
         cluster_ids = [c.cluster_id for c in clusters]
 
-        # Fetch vector assignments
-        assignments = conn.execute(
-            sa.select(facet_metadata_table).where(facet_metadata_table.c.cluster_id.in_(cluster_ids))
-        ).fetchall()
+        # We need a map of size and unique counts since we modified the query return structure
+        cluster_stats = {c.cluster_id: {"size": c.size, "unique_media_count": c.unique_media_count, "cluster_label": c.cluster_label, "metadata_json": c.metadata_json} for c in clusters}
+
+        # Fetch vector assignments using window function for efficiency
+        cluster_ids_str = ",".join(map(str, cluster_ids))
+        sampled_query = sa.text(f"""
+            SELECT cluster_id, vector_id
+            FROM (
+                SELECT cluster_id, vector_id,
+                       ROW_NUMBER() OVER (PARTITION BY cluster_id ORDER BY RANDOM()) as rn
+                FROM facet_metadata
+                WHERE cluster_id IN ({cluster_ids_str})
+            )
+            WHERE rn <= 100
+        """)
+        assignments = conn.execute(sampled_query).fetchall()
 
     from collections import defaultdict
     cluster_to_vectors = defaultdict(list)
     for a in assignments:
         cluster_to_vectors[a.cluster_id].append(a.vector_id)
 
-    # Limit to 9 representatives
-    import random
-    all_vector_ids = []
-    for c_id, vids in cluster_to_vectors.items():
-        if len(vids) > 100:
-            vids = random.sample(vids, 100)
-        cluster_to_vectors[c_id] = vids
-        all_vector_ids.extend(vids)
+    all_vector_ids = [vid for vids in cluster_to_vectors.values() for vid in vids]
 
     vector_info = {}
     if all_vector_ids:
@@ -653,6 +667,7 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
 
     clusters_data = []
     for c in clusters:
+        stats = cluster_stats[c.cluster_id]
         vids = cluster_to_vectors[c.cluster_id]
         vids_info = [vector_info[vid] for vid in vids if vid in vector_info]
         vids_info.sort(key=lambda x: x["area"], reverse=True)
@@ -675,9 +690,10 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
 
         clusters_data.append({
             "id": c.cluster_id,
-            "cluster_label": c.cluster_label,
-            "metadata_json": c.metadata_json,
-            "size": len(vids),
+            "cluster_label": stats["cluster_label"],
+            "metadata_json": stats["metadata_json"],
+            "size": stats["size"],
+            "unique_media_count": stats["unique_media_count"],
             "representative_faces": reps
         })
 
@@ -750,9 +766,14 @@ async def get_published_cluster_faces_by_media(cluster_id: int, request: Request
         if not vector_ids:
             return {}
 
-    # 3. Get metadata from the main DB
-    metadata = project_service.wise_project.get_vector_media_metadata_for_ids(vector_ids)
-    ext_metadata = project_service.wise_project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, vector_ids)
+    # 3. Get metadata from the main DB (Chunked for performance on massive clusters)
+    metadata = []
+    ext_metadata = []
+    chunk_size = 900
+    for i in range(0, len(vector_ids), chunk_size):
+        chunk = vector_ids[i:i + chunk_size]
+        metadata.extend(project_service.wise_project.get_vector_media_metadata_for_ids(chunk))
+        ext_metadata.extend(project_service.wise_project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, chunk))
 
     # 4. Group by media_id
     grouped_faces = {}

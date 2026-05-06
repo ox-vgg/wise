@@ -268,9 +268,9 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
 
             if label.startswith('draft_'):
                 is_noise = (label == "draft_-1")
-                cluster = Cluster(facet_id=facet_id, cluster_label="Noise" if is_noise else "", status=ClusterStatus.draft, machine_feedback=machine_feedback_str, unique_media_count=unique_media_count)
+                cluster = Cluster(facet_id=facet_id, cluster_label="Noise" if is_noise else "", status=ClusterStatus.draft, machine_feedback=machine_feedback_str, unique_media_count=unique_media_count, size=len(cluster_to_final_vids[label]))
             elif label.startswith('uncertain_boundary_'):
-                cluster = Cluster(facet_id=facet_id, cluster_label=label, status=ClusterStatus.draft, machine_feedback=machine_feedback_str, unique_media_count=unique_media_count)
+                cluster = Cluster(facet_id=facet_id, cluster_label=label, status=ClusterStatus.draft, machine_feedback=machine_feedback_str, unique_media_count=unique_media_count, size=len(cluster_to_final_vids[label]))
 
             session.add(cluster)
             session.flush()
@@ -295,7 +295,8 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
             machine_feedback_str = ", ".join(feedbacks) if feedbacks else None
             session.query(Cluster).filter_by(id=cid).update({
                 "machine_feedback": machine_feedback_str,
-                "unique_media_count": unique_media_count
+                "unique_media_count": unique_media_count,
+                "size": len(all_c_vids)
             })
             
 

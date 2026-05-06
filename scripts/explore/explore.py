@@ -395,12 +395,8 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
 
     total_count = total_query.count()
         
-    # Get paginated clusters sorted by number of faces (descending)
-    query = (
-        db.query(Cluster, sa.func.count(Assignment.id).label('size'))
-        .outerjoin(Assignment, Cluster.id == Assignment.cluster_id)
-        .filter(Cluster.facet_id == facet_id)
-    )
+    # Get paginated clusters sorted by pre-calculated size (descending)
+    query = db.query(Cluster).filter(Cluster.facet_id == facet_id)
     
     if status_filter == "starred":
         query = query.filter(Cluster.is_starred == True)
@@ -408,40 +404,41 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         query = query.filter(Cluster.status == ClusterStatus(status_filter))
         
     if machine_feedback != "All":
-        query = query.filter(Cluster.machine_feedback == machine_feedback)
+        query = query.filter(Cluster.machine_feedback.contains(machine_feedback))
 
-    clusters_with_counts = (
-        query.group_by(Cluster.id)
-        .order_by(sa.func.count(Assignment.id).desc())
+    clusters = (
+        query.order_by(Cluster.size.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
     )
     
-    if not clusters_with_counts:
+    if not clusters:
         return {"clusters": [], "total": total_count}
         
-    cluster_ids = [c.Cluster.id for c in clusters_with_counts]
-    
-    # Fetch assignments for each cluster efficiently
-    assignments = db.query(Assignment).filter(Assignment.cluster_id.in_(cluster_ids)).all()
-    from collections import defaultdict
-    import random
-    
-    cluster_to_all_vectors = defaultdict(list)
-    for a in assignments:
-        cluster_to_all_vectors[a.cluster_id].append(a.vector_id)
-        
-    all_sampled_vector_ids = []
-    cluster_to_sampled_vectors = {}
+    cluster_ids = [c.id for c in clusters]
 
-    for c_id, vids in cluster_to_all_vectors.items():
-        if len(vids) > 100:
-            sampled_vids = random.sample(vids, 100)
-        else:
-            sampled_vids = vids
-        cluster_to_sampled_vectors[c_id] = sampled_vids
-        all_sampled_vector_ids.extend(sampled_vids)
+    # Fetch assignments for each cluster efficiently by limiting to 100 per cluster natively in SQL
+    cluster_ids_str = ",".join(map(str, cluster_ids))
+    sampled_query = sa.text(f"""
+        SELECT cluster_id, vector_id
+        FROM (
+            SELECT cluster_id, vector_id, 
+                   ROW_NUMBER() OVER (PARTITION BY cluster_id ORDER BY RANDOM()) as rn
+            FROM assignments
+            WHERE cluster_id IN ({cluster_ids_str})
+        )
+        WHERE rn <= 100
+    """)
+    result = db.execute(sampled_query).fetchall()
+    
+    from collections import defaultdict
+    
+    cluster_to_sampled_vectors = defaultdict(list)
+    all_sampled_vector_ids = []
+    for row in result:
+        cluster_to_sampled_vectors[row.cluster_id].append(row.vector_id)
+        all_sampled_vector_ids.append(row.vector_id)
     
     vector_info = {}
     if all_sampled_vector_ids:
@@ -458,7 +455,7 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
             }
 
     clusters_data = []
-    for c, size in clusters_with_counts:
+    for c in clusters:
         cluster_label = c.cluster_label if c.cluster_label else f"{facet.name} {c.id}"
         
         sampled_vids = cluster_to_sampled_vectors.get(c.id, [])
@@ -489,7 +486,7 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
             "cluster_label": cluster_label, 
             "status": c.status.value,
             "machine_feedback": c.machine_feedback,
-            "size": size,
+            "size": c.size,
             "starred": c.is_starred,
             "unique_media_count": unique_media_count,
             "representative_faces": reps
@@ -707,10 +704,12 @@ def merge_clusters(project_name: str, request: MergeClustersRequest, db = Depend
 
             unique_media_ids = {m.media_id for m in all_metadata}
             primary_cluster.unique_media_count = len(unique_media_ids)
+            primary_cluster.size = len(all_vector_ids)
     except Exception as e:
         logger.error(f"Failed to recalculate unique_media_count after merge for cluster {primary_cluster.id}: {e}", exc_info=True)
 
-    # After merging, the primary cluster is implicitly reviewed, so we should update its known_cluster entry    try:
+    # After merging, the primary cluster is implicitly reviewed, so we should update its known_cluster entry
+    try:
         logger.info(f"Updating known-face-clusters for merged cluster {primary_cluster.id}")
         assignments = db.query(Assignment).filter_by(cluster_id=primary_cluster.id).all()
         vector_ids = [a.vector_id for a in assignments]

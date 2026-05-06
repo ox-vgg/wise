@@ -26,10 +26,19 @@ const App: React.FC = () => {
     if (state.view !== 'cluster') return '#';
     const params = new URLSearchParams(window.location.search);
     const fromPage = params.get('from_page');
+    const statusFilter = params.get('status_filter');
+    const machineFeedback = params.get('machine_feedback');
+
     let url = `/${state.project_name}/explore/${state.facet.name.toLowerCase()}/${getSlug(state.facet.feature_extractor_id)}/`;
-    if (fromPage) {
-      url += `?page=${fromPage}`;
-    }
+    const queryParams = new URLSearchParams();
+
+    if (fromPage) queryParams.append('page', fromPage);
+    if (statusFilter) queryParams.append('status_filter', statusFilter);
+    if (machineFeedback) queryParams.append('machine_feedback', machineFeedback);
+
+    const q = queryParams.toString();
+    if (q) url += `?${q}`;
+
     return url;
   };
 
