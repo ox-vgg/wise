@@ -26,6 +26,7 @@ import torchvision.transforms.functional as F
 from collections.abc import Iterable
 
 from .feature_extractor import (
+    BBoxXYWH,
     FeatureExtractor,
     Features,
     MultiModalModel,
@@ -333,6 +334,17 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
         model_output = self.model.get_text_features(**model_input).float()
         model_output /= torch.linalg.norm(model_output, dim=-1, keepdims=True)
         return model_output.cpu().numpy()
+
+    def preprocess_image_region(
+        self, image: torch.Tensor | Image.Image, region: BBoxXYWH
+    ) -> torch.Tensor:
+        return self._proprocess_image_region_crop(image, region)
+
+    def extract_image_region_features(
+        self, image: torch.Tensor, region: BBoxXYWH
+    ) -> Features:
+        del region
+        return self.extract_image_features(image)
 
     def warmup(self):
         # calculating the output dim does the warmup anyway

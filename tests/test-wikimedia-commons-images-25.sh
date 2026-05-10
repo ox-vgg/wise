@@ -569,6 +569,100 @@ if [ "$IMAGE_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
     fi
 fi
 
+
+json_get_filename_results() {
+    jq '.image_results as $results
+           | [$results.vectors[].media_id]
+           | map($results.images[.].filename)'
+}
+
+
+json_are_equal() {
+    jq \
+        --argjson expected "$1" \
+        --argjson observed "$2" \
+        --exit-status \
+        --null-input \
+        '$expected == $observed'
+}
+
+
+assert_response_filenames() {
+    local test_id="$1"
+    local expected_filenames="$2"
+    local observed_response="$3"
+
+    local observed_filenames=$(echo "$observed_response" | json_get_filename_results)
+    if $(json_are_equal "$expected_filenames" "$observed_filenames"); then
+        echo "Test $test_id PASSED"
+    else
+        echo "Test $test_id FAILED: unexpected search results"
+        echo "Expected filenames:"
+        echo "$expected_filenames" | jq .
+        echo "Observed filenames:"
+        echo "$observed_filenames" | jq .
+        echo "Observed full response:"
+        echo "$observed_response" | jq .
+        exit 1
+    fi
+}
+
+
+# Test 5.6 : face region search search
+test_face_region_search() {
+    local test_id="${1}"
+
+    ## This image is part of the dataset.  We are using it because it
+    ## has two faces, only one of which (Christy Turlington) appears
+    ## 3x in the dataset.  We then test with a box around the other
+    ## face (Edward Burns) to ensure that the given box is actually
+    ## used and exclude the case where the box is ignored and the "top
+    ## detection" is used (which is what should happens in the absence
+    ## of a bbox).  Also, the given bboxes are slightly off from the
+    ## boxes detected by insightface on purpose (to ensure search can
+    ## "adjust").
+    local query_img_fpath="${TEST_DATA_DIR}/Ed_Burns,_Christy_Turlington_at_27_Dresses_Premiere_1.jpg"
+
+    local christy_bbox='{"x": 0.45, "y": 0.23, "w": 0.27, "h": 0.38}'
+    local expected_christy_filenames='[
+        "Ed_Burns,_Christy_Turlington_at_27_Dresses_Premiere_1.jpg",
+        "500px-Christie_Turlington_2000.jpg",
+        "960px-Christy_Turlington_at_the_2024_Toronto_International_Film_Festival.jpg"
+    ]'
+
+    local edward_bbox='{"x": 0.05, "y": 0.12, "w": 0.25, "h": 0.45}'
+    local expected_edward_filenames='[
+        "Ed_Burns,_Christy_Turlington_at_27_Dresses_Premiere_1.jpg",
+        "960px-Edward_Burns_at_the_2024_Toronto_International_Film_Festival_(cropped).jpg",
+        "960px-Admiral_Chester_Nimitz_signs_as_Supreme_Allied_Commander_during_formal_surrender_ceremonies_on_the_USS_Missouri.jpg"
+    ]'
+
+
+    local search_url="${SERVER_URL}search2?start=0&end=3&thumbs=0&search_in=image&feature_extractor_id=${IMAGE_FEATURE_ID2}"
+    local christy_response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual", "bbox": '"$christy_bbox"'}' \
+                    -F "query_file=@\"${query_img_fpath}\";filename=x" \
+                    "$search_url")
+
+    assert_response_filenames \
+        "5.7.1" \
+        "$expected_christy_filenames" \
+        "$christy_response"
+
+    local edward_response=$(curl -s -X POST -H "Content-Type:multipart/form-data" \
+                    -F 'query_term={"term_id": "x", "is_negative": false, "src": null, "qtype": "visual", "bbox": '"$edward_bbox"'}' \
+                    -F "query_file=@\"${query_img_fpath}\";filename=x" \
+                    "$search_url")
+
+    assert_response_filenames \
+        "5.7.2" \
+        "$expected_edward_filenames" \
+        "$edward_response"
+}
+
+test_face_region_search
+
+
 end_time=`date +%s`
 elapsed_time=$((end_time-start))
 echo ""

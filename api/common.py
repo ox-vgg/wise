@@ -29,6 +29,7 @@ from pydantic import (
     HttpUrl,
     PlainSerializer,
     TypeAdapter,
+    field_serializer,
     field_validator,
     ConfigDict
 )
@@ -48,6 +49,29 @@ class BBoxXYWH(BaseModel):
     y: round_float
     w: round_float
     h: round_float
+
+
+class NPArray(BaseModel):
+    """Utility to convert between numpy arrays and json for HTTP requests.
+    """
+    content: str
+    shape: list[int]
+    # assume we only exchange float32 arrays for now
+
+    @classmethod
+    def from_array(cls, x: np.ndarray) -> "NPArray":
+        np_bytes = x.tobytes()
+        base64_encoded = base64.b64encode(np_bytes)
+        return cls(
+            content=base64_encoded.decode('ascii'),
+            shape=list(x.shape)
+        )
+
+    def to_array(self) -> np.ndarray:
+        bytes_from_b64 = base64.b64decode(self.content.encode('ascii'))
+        arr = np.frombuffer(bytes_from_b64, dtype=np.float32)
+        arr = arr.reshape(self.shape)
+        return arr
 
 
 class BaseQueryTerm(BaseModel):
@@ -99,6 +123,19 @@ class VectorQueryTerm(BaseQueryTerm):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     vector: np.ndarray
 
+    @field_validator("vector", mode="before")
+    @classmethod
+    def cast_vector(cls, v):
+        if isinstance(v, dict):  # v is NPArray from json
+            return NPArray.model_validate(v).to_array()
+        else:
+            return v
+
+    @field_serializer('vector', mode='plain')
+    def serialize_vector(self, value: np.ndarray) -> NPArray:
+        return NPArray.from_array(self.vector)
+
+
 class TextQueryTerm(BaseQueryTerm):
     txt: str
 
@@ -121,9 +158,17 @@ Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTer
 class MediaQueryTermInForm(MediaQueryTerm):
     src: HttpUrl | int | None  # None means bytes in another form part
 
+    @classmethod
+    def from_MediaQueryTerm(cls, q: MediaQueryTerm):
+        if isinstance(q.src, bytes):
+            return cls(**q.model_dump(exclude="src"), src=None)
+        else:
+            return cls(**q.model_dump())
+
+
 QueryTermInForm = MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm
 QueryTermInFormAdapter = TypeAdapter(QueryTermInForm)
-
+QueryInForm = list[MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm]
 
 def merge_multipart_query_form(
     query_form: list[str], query_form_files: list[UploadFile]
@@ -161,6 +206,29 @@ def merge_multipart_query_form(
         else:
             query.append(term_form)
     return query
+
+
+def build_response_query(original: Query, processed: Query) -> QueryInForm:
+    """Build the query to be included in the search response.
+
+    The original query is processed for the search.  We need to
+    process it back to be included in the response, e.g., strip the
+    media content, and convert vector query back into the vector id
+    query.
+
+    """
+    assert [x.term_id for x in original] == [x.term_id for x in processed]
+    r: QueryInForm = []
+    for o, p in zip(original, processed):
+        if isinstance(o, VectorIdQueryTerm):
+            assert isinstance(p, VectorQueryTerm)
+            r.append(o)
+        elif isinstance(o, MediaQueryTerm):
+            r.append(MediaQueryTermInForm.from_MediaQueryTerm(p))
+        else:
+            r.append(p)
+    return r
+
 
 def parse_old_api_query(
     # Positive queries
@@ -302,6 +370,7 @@ class FaceTextShardResults(BaseModel):
 
 class SearchResponse(BaseModel):
     time: float # backend search time in seconds
+    query: Query | QueryInForm
     video_audio_results: Optional[VideoAudioResults] # search results from audio stream of video files
     video_results: Optional[VideoResults] # search results from video stream of video files
     image_results: Optional[ImageResults] # search results from image files
@@ -363,25 +432,6 @@ def split_query_terms(query: Query):
         negative_audio_url_queries,
     )
 
-class NPArray(BaseModel):
-    content: str
-    shape: list[int]
-    # assume we only exchange float32 arrays for now
-
-    @classmethod
-    def from_array(cls, x: np.ndarray) -> "NPArray":
-        np_bytes = x.tobytes()
-        base64_encoded = base64.b64encode(np_bytes)
-        return cls(
-            content=base64_encoded.decode('ascii'),
-            shape=list(x.shape)
-        )
-
-    def to_array(self) -> np.ndarray:
-        bytes_from_b64 = base64.b64decode(self.content.encode('ascii'))
-        arr = np.frombuffer(bytes_from_b64, dtype=np.float32)
-        arr = arr.reshape(self.shape)
-        return arr
 
 def patch_precision(config: APIConfig):
 

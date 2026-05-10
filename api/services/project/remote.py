@@ -139,7 +139,12 @@ class RemoteWiseProjectService(WiseProjectService):
             shot_scale: list[int] | None = None,
             metadata_filter: list[str] = [],
         ):
-        feature_obj = common.NPArray.from_array(features)  # validate input
+        vector_qterm = common.VectorQueryTerm(
+            term_id='_',
+            is_negative=False,
+            vector=features,
+        )
+
         resp = await self.client.post(
             "/search_with_feature",
             params={
@@ -151,7 +156,7 @@ class RemoteWiseProjectService(WiseProjectService):
                 "shot_scale": shot_scale,
                 "metadata_filter": metadata_filter,
             },
-            json=feature_obj.model_dump()
+            json=vector_qterm.model_dump()
         )
         resp.raise_for_status()
         data = resp.json()

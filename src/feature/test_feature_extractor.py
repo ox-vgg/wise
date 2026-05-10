@@ -41,6 +41,7 @@ from .transformers_owlv2 import (
     sort_by_objectness,
 )
 from .feature_extractor_factory import FeatureExtractorFactory
+from .feature_extractor import BBoxXYWH
 
 
 class TestFeatureExtractor(unittest.TestCase):
@@ -91,6 +92,10 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
             self._extractor.preprocess_image(images)
         )
 
+    def _preprocess_and_extract_region_features(self, image, region):
+        return self._extractor.extract_image_region_features(
+            self._extractor.preprocess_image_region(image, region), region
+        )
     def _get_tom_hanks_grayscale_tensor(self) -> torch.Tensor:
         np_img = insightface.data.get_image("Tom_Hanks_54745", to_rgb=True)
         assert (np.all(np_img[:,:,0] == np_img[:,:,1])
@@ -125,6 +130,19 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
             self.assertEqual(len(f.metadata), 6)
             self.assertEqual([x.is_male for x in f.metadata].count(True), 3)
 
+    def _test_region_on_ross(self, image):
+        ## This region selects all of Ross face and part of Monica's
+        ## face.  It purposely large to cover part of another face and
+        ## test the selection of face with highest IoU.
+        ross_xt = BBoxXYWH(353/1280, 183/886, 311/1280, 292/886)
+        ross_bbox = [0.36, 0.30, 0.08, 0.17]  # ~ expected from InsightFace
+        features = self._preprocess_and_extract_region_features(image, ross_xt)
+        self.assertTrue(len(features.metadata), 1)
+        self.assertTrue(features.metadata[0].is_male)
+        np.testing.assert_allclose(
+            features.metadata[0].bbox, ross_bbox, atol=0.01
+        )
+
     def test_with_one_element_list(self):
         images = [self._get_t1_rgb_pil()]
         self._test_with_t1_images(images, 1)
@@ -132,6 +150,12 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
     def test_with_one_image_tensor(self):
         images = torch.unsqueeze(self._get_t1_rgb_tensor(), dim=0)
         self._test_with_t1_images(images, 1)
+
+    def test_region_with_pil(self):
+        self._test_region_on_ross(self._get_t1_rgb_pil())
+
+    def test_region_with_tensor(self):
+        self._test_region_on_ross(self._get_t1_rgb_tensor())
 
     def test_with_n_elements_list(self):
         images = [
