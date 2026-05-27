@@ -82,6 +82,9 @@ class WiseProject:
         self.media_type_list = ["image", "video", "audio"]
         self.read_only = read_only
 
+        if create_project and read_only:
+            raise ValueError("options create_project and read_only are mutually exclusive")
+
         if not self.project_dir.exists():
             if create_project:
                 # create the root folders
