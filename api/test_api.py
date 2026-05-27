@@ -70,6 +70,7 @@ class TestWithEmptyProject(unittest.TestCase):
                 "models": {},
                 "shot_based_filters": None,
                 "search_targets": {},
+                "enable_facets": False,
             },
         )
 
