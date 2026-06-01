@@ -89,6 +89,10 @@ machine learning models and code without installing anything locally):
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
+## Online demo
+
+Various capabilities of WISE can be demonstrated using a set of [public online demo](https://meru.robots.ox.ac.uk/cinephile/) maintained by the VGG. If you are not sure what to search for, then visit the [examples page](https://www.robots.ox.ac.uk/~vgg/software/wise/examples/) for detailed instructions and ready-to-try search engine queries.
+
 ## Documentation
 
 The WISE open source software is developed and maintained by the
@@ -98,6 +102,7 @@ Here are some documents for users and developers of WISE.
 
   - [Install](docs/Install.md) : describes the process for installing WISE
   - [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
+    - User guide for the [Cinephile-2025](https://meru.robots.ox.ac.uk/cinephile/) online demo ([pdf](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.pdf), [odt](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.odt), [docx](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.docx))
   - [Metadata](docs/Metadata.md) : describes support for text metadata search in WISE
   - Developer Resources
     - [Data Loading](docs/data-loading.md): describes interface for loading media files
@@ -111,12 +116,14 @@ Here are some documents for users and developers of WISE.
 
 Please submit any bug reports and feature requests on the [Issues page](https://gitlab.com/vgg/wise/wise/-/issues).
 
-For any queries or feedback related to the WISE software, contact [Prasanna Sridhar](mailto:prasanna@robots.ox.ac.uk), [Horace Lee](mailto:horacelee@robots.ox.ac.uk) or [Abhishek Dutta](mailto:adutta@robots.ox.ac.uk).
+For any queries or feedback related to the WISE software, contact [Prasanna Sridhar](mailto:prasanna@robots.ox.ac.uk), [Horace Lee](mailto:horacelee@robots.ox.ac.uk), [David M. S. Pinto](mailto:pinto@robots.ox.ac.uk) or [Abhishek Dutta](mailto:adutta@robots.ox.ac.uk).
 
 ## Citation
 The WISE software can be cited as follows:
 
 Prasanna Sridhar, Horace Lee, David M. S. Pinto, Andrew Zisserman, and Abhishek Dutta. (2026). WISE: A Multimodal Search Engine for Visual Scenes, Audio, Objects, Faces, Speech, and Metadata. [arXiv:2602.12819](https://arxiv.org/abs/2602.12819)
+
+> To appear in Proceedings of the 49th International ACM SIGIR Conference on Research and Development in Information Retrieval (SIGIR ’26), July 20–24, 2026, Melbourne, VIC, Australia
 
 ## Acknowledgements
 
