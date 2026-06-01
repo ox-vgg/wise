@@ -91,7 +91,7 @@ machine learning models and code without installing anything locally):
 
 ## Online demo
 
-Various capabilities of WISE can be demonstrated using a set of [public online demo](https://meru.robots.ox.ac.uk/cinephile/) maintained by the VGG. If you are not sure what to search for, then visit the [examples page](https://www.robots.ox.ac.uk/~vgg/software/wise/examples/) for detailed instructions and ready-to-try search engine queries.
+Various capabilities of WISE can be demonstrated using a set of [public online demo](https://www.robots.ox.ac.uk/~vgg/software/wise/demo/) maintained by the VGG. If you are not sure what to search for, then visit the [examples page](https://www.robots.ox.ac.uk/~vgg/software/wise/examples/) for detailed instructions and ready-to-try search engine queries.
 
 ## Documentation
 
@@ -102,7 +102,7 @@ Here are some documents for users and developers of WISE.
 
   - [Install](docs/Install.md) : describes the process for installing WISE
   - [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
-    - User guide for the [Cinephile-2025](https://meru.robots.ox.ac.uk/cinephile/) online demo ([pdf](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.pdf), [odt](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.odt), [docx](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.docx))
+    - User guide for the [Cinephile-2025](https://meru.robots.ox.ac.uk/cinephile/) online demo : [pdf](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.pdf), [odt](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.odt), [docx](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.docx)
   - [Metadata](docs/Metadata.md) : describes support for text metadata search in WISE
   - Developer Resources
     - [Data Loading](docs/data-loading.md): describes interface for loading media files
