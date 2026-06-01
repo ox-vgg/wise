@@ -31,6 +31,9 @@ build*.json
 /venv/
 __pycache__/
 
+# Jupyter
+.ipynb_checkpoints/
+
 # Temp files by editors
 *~
 .*~
