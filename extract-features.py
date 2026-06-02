@@ -62,7 +62,7 @@ from wise.repository import (
 )
 from wise.dataloader.shot import ShotStream
 
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 
 class ExtractFeatureMode(BaseStrEnum):
     create = "create"

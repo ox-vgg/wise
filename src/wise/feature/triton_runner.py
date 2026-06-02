@@ -284,7 +284,7 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
             )
 
         def __getstate__(self):
-            print(f"getstate: {self.__dict__}")
+            logger.debug(f"getstate: {self.__dict__}")
             state = self.__dict__.copy()
             # Remove unpicklable entries.
             entries = {"model", "tokenizer", "processor"}
@@ -303,7 +303,7 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
             return state
 
         def __setstate__(self, state):
-            print(f"setstate: {state}")
+            logger.debug(f"setstate: {state}")
             # Restore instance attributes
             self.__dict__.update(state)
             # Re-initialize the model property

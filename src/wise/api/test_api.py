@@ -28,7 +28,7 @@ from wise.api import create_app
 from wise.api.common import MediaQueryTerm, TextQueryTerm
 from wise.wise_project import WiseProject
 
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 
 
 class TestWithEmptyProject(unittest.TestCase):

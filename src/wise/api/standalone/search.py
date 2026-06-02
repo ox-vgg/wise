@@ -21,7 +21,7 @@ import functools
 from collections.abc import Callable, Iterable
 from typing import Annotated, cast
 
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 from .. import common
 from ..common import (
     MediaQueryTerm,

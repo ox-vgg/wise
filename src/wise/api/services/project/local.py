@@ -20,7 +20,7 @@ import math
 import logging
 from typing import Any
 
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 from .exceptions import MediaNotFoundException, ThumbnailNotFoundException
 from .base import WiseProjectService, ProjectInfo
 from wise.wise_project import WiseProject

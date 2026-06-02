@@ -34,7 +34,7 @@ from pydantic import (
     ConfigDict
 )
 
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 
 
 PRECISION = 5

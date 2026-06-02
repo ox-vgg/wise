@@ -20,7 +20,7 @@ import logging
 
 from pathlib import Path
 
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 
 # from wise.dataloader import AVDataset
 # from wise.search_index import SearchIndex

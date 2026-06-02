@@ -21,7 +21,7 @@ from typing import Literal
 from .base import WiseProjectService, ProjectInfo
 import httpx
 from ... import common
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 from wise.data_models import MediaType, VectorAndMediaMetadata
 import numpy as np
 from fastapi import Request

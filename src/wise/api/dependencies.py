@@ -18,7 +18,7 @@ import logging
 import json
 from typing import Annotated
 from fastapi import Depends
-from wise.api.config import APIConfig
+from wise.config import APIConfig
 
 from .services.project import LocalWiseProjectService, RemoteWiseProjectService, ProjectInfo
 from .services.embedding import EmbeddingService
