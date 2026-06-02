@@ -6,6 +6,6 @@ To import WiseProject into your scripts
 from wise import WiseProject
 ```
 
-::: src.wise_project.WiseProject
+::: wise.wise_project.WiseProject
 
         

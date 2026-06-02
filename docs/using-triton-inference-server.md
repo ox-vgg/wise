@@ -132,10 +132,10 @@ You can provide feature extractor config by providing `${MODEL_DIR}/1/config.yam
 
 With Triton you can swap the current `model.py` with optimised versions of models exported in ONNX / TensorRT / TorchScript with little to no change
 
-TODO: Add more details on how to use the model export utility for open_clip, clap, owlv2 included in `src/feature/__main__.py`, tests and FAQ
+TODO: Add more details on how to use the model export utility for open_clip, clap, owlv2 included in `src/wise/feature/__main__.py`, tests and FAQ
 
 ```bash
-python3 -m src.feature --feature-extractor mlfoundations/open_clip/ViT-L-16-SigLIP2-512/webli onnx_models --verify --export --batch_size 1
-python3 -m src.feature --feature-extractor microsoft/clap/2023/four-datasets onnx_models --verify --export --batch_size 1
-python3 -m src.feature --feature-extractor transformers/owlv2/google/owlv2-large-patch14-ensemble output --verify --export
+python3 -m wise.feature --feature-extractor mlfoundations/open_clip/ViT-L-16-SigLIP2-512/webli onnx_models --verify --export --batch_size 1
+python3 -m wise.feature --feature-extractor microsoft/clap/2023/four-datasets onnx_models --verify --export --batch_size 1
+python3 -m wise.feature --feature-extractor transformers/owlv2/google/owlv2-large-patch14-ensemble output --verify --export
 ```
