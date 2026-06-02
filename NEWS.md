@@ -4,6 +4,9 @@ Summary of important user-visible changes for WISE
 Next version (unreleased)
 -------------------------
 
+* WISE is now a Python package that can be installed with pip and
+  imported, and used from other projects.
+
 * The WISE software has been described in
   [arXiv:2602.12819](https://arxiv.org/abs/2602.12819) paper.
 
