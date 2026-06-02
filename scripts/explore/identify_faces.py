@@ -6,11 +6,9 @@ import faiss
 import collections
 
 import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from src.wise_project import WiseProject
-from src.data_models import ModalityType
+from wise.wise_project import WiseProject
+from wise.data_models import ModalityType
 from scripts.explore.db import init_explore_db
 from scripts.explore.models import Cluster, Assignment, KnownFaceCluster
 import sqlalchemy as sa

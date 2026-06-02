@@ -1,13 +1,9 @@
 import argparse
 from pathlib import Path
 import logging
-import sys
-import os
 import collections
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-from src.wise_project import WiseProject
+from wise.wise_project import WiseProject
 from scripts.explore.db import init_explore_db
 from scripts.explore.models import Cluster, Assignment
 import sqlalchemy as sa

@@ -22,16 +22,9 @@ import json
 import sqlite3
 import os
 
-# TODO: update when src is available as a module
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-
-# Ensure the src directory is in sys.path for wise_project import
-print(f'Adding {project_root}/src to sys.path')
-sys.path.append(project_root)
-
-from src.wise_project import WiseProject
-from src import db
-from src.repository import MediaRepo
+from wise.wise_project import WiseProject
+from wise import db
+from wise.repository import MediaRepo
 
 import sqlalchemy as sa
 

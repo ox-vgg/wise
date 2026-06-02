@@ -22,7 +22,7 @@ from ... import common
 from ..project import RemoteWiseProjectService
 from ..embedding import EmbeddingService
 
-from src.data_models import MediaType
+from wise.data_models import MediaType
 import numpy as np
 from fastapi import Request
 

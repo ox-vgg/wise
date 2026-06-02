@@ -21,9 +21,9 @@ import logging
 from pathlib import Path
 from typing import Annotated, Literal
 
-from src.wise_project import WiseProject
-from src import db
-from src.utils import batched
+from wise.wise_project import WiseProject
+from wise import db
+from wise.utils import batched
 from pydantic import BaseModel, Field, RootModel, field_serializer
 
 import pandas as pd

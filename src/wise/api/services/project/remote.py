@@ -21,8 +21,8 @@ from typing import Literal
 from .base import WiseProjectService, ProjectInfo
 import httpx
 from ... import common
-from config import APIConfig
-from src.data_models import MediaType, VectorAndMediaMetadata
+from wise.config import APIConfig
+from wise.data_models import MediaType, VectorAndMediaMetadata
 import numpy as np
 from fastapi import Request
 from fastapi.responses import StreamingResponse

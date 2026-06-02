@@ -29,11 +29,11 @@ import csv
 import json
 import sqlite3
 
-from src.wise_project import WiseProject
-from src import db
-from src.metadata_type import MetadataType
+from wise.wise_project import WiseProject
+from wise import db
+from wise.metadata_type import MetadataType
 
-from src.data_models import (
+from wise.data_models import (
     MediaMetadata,
     SourceCollection,
     ExtraMediaMetadata,
@@ -42,14 +42,14 @@ from src.data_models import (
     SourceCollectionType,
     VideoShot
 )
-from src.repository import (
+from wise.repository import (
     SourceCollectionRepo,
     MediaRepo,
     VectorRepo,
     MediaMetadataRepo,
     VideoShotsRepo,
 )
-from src import db
+from wise import db
 import sqlalchemy as sa
 from tqdm import tqdm
 import bisect

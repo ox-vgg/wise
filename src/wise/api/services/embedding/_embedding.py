@@ -18,7 +18,7 @@ import io
 import logging
 from tempfile import NamedTemporaryFile
 from .exceptions import ModalityNotSupportedError, FeatureExtractorNotFoundError, NoFeaturesFoundError
-from src.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
+from wise.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
 from pydantic import BaseModel, HttpUrl
 import numpy as np
 from PIL import Image

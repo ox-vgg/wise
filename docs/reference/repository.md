@@ -1,3 +1,3 @@
 # Repository Pattern
 
-::: src.repository.base
+::: wise.repository.base

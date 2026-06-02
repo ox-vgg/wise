@@ -1,3 +1,3 @@
 # Data tables
 
-::: src.db.tables
+::: wise.db.tables

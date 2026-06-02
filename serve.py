@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 import logging
 
-from src.enums import IndexType
+from wise.enums import IndexType
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,7 +61,7 @@ def main(
             f"Frontend assets not found at {theme_asset_dir}. "
             "Please build the frontend assets using `npm install && npm run build`."
         )
-    from api import serve
+    from wise.api import serve
 
     serve(
         project_dir,

@@ -28,24 +28,24 @@ import numpy as np
 import logging
 
 import sqlalchemy as sa
-from src.enums import BaseStrEnum
-from src.dataloader.dataset import MediaChunk
-from src.dataloader import get_dataset, get_metadata_for_valid_files, DatasetPayload
-from src.data_models import SourceMediaType, MediaChunkType
-from src.dataloader.utils import get_files_from_directory_with_extensions
-from src.wise_project import WiseProject
-from src.feature.feature_extractor import FeatureExtractor
-from src.feature.feature_extractor_factory import (
+from wise.enums import BaseStrEnum
+from wise.dataloader.dataset import MediaChunk
+from wise.dataloader import get_dataset, get_metadata_for_valid_files, DatasetPayload
+from wise.data_models import SourceMediaType, MediaChunkType
+from wise.dataloader.utils import get_files_from_directory_with_extensions
+from wise.wise_project import WiseProject
+from wise.feature.feature_extractor import FeatureExtractor
+from wise.feature.feature_extractor_factory import (
     FeatureExtractorFactory,
     get_canonical_feature_extractor_id,
 )
-from src.feature.store import (
+from wise.feature.store import (
     FeatureStore,
     FeatureStoreFactory,
     FeatureStoreType,
 )
 
-from src.data_models import (
+from wise.data_models import (
     MediaMetadata,
     SourceCollection,
     VectorMetadata,
@@ -54,15 +54,15 @@ from src.data_models import (
     ModalityType,
     SourceCollectionType,
 )
-from src.repository import (
+from wise.repository import (
     SourceCollectionRepo,
     MediaRepo,
     VectorRepo,
     ThumbnailRepo,
 )
-from src.dataloader.shot import ShotStream
+from wise.dataloader.shot import ShotStream
 
-from config import APIConfig
+from wise.config import APIConfig
 
 class ExtractFeatureMode(BaseStrEnum):
     create = "create"

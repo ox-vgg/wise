@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from src.data_models import MediaType
+from wise.data_models import MediaType
 
 from ...common import MediaQueryTerm, Query, TextQueryTerm, VectorIdQueryTerm
 from .face_text import run_face_text_search

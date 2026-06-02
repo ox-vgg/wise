@@ -2,8 +2,8 @@
 
 Module to help load media files for proccessing
 
-::: src.dataloader.dataset
+::: wise.dataloader.dataset
 
-::: src.dataloader.streamreader
+::: wise.dataloader.streamreader
 
-::: src.dataloader.shot
+::: wise.dataloader.shot

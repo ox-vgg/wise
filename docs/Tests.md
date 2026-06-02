@@ -136,11 +136,18 @@ All tests passed.
 
 # Unit Tests
 
-Individual tests can be executed as follows.
+Unit tests can be discovered and run as follows:
 
 ```bash
-python -m unittest api/test_api.py
-python -m unittest src/feature/test_feature_extractor.py
-python -m unittest src/feature/store/test_feature_store.py
-python -m unittest src/search/test_query_parser.py
+python -m unittest discover -s src/
+```
+
+Alternatively, individual tests can be executed as follows.
+
+```bash
+cd src
+python -m unittest wise/api/test_api.py
+python -m unittest wise/feature/test_feature_extractor.py
+python -m unittest wise/feature/store/test_feature_store.py
+python -m unittest wise/search/test_query_parser.py
 ```

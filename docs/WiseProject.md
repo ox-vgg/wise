@@ -35,7 +35,7 @@ and provides the full path of specific folders like `features`, or `index` as sh
 below.
 
 ```python
-from src.wise_project import WiseProject
+from wise.wise_project import WiseProject
 ...
 
 project_dir = '/data/wise/Kinetics-7/'

@@ -20,10 +20,10 @@ from .exceptions import UnknownSearchIndexError
 from ..embedding import EmbeddingService, EmbeddingConfig
 from ..project import LocalWiseProjectService
 from ...common import Query
-from src.wise_project import WiseProject
-from src.data_models import MediaType
-from src.feature.feature_extractor import FeatureExtMetadata
-from src.search.fts import WISEFTSQuery
+from wise.wise_project import WiseProject
+from wise.data_models import MediaType
+from wise.feature.feature_extractor import FeatureExtMetadata
+from wise.search.fts import WISEFTSQuery
 import faiss
 import numpy as np
 

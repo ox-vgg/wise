@@ -25,17 +25,13 @@ from pathlib import Path
 import sqlite3
 import json
 import os
-import sys
 import faiss
 from tqdm import tqdm
 from PIL import Image
 import io
 import shutil
 
-# TODO: update when src is available as a module
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
-sys.path.append(os.path.join(project_root, "src"))
-from wise_project import WiseProject
+from wise.wise_project import WiseProject
 
 # 00:00:12.30 -> 12.30
 def hhmmss_to_sec(hhmmss):
@@ -134,7 +130,7 @@ def get_video_embeddings(project_dir, video_vector_ids, vector_merge_type):
     return video_embeddings
 
 def compute_text_embedding(project_dir, text_queries):
-    from feature.feature_extractor_factory import FeatureExtractorFactory
+    from wise.feature.feature_extractor_factory import FeatureExtractorFactory
 
     project = WiseProject(args.project_dir)
     project_assets = project.discover_assets()

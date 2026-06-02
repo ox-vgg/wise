@@ -30,7 +30,7 @@ from ..dependencies import (
     SearchServiceDep
 )
 
-from src.data_models import MediaType, ModalityType
+from wise.data_models import MediaType, ModalityType
 
 import fastapi
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile, File

@@ -28,7 +28,7 @@ There are three main ways to update a WISE project:
 - **Merge Projects:**  
   Combine multiple WISE projects (with the same feature extraction setup but different media) into a new project. This is useful for handling large datasets in smaller chunks. The merge method copies features, thumbnails, media, and shots from source projects, and supports a dry run for review. Metadata merging is not yet automated and must be handled manually via SQLite dumps.
   ```
-  python3 -m src.wise_project merge --into DEST_PROJECT PROJECT_1 PROJECT_2 PROJECT_3 ...
+  python3 -m wise.wise_project merge --into DEST_PROJECT PROJECT_1 PROJECT_2 PROJECT_3 ...
   ```
 
 ## Aggregator

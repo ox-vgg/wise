@@ -24,7 +24,7 @@ from fastapi import FastAPI, Request, APIRouter
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from config import APIConfig
+from wise.config import APIConfig
 from . import common
 from . import dependencies
 from pathlib import Path
