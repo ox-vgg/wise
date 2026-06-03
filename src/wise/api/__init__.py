@@ -24,9 +24,8 @@ import uvicorn
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
+from wise.api import common, dependencies
 from wise.config import APIConfig
-
-from . import common, dependencies
 
 
 logger = logging.getLogger(__name__)
@@ -48,12 +47,12 @@ class State(TypedDict):
 def setup_routers(config: APIConfig):
     dependencies.init(config)
 
-    from .standalone import report_router
+    from wise.api.standalone import report_router
 
     if config.remote_projects:
-        from .aggregator import project_router, search_router
+        from wise.api.aggregator import project_router, search_router
     else:
-        from .standalone import project_router, search_router
+        from wise.api.standalone import project_router, search_router
 
     project_info = dependencies.project_info
     project_name = project_info.name

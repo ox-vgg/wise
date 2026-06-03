@@ -21,11 +21,14 @@ import fastapi
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from pydantic import HttpUrl
 
-from wise.data_models import MediaType, ModalityType
-
-from .. import common
-from ..common import MediaQueryTerm, Query, VectorIdQueryTerm, VectorQueryTerm
-from ..dependencies import (
+from wise.api import common
+from wise.api.common import (
+    MediaQueryTerm,
+    Query,
+    VectorIdQueryTerm,
+    VectorQueryTerm,
+)
+from wise.api.dependencies import (
     APIConfig,
     ConfigDep,
     EmbeddingService,
@@ -33,7 +36,8 @@ from ..dependencies import (
     RemoteSearchService,
     SearchServiceDep,
 )
-from ..services.embedding import EmbeddingConfig
+from wise.api.services.embedding import EmbeddingConfig
+from wise.data_models import MediaType, ModalityType
 
 
 logger = logging.getLogger(__name__)

@@ -17,8 +17,8 @@
 import enum
 from pathlib import Path
 
-from ...data_models import ModalityType
-from .faiss_store import FaissStore
+from wise.data_models import ModalityType
+from wise.feature.store.faiss_store import FaissStore
 
 
 class FeatureStoreType(enum.Enum):

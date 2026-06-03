@@ -19,7 +19,7 @@ import logging
 import numpy as np
 import torch.utils.data as torch_data
 
-from ..data_models import MediaChunkType
+from wise.data_models import MediaChunkType
 
 
 logger = logging.getLogger(__name__)

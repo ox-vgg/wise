@@ -28,8 +28,8 @@ import torchvision as tv
 from pydantic import ConfigDict, dataclasses
 from tqdm import tqdm
 
-from ..data_models import DatasetPayload, MediaChunkType, SourceMediaType
-from .streamreader import (
+from wise.data_models import DatasetPayload, MediaChunkType, SourceMediaType
+from wise.dataloader.streamreader import (
     BasicAudioStreamOutputOptions,
     BasicImageStreamOutputOptions,
     BasicThumbnailStreamOutputOptions,
@@ -41,7 +41,7 @@ from .streamreader import (
     get_stream_duration,
     get_stream_reader,
 )
-from .utils import (
+from wise.dataloader.utils import (
     MediaMimetype,
     get_media_type_from_mimetype,
     get_mime_type,

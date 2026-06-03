@@ -24,7 +24,7 @@ import torch
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import triton_to_np_dtype
 
-from .feature_extractor import FeatureExtractor, MultiModalModel
+from wise.feature.feature_extractor import FeatureExtractor, MultiModalModel
 
 
 logger = logging.getLogger(__name__)

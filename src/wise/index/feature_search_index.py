@@ -22,9 +22,9 @@ import faiss
 import numpy as np
 from tqdm import tqdm
 
-from ..data_models import ModalityType
-from ..feature.store.feature_store_factory import FeatureStoreFactory
-from .search_index import SearchIndex
+from wise.data_models import ModalityType
+from wise.feature.store.feature_store_factory import FeatureStoreFactory
+from wise.index.search_index import SearchIndex
 
 
 class FeatureSearchIndex(SearchIndex):

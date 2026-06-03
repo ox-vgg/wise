@@ -1,7 +1,7 @@
 import sqlalchemy as sa
 
-from ..base import facets_metadata_obj
-from . import vectors_table
+from wise.db.base import facets_metadata_obj
+from wise.db.tables import vectors_table
 
 
 facets_table = sa.Table(

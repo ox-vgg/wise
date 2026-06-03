@@ -24,8 +24,8 @@ from typing import Literal, Optional, TypeVar
 from pydantic import dataclasses
 from torchaudio.io import StreamReader
 
-from ..data_models import MediaChunkType, SourceMediaType
-from .utils import MediaMimetype
+from wise.data_models import MediaChunkType, SourceMediaType
+from wise.dataloader.utils import MediaMimetype
 
 
 logger = logging.getLogger(__name__)

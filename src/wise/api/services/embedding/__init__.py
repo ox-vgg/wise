@@ -14,8 +14,11 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from ._embedding import EmbeddingConfig, EmbeddingService
-from .exceptions import (
+from wise.api.services.embedding._embedding import (
+    EmbeddingConfig,
+    EmbeddingService,
+)
+from wise.api.services.embedding.exceptions import (
     FeatureExtractorNotFoundError,
     ModalityNotSupportedError,
     NoFeaturesFoundError,

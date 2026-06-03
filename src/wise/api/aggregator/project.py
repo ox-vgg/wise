@@ -21,8 +21,8 @@ from fastapi.responses import (
     StreamingResponse,
 )
 
-from .. import common
-from ..dependencies import ProjectInfoDep, ProjectServiceDep
+from wise.api import common
+from wise.api.dependencies import ProjectInfoDep, ProjectServiceDep
 
 
 logger = logging.getLogger(__name__)

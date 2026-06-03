@@ -19,8 +19,8 @@ import logging
 import numpy as np
 import torch
 
-from .feature_extractor import FeatureExtractor, Features
-from .insightface import InsightFaceFeatureExtractor
+from wise.feature.feature_extractor import FeatureExtractor, Features
+from wise.feature.insightface import InsightFaceFeatureExtractor
 
 
 _logger = logging.getLogger(__name__)

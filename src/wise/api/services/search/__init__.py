@@ -14,7 +14,7 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from .base import SearchOutput
-from .exceptions import UnknownSearchIndexError
-from .local import LocalSearchService
-from .remote import RemoteSearchService
+from wise.api.services.search.base import SearchOutput
+from wise.api.services.search.exceptions import UnknownSearchIndexError
+from wise.api.services.search.local import LocalSearchService
+from wise.api.services.search.remote import RemoteSearchService

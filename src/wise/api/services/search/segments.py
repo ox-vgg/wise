@@ -14,7 +14,7 @@
 
 import itertools
 
-from ... import common
+from wise.api import common
 
 
 def merge_close_segments(_keyframes: list[common.VideoSegment], threshold: float = 4):

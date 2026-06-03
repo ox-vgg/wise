@@ -25,7 +25,7 @@ import onnxruntime as ort
 ## https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#compatibility-with-pytorch
 import torch
 
-from .feature_extractor_factory import FeatureExtractorFactory
+from wise.feature.feature_extractor_factory import FeatureExtractorFactory
 
 
 parser = argparse.ArgumentParser(
@@ -209,7 +209,7 @@ if preprocessed_image is not None:
     })
 
     if feature_extractor.__class__.__name__ == 'TransformersOWLv2FeatureExtractor':
-        from .transformers_owlv2 import sort_by_objectness
+        from wise.feature.transformers_owlv2 import sort_by_objectness
         scores_tensor = torch.from_numpy(ort_outputs[0])
         embeddings_tensor = torch.from_numpy(ort_outputs[1])
         boxes_tensor = torch.from_numpy(ort_outputs[2])

@@ -34,16 +34,15 @@ from fastapi.responses import (
     StreamingResponse,
 )
 
-from wise.data_models import MediaMetadata, MediaType, SourceCollectionType
-
-from .. import common
-from ..dependencies import ConfigDep, ProjectInfoDep, ProjectServiceDep
-from ..services.project import (
+from wise.api import common
+from wise.api.dependencies import ConfigDep, ProjectInfoDep, ProjectServiceDep
+from wise.api.services.project import (
     LocalWiseProjectService,
     MediaNotFoundException,
     ThumbnailNotFoundException,
     WiseProjectService,
 )
+from wise.data_models import MediaMetadata, MediaType, SourceCollectionType
 
 
 logger = logging.getLogger(__name__)

@@ -69,32 +69,40 @@ def get_triton_url_from_id(_id: str) -> str | None:
 def get_feature_extractor_class(_id: str):
 
     if _id.startswith("mlfoundations/open_clip/"):
-        from .mlfoundation_openclip import MlfoundationOpenClipFeatureExtractor
+        from wise.feature.mlfoundation_openclip import (
+            MlfoundationOpenClipFeatureExtractor,
+        )
 
         return MlfoundationOpenClipFeatureExtractor
 
     if _id.startswith("microsoft/clap/"):
-        from .microsoft_clap import MicrosoftClapFeatureExtractor
+        from wise.feature.microsoft_clap import MicrosoftClapFeatureExtractor
 
         return MicrosoftClapFeatureExtractor
 
     if _id.startswith("transformers/owlv2/"):
-        from .transformers_owlv2 import TransformersOWLv2FeatureExtractor
+        from wise.feature.transformers_owlv2 import (
+            TransformersOWLv2FeatureExtractor,
+        )
 
         return TransformersOWLv2FeatureExtractor
 
     if _id.startswith("deepinsight/insightface/"):
-        from .insightface import InsightFaceFeatureExtractor
+        from wise.feature.insightface import InsightFaceFeatureExtractor
 
         return InsightFaceFeatureExtractor
 
     if _id.startswith("deepinsight/insightface-average/"):
-        from .insightface_average import InsightFaceAverageFeatureExtractor
+        from wise.feature.insightface_average import (
+            InsightFaceAverageFeatureExtractor,
+        )
 
         return InsightFaceAverageFeatureExtractor
 
     if _id.startswith("hf/"):
-        from .hf_feature_extractor import HFMultiModalFeatureExtractor
+        from wise.feature.hf_feature_extractor import (
+            HFMultiModalFeatureExtractor,
+        )
 
         return HFMultiModalFeatureExtractor
 
@@ -150,7 +158,7 @@ def FeatureExtractorFactory(id, config: dict[str, dict] = {}):
 
     cls = get_feature_extractor_class(model_id)
     if is_triton:
-        from .triton_runner import make_triton_feature_extractor
+        from wise.feature.triton_runner import make_triton_feature_extractor
         url = url or default_triton_url
         cls = make_triton_feature_extractor(cls)
         model_config["url"] = url

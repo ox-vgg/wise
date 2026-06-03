@@ -14,7 +14,10 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from .base import ProjectInfo, WiseProjectService
-from .exceptions import MediaNotFoundException, ThumbnailNotFoundException
-from .local import LocalWiseProjectService
-from .remote import RemoteWiseProjectService
+from wise.api.services.project.base import ProjectInfo, WiseProjectService
+from wise.api.services.project.exceptions import (
+    MediaNotFoundException,
+    ThumbnailNotFoundException,
+)
+from wise.api.services.project.local import LocalWiseProjectService
+from wise.api.services.project.remote import RemoteWiseProjectService

@@ -27,14 +27,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import HttpUrl
 
-from wise.config import APIConfig
-from wise.data_models import MediaType, ModalityType, VectorAndMediaMetadata
-from wise.feature.feature_extractor import FeatureExtMetadata
-from wise.search.fts import WISEFTSQuery
-from wise.wise_project import WiseProject
-
-from .. import common
-from ..common import (
+from wise.api import common
+from wise.api.common import (
     MediaQueryTerm,
     Query,
     TextQueryTerm,
@@ -42,7 +36,7 @@ from ..common import (
     VectorQueryTerm,
     VideoSegment,
 )
-from ..dependencies import (
+from wise.api.dependencies import (
     ConfigDep,
     EmbeddingService,
     EmbeddingServiceDep,
@@ -53,18 +47,23 @@ from ..dependencies import (
     ProjectServiceDep,
     SearchServiceDep,
 )
-from ..services.embedding import EmbeddingConfig
-from ..services.search import SearchOutput
-from ..services.search.face_text_standalone import (
+from wise.api.services.embedding import EmbeddingConfig
+from wise.api.services.search import SearchOutput
+from wise.api.services.search.face_text_standalone import (
     resolve_face_text_embedder,
     run_face_text_search_standalone,
 )
-from ..services.search.segments import (
+from wise.api.services.search.segments import (
     get_shots_from_segments as _get_shots_from_segments,
 )
-from ..services.search.segments import (
+from wise.api.services.search.segments import (
     merge_close_segments as _merge_close_segments,
 )
+from wise.config import APIConfig
+from wise.data_models import MediaType, ModalityType, VectorAndMediaMetadata
+from wise.feature.feature_extractor import FeatureExtMetadata
+from wise.search.fts import WISEFTSQuery
+from wise.wise_project import WiseProject
 
 
 logger = logging.getLogger(__name__)

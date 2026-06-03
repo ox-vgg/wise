@@ -33,8 +33,8 @@ from PIL import Image
 from torchvision.transforms.functional import pil_to_tensor
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 
-from ..db import project_metadata_obj
-from .feature_extractor import (
+from wise.db import project_metadata_obj
+from wise.feature.feature_extractor import (
     BBoxXYWH,
     FeatureExtMetadata,
     FeatureExtractor,

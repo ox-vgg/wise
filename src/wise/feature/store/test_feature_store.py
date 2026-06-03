@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .faiss_store import FaissStore
+from wise.feature.store.faiss_store import FaissStore
 
 
 class TestFeatureExtractorFactory(unittest.TestCase):

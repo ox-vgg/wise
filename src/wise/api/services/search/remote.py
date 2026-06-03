@@ -22,11 +22,10 @@ from typing import Literal
 import numpy as np
 from fastapi import Request
 
+from wise.api import common
+from wise.api.services.embedding import EmbeddingService
+from wise.api.services.project import RemoteWiseProjectService
 from wise.data_models import MediaType
-
-from ... import common
-from ..embedding import EmbeddingService
-from ..project import RemoteWiseProjectService
 
 
 logger = logging.getLogger(__name__)

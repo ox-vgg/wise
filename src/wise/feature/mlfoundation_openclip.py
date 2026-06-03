@@ -26,7 +26,7 @@ import torch
 import torchvision.transforms.functional as F
 from PIL import Image
 
-from .feature_extractor import (
+from wise.feature.feature_extractor import (
     BBoxXYWH,
     FeatureExtractor,
     Features,

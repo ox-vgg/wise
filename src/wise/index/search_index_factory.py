@@ -14,8 +14,8 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from .feature_search_index import FeatureSearchIndex
-from .sqlite_search_index import SqliteSearchIndex
+from wise.index.feature_search_index import FeatureSearchIndex
+from wise.index.sqlite_search_index import SqliteSearchIndex
 
 
 ## FIXME: modality_type is a str because it may have the value

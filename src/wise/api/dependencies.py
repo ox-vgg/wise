@@ -21,15 +21,14 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from wise.config import APIConfig
-
-from .services.embedding import EmbeddingService
-from .services.project import (
+from wise.api.services.embedding import EmbeddingService
+from wise.api.services.project import (
     LocalWiseProjectService,
     ProjectInfo,
     RemoteWiseProjectService,
 )
-from .services.search import LocalSearchService, RemoteSearchService
+from wise.api.services.search import LocalSearchService, RemoteSearchService
+from wise.config import APIConfig
 
 
 logger = logging.getLogger(__name__)
@@ -71,9 +70,8 @@ def get_project_service(config: ConfigDep):
                     raise ValueError(
                         f"Local path does not exist or is not a directory: {project_path}"
                     )
+                from wise.api.services.project import LocalWiseProjectService
                 from wise.wise_project import WiseProject
-
-                from .services.project import LocalWiseProjectService
                 project = WiseProject(project_path, read_only=True)
                 project.load_search_indices(config.index_type, config.nprobe)
                 _project_service = LocalWiseProjectService(project, config)

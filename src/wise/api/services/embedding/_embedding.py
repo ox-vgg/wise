@@ -27,14 +27,18 @@ from PIL import Image
 from pydantic import BaseModel, HttpUrl
 from torch.hub import download_url_to_file
 
-from wise.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
-
-from ...common import MediaQueryTerm, Query, TextQueryTerm, VectorQueryTerm
-from .exceptions import (
+from wise.api.common import (
+    MediaQueryTerm,
+    Query,
+    TextQueryTerm,
+    VectorQueryTerm,
+)
+from wise.api.services.embedding.exceptions import (
     FeatureExtractorNotFoundError,
     ModalityNotSupportedError,
     NoFeaturesFoundError,
 )
+from wise.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
 
 
 logger = logging.getLogger(__name__)

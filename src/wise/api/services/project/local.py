@@ -23,14 +23,16 @@ from typing import Any
 from PIL import Image
 from webvtt import Caption, WebVTT
 
+from wise.api.services.project.base import ProjectInfo, WiseProjectService
+from wise.api.services.project.exceptions import (
+    MediaNotFoundException,
+    ThumbnailNotFoundException,
+)
 from wise.config import APIConfig
 from wise.data_models import MediaType, VectorAndMediaMetadata
 from wise.repository import get_featured_images
 from wise.utils import convert_uint8array_to_base64
 from wise.wise_project import WiseProject
-
-from .base import ProjectInfo, WiseProjectService
-from .exceptions import MediaNotFoundException, ThumbnailNotFoundException
 
 
 logger = logging.getLogger(__name__)

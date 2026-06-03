@@ -29,8 +29,8 @@ from pydantic import Field, RootModel
 from sqlalchemy.ext import compiler
 from sqlalchemy.schema import DDLElement
 
-from .. import db
-from ..data_models import (
+from wise import db
+from wise.data_models import (
     MediaMetadata,
     MediaType,
     ModalityType,

@@ -15,13 +15,13 @@
 ## limitations under the License.
 
 import sqlalchemy as sa
-
-from ...data_models import MediaType, ModalityType, SourceCollectionType
-from ..base import (
+from wise.db.base import (
     facets_metadata_obj,
     project_metadata_obj,
     thumbs_metadata_obj,
 )
+
+from wise.data_models import MediaType, ModalityType, SourceCollectionType
 
 
 source_collections_table = sa.Table(

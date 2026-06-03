@@ -14,10 +14,14 @@
 
 from __future__ import annotations
 
+from wise.api.common import (
+    MediaQueryTerm,
+    Query,
+    TextQueryTerm,
+    VectorIdQueryTerm,
+)
+from wise.api.services.search.face_text import run_face_text_search
 from wise.data_models import MediaType
-
-from ...common import MediaQueryTerm, Query, TextQueryTerm, VectorIdQueryTerm
-from .face_text import run_face_text_search
 
 
 def describe_face_text_query(
@@ -54,7 +58,7 @@ def resolve_face_text_embedder(
     if not (has_text_queries and has_image_queries and not supports_text):
         return None, has_text_queries, has_image_queries, supports_text
 
-    from .face_text import get_face_text_embedder_id
+    from wise.api.services.search.face_text import get_face_text_embedder_id
 
     text_feature_extractor_id = get_face_text_embedder_id(
         media_type,

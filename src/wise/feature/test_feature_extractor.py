@@ -36,9 +36,9 @@ import torch
 from PIL import Image
 from sklearn.datasets import load_sample_image
 
-from .feature_extractor import BBoxXYWH
-from .feature_extractor_factory import FeatureExtractorFactory
-from .transformers_owlv2 import (
+from wise.feature.feature_extractor import BBoxXYWH
+from wise.feature.feature_extractor_factory import FeatureExtractorFactory
+from wise.feature.transformers_owlv2 import (
     TransformersOWLv2FeatureExtractor,
     owlv2_bbox_to_xywh,
     sort_by_objectness,

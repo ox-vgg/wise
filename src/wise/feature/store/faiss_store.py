@@ -23,8 +23,8 @@ from pathlib import Path
 import faiss
 import numpy as np
 
-from ...utils import batched
-from .feature_store import FeatureStore
+from wise.feature.store.feature_store import FeatureStore
+from wise.utils import batched
 
 
 logger = logging.getLogger(__name__)

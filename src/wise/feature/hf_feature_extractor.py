@@ -22,7 +22,11 @@ import numpy as np
 import torch
 from transformers import AutoConfig, AutoModel, AutoProcessor
 
-from .feature_extractor import FeatureExtractor, Features, get_torch_device
+from wise.feature.feature_extractor import (
+    FeatureExtractor,
+    Features,
+    get_torch_device,
+)
 
 
 logger = logging.getLogger(__name__)

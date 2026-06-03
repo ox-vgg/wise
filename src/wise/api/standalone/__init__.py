@@ -14,6 +14,6 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from .project import router as project_router
-from .report import router as report_router
-from .search import router as search_router
+from wise.api.standalone.project import router as project_router
+from wise.api.standalone.report import router as report_router
+from wise.api.standalone.search import router as search_router

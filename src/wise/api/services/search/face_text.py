@@ -16,9 +16,8 @@ from __future__ import annotations
 
 from typing import Hashable, Iterable, TypeVar
 
+from wise.api.common import MediaQueryTerm, Query, TextQueryTerm
 from wise.data_models import MediaType
-
-from ...common import MediaQueryTerm, Query, TextQueryTerm
 
 
 T = TypeVar("T")

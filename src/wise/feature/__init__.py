@@ -20,18 +20,22 @@ Contains implementation for feature extractor and feature store.
 
 """
 
-from .feature_extractor import BBoxXYWH as BBoxXYWH
-from .feature_extractor import FeatureExtMetadata as FeatureExtMetadata
-from .feature_extractor import FeatureExtractor as FeatureExtractor
-from .feature_extractor import FeatureExtractorConfig as FeatureExtractorConfig
-from .feature_extractor import Features as Features
-from .feature_extractor import get_torch_device as get_torch_device
-from .feature_extractor_factory import (
+from wise.feature.feature_extractor import BBoxXYWH as BBoxXYWH
+from wise.feature.feature_extractor import (
+    FeatureExtMetadata as FeatureExtMetadata,
+)
+from wise.feature.feature_extractor import FeatureExtractor as FeatureExtractor
+from wise.feature.feature_extractor import (
+    FeatureExtractorConfig as FeatureExtractorConfig,
+)
+from wise.feature.feature_extractor import Features as Features
+from wise.feature.feature_extractor import get_torch_device as get_torch_device
+from wise.feature.feature_extractor_factory import (
     FeatureExtractorFactory as FeatureExtractorFactory,
 )
-from .feature_extractor_factory import (
+from wise.feature.feature_extractor_factory import (
     get_canonical_feature_extractor_id as get_canonical_feature_extractor_id,
 )
-from .feature_extractor_factory import (
+from wise.feature.feature_extractor_factory import (
     get_feature_extractor_class as get_feature_extractor_class,
 )

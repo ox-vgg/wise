@@ -22,9 +22,9 @@ import faiss
 import numpy as np
 from tqdm import tqdm
 
-from ..feature.feature_extractor_factory import FeatureExtractorFactory
-from ..feature.store.feature_store_factory import FeatureStoreFactory
-from .search_index import SearchIndex
+from wise.feature.feature_extractor_factory import FeatureExtractorFactory
+from wise.feature.store.feature_store_factory import FeatureStoreFactory
+from wise.index.search_index import SearchIndex
 
 
 class SqliteSearchIndex(SearchIndex):

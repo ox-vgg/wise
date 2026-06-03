@@ -62,8 +62,8 @@ import onnxruntime  # import before insightface for cleaner error
 import insightface.app
 # isort: on
 
-from ..db import project_metadata_obj
-from .feature_extractor import (
+from wise.db import project_metadata_obj
+from wise.feature.feature_extractor import (
     BBoxXYWH,
     FeatureExtMetadata,
     FeatureExtractor,

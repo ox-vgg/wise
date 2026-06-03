@@ -31,8 +31,8 @@ import sqlalchemy as sa
 from PIL import Image
 from tqdm import tqdm
 
-from . import db as wise_db
-from .data_models import (
+from wise import db as wise_db
+from wise.data_models import (
     DatasetPayload,
     MediaMetadata,
     MediaMetadataWithSource,
@@ -43,19 +43,23 @@ from .data_models import (
     VectorAndMediaMetadata,
     VideoShot,
 )
-from .dataloader import AVDataset
-from .feature.feature_extractor_factory import get_feature_extractor_class
-from .feature.store import FeatureStore, FeatureStoreFactory, FeatureStoreType
-from .index.search_index import SearchIndex
-from .index.search_index_factory import SearchIndexFactory
-from .repository import (
+from wise.dataloader import AVDataset
+from wise.feature.feature_extractor_factory import get_feature_extractor_class
+from wise.feature.store import (
+    FeatureStore,
+    FeatureStoreFactory,
+    FeatureStoreType,
+)
+from wise.index.search_index import SearchIndex
+from wise.index.search_index_factory import SearchIndexFactory
+from wise.repository import (
     MediaRepo,
     SourceCollectionRepo,
     ThumbnailRepo,
     VectorRepo,
     VideoShotsRepo,
 )
-from .search.fts import FTSSearch
+from wise.search.fts import FTSSearch
 
 
 logger = logging.getLogger(__name__)

@@ -25,11 +25,10 @@ from fastapi import Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
+from wise.api import common
+from wise.api.services.project.base import ProjectInfo, WiseProjectService
 from wise.config import APIConfig
 from wise.data_models import MediaType, VectorAndMediaMetadata
-
-from ... import common
-from .base import ProjectInfo, WiseProjectService
 
 
 class RemoteWiseProjectService(WiseProjectService):

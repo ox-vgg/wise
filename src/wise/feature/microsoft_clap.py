@@ -24,7 +24,7 @@ import numpy as np
 import torch
 from msclap import CLAP
 
-from .feature_extractor import (
+from wise.feature.feature_extractor import (
     FeatureExtractor,
     MultiModalModel,
     get_torch_device,

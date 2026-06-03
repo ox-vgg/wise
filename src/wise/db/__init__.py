@@ -50,8 +50,8 @@ from sqlite3 import Connection as SQLite3Connection
 
 from sqlalchemy import Engine, MetaData, create_engine, event
 
-from .base import project_metadata_obj, thumbs_metadata_obj
-from .tables import (
+from wise.db.base import project_metadata_obj, thumbs_metadata_obj
+from wise.db.tables import (
     imported_metadata_table,
     media_table,
     shots_table,

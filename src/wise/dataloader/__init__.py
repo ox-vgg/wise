@@ -14,7 +14,7 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from .dataset import (
+from wise.dataloader.dataset import (
     AudioDataset,
     AVDataset,
     BasicAudioStreamOutputOptions,
@@ -29,4 +29,4 @@ from .dataset import (
     get_media_metadata,
     get_metadata_for_valid_files,
 )
-from .shot import ShotStream
+from wise.dataloader.shot import ShotStream

@@ -27,13 +27,13 @@ import torch.utils.data as torch_data
 import typer
 from tqdm import tqdm
 
-from ._extra import (
+from wise.dataloader._extra import (
     CLIPModel,
     _preprocess,
     get_input_transform_for_model,
 )
-from .dataset import get_dataset, get_metadata_for_valid_files
-from .utils import get_files_from_directory_with_extensions
+from wise.dataloader.dataset import get_dataset, get_metadata_for_valid_files
+from wise.dataloader.utils import get_files_from_directory_with_extensions
 
 
 logger = logging.getLogger(__name__)

@@ -16,8 +16,8 @@
 
 import sqlalchemy as sa
 
-from .. import db
-from ..data_models import (
+from wise import db
+from wise.data_models import (
     ExtraMediaMetadata,
     MediaMetadata,
     ModalityType,
@@ -26,7 +26,7 @@ from ..data_models import (
     VectorMetadata,
     VideoShot,
 )
-from .base import SQLAlchemyRepository
+from wise.repository.base import SQLAlchemyRepository
 
 
 SourceCollectionRepo = SQLAlchemyRepository[

@@ -19,16 +19,15 @@ import logging
 import faiss
 import numpy as np
 
+from wise.api.common import Query
+from wise.api.services.embedding import EmbeddingConfig, EmbeddingService
+from wise.api.services.project import LocalWiseProjectService
+from wise.api.services.search.base import SearchOutput
+from wise.api.services.search.exceptions import UnknownSearchIndexError
 from wise.data_models import MediaType
 from wise.feature.feature_extractor import FeatureExtMetadata
 from wise.search.fts import WISEFTSQuery
 from wise.wise_project import WiseProject
-
-from ...common import Query
-from ..embedding import EmbeddingConfig, EmbeddingService
-from ..project import LocalWiseProjectService
-from .base import SearchOutput
-from .exceptions import UnknownSearchIndexError
 
 
 logger = logging.getLogger(__name__)

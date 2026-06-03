@@ -17,7 +17,7 @@
 import json
 import unittest
 
-from .query_parser import parse_search_query
+from wise.search.query_parser import parse_search_query
 
 
 class TestQueryParser(unittest.TestCase):
