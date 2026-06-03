@@ -17,7 +17,9 @@
 import logging
 import io
 import json
+import random
 import sqlalchemy as sa
+from collections import defaultdict
 from pathlib import Path
 from typing import BinaryIO
 
@@ -335,9 +337,6 @@ def _get_facets_with_previews(project_service: LocalWiseProjectService):
                     .where(facet_metadata_table.c.cluster_id.in_(cluster_ids))
                 ).fetchall()
 
-                from collections import defaultdict
-                import random
-
                 cluster_to_vectors = defaultdict(list)
                 for a in assignments:
                     cluster_to_vectors[a.cluster_id].append(a.vector_id)
@@ -641,7 +640,6 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
         """)
         assignments = conn.execute(sampled_query).fetchall()
 
-    from collections import defaultdict
     cluster_to_vectors = defaultdict(list)
     for a in assignments:
         cluster_to_vectors[a.cluster_id].append(a.vector_id)
@@ -777,7 +775,6 @@ async def get_published_cluster_faces_by_media(cluster_id: int, request: Request
 
     # 4. Group by media_id
     grouped_faces = {}
-    from pathlib import Path
     for m, ext in zip(metadata, ext_metadata):
         if m.media_id not in grouped_faces:
             grouped_faces[m.media_id] = {

@@ -16,6 +16,7 @@
 
 import logging
 import json
+from pathlib import Path
 from typing import Annotated
 from fastapi import Depends
 from wise.config import APIConfig
@@ -59,7 +60,6 @@ def get_project_service(config: ConfigDep):
                 _project_service = remote_project_services
             else:
 
-                from pathlib import Path
                 project_path = Path(config.project_dir)
                 if not project_path.exists() or not project_path.is_dir():
                     raise ValueError(
