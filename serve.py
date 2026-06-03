@@ -23,11 +23,6 @@ import typer
 from wise.enums import IndexType
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
-)
-
 app = typer.Typer()
 @app.command(
     help="Serve the REST API and frontend UI for WISE.",
@@ -57,6 +52,10 @@ def main(
         help="The root path where the app is being served behind a proxy",
     ),
 ):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
+    )
     # ensure that the frontend assets are built
     if not Path(theme_asset_dir / 'index.html').exists():
         raise FileNotFoundError(

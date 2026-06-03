@@ -27,11 +27,6 @@ from wise.search.fts import FTSSearch
 from wise.wise_project import WiseProject
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
-)
-
 logger = logging.getLogger(__name__)
 
 def create_fts_index(project, args):
@@ -64,6 +59,10 @@ def create_fts_index(project, args):
         project.fts_config_file.unlink(missing_ok=True)
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
+    )
     parser = argparse.ArgumentParser(prog='create-index',
                                      description='Create a nearest neighbour search index for features extracted from images and videos.',
                                      epilog='For more details about WISE, visit https://www.robots.ox.ac.uk/~vgg/software/wise/')
