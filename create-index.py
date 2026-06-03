@@ -22,8 +22,6 @@ from pathlib import Path
 
 from wise.config import APIConfig
 
-# from wise.dataloader import AVDataset
-# from wise.search_index import SearchIndex
 from wise.wise_project import WiseProject
 from wise.feature import FeatureExtractorFactory
 from wise.index.search_index_factory import SearchIndexFactory
