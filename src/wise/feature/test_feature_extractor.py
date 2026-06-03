@@ -18,6 +18,7 @@ import os
 import tempfile
 import unittest
 
+
 # isort: off
 ## InsightFace, which we will import below, imports albumentations
 ## which by default checks on PyPI if the user is running the last
@@ -31,17 +32,17 @@ os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"  # disable version check
 
 import insightface.data
 import numpy as np
-from sklearn.datasets import load_sample_image
 import torch
 from PIL import Image
+from sklearn.datasets import load_sample_image
 
+from .feature_extractor import BBoxXYWH
+from .feature_extractor_factory import FeatureExtractorFactory
 from .transformers_owlv2 import (
     TransformersOWLv2FeatureExtractor,
     owlv2_bbox_to_xywh,
     sort_by_objectness,
 )
-from .feature_extractor_factory import FeatureExtractorFactory
-from .feature_extractor import BBoxXYWH
 
 
 class TestFeatureExtractor(unittest.TestCase):

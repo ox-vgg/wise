@@ -14,16 +14,17 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from functools import cached_property
 import logging
+from collections.abc import Iterable
+from functools import cached_property
 from pathlib import Path
+from typing import Any
+
+import numpy as np
 import open_clip
 import torch
-import numpy as np
-from typing import Any
-from PIL import Image
 import torchvision.transforms.functional as F
-from collections.abc import Iterable
+from PIL import Image
 
 from .feature_extractor import (
     BBoxXYWH,
@@ -31,6 +32,7 @@ from .feature_extractor import (
     Features,
     MultiModalModel,
 )
+
 
 logger = logging.getLogger(__name__)
 

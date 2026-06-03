@@ -16,21 +16,22 @@
 
 import datetime
 import io
-import math
 import logging
+import math
 from typing import Any
 
-from wise.config import APIConfig
-from .exceptions import MediaNotFoundException, ThumbnailNotFoundException
-from .base import WiseProjectService, ProjectInfo
-from wise.wise_project import WiseProject
-from wise.data_models import VectorAndMediaMetadata, MediaType
-from wise.repository import get_featured_images
-
-from wise.utils import convert_uint8array_to_base64
-
 from PIL import Image
-from webvtt import WebVTT, Caption
+from webvtt import Caption, WebVTT
+
+from wise.config import APIConfig
+from wise.data_models import MediaType, VectorAndMediaMetadata
+from wise.repository import get_featured_images
+from wise.utils import convert_uint8array_to_base64
+from wise.wise_project import WiseProject
+
+from .base import ProjectInfo, WiseProjectService
+from .exceptions import MediaNotFoundException, ThumbnailNotFoundException
+
 
 logger = logging.getLogger(__name__)
 

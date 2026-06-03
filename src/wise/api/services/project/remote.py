@@ -15,18 +15,22 @@
 ## limitations under the License.
 
 import asyncio
-from functools import cached_property
 import io
+from functools import cached_property
 from typing import Literal
-from .base import WiseProjectService, ProjectInfo
+
 import httpx
-from ... import common
-from wise.config import APIConfig
-from wise.data_models import MediaType, VectorAndMediaMetadata
 import numpy as np
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
+
+from wise.config import APIConfig
+from wise.data_models import MediaType, VectorAndMediaMetadata
+
+from ... import common
+from .base import ProjectInfo, WiseProjectService
+
 
 class RemoteWiseProjectService(WiseProjectService):
     def __init__(self, project_uri: str, config: APIConfig):

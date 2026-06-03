@@ -14,7 +14,7 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from .base import WiseProjectService, ProjectInfo
+from .base import ProjectInfo, WiseProjectService
 from .exceptions import MediaNotFoundException, ThumbnailNotFoundException
 from .local import LocalWiseProjectService
 from .remote import RemoteWiseProjectService

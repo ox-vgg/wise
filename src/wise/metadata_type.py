@@ -16,6 +16,7 @@
 
 from enum import Enum
 
+
 class MetadataType(Enum):
     """
     Metadata corresponds to textual description of a media file (e.g. image,

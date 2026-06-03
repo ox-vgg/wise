@@ -18,13 +18,16 @@ import asyncio
 import functools
 import logging
 from typing import Literal
-from ... import common
-from ..project import RemoteWiseProjectService
-from ..embedding import EmbeddingService
 
-from wise.data_models import MediaType
 import numpy as np
 from fastapi import Request
+
+from wise.data_models import MediaType
+
+from ... import common
+from ..embedding import EmbeddingService
+from ..project import RemoteWiseProjectService
+
 
 logger = logging.getLogger(__name__)
 

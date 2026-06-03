@@ -17,16 +17,15 @@
 import argparse
 import json
 import logging
-
 from pathlib import Path
 
+from wise import db
 from wise.config import APIConfig
-
-from wise.wise_project import WiseProject
 from wise.feature import FeatureExtractorFactory
 from wise.index.search_index_factory import SearchIndexFactory
 from wise.search.fts import FTSSearch
-from wise import db
+from wise.wise_project import WiseProject
+
 
 logging.basicConfig(
     level=logging.INFO,

@@ -15,17 +15,18 @@
 ## limitations under the License.
 
 from __future__ import annotations
+
 import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, NamedTuple, Optional, Type
 
-from pydantic import BaseModel, ConfigDict
-from PIL import Image
-import torch
-import torchvision.transforms.v2.functional as F
 import numpy as np
 import sqlalchemy as sa
+import torch
+import torchvision.transforms.v2.functional as F
+from PIL import Image
+from pydantic import BaseModel, ConfigDict
 from torchvision.ops import box_iou
 
 

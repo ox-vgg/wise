@@ -16,10 +16,10 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import TypeVar, Generic, Any, Type, Optional
+from typing import Any, Generic, Optional, Type, TypeVar
 
-from pydantic import BaseModel
 import sqlalchemy as sa
+from pydantic import BaseModel
 
 
 Entity = TypeVar("Entity", bound=BaseModel)

@@ -15,10 +15,14 @@
 ## limitations under the License.
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from pydantic import BaseModel, Field
 from functools import reduce
+
+from pydantic import BaseModel, Field
+
 from wise.data_models import MediaType
+
 
 class Filter(BaseModel):
     name: str

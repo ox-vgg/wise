@@ -15,25 +15,40 @@
 ## limitations under the License.
 
 import argparse
+import logging
 import os
+import pprint
 import time
 from pathlib import Path
-import pprint
-
 from typing import Literal
+
+import numpy as np
+import sqlalchemy as sa
 import torch
 import torch.utils.data as torch_data
 from tqdm import tqdm
-import numpy as np
-import logging
 
-import sqlalchemy as sa
-from wise.enums import BaseStrEnum
+from wise.config import APIConfig
+from wise.data_models import (
+    MediaChunkType,
+    MediaMetadata,
+    MediaType,
+    ModalityType,
+    SourceCollection,
+    SourceCollectionType,
+    SourceMediaType,
+    ThumbnailMetadata,
+    VectorMetadata,
+)
+from wise.dataloader import (
+    DatasetPayload,
+    get_dataset,
+    get_metadata_for_valid_files,
+)
 from wise.dataloader.dataset import MediaChunk
-from wise.dataloader import get_dataset, get_metadata_for_valid_files, DatasetPayload
-from wise.data_models import SourceMediaType, MediaChunkType
+from wise.dataloader.shot import ShotStream
 from wise.dataloader.utils import get_files_from_directory_with_extensions
-from wise.wise_project import WiseProject
+from wise.enums import BaseStrEnum
 from wise.feature.feature_extractor import FeatureExtractor
 from wise.feature.feature_extractor_factory import (
     FeatureExtractorFactory,
@@ -44,25 +59,14 @@ from wise.feature.store import (
     FeatureStoreFactory,
     FeatureStoreType,
 )
-
-from wise.data_models import (
-    MediaMetadata,
-    SourceCollection,
-    VectorMetadata,
-    ThumbnailMetadata,
-    MediaType,
-    ModalityType,
-    SourceCollectionType,
-)
 from wise.repository import (
-    SourceCollectionRepo,
     MediaRepo,
-    VectorRepo,
+    SourceCollectionRepo,
     ThumbnailRepo,
+    VectorRepo,
 )
-from wise.dataloader.shot import ShotStream
+from wise.wise_project import WiseProject
 
-from wise.config import APIConfig
 
 class ExtractFeatureMode(BaseStrEnum):
     create = "create"

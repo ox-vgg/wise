@@ -15,31 +15,41 @@
 ## limitations under the License.
 
 import itertools
-import logging
 import json
-from pathlib import Path
-from uuid import uuid4, UUID
+import logging
 from collections.abc import Callable, Generator
-from typing import Optional, Any, overload, Literal
-from ..data_models import SourceMediaType, MediaChunkType, DatasetPayload
+from pathlib import Path
+from typing import Any, Literal, Optional, overload
+from uuid import UUID, uuid4
+
+import torch
+import torch.utils.data as torch_data
+import torchvision as tv
+from pydantic import ConfigDict, dataclasses
+from tqdm import tqdm
+
+from ..data_models import DatasetPayload, MediaChunkType, SourceMediaType
 from .streamreader import (
-    StreamOutputOptions,
-    BasicImageStreamOutputOptions,
     BasicAudioStreamOutputOptions,
-    BasicVideoStreamOutputOptions,
+    BasicImageStreamOutputOptions,
     BasicThumbnailStreamOutputOptions,
-    get_media_type,
+    BasicVideoStreamOutputOptions,
+    StreamOutputOptions,
+    get_media_chunk_type,
     get_media_info,
+    get_media_type,
     get_stream_duration,
     get_stream_reader,
-    get_media_chunk_type,
 )
-from .utils import get_mimetype_and_media_type_for_file, md5, MediaMimetype, get_media_type_from_mimetype, get_mime_type
-from pydantic import dataclasses, ConfigDict
-import torch
-import torchvision as tv
-import torch.utils.data as torch_data
-from tqdm import tqdm
+from .utils import (
+    MediaMimetype,
+    get_media_type_from_mimetype,
+    get_mime_type,
+    get_mimetype_and_media_type_for_file,
+    md5,
+)
+
+
 logger = logging.getLogger(__name__)
 
 

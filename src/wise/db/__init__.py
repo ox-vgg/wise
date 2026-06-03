@@ -47,16 +47,19 @@ instantiated in the `repository` module.
 """
 
 from sqlite3 import Connection as SQLite3Connection
-from sqlalchemy import create_engine, Engine, MetaData, event
-from .base import thumbs_metadata_obj, project_metadata_obj
+
+from sqlalchemy import Engine, MetaData, create_engine, event
+
+from .base import project_metadata_obj, thumbs_metadata_obj
 from .tables import (
-    source_collections_table,
-    media_table,
-    vectors_table,
     imported_metadata_table,
+    media_table,
+    shots_table,
+    source_collections_table,
     thumbnails_table,
-    shots_table
+    vectors_table,
 )
+
 
 _WISE_FTS_TABLE = 'metadata_fts'
 _WISE_ASR_TABLE = 'metadata-asr'

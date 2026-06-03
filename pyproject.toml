@@ -41,5 +41,14 @@ releasenotes = "https://gitlab.com/vgg/wise/wise/-/blob/main/NEWS.md"
 repository = "https://gitlab.com/vgg/wise/wise/"
 tracker = "https://gitlab.com/vgg/wise/wise/-/work_items"
 
+
+[tool.isort]
+src_paths = ["src"]
+py_version = 310
+profile = "black"
+line_length = 79
+lines_after_imports = 2
+
+
 [tool.pytest]
 testpaths = ["src"]

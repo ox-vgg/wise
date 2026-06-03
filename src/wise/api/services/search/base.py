@@ -15,8 +15,10 @@
 ## limitations under the License.
 
 from pydantic import BaseModel
+
 from wise.data_models import VectorAndMediaMetadata
 from wise.feature.feature_extractor import FeatureExtMetadata
+
 
 class SearchOutput(BaseModel):
     ids: list[int | None] = []

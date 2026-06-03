@@ -15,15 +15,21 @@
 ## limitations under the License.
 
 import collections
-from functools import cached_property
 import logging
 import re
+from functools import cached_property
 from pathlib import Path
-from msclap import CLAP
-import torch
-import numpy as np
 
-from .feature_extractor import FeatureExtractor, get_torch_device, MultiModalModel
+import numpy as np
+import torch
+from msclap import CLAP
+
+from .feature_extractor import (
+    FeatureExtractor,
+    MultiModalModel,
+    get_torch_device,
+)
+
 
 logger = logging.getLogger(__name__)
 

@@ -14,17 +14,18 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import faiss
-from tqdm import tqdm
-from pathlib import Path
-import numpy as np
-import math
 import itertools
+import math
+from pathlib import Path
 
+import faiss
+import numpy as np
+from tqdm import tqdm
+
+from ..data_models import ModalityType
+from ..feature.store.feature_store_factory import FeatureStoreFactory
 from .search_index import SearchIndex
 
-from ..feature.store.feature_store_factory import FeatureStoreFactory
-from ..data_models import ModalityType
 
 class FeatureSearchIndex(SearchIndex):
 

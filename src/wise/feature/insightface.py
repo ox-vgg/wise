@@ -15,18 +15,20 @@
 ## limitations under the License.
 
 from __future__ import annotations
+
 import contextlib
-from functools import cached_property
 import logging
 import os
 import os.path
 from dataclasses import dataclass
+from functools import cached_property
 
 import huggingface_hub
 import numpy as np
 import PIL.Image
 import sqlalchemy as sa
 import torch
+
 
 ## Importing InsightFace requires some care:
 ##
@@ -54,21 +56,20 @@ import torch
 ##      https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#compatibility-with-pytorch
 
 # isort: off
-import os
 os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"  # disable check for version
 import cv2  # import before onnxruntime
 import onnxruntime  # import before insightface for cleaner error
 import insightface.app
 # isort: on
 
+from ..db import project_metadata_obj
 from .feature_extractor import (
     BBoxXYWH,
-    FeatureExtractor,
     FeatureExtMetadata,
+    FeatureExtractor,
     Features,
     MultiModalModel,
 )
-from ..db import project_metadata_obj
 
 
 _logger = logging.getLogger(__name__)

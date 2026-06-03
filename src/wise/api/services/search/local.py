@@ -15,17 +15,21 @@
 ## limitations under the License.
 
 import logging
-from .base import SearchOutput
-from .exceptions import UnknownSearchIndexError
-from ..embedding import EmbeddingService, EmbeddingConfig
-from ..project import LocalWiseProjectService
-from ...common import Query
-from wise.wise_project import WiseProject
+
+import faiss
+import numpy as np
+
 from wise.data_models import MediaType
 from wise.feature.feature_extractor import FeatureExtMetadata
 from wise.search.fts import WISEFTSQuery
-import faiss
-import numpy as np
+from wise.wise_project import WiseProject
+
+from ...common import Query
+from ..embedding import EmbeddingConfig, EmbeddingService
+from ..project import LocalWiseProjectService
+from .base import SearchOutput
+from .exceptions import UnknownSearchIndexError
+
 
 logger = logging.getLogger(__name__)
 

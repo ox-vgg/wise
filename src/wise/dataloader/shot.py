@@ -14,10 +14,14 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from ..data_models import MediaChunkType
-import torch.utils.data as torch_data
-import numpy as np
 import logging
+
+import numpy as np
+import torch.utils.data as torch_data
+
+from ..data_models import MediaChunkType
+
+
 logger = logging.getLogger(__name__)
 
 class ShotStream(torch_data.IterableDataset):

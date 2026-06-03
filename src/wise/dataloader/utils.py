@@ -16,11 +16,12 @@
 
 import enum
 import hashlib
-from pathlib import Path
 import logging
+from pathlib import Path
 
 import filetype
 import magic
+
 
 logger = logging.getLogger(__name__)
 

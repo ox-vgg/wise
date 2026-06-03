@@ -14,13 +14,15 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import unittest
-import torch
 import tempfile
-import numpy as np
+import unittest
 from pathlib import Path
 
+import numpy as np
+import torch
+
 from .faiss_store import FaissStore
+
 
 class TestFeatureExtractorFactory(unittest.TestCase):
     def setUp(self):

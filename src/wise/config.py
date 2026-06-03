@@ -14,19 +14,18 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from typing_extensions import Self
-from pydantic import model_validator
+from pathlib import Path
+from typing import Literal, Optional
 
+from pydantic import model_validator
 from pydantic_settings import (
     BaseSettings,
-    SettingsConfigDict,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
     YamlConfigSettingsSource,
 )
+from typing_extensions import Self
 
-from typing import Literal, Optional
-from pathlib import Path
 
 class APIConfig(BaseSettings):
 

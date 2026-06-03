@@ -23,38 +23,38 @@ Table of Contents
 """
 
 import argparse
-import sys
-from pathlib import Path
+import bisect
 import csv
 import json
+import re
 import sqlite3
+import sys
+from collections import defaultdict
+from pathlib import Path
 
-from wise.wise_project import WiseProject
-from wise import db
-from wise.metadata_type import MetadataType
-
-from wise.data_models import (
-    MediaMetadata,
-    SourceCollection,
-    ExtraMediaMetadata,
-    VectorMetadata,
-    MediaType,
-    SourceCollectionType,
-    VideoShot
-)
-from wise.repository import (
-    SourceCollectionRepo,
-    MediaRepo,
-    VectorRepo,
-    MediaMetadataRepo,
-    VideoShotsRepo,
-)
-from wise import db
 import sqlalchemy as sa
 from tqdm import tqdm
-import bisect
-from collections import defaultdict
-import re
+
+from wise import db
+from wise.data_models import (
+    ExtraMediaMetadata,
+    MediaMetadata,
+    MediaType,
+    SourceCollection,
+    SourceCollectionType,
+    VectorMetadata,
+    VideoShot,
+)
+from wise.metadata_type import MetadataType
+from wise.repository import (
+    MediaMetadataRepo,
+    MediaRepo,
+    SourceCollectionRepo,
+    VectorRepo,
+    VideoShotsRepo,
+)
+from wise.wise_project import WiseProject
+
 
 ##
 ## A. Command line interface (CLI) parser and handler

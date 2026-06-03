@@ -16,18 +16,17 @@
 
 import sqlalchemy as sa
 
-from .base import SQLAlchemyRepository
-
+from .. import db
 from ..data_models import (
+    ExtraMediaMetadata,
+    MediaMetadata,
     ModalityType,
     SourceCollection,
-    MediaMetadata,
-    VectorMetadata,
-    ExtraMediaMetadata,
     ThumbnailMetadata,
-    VideoShot
+    VectorMetadata,
+    VideoShot,
 )
-from .. import db
+from .base import SQLAlchemyRepository
 
 
 SourceCollectionRepo = SQLAlchemyRepository[

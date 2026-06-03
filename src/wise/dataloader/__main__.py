@@ -15,23 +15,25 @@
 ## limitations under the License.
 
 from __future__ import annotations
-import logging
+
 import functools
-from pathlib import Path
 import itertools
+import logging
+from pathlib import Path
 from typing import Optional
 
-from ._extra import (
-    CLIPModel,
-    get_input_transform_for_model,
-    _preprocess,
-)
-from .utils import get_files_from_directory_with_extensions
-from .dataset import get_metadata_for_valid_files, get_dataset
 import torch
 import torch.utils.data as torch_data
 import typer
 from tqdm import tqdm
+
+from ._extra import (
+    CLIPModel,
+    _preprocess,
+    get_input_transform_for_model,
+)
+from .dataset import get_dataset, get_metadata_for_valid_files
+from .utils import get_files_from_directory_with_extensions
 
 
 logger = logging.getLogger(__name__)

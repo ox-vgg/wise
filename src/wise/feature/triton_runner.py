@@ -14,16 +14,18 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from functools import cached_property
 import itertools
 import logging
-from typing import Type, Literal
+from functools import cached_property
+from typing import Literal, Type
 
-from .feature_extractor import FeatureExtractor, MultiModalModel
-import torch
 import numpy as np
+import torch
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import triton_to_np_dtype
+
+from .feature_extractor import FeatureExtractor, MultiModalModel
+
 
 logger = logging.getLogger(__name__)
 

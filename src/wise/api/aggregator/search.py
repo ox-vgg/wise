@@ -17,25 +17,23 @@
 import logging
 from typing import Annotated, Literal, cast
 
-
-from .. import common
-from ..common import MediaQueryTerm, Query, VectorIdQueryTerm, VectorQueryTerm
-from ..services.embedding import EmbeddingConfig
-from ..dependencies import (
-    APIConfig,
-    ConfigDep, 
-    EmbeddingService,
-    EmbeddingServiceDep,
-    RemoteSearchService,
-    SearchServiceDep
-)
+import fastapi
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from pydantic import HttpUrl
 
 from wise.data_models import MediaType, ModalityType
 
-import fastapi
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile, File
-from pydantic import HttpUrl
-
+from .. import common
+from ..common import MediaQueryTerm, Query, VectorIdQueryTerm, VectorQueryTerm
+from ..dependencies import (
+    APIConfig,
+    ConfigDep,
+    EmbeddingService,
+    EmbeddingServiceDep,
+    RemoteSearchService,
+    SearchServiceDep,
+)
+from ..services.embedding import EmbeddingConfig
 
 
 logger = logging.getLogger(__name__)

@@ -15,38 +15,48 @@
 ## limitations under the License.
 
 from __future__ import annotations
-from collections import defaultdict
-from functools import cached_property
+
+import io
 import itertools
 import logging
-from pathlib import Path
-import sqlite3
-import io
 import os
 import shutil
+import sqlite3
+from collections import defaultdict
+from functools import cached_property
+from pathlib import Path
+
+import numpy as np
+import sqlalchemy as sa
+from PIL import Image
+from tqdm import tqdm
 
 from . import db as wise_db
 from .data_models import (
-    MediaMetadata, SourceCollection, ThumbnailMetadata,
     DatasetPayload,
-    MediaType,
+    MediaMetadata,
     MediaMetadataWithSource,
+    MediaType,
     ModalityType,
-    VideoShot,
+    SourceCollection,
+    ThumbnailMetadata,
     VectorAndMediaMetadata,
+    VideoShot,
 )
-from .repository import SourceCollectionRepo, MediaRepo, VectorRepo, ThumbnailRepo, VideoShotsRepo
-from .feature.feature_extractor_factory import get_feature_extractor_class
-from .feature.store import FeatureStoreFactory, FeatureStore, FeatureStoreType
-from .index.search_index_factory import SearchIndexFactory
-from .index.search_index import SearchIndex
-from .search.fts import FTSSearch
 from .dataloader import AVDataset
+from .feature.feature_extractor_factory import get_feature_extractor_class
+from .feature.store import FeatureStore, FeatureStoreFactory, FeatureStoreType
+from .index.search_index import SearchIndex
+from .index.search_index_factory import SearchIndexFactory
+from .repository import (
+    MediaRepo,
+    SourceCollectionRepo,
+    ThumbnailRepo,
+    VectorRepo,
+    VideoShotsRepo,
+)
+from .search.fts import FTSSearch
 
-import numpy as np
-from PIL import Image
-import sqlalchemy as sa
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 DB_SCHEME = "sqlite+pysqlite://"

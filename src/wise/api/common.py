@@ -26,12 +26,12 @@ from fastapi import HTTPException, Request, Response, UploadFile
 from fastapi.routing import APIRoute
 from pydantic import (
     BaseModel,
+    ConfigDict,
     HttpUrl,
     PlainSerializer,
     TypeAdapter,
     field_serializer,
     field_validator,
-    ConfigDict
 )
 
 from wise.config import APIConfig

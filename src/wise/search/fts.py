@@ -15,22 +15,28 @@
 ## limitations under the License.
 
 from __future__ import annotations
+
 import bisect
-from collections import defaultdict
-import itertools
 import functools
+import itertools
 import json
 import logging
-from typing import Literal, Annotated, TYPE_CHECKING
+from collections import defaultdict
+from typing import TYPE_CHECKING, Annotated, Literal
 
-from .. import db
-from ..data_models import MediaMetadata, VectorAndMediaMetadata, MediaType, ModalityType
-
-
-from pydantic import Field, RootModel
 import sqlalchemy as sa
+from pydantic import Field, RootModel
 from sqlalchemy.ext import compiler
 from sqlalchemy.schema import DDLElement
+
+from .. import db
+from ..data_models import (
+    MediaMetadata,
+    MediaType,
+    ModalityType,
+    VectorAndMediaMetadata,
+)
+
 
 if TYPE_CHECKING:
     from wise.wise_project import WiseProject

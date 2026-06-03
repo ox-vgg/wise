@@ -14,18 +14,19 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from datetime import datetime, timedelta
 import enum
 import logging
 import math
-from typing import Optional, Literal, TypeVar
+from dataclasses import asdict
+from datetime import datetime, timedelta
+from typing import Literal, Optional, TypeVar
 
 from pydantic import dataclasses
-from dataclasses import asdict
 from torchaudio.io import StreamReader
 
+from ..data_models import MediaChunkType, SourceMediaType
 from .utils import MediaMimetype
-from ..data_models import SourceMediaType, MediaChunkType
+
 
 logger = logging.getLogger(__name__)
 

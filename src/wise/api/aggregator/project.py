@@ -16,14 +16,13 @@
 
 import logging
 
-from .. import common
-
-
-from fastapi import HTTPException, APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import (
     StreamingResponse,
 )
-from ..dependencies import ProjectServiceDep, ProjectInfoDep
+
+from .. import common
+from ..dependencies import ProjectInfoDep, ProjectServiceDep
 
 
 logger = logging.getLogger(__name__)

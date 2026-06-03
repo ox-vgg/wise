@@ -20,27 +20,29 @@
 ## 4.44.2 Licensed under the Apache License, Version 2.0.
 ##     Copyright 2023 Google AI and The HuggingFace Team. All rights reserved.
 
+import logging
 from dataclasses import dataclass
 from functools import cached_property
-import logging
 from pathlib import Path
 from typing import Any
-from transformers import Owlv2Processor, Owlv2ForObjectDetection
-import torch
-from torchvision.transforms.functional import pil_to_tensor
-import numpy as np
-from PIL import Image
-import sqlalchemy as sa
 
+import numpy as np
+import sqlalchemy as sa
+import torch
+from PIL import Image
+from torchvision.transforms.functional import pil_to_tensor
+from transformers import Owlv2ForObjectDetection, Owlv2Processor
+
+from ..db import project_metadata_obj
 from .feature_extractor import (
     BBoxXYWH,
     FeatureExtMetadata,
     FeatureExtractor,
     Features,
-    get_torch_device,
     MultiModalModel,
+    get_torch_device,
 )
-from ..db import project_metadata_obj
+
 
 logger = logging.getLogger(__name__)
 

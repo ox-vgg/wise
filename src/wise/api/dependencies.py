@@ -14,15 +14,21 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import logging
 import json
+import logging
 from pathlib import Path
 from typing import Annotated
+
 from fastapi import Depends
+
 from wise.config import APIConfig
 
-from .services.project import LocalWiseProjectService, RemoteWiseProjectService, ProjectInfo
 from .services.embedding import EmbeddingService
+from .services.project import (
+    LocalWiseProjectService,
+    ProjectInfo,
+    RemoteWiseProjectService,
+)
 from .services.search import LocalSearchService, RemoteSearchService
 
 
@@ -66,6 +72,7 @@ def get_project_service(config: ConfigDep):
                         f"Local path does not exist or is not a directory: {project_path}"
                     )
                 from wise.wise_project import WiseProject
+
                 from .services.project import LocalWiseProjectService
                 project = WiseProject(project_path, read_only=True)
                 project.load_search_indices(config.index_type, config.nprobe)

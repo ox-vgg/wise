@@ -14,18 +14,19 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
+import argparse
 import logging
 from pathlib import Path
+
+import numpy as np
+import onnxruntime as ort
 
 ## import torch before onnxruntime so both use same cuDNN, see
 ## https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#compatibility-with-pytorch
 import torch
-import numpy as np
-import onnxruntime as ort
 
 from .feature_extractor_factory import FeatureExtractorFactory
 
-import argparse
 
 parser = argparse.ArgumentParser(
     description="Test feature extractor and export model to ONNX"
@@ -157,6 +158,7 @@ if not args.verify:
 #     )
 
 import onnxruntime as ort
+
 
 providers = ['CPUExecutionProvider']
 if args.device.startswith('cuda:'):

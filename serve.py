@@ -14,12 +14,14 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import typer
+import logging
 from pathlib import Path
 from typing import Optional
-import logging
+
+import typer
 
 from wise.enums import IndexType
+
 
 logging.basicConfig(
     level=logging.INFO,

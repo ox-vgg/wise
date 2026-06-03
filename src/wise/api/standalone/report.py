@@ -14,11 +14,13 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from fastapi import APIRouter, File, Form
-from fastapi.responses import PlainTextResponse
-import os
 import csv
 import json
+import os
+
+from fastapi import APIRouter, File, Form
+from fastapi.responses import PlainTextResponse
+
 
 router = APIRouter()
 

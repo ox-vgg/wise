@@ -14,14 +14,25 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
+import functools
 import itertools
 import json
 import logging
-import functools
 from collections.abc import Callable, Iterable
 from typing import Annotated, cast
 
+import fastapi
+import numpy as np
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import PlainTextResponse
+from pydantic import HttpUrl
+
 from wise.config import APIConfig
+from wise.data_models import MediaType, ModalityType, VectorAndMediaMetadata
+from wise.feature.feature_extractor import FeatureExtMetadata
+from wise.search.fts import WISEFTSQuery
+from wise.wise_project import WiseProject
+
 from .. import common
 from ..common import (
     MediaQueryTerm,
@@ -31,39 +42,30 @@ from ..common import (
     VectorQueryTerm,
     VideoSegment,
 )
-from ..services.embedding import EmbeddingConfig
 from ..dependencies import (
     ConfigDep,
-    ProjectServiceDep,
-    ProjectInfo,
-    ProjectInfoDep,
     EmbeddingService,
     EmbeddingServiceDep,
-    SearchServiceDep,
-    LocalWiseProjectService,
     LocalSearchService,
+    LocalWiseProjectService,
+    ProjectInfo,
+    ProjectInfoDep,
+    ProjectServiceDep,
+    SearchServiceDep,
 )
+from ..services.embedding import EmbeddingConfig
 from ..services.search import SearchOutput
 from ..services.search.face_text_standalone import (
     resolve_face_text_embedder,
     run_face_text_search_standalone,
 )
 from ..services.search.segments import (
-    merge_close_segments as _merge_close_segments,
     get_shots_from_segments as _get_shots_from_segments,
 )
+from ..services.search.segments import (
+    merge_close_segments as _merge_close_segments,
+)
 
-from wise.data_models import MediaType, ModalityType, VectorAndMediaMetadata
-from wise.search.fts import WISEFTSQuery
-
-from wise.feature.feature_extractor import FeatureExtMetadata
-from wise.wise_project import WiseProject
-
-import numpy as np
-import fastapi
-from fastapi import APIRouter, UploadFile, Form, File, HTTPException, Depends
-from fastapi.responses import PlainTextResponse
-from pydantic import HttpUrl
 
 logger = logging.getLogger(__name__)
 

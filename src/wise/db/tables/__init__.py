@@ -15,8 +15,14 @@
 ## limitations under the License.
 
 import sqlalchemy as sa
-from ..base import project_metadata_obj, thumbs_metadata_obj, facets_metadata_obj
-from ...data_models import SourceCollectionType, MediaType, ModalityType
+
+from ...data_models import MediaType, ModalityType, SourceCollectionType
+from ..base import (
+    facets_metadata_obj,
+    project_metadata_obj,
+    thumbs_metadata_obj,
+)
+
 
 source_collections_table = sa.Table(
     "source_collections",

@@ -16,19 +16,26 @@
 
 import io
 import logging
-from tempfile import NamedTemporaryFile
-from .exceptions import ModalityNotSupportedError, FeatureExtractorNotFoundError, NoFeaturesFoundError
-from wise.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
-from pydantic import BaseModel, HttpUrl
-import numpy as np
-from PIL import Image
-import torch
-from torch.hub import download_url_to_file
-import torchaudio
 import typing
+from tempfile import NamedTemporaryFile
+
+import numpy as np
+import torch
+import torchaudio
 from fastapi import HTTPException
+from PIL import Image
+from pydantic import BaseModel, HttpUrl
+from torch.hub import download_url_to_file
+
+from wise.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
 
 from ...common import MediaQueryTerm, Query, TextQueryTerm, VectorQueryTerm
+from .exceptions import (
+    FeatureExtractorNotFoundError,
+    ModalityNotSupportedError,
+    NoFeaturesFoundError,
+)
+
 
 logger = logging.getLogger(__name__)
 

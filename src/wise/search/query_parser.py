@@ -14,8 +14,9 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import json
 import copy
+import json
+
 
 def which_keyword_is_next(cmd, start_index, keyword_list, ignore_case=True):
     for ki in range(0, len(keyword_list)):

@@ -14,11 +14,12 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from pathlib import Path
 import enum
+from pathlib import Path
 
-from .faiss_store import FaissStore
 from ...data_models import ModalityType
+from .faiss_store import FaissStore
+
 
 class FeatureStoreType(enum.Enum):
     FAISS = "faiss"

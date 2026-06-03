@@ -15,13 +15,14 @@
 ## limitations under the License.
 
 from __future__ import annotations
+
 import enum
 import logging
 
 import numpy as np
+import open_clip
 import torch
 import torchvision.transforms.v2 as transforms_v2
-import open_clip
 
 
 logger = logging.getLogger(__name__)

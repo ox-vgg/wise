@@ -16,6 +16,7 @@
 
 import enum
 
+
 class ContainsEnumMeta(enum.EnumMeta):
     def __contains__(cls, item):
         if type(item) == cls:

@@ -14,32 +14,37 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import logging
 import io
 import json
+import logging
 import random
-import sqlalchemy as sa
 from collections import defaultdict
 from pathlib import Path
 from typing import BinaryIO
 
-from .. import common
-from ..services.project import (
-    MediaNotFoundException, ThumbnailNotFoundException, LocalWiseProjectService, WiseProjectService
+import sqlalchemy as sa
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
 )
 
 from wise.data_models import MediaMetadata, MediaType, SourceCollectionType
-from fastapi import HTTPException, status, APIRouter, Request, Depends
-from fastapi.responses import (
-    Response,
-    FileResponse,
-    PlainTextResponse,
-    JSONResponse,
-    RedirectResponse,
-    StreamingResponse,
-    HTMLResponse,
+
+from .. import common
+from ..dependencies import ConfigDep, ProjectInfoDep, ProjectServiceDep
+from ..services.project import (
+    LocalWiseProjectService,
+    MediaNotFoundException,
+    ThumbnailNotFoundException,
+    WiseProjectService,
 )
-from ..dependencies import ConfigDep, ProjectServiceDep, ProjectInfoDep
+
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +320,11 @@ def get_related_vectors(_vector_id: int, project_service: ProjectServiceDep):
 
 def _get_facets_with_previews(project_service: LocalWiseProjectService):
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import facets_table, cluster_metadata_table, facet_metadata_table
+        from wise.db.tables.facets import (
+            cluster_metadata_table,
+            facet_metadata_table,
+            facets_table,
+        )
         facets = conn.execute(sa.select(facets_table)).fetchall()
 
         result = []
@@ -426,7 +435,11 @@ def get_facets_cluster_detail(config: ConfigDep, project_info: ProjectInfoDep, p
         return HTMLResponse("Facets UI not built. Please run npm run build in frontend.", status_code=500)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import facets_table, cluster_metadata_table, facet_metadata_table
+        from wise.db.tables.facets import (
+            cluster_metadata_table,
+            facet_metadata_table,
+            facets_table,
+        )
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -479,7 +492,7 @@ def get_facets_cluster_overview(config: ConfigDep, project_info: ProjectInfoDep,
         return HTMLResponse("Facets UI not built. Please run npm run build in frontend.", status_code=500)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import facets_table, cluster_metadata_table
+        from wise.db.tables.facets import cluster_metadata_table, facets_table
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -519,7 +532,11 @@ def get_facet_cluster_info_api(facet_name: str, feature_extractor_slug: str, clu
     if not isinstance(project_service, LocalWiseProjectService):
         return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import facets_table, cluster_metadata_table, facet_metadata_table
+        from wise.db.tables.facets import (
+            cluster_metadata_table,
+            facet_metadata_table,
+            facets_table,
+        )
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -555,7 +572,7 @@ def get_facet_info_api(config: ConfigDep, facet_name: str, feature_extractor_slu
     if not isinstance(project_service, LocalWiseProjectService):
         raise HTTPException(status_code=400, detail="Facets only supported on local projects")
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import facets_table, cluster_metadata_table
+        from wise.db.tables.facets import cluster_metadata_table, facets_table
         facet = conn.execute(
             sa.select(facets_table).where(
                 facets_table.c.name.ilike(facet_name),
@@ -580,8 +597,11 @@ def get_published_clusters(config: ConfigDep, facet_id: int, project_service: Pr
         return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import cluster_metadata_table, facet_metadata_table
         from wise.db.tables import vectors_table
+        from wise.db.tables.facets import (
+            cluster_metadata_table,
+            facet_metadata_table,
+        )
 
         # Paginated clusters
         query = (
@@ -705,7 +725,11 @@ def get_facets_cluster_faces(config: ConfigDep, cluster_id: int, project_service
         return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import facet_metadata_table, cluster_metadata_table, facets_table
+        from wise.db.tables.facets import (
+            cluster_metadata_table,
+            facet_metadata_table,
+            facets_table,
+        )
 
         assignments = conn.execute(
             sa.select(facet_metadata_table).where(facet_metadata_table.c.cluster_id == cluster_id).offset((page - 1) * page_size).limit(page_size)
@@ -741,7 +765,11 @@ async def get_published_cluster_faces_by_media(cluster_id: int, request: Request
         return JSONResponse({"error": "Facets are not supported in Aggregator Mode."}, status_code=400)
 
     with project_service.wise_project.db_engine.connect() as conn:
-        from wise.db.tables.facets import facet_metadata_table, cluster_metadata_table, facets_table
+        from wise.db.tables.facets import (
+            cluster_metadata_table,
+            facet_metadata_table,
+            facets_table,
+        )
 
         # 1. Verify cluster exists and get its facet
         cluster_row = conn.execute(

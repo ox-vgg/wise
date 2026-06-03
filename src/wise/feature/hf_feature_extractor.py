@@ -14,13 +14,16 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from functools import cached_property
 import logging
+from functools import cached_property
 from typing import Any
-from .feature_extractor import FeatureExtractor, get_torch_device, Features
-import torch
+
 import numpy as np
-from transformers import AutoProcessor, AutoConfig, AutoModel
+import torch
+from transformers import AutoConfig, AutoModel, AutoProcessor
+
+from .feature_extractor import FeatureExtractor, Features, get_torch_device
+
 
 logger = logging.getLogger(__name__)
 

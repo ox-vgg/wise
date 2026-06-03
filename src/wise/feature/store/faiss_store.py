@@ -15,16 +15,17 @@
 ## limitations under the License.
 
 import functools
-from pathlib import Path
 import glob
-import random
 import logging
+import random
+from pathlib import Path
 
-from .feature_store import FeatureStore
-from ...utils import batched
-
-import numpy as np
 import faiss
+import numpy as np
+
+from ...utils import batched
+from .feature_store import FeatureStore
+
 
 logger = logging.getLogger(__name__)
 

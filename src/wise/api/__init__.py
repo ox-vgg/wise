@@ -15,19 +15,19 @@
 ## limitations under the License.
 
 import logging
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional, TypedDict
 
-from fastapi import FastAPI, Request, APIRouter
-from fastapi.staticfiles import StaticFiles
 import uvicorn
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 
 from wise.config import APIConfig
-from . import common
-from . import dependencies
-from pathlib import Path
+
+from . import common, dependencies
+
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +51,9 @@ def setup_routers(config: APIConfig):
     from .standalone import report_router
 
     if config.remote_projects:
-        from .aggregator import project_router
-        from .aggregator import search_router
+        from .aggregator import project_router, search_router
     else:
-        from .standalone import project_router
-        from .standalone import search_router
+        from .standalone import project_router, search_router
 
     project_info = dependencies.project_info
     project_name = project_info.name

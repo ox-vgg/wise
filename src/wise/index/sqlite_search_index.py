@@ -14,16 +14,18 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import sqlite3
-import faiss
-from tqdm import tqdm
-from pathlib import Path
-import numpy as np
 import math
+import sqlite3
+from pathlib import Path
 
-from .search_index import SearchIndex
+import faiss
+import numpy as np
+from tqdm import tqdm
+
 from ..feature.feature_extractor_factory import FeatureExtractorFactory
 from ..feature.store.feature_store_factory import FeatureStoreFactory
+from .search_index import SearchIndex
+
 
 class SqliteSearchIndex(SearchIndex):
     def __init__(self, modality_type, asset_id, asset):

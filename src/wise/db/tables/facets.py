@@ -1,6 +1,8 @@
 import sqlalchemy as sa
+
 from ..base import facets_metadata_obj
 from . import vectors_table
+
 
 facets_table = sa.Table(
     "facets",

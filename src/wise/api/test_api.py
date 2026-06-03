@@ -26,9 +26,8 @@ from pydantic import HttpUrl
 import wise.api.common
 from wise.api import create_app
 from wise.api.common import MediaQueryTerm, TextQueryTerm
-from wise.wise_project import WiseProject
-
 from wise.config import APIConfig
+from wise.wise_project import WiseProject
 
 
 class TestWithEmptyProject(unittest.TestCase):
