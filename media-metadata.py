@@ -224,8 +224,7 @@ def import_media_metadata(args):
     project = WiseProject(args.project_dir, create_project=False, db_kwargs={'echo': False})
     project_assets = project.discover_assets()
     if len(project_assets) == 0:
-        print(f'failed to load assets from {args.project_dir}', file=sys.stderr)
-        sys.exit(1)
+        raise ValueError(f"failed to load assets from {args.project_dir}")
     db_engine = project.db_engine
     db_inspector = sa.inspect(db_engine)
 
