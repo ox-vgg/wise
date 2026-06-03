@@ -40,3 +40,6 @@ documentation = "https://gitlab.com/vgg/wise/wise/-/tree/main/docs"
 releasenotes = "https://gitlab.com/vgg/wise/wise/-/blob/main/NEWS.md"
 repository = "https://gitlab.com/vgg/wise/wise/"
 tracker = "https://gitlab.com/vgg/wise/wise/-/work_items"
+
+[tool.pytest]
+testpaths = ["src"]
