@@ -17,6 +17,7 @@
 import argparse
 import json
 import logging
+import sys
 from pathlib import Path
 
 from wise import db
@@ -58,7 +59,8 @@ def create_fts_index(project, args):
         logging.exception("failed to create metadat index")
         project.fts_config_file.unlink(missing_ok=True)
 
-if __name__ == '__main__':
+
+def main(argv: list[str]):
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
@@ -96,7 +98,7 @@ if __name__ == '__main__':
                         help='the id of the feature to create an index for')
 
     parser.add_argument('--fts-config', help='json file representing the config for building the FTS5 index')
-    args = parser.parse_args()
+    args = parser.parse_args(argv[1:])
 
     config = APIConfig(project_dir=args.project_dir, command='create_index')
 
@@ -126,3 +128,7 @@ if __name__ == '__main__':
                 media_type, feature_extractor_id, asset
             )
             search_index.create_index(args.index_type, args.overwrite)
+
+
+if __name__ == '__main__':
+    main(sys.argv)

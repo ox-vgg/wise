@@ -60,7 +60,7 @@ from wise.wise_project import WiseProject
 ## A. Command line interface (CLI) parser and handler
 ##
 
-def main():
+def main(argv: list[str]):
     parser = argparse.ArgumentParser(prog='media-metadata',
                                      description='Manage metadata associated with media files contained in a WISE project',
                                      epilog='''
@@ -95,7 +95,7 @@ def main():
                         type=str,
                         help='folder where all project assets are stored')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv[1:])
 
     if(args.command == 'import'):
         import_media_metadata(args)
@@ -467,5 +467,6 @@ def import_shot_scale(args):
     shot_scale_metadata = load_metadata_from_csv(args.from_csv, args)
     add_shot_scale(shot_scale_metadata)
 
+
 if __name__ == '__main__':
-    main()
+    main(sys.argv)

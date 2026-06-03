@@ -18,6 +18,7 @@ import argparse
 import logging
 import os
 import pprint
+import sys
 import time
 from pathlib import Path
 from typing import Literal
@@ -66,6 +67,9 @@ from wise.repository import (
     VectorRepo,
 )
 from wise.wise_project import WiseProject
+
+
+logger = logging.getLogger()
 
 
 class ExtractFeatureMode(BaseStrEnum):
@@ -477,7 +481,7 @@ def get_media_files_for_dataset(
     return all_metadata
 
 
-if __name__ == "__main__":
+def main(argv: list[str]):
     parser = argparse.ArgumentParser(
         prog="extract-features",
         description="Initialise a WISE project by extractng features from images, audio and videos.",
@@ -600,7 +604,7 @@ if __name__ == "__main__":
         help="enable automatic mixed precision (AMP) for faster feature extraction (disabled by default as some feature extractors like MS CLAP are not compatible)",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv[1:])
     config = APIConfig(project_dir=Path(args.project_dir), command='extract_features')
 
     feature_extractor_config = config.feature_extractor_config
@@ -610,7 +614,6 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
     )
-    logger = logging.getLogger()
 
     if args.num_workers > 0:
         torch.multiprocessing.set_start_method("spawn")
@@ -862,3 +865,7 @@ if __name__ == "__main__":
     print(
         f"Feature extraction completed in {elapsed_time:.0f} sec ({elapsed_time/60:.2f} min)"
     )
+
+
+if __name__ == "__main__":
+    main(sys.argv)
