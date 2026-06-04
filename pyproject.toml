@@ -33,6 +33,8 @@ dependencies = {file = ["requirements.txt"]}
 dev = {file = ["requirements-dev.txt"]}
 docs = {file = ["requirements-docs.txt"]}
 
+[project.scripts]
+wise = "wise.__main__:script_entrypoint"
 
 [project.urls]
 homepage = "https://www.robots.ox.ac.uk/~vgg/software/wise/"

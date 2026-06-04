@@ -89,5 +89,15 @@ def main(argv: list[str]):
         return 1
 
 
+def script_entrypoint():
+    ## Script entrypoints for Python distributions must be a function,
+    ## we can't just pass this module.  Those functions are called
+    ## without any argument --- it is up to them to get sys.argv.  In
+    ## main() we expect argv as an argument so we can't use main() as
+    ## the entrypoint.  We want to keep main() as a function that
+    ## takes argv as argument so it can be called from Python code.
+    return main(sys.argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
