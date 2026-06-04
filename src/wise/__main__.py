@@ -39,7 +39,16 @@ def main(argv: list[str]):
             " https://www.robots.ox.ac.uk/~vgg/software/wise/"
         ),
     )
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+        title="commands",
+        description=(
+            "The following commands are available.  Use 'wise <command> --help'"
+            " for more details about each command."
+        ),
+        metavar="COMMAND",
+    )
 
     create_index_subparser = subparsers.add_parser(
         "create-index",
