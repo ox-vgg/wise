@@ -35,6 +35,11 @@ pip install .
 supported, just replace `conda` with `mamba` or `micromamba` on the
 commands above.
 
+To check if WISE is successfully installed run
+```bash
+wise --help
+```
+
 ## Full install instructions
 
 WISE is a Python package and can be installed with `pip` as any other

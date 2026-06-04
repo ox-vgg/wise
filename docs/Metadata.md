@@ -27,7 +27,7 @@ Next, we create a WISE project based on these videos.
 ```bash
 ## 2. Extract audiovisual features
 mkdir -p wise-projects/
-python3 -m wise extract-features \
+wise extract-features \
   wise-data/Kinetics-6c/ \
   --project-dir wise-projects/Kinetics-6c/
 ```
@@ -48,7 +48,7 @@ coughing/AFRoHj8B8DM_000116_000126.mp4,"coughing","Hillary Clinton coughts while
 This metadata can be imported into the existing WISE project using the `media-metadata` command as follows.
 
 ```bash
-python3 -m wise media-metadata import \
+wise media-metadata import \
   --metadata-id "Kinetics-6c" \
   --from-csv wise-data/Kinetics-6c/metadata.csv \
   --metadata-type "media" \
@@ -62,7 +62,7 @@ The metadata gets added to a table named `metadata-Kinetics-c` in the `wise-proj
 
 ```bash
 echo '{ "metadata-Kinetics-6c": [ "media_category", "media_description" ] }' > fts_config.json
-python3 -m wise create-index \
+wise create-index \
   --media-type metadata \
   --fts-config fts_config.json \
   --project-dir wise-projects/Kinetics-6c/
@@ -94,7 +94,7 @@ python3 scripts/metadata/export-vise-metadata-as-csv.py\
 # to "vise_filename" in the exported csv file so that these entries can be
 # identified in the frontend
 
-python3 -m wise media-metadata import \
+wise media-metadata import \
   --metadata-id "1516ci-2024-11-25" \
   --from-csv /data/wise/dataset/1516ci/metadata_db.csv \
   --metadata-type "media" \

@@ -45,7 +45,7 @@ dataset. Here is an example of how this feature can be used in general.
 
 REMOTE_PROJECTS='["http://localhost:10001/1/","http://localhost:10002/2/","http://localhost:10003/3/"]' \
   PORT=10000 \
-  python3 -m wise serve --project-dir tmp/123/
+  wise serve --project-dir tmp/123/
 ```
 
 Users visiting the URL `http://localhost:10000/123/` will see WISE search interface that allows audiovisual

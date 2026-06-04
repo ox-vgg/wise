@@ -62,7 +62,7 @@ cp shots.csv /data/wise-project/
 
 cd ~/wise
 micromamba activate wise
-python3 -m wise media-metadata \
+wise media-metadata \
     import-shots \
     --project-dir /data/wise-project/ \
     --from-csv /data/wise-project/shots.csv
@@ -102,7 +102,7 @@ micromamba deactivate
 
 cd ~/wise
 micromamba activate wise
-python3 -m wise media-metadata \
+wise media-metadata \
     import-shot-scale \
     --project-dir /data/a-wise-project/ \
     --from-csv /data/a-wise-project/thumbs-shot-scale.csv
@@ -122,20 +122,20 @@ For the purpose of illustration, let us assume that we have split a large video 
 # 1. Start shard1
 FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
   PORT="10001" \
-  python3 -m wise serve \
+  wise serve \
   --project-dir /data/wise-projects/shard1
 
 # 2. Start shard2
 FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
   PORT="10002" \
-  python3 -m wise serve \
+  wise serve \
   --project-dir /data/wise-projects/shard2
 
 # 3. Serve both shard1 and shard2 using aggregator
 REMOTE_PROJECTS='["http://localhost:10001/shard1/", "http://localhost:10002/shard2/"]' \
   FEATURE_EXTRACTOR_CONFIG='{"default": {"url": "localhost:8801"}}' \
   PORT=10000 \
-  python3 -m wise serve \
+  wise serve \
   --project-dir combined_shards
 ```
 
@@ -151,7 +151,7 @@ coverage of objects. The parameter can be set as follows:
 
 ```bash
 FEATURE_EXTRACTOR_CONFIG='{"transformers/owlv2/google/owlv2-large-patch14-ensemble":{"objectness_threshold":0.10}}' \
-  python3 -m wise extract-features \
+  wise extract-features \
   --enable-autocast \          # this reduces memory and compute by using fp16
   --video-feature-id "transformers/owlv2/google/owlv2-large-patch14-ensemble" \
   ...
