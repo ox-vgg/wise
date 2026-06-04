@@ -5,7 +5,7 @@
 WISE Explore is a set of tools that allows exploration of a collection of
 videos using anchors such as face, objects, acoustic events. 
 
-We demonstrate this feature using the [`wikimedia-commons-25`](http://thor.robots.ox.ac.uk/wise/assets/test/wikimedia-commons-25.zip) dataset which contains 25 videos taken from the Wikimedia Commons repository. First, we run the [tests/test-wikimedia-commons-25.sh](tests/test-wikimedia-commons-25.sh) script to create a sample WISE project based on this dataset. This script automatically downloads the dataset, extracts features from the videos and creates a WISE project that can be used as a visual search engine for these videos.
+We demonstrate this feature using the [`wikimedia-commons-25`](http://thor.robots.ox.ac.uk/wise/assets/test/wikimedia-commons-25.zip) dataset which contains 25 videos taken from the Wikimedia Commons repository. First, we run the {{ repo_link("tests/test-wikimedia-commons-25.sh") }} script to create a sample WISE project based on this dataset. This script automatically downloads the dataset, extracts features from the videos and creates a WISE project that can be used as a visual search engine for these videos.
 
 ```bash
 cd $HOME
@@ -18,7 +18,7 @@ The resulting WISE project is stored in `/tmp/wise/wise-test/wise-project/wikime
 
 ## Face Facet
 A media collection can be explored using human faces based anchors as
-shown below. See [scripts/explore/README.md](../scripts/explore/README.md)
+shown below. See {{ repo_link("scripts/explore/README.md") }}
 for more details about the semi-supervised, iterative clustering approach
 to group face embeddings into distinct identities
 

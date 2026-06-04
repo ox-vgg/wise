@@ -113,7 +113,7 @@ python3 -m wise media-metadata \
 See [Using Triton Inference Server](using-triton-inference-server.md) to understand how better GPU memory utilisation can be achieved using the Triton Inference Server (maintained by NVIDIA) and running inference on optimised models (e.g. ONNX, TensorRT).
 
 ## 7. Aggregator Mode
-WISE can operate in aggregator mode, where a large audiovisual collection is split up across multiple standalone nodes each covering a different subset. A central instance distributes search queries to all standalone nodes, gathers their results, and presents a unified response to the user. See [tests/test-aggregator.sh](tests/test-aggregator.sh) to understand the aggregator mode available in WISE.
+WISE can operate in aggregator mode, where a large audiovisual collection is split up across multiple standalone nodes each covering a different subset. A central instance distributes search queries to all standalone nodes, gathers their results, and presents a unified response to the user. See {{ repo_link("tests/test-aggregator.sh") }} to understand the aggregator mode available in WISE.
 
 For the purpose of illustration, let us assume that we have split a large video dataset into two sub-sets called `shard1` and `shard2` each containing around 1000 videos and independently processed using WISE.
 

@@ -1,12 +1,12 @@
 # Feature Extractor
 
 WISE depends on feature extractors to compute a vector representation of an image,
-a set of video frames or audio samples. The [src/wise/feature] folder contains
+a set of video frames or audio samples. The {{ repo_link("src/wise/feature") }} folder contains
 implementation of various types of feature extractors. For example, the
-[src/wise/feature/mlfoundation_openclip.py] file implements the [open_clip](https://github.com/mlfoundations/open_clip)
+{{ repo_link("src/wise/feature/mlfoundation_openclip.py") }} file implements the [open_clip](https://github.com/mlfoundations/open_clip)
 feature extractor. Any new implementation of feature extractor must contain an
 implementation for `preprocess_image(), extract_image_features(), ...` and
-various other methods that are defined in the [src/wise/feature/feature_extractor.py].
+various other methods that are defined in the {{ repo_link("src/wise/feature/feature_extractor.py") }}.
 
 ## Implement a New Feature Extractor
 WISE can be extended to use a new feature extractor. In this tutorial, we
@@ -15,7 +15,7 @@ random 512 dimensional feature for any type of input. While this feature
 extractor has no practical benefit, it is useful for illustrating the process
 of using a new feature extractor in WISE.
 
-First, we create a new file [src/wise/feature/random_features.py] and create an
+First, we create a new file {{ repo_link("src/wise/feature/random_features.py") }} and create an
 implementation of a feature extractor that returns a random 512 dimensional
 vector for any input.
 
@@ -84,7 +84,7 @@ class RandomFeatures(FeatureExtractor):
 ```
 
 Next, we register this newly created feature extractor in WISE by updating
-[src/wise/feature/feature_extractor_factory.py] as follows.
+{{ repo_link("src/wise/feature/feature_extractor_factory.py") }} as follows.
 
 ```python
 # File: src/wise/feature/feature_extractor_factory.py

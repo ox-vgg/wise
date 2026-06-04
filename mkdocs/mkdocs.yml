@@ -12,9 +12,13 @@ theme:
     - navigation.top
     - toc.follow
 
+extra:
+  repo_blob_infix: "/-/blob"   # GitLab; use "/blob" for GitHub
+
 plugins:
   - search
   - autorefs
+  - macros
   - mkdocstrings:
       default_handler: python
       handlers:
