@@ -198,7 +198,12 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
     logger.info(f"Dataset parameters: {pprint.pformat(params)}")
     return params, segment_length
 
-def get_dataset_stream(all_metadata: list[DatasetPayload], params: dict, use_shots: bool):
+def get_dataset_stream(
+    project: WiseProject,
+    all_metadata: list[DatasetPayload],
+    params: dict,
+    use_shots: bool,
+):
     uniform_stream = torch_data.ChainDataset(
         get_dataset(all_metadata, params)
     )
@@ -434,7 +439,12 @@ def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, ar
     
     return feature_extractor_ids
 
-def get_media_files_for_dataset(mode: ExtractFeatureMode, project: WiseProject, args):
+def get_media_files_for_dataset(
+    mode: ExtractFeatureMode,
+    project: WiseProject,
+    args,
+    db_engine,
+):
     """Initialise internal metadata database with valid files."""
     logger.info("Initialising internal metadata database")
     all_metadata: list[DatasetPayload] = []
@@ -653,7 +663,7 @@ if __name__ == "__main__":
 
     ## 1. Initialise internal metadata database with valid files
     print('Initialising internal metadata database')
-    all_metadata = get_media_files_for_dataset(mode, project, args)
+    all_metadata = get_media_files_for_dataset(mode, project, args, db_engine)
 
     if len(all_metadata) == 0:
         logger.info("No valid media files found. Nothing to do.")
@@ -693,7 +703,7 @@ if __name__ == "__main__":
     )
 
     params, segment_length = get_dataset_params(feature_extractors, args.thumbnails)
-    stream = get_dataset_stream(all_metadata, params, args.use_shots)
+    stream = get_dataset_stream(project, all_metadata, params, args.use_shots)
     av_data_loader = get_dataloader(stream, args.num_workers)
 
     audio_sampling_rate = params['audio_sampling_rate']
