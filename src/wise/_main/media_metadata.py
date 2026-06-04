@@ -466,7 +466,3 @@ def import_shot_scale(args):
         raise ValueError('thumbnail_id or shot_scale columns missing from CSV')
     shot_scale_metadata = load_metadata_from_csv(args.from_csv, args)
     add_shot_scale(shot_scale_metadata)
-
-
-if __name__ == '__main__':
-    main(sys.argv)

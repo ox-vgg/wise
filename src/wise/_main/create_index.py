@@ -128,7 +128,3 @@ def main(argv: list[str]):
                 media_type, feature_extractor_id, asset
             )
             search_index.create_index(args.index_type, args.overwrite)
-
-
-if __name__ == '__main__':
-    main(sys.argv)

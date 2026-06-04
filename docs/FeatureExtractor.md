@@ -115,7 +115,7 @@ mkdir -p wise-data/ wise-projects
 curl -sLO "https://www.robots.ox.ac.uk/~vgg/software/wise/data/test/CondensedMovies-10.tar.gz"
 tar -zxvf CondensedMovies-10.tar.gz -C wise-data/
 
-python extract-features.py \
+python -m wise extract-features \
   wise-data/CondensedMovies-10/ \
   --video-feature-id "vgg/random/2024/04" \
   --project-dir wise-projects/CondensedMovies-10/

@@ -97,13 +97,6 @@ COPY --from=wise-env --chmod=3775 --chown=nonroot:nonroot \
     /tmp/wise_root/ /
 
 WORKDIR /wise
-COPY --from=wise-env \
-    --chown=nonroot:nonroot \
-    /tmp/wise/create-index.py \
-    /tmp/wise/extract-features.py \
-    /tmp/wise/media-metadata.py \
-    /tmp/wise/serve.py \
-    .
 
 # Ensure this command goes after copying the current folder
 # if the current folder already has a dist folder
@@ -122,6 +115,6 @@ ENV MAGIC='/env/share/misc/magic' \
     USER=nonroot
 
 # You can modify the CMD statement as needed....
-ENTRYPOINT ["python3"]
+ENTRYPOINT ["python3", "-m", "wise"]
 VOLUME [ "/tmp" ]
-CMD ["extract-features.py", "--help"]
+CMD ["--help"]

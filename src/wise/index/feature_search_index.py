@@ -118,7 +118,7 @@ class FeatureSearchIndex(SearchIndex):
         index_fn = self.get_index_filename(index_type)
         if not index_fn.exists():
             print(f'  index {index_fn} does not exist')
-            print(f'  use create-index.py script to create an index')
+            print(f'  use python -m wise create-index to create an index')
             return False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
         return True

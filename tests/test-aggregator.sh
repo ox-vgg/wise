@@ -97,15 +97,6 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
     fi
 done
 
-# check if required python scripts exist
-REQUIRED_PYTHON_SCRIPTS=(extract-features.py media-metadata.py create-index.py serve.py)
-for script in "${REQUIRED_PYTHON_SCRIPTS[@]}"; do
-    if [ ! -f "${script}" ]; then
-        echo "$script not found, please run this script from the WISE code directory"
-        exit 1
-    fi
-done
-
 # check if required python packages exist
 REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss msclap open_clip)
 for package in "${REQUIRED_PYTHON_PACKAGES[@]}"; do
@@ -151,7 +142,7 @@ for subset_id in 1 2 3; do
     if [ ! -d "${WISE_PROJECT_SUBSET_DIR}" ]; then
         echo "[${subset_id}] Extracting features from videos in subset ${subset_id} using ${NUM_WORKERS} workers (takes about 8 min.) ..."
         cd "${WISE_CODE_DIR}"
-        python extract-features.py \
+        python -m wise extract-features \
                "${SUBSET_DIR}" \
                --media-include "*.mp4" \
                --shard-maxcount 4096 \
@@ -169,7 +160,7 @@ for subset_id in 1 2 3; do
     RESULT=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
     if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
         echo "[${subset_id}] Importing metadata from ${SUBSET_DIR}media-metadata.csv (takes few seconds) ..."
-        python3 media-metadata.py import \
+        python3 -m wise media-metadata import \
                 --metadata-id "${subset_id}" \
                 --from-csv "${SUBSET_DIR}media-metadata.csv" \
                 --metadata-type "media" \
@@ -203,7 +194,7 @@ for subset_id in 1 2 3; do
     if [ "$NUM_INDEX_FILES" -eq 0 ]; then
         echo "[${subset_id}] Creating FAISS index of type ${FAISS_INDEX_TYPE} for video feature ${VIDEO_FEATURE_ID1} (takes about 1 min.) ..."
         cd "${WISE_CODE_DIR}"
-        python create-index.py \
+        python -m wise create-index \
             --index-type "IndexFlatIP" \
             --fts-config "${FTS_CONFIG_FILE}" \
             --project-dir "$WISE_PROJECT_SUBSET_DIR"
@@ -221,7 +212,7 @@ done
 if [ ! -d "${WISE_ALL_PROJECT_DIR}" ]; then
     echo "[123] Extracting features from videos using ${NUM_WORKERS} workers (takes about 20 min.) ..."
     cd "${WISE_CODE_DIR}"
-    python extract-features.py \
+    python -m wise extract-features \
            "${TEST_DATA_DIR}" \
            --media-include "*.mp4" \
            --shard-maxcount 4096 \
@@ -239,7 +230,7 @@ METADATA_TABLE_NAME="metadata-123"
 RESULT=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
 if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
     echo "[123] Importing metadata from ${TEST_DATA_DIR}media-metadata.csv (takes few seconds) ..."
-    python3 media-metadata.py import \
+    python3 -m wise media-metadata import \
             --metadata-id "123" \
             --from-csv "${TEST_DATA_DIR}media-metadata.csv" \
             --metadata-type "media" \
@@ -267,7 +258,7 @@ if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
     cat ${TEST_DATA_DIR}1/media-metadata.csv | sed -e '$a\' > $TMPFILE
     tail -n +2 ${TEST_DATA_DIR}2/media-metadata.csv | sed -e '$a\' >> $TMPFILE
     tail -n +2 ${TEST_DATA_DIR}3/media-metadata.csv | sed -e '$a\' >> $TMPFILE
-    python3 media-metadata.py import \
+    python3 -m wise media-metadata import \
             --metadata-id "123" \
             --from-csv ${TMPFILE} \
             --metadata-type "media" \
@@ -306,7 +297,7 @@ for PROJECT in "${WISE_ALL_PROJECT_DIR}" "${WISE_MERGED_PROJECT_DIR}"; do
     if [ "$NUM_INDEX_FILES" -eq 0 ]; then
         echo "Creating FAISS index of type ${FAISS_INDEX_TYPE} (takes about 5 min.) ..."
         cd "${WISE_CODE_DIR}"
-        python create-index.py \
+        python -m wise create-index \
             --index-type "IndexFlatIP" \
             --fts-config "${FTS_CONFIG_FILE}" \
             --project-dir "${PROJECT}"
@@ -347,7 +338,7 @@ PORTS_TO_CHECK=()
 for i in "${!PROJECT_LIST[@]}"; do
     PORT=$((BIND_BASE_PORT + 1 + i))
     PORTS_TO_CHECK+=($PORT)
-    LISTEN_ADDRESS=$BIND_ADDRESS PORT=$PORT CUDA_VISIBLE_DEVICES=$GPU_ID python serve.py \
+    LISTEN_ADDRESS=$BIND_ADDRESS PORT=$PORT CUDA_VISIBLE_DEVICES=$GPU_ID python -m wise serve \
         --index-type IndexFlatIP \
         --project-dir "$WISE_PROJECT_BASEDIR/${PROJECT_LIST[$i]}/" &
     PIDS+=($!)
@@ -362,7 +353,7 @@ MERGED_PROJECT_PORT=$((BIND_BASE_PORT + ${#PROJECT_LIST[@]}))
 for PROJECT in "${WISE_ALL_PROJECT_DIR}" "${WISE_MERGED_PROJECT_DIR}"; do
     MERGED_PROJECT_PORT=$((MERGED_PROJECT_PORT + 1))
     PORTS_TO_CHECK+=($MERGED_PROJECT_PORT)
-    LISTEN_ADDRESS=$BIND_ADDRESS PORT=$MERGED_PROJECT_PORT CUDA_VISIBLE_DEVICES=$GPU_ID python serve.py \
+    LISTEN_ADDRESS=$BIND_ADDRESS PORT=$MERGED_PROJECT_PORT CUDA_VISIBLE_DEVICES=$GPU_ID python -m wise serve \
         --index-type IndexFlatIP \
         --project-dir "${PROJECT}" &
     PIDS+=($!)
@@ -406,7 +397,7 @@ for ((poll_count=1; poll_count<=MAX_POLL_SERVER_COUNT; poll_count++)); do
 done
 
 # Task 5 : Start the WISE aggregator server
-PORT=$BIND_BASE_PORT REMOTE_PROJECTS=$REMOTE_PROJECTS python3 serve.py --project-dir tmp/123/ &
+PORT=$BIND_BASE_PORT REMOTE_PROJECTS=$REMOTE_PROJECTS python3 -m wise serve --project-dir tmp/123/ &
 PIDS+=($!)
 AGGREGATOR_URL="http://localhost:${BIND_BASE_PORT}/123/"
 COMBINED_URL="http://localhost:$((MERGED_PROJECT_PORT-1))/123/"

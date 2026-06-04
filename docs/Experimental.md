@@ -7,19 +7,19 @@
 There are three main ways to update a WISE project:
 
 - **Add New Features:**  
-  Run `extract-features.py` on your project without specifying a folder path. Provide the desired feature extractor to process all media files in the project.  
+  Run `extract-features` on your project without specifying a folder path. Provide the desired feature extractor to process all media files in the project.
   Example (adding face search features):
   ```
-  python extract-features.py \
+  python -m wise extract-features \
     --media-include "*.mp4" \
     --video-feature-id "deepinsight/insightface/buffalo_l/_unknown" \
     --project-dir /data/wise/my-project/
   ```
 
 - **Add New Media:**  
-  Supply a folder containing new media files to `extract-features.py` to add them to your project.
+  Supply a folder containing new media files to `extract-features` to add them to your project.
   ```
-  python extract-features.py \
+  python -m wise extract-features \
     "/data/videos/new-set/" \
     --media-include "*.mp4" \
     --project-dir /data/wise/my-project/
@@ -45,7 +45,7 @@ dataset. Here is an example of how this feature can be used in general.
 
 REMOTE_PROJECTS='["http://localhost:10001/1/","http://localhost:10002/2/","http://localhost:10003/3/"]' \
   PORT=10000 \
-  python3 serve.py --project-dir tmp/123/
+  python3 -m wise serve --project-dir tmp/123/
 ```
 
 Users visiting the URL `http://localhost:10000/123/` will see WISE search interface that allows audiovisual

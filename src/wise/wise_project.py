@@ -513,7 +513,7 @@ class WiseProject:
         if not self.enable_shot_scale():
             raise ValueError(
                 "vectors_to_shots_map table not found! Please run the import shots script as follows:"
-                'Please run "python3 media-metadata.py import-shot-scale ..."'
+                'Please run "python3 -m wise media-metadata import-shot-scale ..."'
             )
 
         with self.db_engine.connect() as conn:
@@ -1055,7 +1055,7 @@ class WiseProject:
                         logger.info(
                             "This faiss index does not support internal search. To enable "
                             "internal search, please re-create the index by running "
-                            f'`python create-index.py --project-dir "{self.project_dir}" --media-type {media_type} --index-type {search_indices[media_type][feature_extractor_id].index_type} --overwrite`',
+                            f'`python -m wise create-index --project-dir "{self.project_dir}" --media-type {media_type} --index-type {search_indices[media_type][feature_extractor_id].index_type} --overwrite`',
                         )
             # TODO: Fix this to handle audio when support gets added
             if fts_search_index is not None and media_type in {

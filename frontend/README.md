@@ -15,7 +15,7 @@ You can also develop your own frontend that interacts with the WISE backend. The
 This frontend was built with [React](https://react.dev), [Ant Design](https://ant.design), and TypeScript + SASS + HTML. The [Vite.js](https://vitejs.dev) development tool was also used.
 
 ## Usage
-If you would like to use this frontend without modifying the source code, simply run `python3 serve.py --project-dir {your_project_dir}` from the root directory of this repository. See the [User Guide](../docs/UserGuide.md) for more details.
+If you would like to use this frontend without modifying the source code, simply run `python3 -m wise serve --project-dir {your_project_dir}` from the root directory of this repository. See the [User Guide](../docs/UserGuide.md) for more details.
 
 If you need to modify/customise the frontend, read the section below.
 
@@ -28,7 +28,7 @@ If you need to modify/customise the frontend, read the section below.
 1. Make sure you have completed the prerequisite steps above, and `cd`'ed into this directory if you haven't already done so
 2. Start the development server using `API_BASE_URL="http://localhost:9670/PROJECT_NAME/" npm run dev`. Once the server is running, open `localhost:5173` in your browser to access the development version of the frontend
 
-Note: You will need to separately run the API server using `MODE="development" python3 serve.py --project-dir {your_project_dir}` from the root directory of this repository (or run `python3 serve.py --project-dir {your_project_dir}` with `mode` set to `"development"` in `config.py`).
+Note: You will need to separately run the API server using `MODE="development" python3 -m wise serve --project-dir {your_project_dir}` from the root directory of this repository (or run `python3 -m wise serve --project-dir {your_project_dir}` with `mode` set to `"development"` in `config.py`).
 
 ### Production build
 1. Make sure you have completed the prerequisite steps above, and `cd`'ed into this directory if you haven't already done so

@@ -1,6 +1,6 @@
 # WISE Project Thumbnails
 
-To help serve wise projects quickly, thumbnails (height: 192px) are obtained from the input media files at **0.5s** intervals and stored in the `thumbs.db` database in the `extract-features.py` script
+To help serve wise projects quickly, thumbnails (height: 192px) are obtained from the input media files at **0.5s** intervals and stored in the `thumbs.db` database in the `extract-features` command.
 
 Each frame is then encoded as jpeg (with quality set as 80) and stored in the `thumbnails` table in the `thumbs.db` database, under the `content` column, along with the timestamp and media_id
 
