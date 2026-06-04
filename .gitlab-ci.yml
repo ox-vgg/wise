@@ -94,7 +94,7 @@ build-only:
   rules:
     - <<: *docker-changes
       if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
+      when: never # change to always to re-enable docker build
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: never
   parallel:
@@ -131,7 +131,7 @@ build:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
       when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      when: always
+      when: never # change to always to re-enable docker build
   tags: 
     - saas-linux-${SIZE}-${PLATFORM}
 
