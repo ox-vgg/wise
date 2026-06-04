@@ -91,7 +91,7 @@ def main(argv: list[str]):
     elif args.command == "media-metadata":
         return wise._main.media_metadata.main(argv[1:])
     elif args.command == "serve":
-        return wise._main.serve.app(argv[2:])
+        return wise._main.serve.app(argv[2:], prog_name="wise serve")
     else:
         ## Panic!  argparse should never let us get here.
         _logger.critical(f"Unknown command '{args.command}'")
