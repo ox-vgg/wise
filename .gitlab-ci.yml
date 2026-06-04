@@ -19,7 +19,7 @@ pages:
   before_script:
     - pip install pip --upgrade
   script:
-    - pip install -r requirements-docs.txt
+    - pip install -r requirements-docs.txt && pip install --no-deps .
     - (cd mkdocs && mkdocs build --site-dir public)
     - mv mkdocs/public .
   cache:
