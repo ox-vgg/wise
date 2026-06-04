@@ -69,7 +69,7 @@ python3 scripts/explore/explore.py \
 # See scripts/explore/README.md for more details about the iterative workflow
 
 # 5. Serve project with facets enabled
-ENABLE_FACETS=true PORT=10102 python3 serve.py \
+ENABLE_FACETS=true PORT=10102 python3 -m wise serve \
   --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/
 ```
 

@@ -86,15 +86,6 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
     fi
 done
 
-# check if required python scripts exist
-REQUIRED_PYTHON_SCRIPTS=(extract-features.py media-metadata.py create-index.py serve.py)
-for script in "${REQUIRED_PYTHON_SCRIPTS[@]}"; do
-    if [ ! -f "${script}" ]; then
-        echo "$script not found, please run this script from the WISE code directory"
-        exit 1
-    fi
-done
-
 # check if required python packages exist
 REQUIRED_PYTHON_PACKAGES=(torch torchvision torchaudio transformers faiss msclap open_clip)
 for package in "${REQUIRED_PYTHON_PACKAGES[@]}"; do
@@ -127,7 +118,7 @@ fi
 if [ ! -d "${WISE_PROJECT_DIR}" ]; then
     echo "Extracting features from videos using ${NUM_WORKERS} workers (takes about 3 min.) ..."
     cd "${WISE_CODE_DIR}"
-    python extract-features.py \
+    python -m wise extract-features \
            "${TEST_DATA_DIR}" \
            --media-include "*.mp4" \
            --shard-maxcount 512 \
@@ -144,7 +135,7 @@ METADATA_TABLE_NAME="metadata-${TEST_ID}"
 RESULT=$(sqlite3 "$METADATA_DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$METADATA_TABLE_NAME';")
 if [ "$RESULT" != "$METADATA_TABLE_NAME" ]; then
     echo "Importing metadata from ${TEST_DATA_DIR}/media-metadata.csv (takes few seconds) ..."
-    python3 media-metadata.py import \
+    python3 -m wise media-metadata import \
             --metadata-id "${TEST_ID}" \
             --from-csv "${TEST_DATA_DIR}/media-metadata.csv" \
             --metadata-type "media" \
@@ -178,7 +169,7 @@ AUDIO_INDEX_FILENAME="${WISE_PROJECT_DIR}store/${AUDIO_FEATURE_ID}/index/audio-$
 if [ ! -f "${VIDEO_INDEX_FILENAME1}" ] || [ ! -f "${VIDEO_INDEX_FILENAME2}" ] || [ ! -f "${AUDIO_INDEX_FILENAME}" ]; then
     echo "Creating index (takes about 1 min.) ..."
     cd "${WISE_CODE_DIR}"
-    python create-index.py \
+    python -m wise create-index \
            --index-type "${FAISS_INDEX_TYPE}" \
            --project-dir "$WISE_PROJECT_DIR"
 fi
@@ -213,7 +204,7 @@ fi
 
 echo "Starting WISE server on ${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT} (takes about 1 min.) ..."
 cd "${WISE_CODE_DIR}"
-FACE_TEXT_SEARCH_RRF=$FACE_TEXT_SEARCH_RRF LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python serve.py \
+FACE_TEXT_SEARCH_RRF=$FACE_TEXT_SEARCH_RRF LISTEN_ADDRESS=$HTTP_SERVER_HOST PORT=$HTTP_SERVER_PORT python -m wise serve \
         --index-type "${FAISS_INDEX_TYPE}" \
         --project-dir "$WISE_PROJECT_DIR" & # to start the server in the background
 SERVER_PID=$!

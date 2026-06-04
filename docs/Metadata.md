@@ -11,7 +11,7 @@ WISE aims to support the following four types of metadata.
 For each type of metadata, we write scripts that will populate the `metadata/internal.db` SQLite database with a new table that must have all the columns (i.e. reserved column names) described above. Illustrative examples of each type of metadata is shown below.
 
 ## Media Metadata
-The script `media-metadata.py` allows import of metadata associated with each image, video or audio file. Here is an example based on Kinetics-6c dataset which is a set of 30 videos taken from the [Kinetics](https://github.com/cvdfoundation/kinetics-dataset) dataset.
+The `media-metadata` command allows import of metadata associated with each image, video or audio file. Here is an example based on Kinetics-6c dataset which is a set of 30 videos taken from the [Kinetics](https://github.com/cvdfoundation/kinetics-dataset) dataset.
 
 The [Install](Install.md) guide describes the process of installing WISE. We assume that the WISE software has already been installed in the `wise` folder.
 
@@ -27,7 +27,7 @@ Next, we create a WISE project based on these videos.
 ```bash
 ## 2. Extract audiovisual features
 mkdir -p wise-projects/
-python3 extract-features.py \
+python3 -m wise extract-features \
   wise-data/Kinetics-6c/ \
   --project-dir wise-projects/Kinetics-6c/
 ```
@@ -45,10 +45,10 @@ coughing/AFRoHj8B8DM_000116_000126.mp4,"coughing","Hillary Clinton coughts while
 ...
 ```
 
-This metadata can be imported into the existing WISE project using the `media-metadata.py` script as follows.
+This metadata can be imported into the existing WISE project using the `media-metadata` command as follows.
 
 ```bash
-python3 media-metadata.py import \
+python3 -m wise media-metadata import \
   --metadata-id "Kinetics-6c" \
   --from-csv wise-data/Kinetics-6c/metadata.csv \
   --metadata-type "media" \
@@ -62,7 +62,7 @@ The metadata gets added to a table named `metadata-Kinetics-c` in the `wise-proj
 
 ```bash
 echo '{ "metadata-Kinetics-6c": [ "media_category", "media_description" ] }' > fts_config.json
-python3 create-index.py \
+python3 -m wise create-index \
   --media-type metadata \
   --fts-config fts_config.json \
   --project-dir wise-projects/Kinetics-6c/
@@ -94,7 +94,7 @@ python3 scripts/metadata/export-vise-metadata-as-csv.py\
 # to "vise_filename" in the exported csv file so that these entries can be
 # identified in the frontend
 
-python3 media-metadata.py import \
+python3 -m wise media-metadata import \
   --metadata-id "1516ci-2024-11-25" \
   --from-csv /data/wise/dataset/1516ci/metadata_db.csv \
   --metadata-type "media" \

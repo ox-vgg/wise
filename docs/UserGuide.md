@@ -24,7 +24,7 @@ us to perform audio and visual search on the video collection.
 
 ```bash
 mkdir -p wise-projects/
-python3 extract-features.py \
+python3 -m wise extract-features \
   wise-data/Kinetics-6/ \                   # input media folder 
   --project-dir wise-projects/Kinetics-6/   # WISE project folder
 ```
@@ -50,16 +50,16 @@ Notes:
     - To enable Object Search, pass in `--image-feature-id transformers/owlv2/google/owlv2-base-patch16-ensemble` (use `--video-feature-id ...` for video files)
     - Multiple feature extractors can be used for a given media type by specifying them as separate arguments, e.g., `--image-feature-id mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli --image-feature-id deepinsight/insightface/buffalo_l/_`.
   </details>
-- For more details on the options available, run `python3 extract-features.py --help`
+- For more details on the options available, run `python3 -m wise extract-features --help`
 
 ## Step 4: Create vector search index
 ```bash
-python3 create-index.py \
+python3 -m wise create-index \
   --project-dir wise-projects/Kinetics-6/  # Pass in the same project folder as above
 ```
 
 - The type of search index can be customised using the `--index-type` option, with supported types being `IndexFlatIP` (default) and `IndexIVFFlat` (for faster search speeds at the cost of slightly reduced retrieval accuracy, suitable for larger projects with many images / video frames)
-- For more details on the options available, run `python3 create-index.py --help`
+- For more details on the options available, run `python3 -m wise create-index --help`
 
 ## Step 5: Search
 
@@ -69,12 +69,11 @@ We can now search the video collection either using the web-based interface, or 
 
 Start the web server using the command below:
 ```bash
-python3 serve.py --project-dir wise-projects/Kinetics-6/
+python3 -m wise serve --project-dir wise-projects/Kinetics-6/
 ```
 Once the server has been started, go to http://localhost:9670/Kinetics-6/ in your browser. This will open up a search interface like this:
 
 ![Screenshot of WISE search UI](./assets/search_ui_screenshot.png)
 
 - You can change some configurations, such as the port number and index type, in `config.py`
-- For more details on the options available, run `python3 serve.py --help`
-
+- For more details on the options available, run `python3 -m wise serve --help`

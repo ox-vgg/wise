@@ -5,7 +5,13 @@ Next version (unreleased)
 -------------------------
 
 * WISE is now a Python package that can be installed with pip and
-  imported, and used from other projects.
+  imported, and used from other projects.  Previous scripts are now
+  commands of the wise package, i.e., replace calling them like so:
+
+  * `python create-index.py ...` -> `python -m wise create-index ...`
+  * `python extract-features.py ...` -> `python -m wise extract-features ...`
+  * `python media-metadata.py ...` -> `python -m wise media-metadata ...`
+  * `python serve.py ...` -> `python -m wise serve ...`
 
 * The WISE software has been described in
   [arXiv:2602.12819](https://arxiv.org/abs/2602.12819) paper.

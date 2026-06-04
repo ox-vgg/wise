@@ -223,7 +223,7 @@ def get_dataset_stream(
                 "   2,1,1.600,3.533\n"
                 "   ... (where, media_id is the ID of the video in the WISE project)\n"
                 "2. Add it to a WISE project as follows:\n"
-                "   python3 media-metadata.py import-shots ... --from-csv shots.csv"
+                "   python3 -m wise media-metadata import-shots ... --from-csv shots.csv"
             )
             exit(1)
         stream = ShotStream(uniform_stream, shots, params)
@@ -865,7 +865,3 @@ def main(argv: list[str]):
     print(
         f"Feature extraction completed in {elapsed_time:.0f} sec ({elapsed_time/60:.2f} min)"
     )
-
-
-if __name__ == "__main__":
-    main(sys.argv)

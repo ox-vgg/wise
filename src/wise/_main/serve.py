@@ -52,10 +52,9 @@ def main(
         help="The root path where the app is being served behind a proxy",
     ),
 ):
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
-    )
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
     # ensure that the frontend assets are built
     if not Path(theme_asset_dir / 'index.html').exists():
         raise FileNotFoundError(
@@ -70,7 +69,3 @@ def main(
         index_type.value if index_type else None,
         proxy_root_path=proxy_root_path,
     )
-
-
-if __name__ == "__main__":
-    app()

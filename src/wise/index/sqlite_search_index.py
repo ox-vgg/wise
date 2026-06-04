@@ -115,7 +115,7 @@ class SqliteSearchIndex(SearchIndex):
                 return True
         else:
             print(f'missing metadata index')
-            print(f'use create-index.py script to create a FTS search index')
+            print(f'use python -m wise create-index to create a FTS search index')
             return False
 
     def search(self, modality_type, query, topk=5, query_type='text'):

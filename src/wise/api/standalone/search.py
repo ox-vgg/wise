@@ -353,7 +353,7 @@ def reconstruct_vectors(
         logger.exception(
             "This faiss index does not support internal search. To enable "
             "internal search, please re-create the index by running "
-            f"`python create-index.py --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {index_type} --overwrite`",
+            f"`python -m wise create-index --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {index_type} --overwrite`",
         )
         return PlainTextResponse(
             status_code=500, content=f"Internal search not supported in this project"
@@ -711,7 +711,7 @@ async def _search(
         logger.exception(
             "This faiss index does not support internal search. To enable "
             "internal search, please re-create the index by running "
-            f'`python create-index.py --project-dir "{config.project_dir}" '
+            f'`python -m wise create-index --project-dir "{config.project_dir}" '
             f"--media-type {media_type} --index-type {index_type} --overwrite`"
         )
         raise HTTPException(
