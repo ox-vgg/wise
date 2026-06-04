@@ -24,7 +24,7 @@ us to perform audio and visual search on the video collection.
 
 ```bash
 mkdir -p wise-projects/
-python3 -m extract-features \
+python3 -m wise extract-features \
   wise-data/Kinetics-6/ \                   # input media folder 
   --project-dir wise-projects/Kinetics-6/   # WISE project folder
 ```
