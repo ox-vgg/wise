@@ -45,7 +45,6 @@ from wise.data_models import (
     VectorMetadata,
     VideoShot,
 )
-from wise.metadata_type import MetadataType
 from wise.repository import (
     MediaMetadataRepo,
     MediaRepo,
