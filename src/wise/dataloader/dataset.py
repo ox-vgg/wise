@@ -180,26 +180,6 @@ class MediaChunk:
     tensor: torch.Tensor | list[torch.Tensor]
     pts: float
 
-def get_segment_lengths(stream, stream_opts):
-    segment_lengths = []
-    for i, opts in enumerate(stream_opts):
-        output_stream_info = stream.get_out_stream_info(i)
-        frames_per_chunk = opts.frames_per_chunk
-        rate = (
-            output_stream_info.frame_rate
-            if isinstance(opts, BasicVideoStreamOutputOptions)
-            else output_stream_info.sample_rate
-        )
-        if rate is None:
-            # Need to use the input media info to calculate the rate
-            raise NotImplementedError()
-
-        if rate == 0:
-            segment_lengths.append(0)
-        else:
-            segment_lengths.append(frames_per_chunk / rate)
-    return segment_lengths
-
 
 def validate_segment_lengths_from_options(stream_opts: list[StreamOutputOptions]):
     # Each stream should be aligned, or we will just miss one or the other.
@@ -682,20 +662,3 @@ def get_dataset(media_metadata: list[DatasetPayload], params: dict[str, Any]):
         )
     )
     return datasets
-
-
-def is_valid_media_file(p: Path):
-    """
-    Quicker, but non-exhaustive check.
-    Can find if the streamreader recognizes the file, but doesn't ensure it can be iterated over
-    """
-    media_type = get_media_type_from_mimetype(get_mime_type(p))
-    if media_type == MediaMimetype.unknown:
-        return False
-
-    try:
-        get_media_info(str(p))
-        return True
-    except Exception:
-        logger.warning(f'Skipping invalid video file: {p}')
-        return False

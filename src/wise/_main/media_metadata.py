@@ -46,7 +46,6 @@ from wise.data_models import (
     VideoShot,
 )
 from wise.repository import (
-    MediaMetadataRepo,
     MediaRepo,
     SourceCollectionRepo,
     VectorRepo,
@@ -345,25 +344,6 @@ def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metada
 ##
 ## Helper functions
 ##
-def get_csv_row_col_value(row, col_id):
-    if '{' in col_id and '}' in col_id:
-        col_value = col_id.format(**row)
-    else:
-        col_value = row[col_id]
-    return col_value
-
-def time2sec(time):
-    if isinstance(time, int) or isinstance(time, float):
-        return float(time)
-    if isinstance(time, str):
-        if ':' in time:
-            return hhmmss_to_sec(time)
-        else:
-            try:
-                time_sec = float(time)
-                return time_sec
-            except ex:
-                print(ex)
 
 def hhmmss_to_sec(hhmmss):
     tok = hhmmss.split(':')
@@ -375,15 +355,6 @@ def hhmmss_to_sec(hhmmss):
     ms = int(ssms_tok[1])
     sec = hh*60*60 + mm*60 + ss + ms/100.0
     return float(sec)
-
-def metadata_exist(metadata_db, metadata_table):
-    if metadata_db.exists():
-        with sqlite3.connect( str(metadata_db) ) as sqlite_connection:
-            cursor = sqlite_connection.cursor()
-            res = cursor.execute(f'SELECT COUNT(*) FROM sqlite_master WHERE type="table" AND name="{metadata_table}"')
-            if res == (1,):
-                return True
-    return False
 
 ##
 ## Import Shot Scale

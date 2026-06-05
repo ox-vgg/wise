@@ -375,11 +375,6 @@ class SearchResponse(BaseModel):
     video_results: Optional[VideoResults] # search results from video stream of video files
     image_results: Optional[ImageResults] # search results from image files
 
-class FaceTextSearchResponse(BaseModel):
-    time: float # backend search time in seconds
-    face_results: FaceTextShardResults
-    text_results: FaceTextShardResults
-
 def split_query_terms(query: Query):
     text_queries: list[str] = []
     negative_text_queries: list[str] = []
