@@ -90,8 +90,8 @@ class WiseProject:
     """
     def __init__(self, project_dir: Path, *, create_project=False, read_only=False, **kwargs):
         self.project_dir = Path(project_dir)
-        self.store_dir = self.project_dir / "store"
-        self.media_dir = self.project_dir / "media"
+        self._store_dir = self.project_dir / "store"
+        self._media_dir = self.project_dir / "media"
         self.metadata_dir = self.project_dir / "metadata"
         self.media_type_list = ["image", "video", "audio"]
         self.read_only = read_only
@@ -178,11 +178,13 @@ class WiseProject:
     def metadata_tablename(self, metadata_id: str) -> str:
         return "metadata-" + metadata_id
 
+    @property
     def store_dir(self) -> Path:
-        return self.store_dir
+        return self._store_dir
 
+    @property
     def media_dir(self) -> Path:
-        return self.media_dir
+        return self._media_dir
 
     def features_root(self, feature_extractor_id: str) -> Path:
         return self.store_dir / feature_extractor_id
