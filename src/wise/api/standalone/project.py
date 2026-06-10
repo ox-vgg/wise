@@ -395,7 +395,7 @@ def get_facets_index(config: ConfigDep, project_info: ProjectInfoDep, project_se
     facets_html_path = config.project_dir.parent.parent.parent / "frontend" / "dist" / "facets.html"
     # Alternative path if running installed vs dev
     if not facets_html_path.exists():
-        facets_html_path = Path(__file__).parent.parent.parent / "frontend" / "dist" / "facets.html"
+        facets_html_path = Path(__file__).parent.parent.parent.parent.parent / "frontend" / "dist" / "facets.html"
 
     try:
         with open(facets_html_path, "r") as f:
@@ -425,7 +425,7 @@ def get_facets_cluster_detail(config: ConfigDep, project_info: ProjectInfoDep, p
 
     facets_html_path = config.project_dir.parent.parent.parent / "frontend" / "dist" / "facets.html"
     if not facets_html_path.exists():
-        facets_html_path = Path(__file__).parent.parent.parent / "frontend" / "dist" / "facets.html"
+        facets_html_path = Path(__file__).parent.parent.parent.parent.parent / "frontend" / "dist" / "facets.html"
 
     try:
         with open(facets_html_path, "r") as f:
@@ -482,7 +482,7 @@ def get_facets_cluster_overview(config: ConfigDep, project_info: ProjectInfoDep,
 
     facets_html_path = config.project_dir.parent.parent.parent / "frontend" / "dist" / "facets.html"
     if not facets_html_path.exists():
-        facets_html_path = Path(__file__).parent.parent.parent / "frontend" / "dist" / "facets.html"
+        facets_html_path = Path(__file__).parent.parent.parent.parent.parent / "frontend" / "dist" / "facets.html"
 
     try:
         with open(facets_html_path, "r") as f:
