@@ -70,7 +70,6 @@ def main(argv: list[str]):
 
     parser.add_argument('command',
                         choices=['import', 'import-shots', 'import-shot-scale'],
-                        nargs='?',
                         help='various modes of operation supported by the metadata script')
 
     parser.add_argument('--metadata-id',
