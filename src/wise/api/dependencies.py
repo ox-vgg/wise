@@ -89,10 +89,15 @@ def get_project_info(config: ConfigDep, project_service: ProjectServiceDep):
     if project_info is None:
         def init_project_info(project_service: ProjectServiceType):
             if isinstance(project_service, LocalWiseProjectService):
-                return project_service.info()
-            # remote projects
-            name = config.project_dir.name
-            return RemoteWiseProjectService.get_info(project_service, name)
+                info = project_service.info()
+            else:
+                # remote projects
+                name = config.project_dir.name
+                info = RemoteWiseProjectService.get_info(project_service, name)
+
+            # expose the active API limit used by this server.
+            info.max_search_results = config.max_search_results
+            return info
 
         project_info = init_project_info(project_service)
     return project_info

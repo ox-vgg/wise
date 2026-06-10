@@ -663,6 +663,9 @@ async def _search(
     metadata_filter: list[str],
     add_prefix: bool,
 ) -> common.SearchResponse:
+    max_end = min(config.max_search_results, project_info.num_vectors)
+    start, end = common.clamp_search_window(start, end, max_end)
+
     if feature_extractor_id == "wise/metadata":
         return _search_metadata(
             config,
@@ -693,10 +696,6 @@ async def _search(
             raise HTTPException(
                 400, {"message": "Cannot search on audio using a visual query"}
             )
-
-    end = min(end, project_info.num_vectors)
-    if start > end:
-        raise HTTPException(400, {"message": "'start' cannot be greater than 'end'"})
 
     media_type = get_media_type(search_in)
 
@@ -806,8 +805,8 @@ async def handle_post_search_feature(
     search_in: Annotated[MediaType, Depends(validate_search_targets)],
     feature_extractor_id: str = fastapi.Query(),
     # Other parameters
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
+    start: int = fastapi.Query(0, ge=0),
+    end: int = fastapi.Query(20, gt=0),
     thumbnails_to_send: int = fastapi.Query(0),
     shot_scale: list[int] = fastapi.Query(default=[]),
     metadata_filter: list[str] = fastapi.Query(default=[]),
@@ -817,11 +816,8 @@ async def handle_post_search_feature(
             "message": "`wise/metadata` feature extractor cannot be used for feature-based search. Please use a different feature extractor."
         })
 
-    end = min(end, project_info.num_vectors)
-    if start > end:
-        raise HTTPException(
-            400, {"message": "'start' cannot be greater than 'end'"}
-        )
+    max_end = min(config.max_search_results, project_info.num_vectors)
+    start, end = common.clamp_search_window(start, end, max_end)
 
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
     media_type = get_media_type(search_in)
@@ -876,8 +872,8 @@ async def handle_post_search(
     negative_internal_image_queries: list[str] = fastapi.Query(
         default=[]
     ),  # ids to internal images
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
+    start: int = fastapi.Query(0, ge=0),
+    end: int = fastapi.Query(20, gt=0),
     thumbnails_to_send: int = fastapi.Query(0),
     shot_scale: list[int] = fastapi.Query(default=[]),
     metadata_filter: list[str] = fastapi.Query(default=[]),
@@ -943,8 +939,8 @@ async def handle_post_search2(
     query_term: Annotated[list[str], Form()] = [],
     query_file: list[UploadFile] = [],
     # Other parameters
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
+    start: int = fastapi.Query(0, ge=0),
+    end: int = fastapi.Query(20, gt=0),
     thumbnails_to_send: int = fastapi.Query(0),
     shot_scale: list[int] = fastapi.Query(default=[]),
     metadata_filter: list[str] = fastapi.Query(default=[]),
@@ -982,6 +978,7 @@ async def handle_post_search2(
 @router.get("/featured", response_model=common.SearchResponse)
 @common.add_response_time
 async def handle_get_featured(
+    config: ConfigDep,
     project_service: ProjectServiceDep,
     search_service: SearchServiceDep,
     # The "media type" used for "featured_in" does not actually
@@ -991,12 +988,13 @@ async def handle_get_featured(
     # is just a convenience to get the values checked.
     featured_in: MediaType = fastapi.Query(),
     feature_extractor_id: str = fastapi.Query(),
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
+    start: int = fastapi.Query(0, ge=0),
+    end: int = fastapi.Query(20, gt=0),
     thumbnails_to_send: int = fastapi.Query(0),
     # This seed is used to randomly select the set of images used for the featured images
     random_seed: int = fastapi.Query(123),
 ):
+    start, end = common.clamp_search_window(start, end, config.max_search_results)
     modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in)
     search_output = search_service.featured(
         modality, feature_extractor_id, start, end, random_seed

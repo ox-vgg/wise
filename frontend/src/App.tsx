@@ -39,9 +39,9 @@ export const App: React.FunctionComponent = () => {
   const [featureExtractorId, setFeatureExtractorId] = useState<string>('');
   const [shotScaleFilter, setShotScaleFilter] = useState<number[]>([]);
 
-  const dataService = useDataService();
-  const [isHomePage, setIsHomePage] = useState(true);
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({});
+  const dataService = useDataService(projectInfo.max_search_results);
+  const [isHomePage, setIsHomePage] = useState(true);
 
   const [isSearchDropdownOpenForTour, setIsSearchDropdownOpenForTour] = useState(false);
   const tourVariables: TourVariables = {

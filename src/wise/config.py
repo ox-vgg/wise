@@ -56,6 +56,7 @@ class APIConfig(BaseSettings):
     listen_address: str = "0.0.0.0"
     port: int = 9670
     top_k: int = 10
+    max_search_results: int = 1000  # Higher values increase latency, memory use, and payload size.
     precision: int = 3
     query_prefix: str = "This is a photo of a"
     text_queries_weight: float = 2.0

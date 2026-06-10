@@ -215,6 +215,7 @@ export interface ProjectInfo {
     };
   };
   num_vectors?: number;
+  max_search_results?: number;
   num_media_files?: number;
   media_file_counts?: {
     image?: number;

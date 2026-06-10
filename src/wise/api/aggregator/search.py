@@ -57,6 +57,7 @@ router = APIRouter(route_class=common.CachedBodyRoute)
 @router.get("/featured", response_model=common.SearchResponse)
 @common.add_response_time
 async def handle_get_featured(
+    config: ConfigDep,
     search_service: SearchServiceDep,
     # The "media type" used for "featured_in" does not actually
     # refer to the media_type in the database.  It is actually
@@ -65,12 +66,13 @@ async def handle_get_featured(
     # is just a convenience to get the values checked.
     featured_in: MediaType = fastapi.Query(),
     feature_extractor_id: str = fastapi.Query(),
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
+    start: int = fastapi.Query(0, ge=0),
+    end: int = fastapi.Query(20, gt=0),
     thumbnails_to_send: int = fastapi.Query(0),
     # This seed is used to randomly select the set of images used for the featured images
     random_seed: int = fastapi.Query(123),
 ):
+    start, end = common.clamp_search_window(start, end, config.max_search_results)
     # modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in) 
     response = await cast(RemoteSearchService, search_service).featured(
         featured_in, feature_extractor_id, start, end, random_seed
@@ -212,8 +214,8 @@ async def handle_post_search(
         default=[]
     ),  # ids to internal images
     # Other parameters
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
+    start: int = fastapi.Query(0, ge=0),
+    end: int = fastapi.Query(20, gt=0),
     thumbnails_to_send: int = fastapi.Query(0),
     shot_scale: list[int] = fastapi.Query(default=[]),
     metadata_filter: list[str] = fastapi.Query(default=[]),
@@ -277,8 +279,8 @@ async def handle_post_search2(
     query_term: Annotated[list[str], Form()] = [],
     query_file: list[UploadFile] = [],
     # Other parameters
-    start: int = fastapi.Query(0, ge=0, le=980),
-    end: int = fastapi.Query(20, gt=0, le=1000),
+    start: int = fastapi.Query(0, ge=0),
+    end: int = fastapi.Query(20, gt=0),
     thumbnails_to_send: int = fastapi.Query(0),
     shot_scale: list[int] = fastapi.Query(default=[]),
     metadata_filter: list[str] = fastapi.Query(default=[]),

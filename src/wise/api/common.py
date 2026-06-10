@@ -43,6 +43,12 @@ def round_float_(v: float) -> float:
 
 round_float = Annotated[float, PlainSerializer(round_float_, when_used='json-unless-none')]
 
+def clamp_search_window(start: int, end: int, max_end: int) -> tuple[int, int]:
+    end = min(end, max_end)
+    if start > end:
+        raise HTTPException(400, {"message": "'start' cannot be greater than 'end'"})
+    return start, end
+
 
 class BBoxXYWH(BaseModel):
     x: round_float
