@@ -26,6 +26,7 @@ import argparse
 import bisect
 import csv
 import json
+import logging
 import re
 import sqlite3
 import sys
@@ -52,6 +53,9 @@ from wise.repository import (
     VideoShotsRepo,
 )
 from wise.wise_project import WiseProject
+
+
+logger = logging.getLogger(__name__)
 
 
 ##
@@ -101,7 +105,8 @@ def main(argv: list[str]):
     elif(args.command == 'import-shot-scale'):
         import_shot_scale(args)
     else:
-        print(f'unknown command {args.command}')
+        ## Panic!  argparse should never let us get here.
+        logger.critical("Unknown command '%s'", args.command)
 
 ##
 ## Import Shots
@@ -134,12 +139,12 @@ def import_shots(args):
             db_inspector = sa.inspect(db_engine)
             if db_inspector.has_table('vectors_to_shots_map'):
                 # drop the table if it exists
-                print('dropping existing vectors_to_shots_map table ...')
+                logger.info('dropping existing vectors_to_shots_map table ...')
                 db.project_metadata_obj.reflect(db_engine, only=['vectors_to_shots_map'])
                 vectors_to_shots_map = db.project_metadata_obj.tables['vectors_to_shots_map']
                 vectors_to_shots_map.drop(db_engine)
 
-            print('creating vectors_to_shots_map table ...')
+            logger.info('creating vectors_to_shots_map table ...')
             sqlalchemy_metadata = sa.MetaData()
             sqlalchemy_metadata.reflect(bind=db_engine)
             vectors_to_shots_map = sa.Table(
@@ -155,7 +160,10 @@ def import_shots(args):
             # Count total vectors to process for progress bar
             result = conn.execute(sa.text("SELECT COUNT(*) FROM vectors"))
             total_vectors = result.scalar() or 0
-            print(f'Populating vectors_to_shots_map table for {total_vectors} vectors (takes a while) ...')
+            logger.info(
+                "Populating vectors_to_shots_map table for %d vectors (takes a while) ...",
+                total_vectors,
+            )
 
             # Fetch all vectors and shots into memory for mapping
             vectors = conn.execute(sa.text("SELECT id, media_id, timestamp FROM vectors")).fetchall()
@@ -186,7 +194,7 @@ def import_shots(args):
                         break  # Each vector maps to at most one shot
 
             conn.commit()
-            print('Creating indices on vectors_to_shots_map ...')
+            logger.info("Creating indices on vectors_to_shots_map ...")
             conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_vectors_vector_id ON vectors_to_shots_map (vector_id);"))
             conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_vectors_shot_and_media_id ON vectors_to_shots_map (shot_id, media_id);"))
             conn.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_vectors_modality_feat_media ON vectors (modality, feature_extractor_id, media_id)"))
@@ -266,7 +274,7 @@ def get_csv_header(csv_filename):
         return colnames
 
 def load_metadata_from_csv(csv_filename, args):
-    print(f'Loading metadata from CSV file {csv_filename} ...')
+    logger.info("Loading metadata from CSV file '%s' ...", csv_filename)
     all_metadata = []
     with open(csv_filename, 'r', newline='', encoding='utf-8') as csv_file:
         data_sample = csv_file.read(1024)
@@ -292,12 +300,13 @@ def resolve_media_path(db_engine, metadata):
                 metadata[i]['media_id'] = -1
                 failed_count += 1
                 if failed_count < 10:
-                    print(
-                        f'failed to resolve media_path "{media_path}" to a valid media_id'
+                    logger.error(
+                        "Failed to resolve media_path '%s' to a valid media_id",
+                        media_path,
                     )
                 else:
                     if failed_count == 10:
-                        print("... skipping further error messages ...")
+                        logger.error("... skipping further error messages ...")
         if failed_count:
             raise ValueError(f'failed to resolved media_path for {failed_count} metadata rows')
 
@@ -338,7 +347,11 @@ def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metada
     with db_engine.connect() as conn:
         conn.execute(metadata_table.insert(), media_metadata)
         conn.commit()
-    print(f'inserted {len(media_metadata)} rows into table {metadata_tablename}')
+    logger.info(
+        "Inserted %d rows into table '%s'",
+        len(media_metadata),
+        metadata_tablename,
+    )
 
 ##
 ## Helper functions
@@ -372,7 +385,10 @@ def import_shot_scale(args):
             if thumbnail_id in thumbnail_id_to_shot_scale:
                 raise ValueError(f'duplicate thumbnail_id of {thumbnail_id} found in CSV metadata')
             thumbnail_id_to_shot_scale[thumbnail_id] = int(row.get('shot_scale'))
-        print(f'Loaded {len(thumbnail_id_to_shot_scale)} thumbnail_id to shot_scale mappings from CSV metadata')
+        logger.info(
+            "Loaded %d thumbnail_id to shot_scale mappings from CSV metadata",
+            len(thumbnail_id_to_shot_scale),
+        )
 
         # 2. Group thumbnails by media
         thumbs_by_media = {}
@@ -384,7 +400,9 @@ def import_shot_scale(args):
                 if media_id not in thumbs_by_media:
                     thumbs_by_media[media_id] = []
                 thumbs_by_media[media_id].append((thumb_id, float(row.timestamp)))
-        print(f'Loaded {len(thumbs_by_media)} thumbnails grouped by media')
+        logger.info(
+            "Loaded %d thumbnails grouped by media", len(thumbs_by_media),
+        )
 
         # 3. Compute the shot_scale for each shot
         with db_engine.connect() as conn:
@@ -409,9 +427,25 @@ def import_shot_scale(args):
                 if shot_scales:
                     most_common_scale = max(set(shot_scales), key=shot_scales.count)
                     shot_to_scale.append((media_id, shot_id, most_common_scale))
-                    #print(f"media_id={media_id}, shot_id={shot_id}, shot-window=({shot_ts} to {shot_te}), shot_scale: {most_common_scale}")
+                    logger.debug(
+                        "media_id=%d, shot_id=%d, shot-window=(%f to %f), shot_scale: %d",
+                        media_id,
+                        shot_id,
+                        shot_ts,
+                        shot_te,
+                        most_common_scale,
+                    )
                 else:
-                    print(f'No thumbnails found for shot {shot_id} in media {media_id} within the shot window ({shot_ts} to {shot_te})')
+                    logger.warning(
+                        (
+                            "No thumbnails found for shot %d in media %d"
+                            " within the shot window (%f to %f)"
+                        ),
+                        shot_id,
+                        media_id,
+                        shot_ts,
+                        shot_te,
+                    )
             # Insert/Update shot_scale for each shot in the shots table
             if shot_to_scale:
                 # Add shot_scale column if it doesn't exist
@@ -424,7 +458,9 @@ def import_shot_scale(args):
                         {"shot_scale": shot_scale, "id": shot_id, "media_id": media_id}
                     )
                 conn.commit()
-                print(f"Updated shot_scale for {len(shot_to_scale)} shots.")
+                logger.info(
+                    "Updated shot_scale for %d shots.", len(shot_to_scale)
+                )
 
     csv_filename = Path(args.from_csv)
     if not csv_filename.exists():

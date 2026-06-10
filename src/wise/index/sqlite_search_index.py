@@ -14,6 +14,7 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
+import logging
 import math
 import sqlite3
 from pathlib import Path
@@ -25,6 +26,9 @@ from tqdm import tqdm
 from wise.feature.feature_extractor_factory import FeatureExtractorFactory
 from wise.feature.store.feature_store_factory import FeatureStoreFactory
 from wise.index.search_index import SearchIndex
+
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteSearchIndex(SearchIndex):
@@ -60,9 +64,13 @@ class SqliteSearchIndex(SearchIndex):
         index_type = "FTS5" # use full text search version 5 of sqlite by default
         self.metadata_table_fts = f'{self.metadata_table}_fts'
         if self.sqlite_table_exists(self.metadata_db, self.metadata_table_fts) and not overwrite:
-            print(f'{index_type} index for {self.modality_type} already exists')
+            logger.warning(
+                "%s index for %s already exists",
+                index_type,
+                self.modality_type,
+            )
             return
-        print(f'Creating metadata index for {self.metadata_id}')
+        logger.info("Creating metadata index for %s", self.metadata_id)
 
         with sqlite3.connect(self.metadata_db) as sqlite_connection:
             cursor = sqlite_connection.cursor()
@@ -114,8 +122,10 @@ class SqliteSearchIndex(SearchIndex):
                 sqlite_connection.backup(self.index)
                 return True
         else:
-            print(f'missing metadata index')
-            print(f'use python -m wise create-index to create a FTS search index')
+            logger.error(
+                "Missing metadata index; use `python -m wise create-index`"
+                " to create a FTS search index"
+            )
             return False
 
     def search(self, modality_type, query, topk=5, query_type='text'):

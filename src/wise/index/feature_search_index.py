@@ -15,6 +15,7 @@
 ## limitations under the License.
 
 import itertools
+import logging
 import math
 from pathlib import Path
 
@@ -25,6 +26,9 @@ from tqdm import tqdm
 from wise.data_models import ModalityType
 from wise.feature.store.feature_store_factory import FeatureStoreFactory
 from wise.index.search_index import SearchIndex
+
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureSearchIndex(SearchIndex):
@@ -54,7 +58,11 @@ class FeatureSearchIndex(SearchIndex):
         self.index_dir.mkdir(parents=True, exist_ok=True)
         index_fn = self.get_index_filename(index_type)
         if index_fn.exists() and overwrite is False:
-            print(f'{index_type} for {self.modality_type} already exists')
+            logger.warning(
+                "%s index for %s already exists",
+                index_type,
+                self.modality_type,
+            )
             return
         self.index_type = index_type
 
@@ -83,7 +91,11 @@ class FeatureSearchIndex(SearchIndex):
             index = faiss.IndexIVFFlat(quantizer, feature_dim, cell_count, faiss.METRIC_INNER_PRODUCT)
             index.set_direct_map_type(faiss.DirectMap.Hashtable) # Hashtable needed to support non-sequential ids
 
-            print(f'  loading a random sample of {train_count} features from {feature_count} features ...')
+            logger.info(
+                "Loading a random sample of %d features from %d features",
+                train_count,
+                feature_count,
+            )
             shuffled_features = FeatureStoreFactory.load_store(
                 self.modality_type, self.features_dir
             )
@@ -97,18 +109,23 @@ class FeatureSearchIndex(SearchIndex):
                 train_features[i,:] = feature_vector
 
             assert not index.is_trained
-            print(f'  training {index_type} faiss index with {train_count} features with {cell_count} clusters ...')
+            logger.info(
+                "Training %s faiss index with %d features with %d clusters",
+                index_type,
+                train_count,
+                cell_count,
+            )
             index.train(train_features)
             assert index.is_trained
 
-        print('Adding feature vectors to index')
+        logger.info("Adding feature vectors to index")
         with tqdm(total=feature_count) as pbar:
             for feature_ids_batch, feature_vectors_batch in feature_store.iter_batch():
                 index.add_with_ids(feature_vectors_batch, feature_ids_batch)
                 pbar.update(len(feature_ids_batch))
 
         faiss.write_index(index, index_fn.as_posix())
-        print(f'  saved index to {index_fn}')
+        logger.info("Saved index to '%s'", index_fn)
 
     def is_index_loaded(self):
         return hasattr(self, 'index')
@@ -117,8 +134,13 @@ class FeatureSearchIndex(SearchIndex):
         self.index_type = index_type
         index_fn = self.get_index_filename(index_type)
         if not index_fn.exists():
-            print(f'  index {index_fn} does not exist')
-            print(f'  use python -m wise create-index to create an index')
+            logger.error(
+                (
+                    "Index '%s' does not exist;"
+                    " use `python -m wise create-index` to create it."
+                ),
+                index_fn,
+            )
             return False
         self.index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
         return True

@@ -665,7 +665,7 @@ def main(argv: list[str]):
         exit(0)
 
     ## 1. Initialise internal metadata database with valid files
-    print('Initialising internal metadata database')
+    logger.info("Initialising internal metadata database")
     all_metadata = get_media_files_for_dataset(mode, project, args, db_engine)
 
     if len(all_metadata) == 0:
@@ -862,6 +862,8 @@ def main(argv: list[str]):
 
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(
-        f"Feature extraction completed in {elapsed_time:.0f} sec ({elapsed_time/60:.2f} min)"
+    logger.info(
+        "Feature extraction completed in %.0f sec (%.2f min)",
+        elapsed_time,
+        elapsed_time/60,
     )

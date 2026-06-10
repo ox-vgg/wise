@@ -361,7 +361,7 @@ class WiseProject:
         return media_files
 
     def get_shots(self) -> list[dict]:
-        print(f'Fetching shots from {self.dburi} ...')
+        logger.info("Fetching shots from '%s' ...", self.dburi)
         shots = {}
         with self.db_engine.connect() as conn:
             stmt = sa.select(
@@ -1035,7 +1035,11 @@ class WiseProject:
                 if not search_indices[media_type][feature_extractor_id].load_index(
                     index_type_to_load
                 ):
-                    print(f"failed to load {media_type} index: {feature_extractor_id}")
+                    logger.error(
+                        "Failed to load %s index: %s",
+                        media_type,
+                        feature_extractor_id,
+                    )
                     del search_indices[media_type][feature_extractor_id]
                     continue
                 if hasattr(

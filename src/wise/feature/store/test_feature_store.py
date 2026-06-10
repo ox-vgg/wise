@@ -93,7 +93,7 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             # print cache info to check cache access
             # should print something like
             # CacheInfo(hits=4, misses=2, maxsize=32, current_size=2)
-            print(store.load_faiss_index.cache_info())
+            # print(store.load_faiss_index.cache_info())
 
             # check overwrite
             store.enable_write(shard_maxcount=1, overwrite=True)

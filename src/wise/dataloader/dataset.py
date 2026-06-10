@@ -345,7 +345,7 @@ class MediaDataset(torch_data.IterableDataset):
             # Construct iterator with all files
             return self._get_media_iterator(list(self._filelist.keys()))
 
-        print(worker_info)
+        logger.debug("work_info='%s'", worker_info)
         n_workers = worker_info.num_workers
         worker_id = worker_info.id
 

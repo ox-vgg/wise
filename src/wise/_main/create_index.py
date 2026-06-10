@@ -30,6 +30,7 @@ from wise.wise_project import WiseProject
 
 logger = logging.getLogger(__name__)
 
+
 def create_fts_index(project, args):
     if not args.fts_config:
         raise ValueError('--fts-config must be a valid json file to index metadata')
@@ -105,7 +106,7 @@ def main(argv: list[str]):
     project = WiseProject(args.project_dir)
     project_assets = project.discover_assets()
     media_type_list = list(project_assets.keys())
-    print(f"discovered media types: {media_type_list}")
+    logger.debug("Discovered media types: %s", media_type_list)
     if args.media_type is not None:
         media_type_list = list(args.media_type)
 
@@ -114,7 +115,7 @@ def main(argv: list[str]):
         if "metadata" in media_type_list:
             media_type_list.remove("metadata")
 
-    print(f"creating indices for media types: {media_type_list}")
+    logger.info("Creating indices for media types: %s", media_type_list)
     for media_type in media_type_list:
         feature_extractor_id_list = list(project_assets[media_type].keys())
         if args.feature_id:

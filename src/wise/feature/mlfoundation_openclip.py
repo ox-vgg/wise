@@ -253,7 +253,7 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
 
     @cached_property
     def processor(self):
-        print("Loading openclip preprocessor")
+        logger.debug("Loading openclip preprocessor")
         _, preprocessor = _load_openclip_model(
             self.pretrained_model_name,
             pretrained=self.pretraining_dataset,
