@@ -1,3 +1,5 @@
+> See [User Guide](UserGuide.md) for instructions on using WISE for creating audiovisual search engine.
+
 # WISE Installation
 
 The requirements for installing WISE are as follows:
