@@ -77,7 +77,7 @@ logging.basicConfig(
         "[%(filename)s:%(lineno)d %(funcName)s] - %(message)s"
     ),
 )
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 default_config = {
     "default": {

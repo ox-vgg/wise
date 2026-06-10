@@ -69,7 +69,7 @@ from wise.repository import (
 from wise.wise_project import WiseProject
 
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class ExtractFeatureMode(BaseStrEnum):
