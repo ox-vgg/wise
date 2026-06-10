@@ -36,6 +36,7 @@ class ShotBasedFilters(BaseModel):
 class ProjectInfo(BaseModel):
     name: str = Field(alias="project_name")
     num_vectors: int # total number of vectors in the project
+    max_search_results: int = 1000
     num_media_files: int # total number of media files in the project
     num_thumbnails: int
     num_shots: int
@@ -65,6 +66,7 @@ class ProjectInfo(BaseModel):
     def reduce(cls, name, info: list["ProjectInfo"]) -> "ProjectInfo":
         def merge_(a: ProjectInfo, b: ProjectInfo) -> ProjectInfo:
             a.num_vectors += b.num_vectors
+            a.max_search_results = min(a.max_search_results, b.max_search_results)
             a.num_media_files += b.num_media_files
             a.num_thumbnails += b.num_thumbnails
             a.total_duration += b.total_duration

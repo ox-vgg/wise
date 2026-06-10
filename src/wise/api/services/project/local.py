@@ -103,6 +103,7 @@ class LocalWiseProjectService(WiseProjectService):
         return ProjectInfo(
             project_name=self.name,
             num_vectors=self.wise_project.num_vectors,
+            max_search_results=self.config.max_search_results,
             num_media_files=self.wise_project.num_media,
             num_thumbnails=self.wise_project.num_thumbnails,
             num_shots=self.wise_project.num_shots,

@@ -37,6 +37,13 @@ import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/uti
 const MAX_FEATURED_IMAGES = 1000; // TODO set this based on actual number of featured images
 const FEATURED_IMAGES_RANDOM_SEED = Math.floor(Math.random()*100); // Generate a random number between 0-100 to be used as the random seed when fetching the featured images
 
+const getMaxSearchResults = (maxSearchResults?: number): number => {
+  if (typeof maxSearchResults === 'number' && Number.isFinite(maxSearchResults) && maxSearchResults > 0) {
+    return maxSearchResults;
+  }
+  return config.MAX_SEARCH_RESULTS;
+};
+
 const processVideos = (videos: Record<string, VideoInfo>, shots: VideoSegment[]) => {
   return new Map(
     Object.entries(videos).map(([mediaId, videoInfo]) => {
@@ -263,10 +270,18 @@ const fetchRelatedVectors = async (vector_id: string, media_id: string): Promise
 }
 
 
-const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featureExtractorId: string, pageStart: number, pageEnd: number, shotScaleFilter: number[]): Promise<ProcessedSearchResponse> => {
+const fetchSearchResults = (
+  queries: Query[],
+  viewModality: ViewModality,
+  featureExtractorId: string,
+  pageStart: number,
+  pageEnd: number,
+  shotScaleFilter: number[],
+  maxSearchResults?: number,
+): Promise<ProcessedSearchResponse> => {
   console.log('Fetching queries', queries);
   const start = pageStart*config.PAGE_SIZE;
-  const end = Math.min(config.MAX_SEARCH_RESULTS, pageEnd*config.PAGE_SIZE);
+  const end = Math.min(getMaxSearchResults(maxSearchResults), pageEnd*config.PAGE_SIZE);
   const metadataFilterQueries = queries.filter(q => q.type === "METADATA");
   
   const formData = convertQueriesToFormData(queries.filter(q => q.type !== "METADATA"));
@@ -319,7 +334,7 @@ const fetchSearchResults = (queries: Query[], viewModality: ViewModality, featur
 }
 
 
-export const useDataService = (): DataServiceOutput => {
+export const useDataService = (maxSearchResults?: number): DataServiceOutput => {
   const [ searchingState, setSearchingState ] = useState({
     queries: [] as Query[],
     isFeaturedImages: false,
@@ -412,7 +427,15 @@ export const useDataService = (): DataServiceOutput => {
     }));
     let searchResponseJSON: ProcessedSearchResponse;
     try {
-      searchResponseJSON = await fetchSearchResults(queries, viewModality, featureExtractorId, 0, config.NUM_PAGES_PER_REQUEST, shotScaleFilter);
+      searchResponseJSON = await fetchSearchResults(
+        queries,
+        viewModality,
+        featureExtractorId,
+        0,
+        config.NUM_PAGES_PER_REQUEST,
+        shotScaleFilter,
+        maxSearchResults,
+      );
     } catch (e) {
       setSearchingState((_searchingState) => ({
         ..._searchingState,
@@ -425,7 +448,7 @@ export const useDataService = (): DataServiceOutput => {
       isFeaturedImages: false,
       isLoadingNewSearch: false,
       searchLatency: searchResponseJSON.time,
-      totalResults: config.MAX_SEARCH_RESULTS
+      totalResults: getMaxSearchResults(maxSearchResults)
     });
     setSearchResponse(searchResponseJSON.processedSearchResults);
     // setPageNum(0);
