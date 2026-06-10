@@ -196,7 +196,6 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
 if __name__ == "__main__":
     # Example usage
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
     extractor = HFMultiModalFeatureExtractor('hf/openai/clip-vit-base-patch32', warmup=True)
     image_features = extractor.extract_image_features(torch.rand((1, 3, 224, 224)))
     text_features = extractor.extract_text_features(['Hello, world!'])
