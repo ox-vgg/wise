@@ -23,17 +23,28 @@
 start_time=$(date +%s)
 echo "Script started at: $(date '+%Y-%m-%d %H:%M:%S')"
 
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 FILELIST SOURCE_MEDIA_DIR OUTPUT_MEDIA_DIR"
+SKIP_MP4=0
+pos_args=()
+for arg in "$@"; do
+    if [ "$arg" = "--skip-mp4" ]; then
+        SKIP_MP4=1
+    else
+        pos_args+=("$arg")
+    fi
+done
+
+if [ "${#pos_args[@]}" -ne 3 ]; then
+    echo "Usage: $0 [--skip-mp4] FILELIST SOURCE_MEDIA_DIR OUTPUT_MEDIA_DIR"
     echo "  - FILELIST: A null-delimited text file containing relative media filenames (e.g. find . -type f -print0 > filelist.bin)"
     echo "  - SOURCE_MEDIA_DIR: Base folder for input images/videos/audio files"
     echo "  - OUTPUT_MEDIA_DIR: Base folder for output mp4 files"
+    echo "  - --skip-mp4: Skip re-encoding of input files that are already in mp4 format"
     exit 1
 fi
 
-FILELIST=$1
-INDIR=$2
-OUT_BASEDIR=$3
+FILELIST="${pos_args[0]}"
+INDIR="${pos_args[1]}"
+OUT_BASEDIR="${pos_args[2]}"
 OUTDIR="${OUT_BASEDIR}/"
 MAX_JOBS="${MAX_JOBS:-16}"
 FFMPEG_THREADS="${FFMPEG_THREADS:-4}"
@@ -95,6 +106,14 @@ process_file() {
             rm -f "$tmpfile"
             return 1
         fi
+    elif [[ "$lower_infile" =~ \.mp4$ ]] && [ "${SKIP_MP4:-0}" = "1" ]; then
+        echo "Copying (already mp4): $infile → $outfile"
+        mkdir -p "$outdir"
+        if ! cp "$infile" "$outfile"; then
+            echo "Failed to copy mp4: $infile" >&2
+            return 1
+        fi
+        return 0
     elif [[ "$lower_infile" =~ \.(mp3|m4a|aac|wav|flac|ogg|opus|wma)$ ]]; then
         # Audio-only input:
         # - keep output in mp4 container
@@ -135,7 +154,7 @@ process_file() {
 }
 
 export -f process_file
-export INDIR OUTDIR FFMPEG_THREADS
+export INDIR OUTDIR FFMPEG_THREADS SKIP_MP4
 
 xargs -0 -n1 -P "$MAX_JOBS" bash -c 'process_file "$1"' _ < "$FILELIST"
 
