@@ -1,6 +1,7 @@
-# WISE Explore
-
 > **Note:** The features described in this document are still being developed and therefore are not yet stable or ready for production usage.
+> See [scripts/explore/README.md](../scripts/explore/README.md) for more details about the methods used for creating facets.
+
+# WISE Explore
 
 WISE Explore is a set of tools that allows exploration of a collection of
 videos using anchors such as face, objects, acoustic events. 

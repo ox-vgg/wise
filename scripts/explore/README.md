@@ -1,7 +1,9 @@
-# Explore Various Facets of a Dataset
-This folder contains various tools to enable exploration of a dataset using different facets (e.g. face).
-
 > **Note:** The features described in this document are still being developed and therefore are not yet stable or ready for production usage.
+> See [docs/Explore.md](../../docs/Explore.md) for more details about the suggested workflow for creating facets.
+
+# Explore Various Facets of a Dataset
+
+This folder contains various tools to enable exploration of a dataset using different facets (e.g. face).
 
 ## Cluster Faces
 
@@ -34,7 +36,7 @@ The system is designed to be used iteratively:
 *   Iteration 1: Run the script with a strict similarity threshold. The algorithm groups the most obvious matches into many small, high-purity draft clusters.
 
 ```bash
-python3 scripts/explore/cluster_faces.py \
+python3 -m scripts.explore.cluster_faces \
   --project-dir /data/wise-projects/wise-test-dataset/\
   --feature-extractor-id "deepinsight/insightface/buffalo_l/_unknown"\
   --k-neighbors 50 \
@@ -44,7 +46,7 @@ python3 scripts/explore/cluster_faces.py \
 *   Review Phase: Use the web interface to merge these small draft clusters belonging to the same person and mark them as "Reviewed". The web interface is made available at `http://localhost:10101/wise-test-dataset/explore/` using the command show below.
 
 ```bash
-python3 scripts/explore/explore.py \
+python3 -m scripts.explore.explore \
    --project-dir /data/wise-projects/wise-test-dataset/ \
    --port 10101
 ```
@@ -65,7 +67,7 @@ Here is an example workflow:
 1.  Run the identification script, providing paths to both projects:
 
 ```bash
-python3 scripts/explore/identify_faces.py \
+python3 -m scripts.explore.identify_faces \
    --unknown-project-dir /data/wise-projects/unknown/ \
    --known-project-dir /data/wise-projects/manually_annotated_profiles/ \
    --feature-extractor-id "deepinsight/insightface/buffalo_l/_unknown" \
