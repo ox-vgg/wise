@@ -230,7 +230,7 @@ class WiseProject:
         _supported = defaultdict(set)
         for g, vals in itertools.groupby(results, key = lambda x: x[0]):
             feature_extractor_ids = set([v[1] for v in vals])
-            if any([ x == '' for x in feature_extractor_ids]):
+            if "" in feature_extractor_ids:
                 # Fallback - find it by globbing
                 if _assets is None:
                     _assets = self.discover_assets()
