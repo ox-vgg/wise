@@ -195,7 +195,7 @@ def get_join_onclause(
             sa.or_(
                 left.c[left_col] == right.c[col],
                 (
-                    sa.and_(left.c[left_col] == None, right.c[col] == None)
+                    sa.and_(left.c[left_col] is None, right.c[col] is None)
                     if isouter
                     else False
                 ),

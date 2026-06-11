@@ -198,7 +198,7 @@ def validate_segment_lengths_from_options(stream_opts: list[StreamOutputOptions]
         else:
             _segment_length = frames / rate
 
-        if segment_length == None:
+        if segment_length is None:
             segment_length = _segment_length
         elif abs(segment_length - _segment_length) > 1e-2:
             raise ValueError(

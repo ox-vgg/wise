@@ -70,7 +70,7 @@ class TestFeatureExtractor(unittest.TestCase):
 
         self.assertEqual(preprocessed_data.shape[0], len(extracted_features))
         self.assertTrue(all([x.vectors.shape == (1, 768) for x in extracted_features]))
-        self.assertTrue(all([x.metadata == None for x in extracted_features]))
+        self.assertTrue(all([x.metadata is None for x in extracted_features]))
 
     def test_audio_feature(self):
         featureExtractor = FeatureExtractorFactory('microsoft/clap/2023/Not-Applicable')
