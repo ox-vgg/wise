@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -40,7 +40,6 @@ from wise.api.services.project import (
     LocalWiseProjectService,
     MediaNotFoundException,
     ThumbnailNotFoundException,
-    WiseProjectService,
 )
 from wise.data_models import MediaMetadata, MediaType, SourceCollectionType
 

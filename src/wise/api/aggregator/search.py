@@ -37,7 +37,7 @@ from wise.api.dependencies import (
     SearchServiceDep,
 )
 from wise.api.services.embedding import EmbeddingConfig
-from wise.data_models import MediaType, ModalityType
+from wise.data_models import MediaType
 
 
 logger = logging.getLogger(__name__)

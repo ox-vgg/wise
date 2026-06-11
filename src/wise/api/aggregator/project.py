@@ -17,9 +17,6 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import (
-    StreamingResponse,
-)
 
 from wise.api import common
 from wise.api.dependencies import ProjectInfoDep, ProjectServiceDep

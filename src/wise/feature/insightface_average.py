@@ -22,6 +22,7 @@ import torch
 from wise.feature.feature_extractor import FeatureExtractor, Features
 from wise.feature.insightface import InsightFaceFeatureExtractor
 
+
 _logger = logging.getLogger(__name__)
 
 

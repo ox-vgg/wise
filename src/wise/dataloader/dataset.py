@@ -15,7 +15,6 @@
 ## limitations under the License.
 
 import itertools
-import json
 import logging
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -43,8 +42,6 @@ from wise.dataloader.streamreader import (
 )
 from wise.dataloader.utils import (
     MediaMimetype,
-    get_media_type_from_mimetype,
-    get_mime_type,
     get_mimetype_and_media_type_for_file,
     md5,
 )

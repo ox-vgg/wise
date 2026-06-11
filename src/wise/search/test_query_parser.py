@@ -14,7 +14,6 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import json
 import unittest
 
 from wise.search.query_parser import parse_search_query

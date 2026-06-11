@@ -15,7 +15,6 @@
 ## limitations under the License.
 
 import copy
-import json
 
 
 def which_keyword_is_next(cmd, start_index, keyword_list, ignore_case=True):

@@ -15,16 +15,9 @@
 ## limitations under the License.
 
 import logging
-import math
 import sqlite3
 from pathlib import Path
 
-import faiss
-import numpy as np
-from tqdm import tqdm
-
-from wise.feature.feature_extractor_factory import FeatureExtractorFactory
-from wise.feature.store.feature_store_factory import FeatureStoreFactory
 from wise.index.search_index import SearchIndex
 
 

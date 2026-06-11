@@ -16,10 +16,8 @@
 
 import tempfile
 import unittest
-from pathlib import Path
 
 import numpy as np
-import torch
 
 from wise.feature.store.faiss_store import FaissStore
 

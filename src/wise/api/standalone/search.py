@@ -16,7 +16,6 @@
 
 import functools
 import itertools
-import json
 import logging
 from collections.abc import Callable, Iterable
 from typing import Annotated, cast

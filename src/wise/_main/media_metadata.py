@@ -25,11 +25,8 @@ Table of Contents
 import argparse
 import bisect
 import csv
-import json
 import logging
 import re
-import sqlite3
-import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -37,21 +34,8 @@ import sqlalchemy as sa
 from tqdm import tqdm
 
 from wise import db
-from wise.data_models import (
-    ExtraMediaMetadata,
-    MediaMetadata,
-    MediaType,
-    SourceCollection,
-    SourceCollectionType,
-    VectorMetadata,
-    VideoShot,
-)
-from wise.repository import (
-    MediaRepo,
-    SourceCollectionRepo,
-    VectorRepo,
-    VideoShotsRepo,
-)
+from wise.data_models import VideoShot
+from wise.repository import MediaRepo, VideoShotsRepo
 from wise.wise_project import WiseProject
 
 

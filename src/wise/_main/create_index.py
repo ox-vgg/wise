@@ -17,12 +17,10 @@
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 
 from wise import db
 from wise.config import APIConfig
-from wise.feature import FeatureExtractorFactory
 from wise.index.search_index_factory import SearchIndexFactory
 from wise.search.fts import FTSSearch
 from wise.wise_project import WiseProject
