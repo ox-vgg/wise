@@ -22,7 +22,6 @@ import torch
 from wise.feature.feature_extractor import FeatureExtractor, Features
 from wise.feature.insightface import InsightFaceFeatureExtractor
 
-
 _logger = logging.getLogger(__name__)
 
 
@@ -50,12 +49,12 @@ class InsightFaceAverageFeatureExtractor(FeatureExtractor):
         assert (
             len(feature_id) == 4
             and feature_id_parts[0] == "deepinsight"
-            and feature_id_parts[1] == "insightface-average",
-            (
-                f"Invalid feature-id: '{feature_id}', an example of a valid"
-                f" feature-id is 'deepinsight/insightface-average/buffalo_l/_'"
-            ),
+            and feature_id_parts[1] == "insightface-average"
+        ), (
+            f"Invalid feature-id: '{feature_id}', an example of a valid"
+            f" feature-id is 'deepinsight/insightface-average/buffalo_l/_'"
         )
+
         feature_id_parts[1] = "insightface"  # remove the "-average" suffix
         self._extractor = InsightFaceFeatureExtractor(
             "/".join(feature_id_parts), *args, **kwargs
