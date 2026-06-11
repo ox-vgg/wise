@@ -552,7 +552,7 @@ class FTSSearch:
                 if media_metadata.media_type == MediaType.AV:
                     m_audio = m.model_copy(update={"modality": ModalityType.AUDIO})
                     responses.append(m_audio)
-        logger.info(f"Num responses: {len(responses)}")
+        logger.info("Num responses: %d", len(responses))
         return responses
 
 

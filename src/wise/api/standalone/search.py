@@ -168,7 +168,7 @@ def construct_video_search_response(
         ts = _metadata.timestamp
         te = _metadata.end_timestamp
         if ts is None:
-            logger.error(f"ts is None for vector {_metadata.id}")
+            logger.error("ts is None for vector %d", _metadata.id)
         if te is None:
             te = ts
 
@@ -350,9 +350,13 @@ def reconstruct_vectors(
     else:
         index_type = cast(LocalSearchService, search_service).get_search_index_type(media_type, feature_extractor_id)
         logger.exception(
-            "This faiss index does not support internal search. To enable "
-            "internal search, please re-create the index by running "
-            f"`python -m wise create-index --project-dir \"{config.project_dir}\" --media-type {media_type} --index-type {index_type} --overwrite`",
+            "This faiss index does not support internal search.  To enable"
+            " internal search, please re-create the index by running"
+            " `python -m wise create-index --project-dir '%s' --media-type %s"
+            " --index-type %s --overwrite`",
+            config.project_dir,
+            media_type,
+            index_type,
         )
         return PlainTextResponse(
             status_code=500, content=f"Internal search not supported in this project"
@@ -707,10 +711,13 @@ async def _search(
             media_type, feature_extractor_id
         )
         logger.exception(
-            "This faiss index does not support internal search. To enable "
-            "internal search, please re-create the index by running "
-            f'`python -m wise create-index --project-dir "{config.project_dir}" '
-            f"--media-type {media_type} --index-type {index_type} --overwrite`"
+            "This faiss index does not support internal search.  To enable"
+            " internal search, please re-create the index by running"
+            " `python -m wise create-index --project-dir '%s' --media-type %s"
+            " --index-type %s --overwrite`",
+            config.project_dir,
+            media_type,
+            index_type,
         )
         raise HTTPException(
             status_code=500,

@@ -56,7 +56,10 @@ class MlfoundationsOpenClipModel(MultiModalModel):
     @cached_property
     def model(self):
         logger.info(
-            f"Initialising model mlfoundations/openclip model - {self.model_id} ({self.pretraining_dataset}, device={self.DEVICE})"
+            "Initialising model mlfoundations/openclip model - %s (%s, device=%s)",
+            self.model_id,
+            self.pretraining_dataset,
+            self.DEVICE,
         )
         model, _ = _load_openclip_model(
             self.model_id,
@@ -70,7 +73,7 @@ class MlfoundationsOpenClipModel(MultiModalModel):
             backend = "inductor"
             if "tensorrt" in available_backends:
                 backend = "tensorrt"
-            logger.info(f"Compiling model with backend {backend}")
+            logger.info("Compiling model with backend %s", backend)
             model.compile(mode="reduce-overhead", backend=backend)
         return model
 
@@ -119,7 +122,7 @@ class MlfoundationsOpenClipModel(MultiModalModel):
         model = self.model
         model.eval()
 
-        logger.info(f"Exporting vision model...")
+        logger.info("Exporting vision model...")
         output_path = Path(f"{save_path}--image")
         output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "model.onnx"
@@ -145,7 +148,7 @@ class MlfoundationsOpenClipModel(MultiModalModel):
                 do_constant_folding=True,
                 opset_version=17,
             )
-        logger.info(f"Successfully exported vision model to {output_path}")
+        logger.info("Successfully exported vision model to '%s'", output_path)
 
         class CustomTextEncoder(torch.nn.Module):
             def __init__(self, model):
@@ -155,7 +158,7 @@ class MlfoundationsOpenClipModel(MultiModalModel):
             def forward(self, input_ids):
                 return self.model.encode_text(input_ids)
 
-        logger.info(f"Exporting text model")
+        logger.info("Exporting text model")
         output_path = Path(f"{save_path}--text")
         output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "model.onnx"
@@ -183,7 +186,7 @@ class MlfoundationsOpenClipModel(MultiModalModel):
                 do_constant_folding=True,
                 opset_version=17,
             )
-        logger.info(f"Successfully exported text model to {output_path}")
+        logger.info("Successfully exported text model to '%s'", output_path)
 
 
 class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):

@@ -41,11 +41,14 @@ def get_config_and_metadata(client, model_name: str):
     """Retrieves the model configuration and metadata from the Triton server."""
     # Get the input / output schema
     logger.debug(
-        f"model metadata: {client.get_model_metadata(model_name, as_json=True)}"
+        "model metadata: %s",
+        client.get_model_metadata(model_name, as_json=True)
     )
     model_metadata = client.get_model_metadata(model_name)
 
-    logger.debug(f"Model config: {client.get_model_config(model_name, as_json=True)}")
+    logger.debug(
+        "Model config: %s", client.get_model_config(model_name, as_json=True)
+    )
     model_config = client.get_model_config(model_name).config
 
     max_batch_size = model_config.max_batch_size
@@ -79,7 +82,7 @@ class TritonModel(MultiModalModel):
                 f"Failed to connect to Triton server at {url}: {e}"
             ) from e
 
-        logger.debug(f"Connected to Triton server at {url}")
+        logger.debug("Connected to Triton server at %s", url)
 
         self._model = model_id
         self._triton_configs = {}
@@ -106,7 +109,10 @@ class TritonModel(MultiModalModel):
         generic tensor (like an image or audio tensor) to Triton.
         """
         logger.debug(
-            f"({self._model}) Getting {_type} features with params: {input_params}"
+            "(%s) Getting %s features with params: %s",
+            self._model,
+            _type,
+            input_params
         )
         model_name =  f"{self._model}--{_type}"
         if _type not in self._triton_configs:
@@ -137,7 +143,9 @@ class TritonModel(MultiModalModel):
             np_dtype = triton_to_np_dtype(input_info["dtype"])
             if value.dtype != np_dtype:
                 logger.debug(
-                    "Converting input dtype from {} to {}".format(value.dtype, np_dtype)
+                    "Converting input dtype from %s to %s",
+                    value.dtype,
+                    np_dtype
                 )
                 value = value.astype(np_dtype)
 
@@ -187,7 +195,7 @@ class TritonModel(MultiModalModel):
 
         outputs_data = []
         for chunk in inputs_data:
-            logger.debug(f"Sending chunk with ({len(chunk)}) inputs")
+            logger.debug("Sending chunk with (%d) inputs", len(chunk))
             _outputs = [
                 grpcclient.InferRequestedOutput(name) for name in outputs.keys()
             ]
@@ -201,7 +209,7 @@ class TritonModel(MultiModalModel):
                 name: torch.from_numpy(response.as_numpy(name).copy())
                 for name in outputs.keys()
             }
-            logger.debug(f"Received features: {infer_output.keys()}")
+            logger.debug("Received features: %s", infer_output.keys())
             outputs_data.append(infer_output)
 
         # Concatenate the outputs
@@ -286,7 +294,7 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
             )
 
         def __getstate__(self):
-            logger.debug(f"getstate: {self.__dict__}")
+            logger.debug("getstate: %s", self.__dict__)
             state = self.__dict__.copy()
             # Remove unpicklable entries.
             entries = {"model", "tokenizer", "processor"}
@@ -305,7 +313,7 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
             return state
 
         def __setstate__(self, state):
-            logger.debug(f"setstate: {state}")
+            logger.debug("setstate: %s", state)
             # Restore instance attributes
             self.__dict__.update(state)
             # Re-initialize the model property

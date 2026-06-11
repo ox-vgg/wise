@@ -88,7 +88,7 @@ def initialise_feature_extractors(
     dict[ModalityType, dict[str, FeatureStore]],
 ]:
     ## 3. Prepare for feature extraction and storage
-    logger.info(f"Initialising feature extractor")
+    logger.info("Initialising feature extractor")
 
     feature_extractors = {}
     feature_stores = {}
@@ -98,7 +98,7 @@ def initialise_feature_extractors(
         feature_stores[modality_type] = {}
         for feature_extractor_id in feature_extractor_id_map:
             ## 3.1 Initialise feature extractor
-            logger.info(f"Initialising {feature_extractor_id} for {modality_type}")
+            logger.info("Initialising %s for %s", feature_extractor_id, modality_type)
 
             # Check if we already have an instance of this feature extractor (could be local / triton)
             canonical_feature_extractor_id = get_canonical_feature_extractor_id(
@@ -106,7 +106,9 @@ def initialise_feature_extractors(
             )
             if canonical_feature_extractor_id in feature_extractors[modality_type]:
                 logger.warning(
-                    f"Feature extractor {feature_extractor_id} for {modality_type} already exists, re-using previous instance."
+                    "Feature extractor '%s' for %s already exists, re-using previous instance.",
+                    feature_extractor_id,
+                    modality_type,
                 )
                 continue
 
@@ -236,7 +238,7 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
         }
     else:
         _log_params = params
-    logger.info(f"Dataset parameters: {pprint.pformat(_log_params)}")
+    logger.info("Dataset parameters: %s", pprint.pformat(_log_params))
     return params, segment_length, segment_level
 
 def get_dataset_stream(
@@ -302,7 +304,7 @@ def get_dataset_stream(
     return stream
 
 def get_dataloader(stream: torch.utils.data.Dataset, num_workers: int):
-    logger.info(f"Initializing data loader with {num_workers} workers ...")
+    logger.info("Initialising data loader with %d workers ...", num_workers)
 
     prefetch_factor = None
     persistent_workers = False
@@ -326,13 +328,15 @@ def process_media_files(media_dir: Path, db_engine, media_files: list[Path]):
     metadata, unknown_files = get_metadata_for_valid_files(media_files)
     if len(unknown_files) > 0:
         logger.warning(
-            f"Skipping {len(unknown_files)} invalid media files in directory {media_dir}'"
+            "Skipping %d invalid media files in directory '%s'",
+            len(unknown_files),
+            media_dir
         )
-        logger.debug("\n".join(map(str, unknown_files)))
+        logger.debug("Unknown files:\n%s", "\n".join(map(str, unknown_files)))
 
     # Add metadata to database
     dataset_payload: list[DatasetPayload] = []
-    logger.info(f"Writing metadata to database...")
+    logger.info("Writing metadata to database...")
     with tqdm(total=len(metadata)) as pbar, db_engine.begin() as conn:
         # Add each folder to source collection table
         data = SourceCollection(location=str(media_dir), type=SourceCollectionType.DIR)
@@ -439,12 +443,12 @@ def get_mode(args):
     if not Path(args.project_dir).exists():
         mode = ExtractFeatureMode.create
     else:
-        logger.info(f"Project directory {args.project_dir} already exists.")
+        logger.info("Project directory '%s' already exists.", args.project_dir)
         if len(args.media_dir_list) == 0:
             mode = ExtractFeatureMode.add_feature_extractor
         else:
             mode = ExtractFeatureMode.add_media
-    logger.debug(f"Operating in {mode} mode")
+    logger.debug("Operating in %s mode", mode)
     return mode
 
 def get_feature_extractor_ids_from_args(args):
@@ -493,7 +497,9 @@ def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, ar
 
             if _feature_extractor_id in project_feature_extractor_ids[modality_type]:
                 logger.warning(
-                    f"Feature extractor {_feature_extractor_id} for {modality_type} already exists in the project. Skipping."
+                    "Feature extractor '%s' for %s already exists in the project. Skipping.",
+                    _feature_extractor_id,
+                    modality_type,
                 )
                 feature_extractor_ids[modality_type].remove(feature_extractor_id)
         if len(feature_extractor_ids[modality_type]) == 0:
@@ -529,7 +535,10 @@ def get_media_files_for_dataset(
             assert len(args.media_dir_list) == 1  # checked in validate_args
             media_dir = Path(args.media_dir_list[0])
 
-            logger.info(f"Reading filepaths to be included from '{args.media_files_from}'")
+            logger.info(
+                "Reading filepaths to be included from '%s'",
+                args.media_files_from
+            )
             with open(args.media_files_from, "rt") as fh:
                 ## Remove *only* the \n at the end of each line
                 media_files = [media_dir / line[:-1] for line in fh if len(line) > 1]
@@ -706,14 +715,16 @@ def main(argv: list[str]):
                 exit(1)
         if mode == ExtractFeatureMode.add_media:
             logger.info(
-                f"Updating existing project {args.project_dir} with new media files ..."
+                "Updating existing project '%s' with new media files ...",
+                args.project_dir
             )
         else:
             logger.info(
-                f"Updating existing project {args.project_dir} with new feature extractor(s) ..."
+                "Updating existing project '%s' with new feature extractor(s) ...",
+                args.project_dir
             )
     else:
-        logger.info(f"Creating new project {args.project_dir} ...")
+        logger.info("Creating new project '%s' ...", args.project_dir)
 
     project = WiseProject(args.project_dir, create_project=True, db_kwargs={'echo': False}, thumbsdb_kwargs={'echo': False})
     db_engine = project.db_engine
@@ -829,7 +840,11 @@ def main(argv: list[str]):
 
             if segment_tensor is None or segment_tensor.shape[0] == 0:
                 logger.warning(
-                    f"Skipping empty segment for media_id={mid}, media_type={media_type}, feature_extractor_id={feature_extractor_id}"
+                    "Skipping empty segment for media_id=%d, media_type=%s,"
+                    " feature_extractor_id=%s",
+                    mid,
+                    media_type,
+                    feature_extractor_id,
                 )
                 return
 
@@ -924,7 +939,10 @@ def main(argv: list[str]):
                 if media_type not in feature_extractors or chunks[media_type] is None:
                     # This is a single chunk, not a dictionary of chunks
                     logger.debug(
-                        f"Skipping empty / irrelevant chunk for media_id={mid}, media_type={media_type}"
+                        "Skipping empty / irrelevant chunk for media_id=%d,"
+                        " media_type=%s",
+                        mid,
+                        media_type,
                     )
                     continue
                 if isinstance(chunks[media_type], MediaChunk):
@@ -937,7 +955,11 @@ def main(argv: list[str]):
                         or feature_extractor_id not in feature_extractors[media_type]
                     ):
                         logger.debug(
-                            f"Skipping empty / irrelevant chunk for media_id={mid}, media_type={media_type}, feature_extractor_id={feature_extractor_id}"
+                            "Skipping empty / irrelevant chunk for media_id=%d,"
+                            " media_type=%s, feature_extractor_id=%s",
+                            mid,
+                            media_type,
+                            feature_extractor_id,
                         )
                         continue
                     handle_chunk(_chunk, media_type, feature_extractor_id)

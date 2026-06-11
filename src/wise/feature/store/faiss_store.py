@@ -57,7 +57,10 @@ class FaissStore(FeatureStore):
         self._pattern = self._prefix + '%06d.' + self.EXTENSION
 
         logger.debug(
-            f"FaissStore: store_name={self.store_name}, store_data_dir={self.store_data_dir}, pattern={self._pattern}"
+            "FaissStore: store_name=%s, store_data_dir=%s, pattern=%s",
+            self.store_name,
+            self.store_data_dir,
+            self._pattern,
         )
 
         self.load_faiss_index = functools.lru_cache(maxsize=MAX_CACHE_SIZE)(
@@ -152,7 +155,9 @@ class FaissStore(FeatureStore):
 
         filename = self._pattern % self._current_shard_idx
         logger.info(
-            f"Saving active shard to {filename} with {self._current_shard.ntotal} vectors"
+            "Saving active shard to '%s' with %d vectors",
+            filename,
+            self._current_shard.ntotal,
         )
         faiss.write_index(self._current_shard, filename)
 

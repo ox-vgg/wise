@@ -515,21 +515,21 @@ class WiseProject:
     def enable_fts(self):
         _table = wise_db.project_metadata_obj.tables.get(wise_db._WISE_FTS_TABLE)
         if _table is not None:
-            logger.debug(f"{wise_db._WISE_FTS_TABLE} table already loaded")
+            logger.debug("%s table already loaded", wise_db._WISE_FTS_TABLE)
             return True
 
         if self.db_inspector.has_table(wise_db._WISE_FTS_TABLE):
             wise_db.project_metadata_obj.reflect(
                 bind=self.db_engine, only=[wise_db._WISE_FTS_TABLE]
             )
-            logger.debug(f"Loaded {wise_db._WISE_FTS_TABLE} table")
+            logger.debug("Loaded %s table", wise_db._WISE_FTS_TABLE)
             return True
         return False
 
     def enable_shot_scale(self):
         _table = wise_db.project_metadata_obj.tables.get("vectors_to_shots_map")
         if _table is not None:
-            logger.debug(f"vectors_to_shots_map table already loaded")
+            logger.debug("vectors_to_shots_map table already loaded")
             return True
 
         if not self.db_inspector.has_table(wise_db.shots_table.name):
@@ -752,7 +752,7 @@ class WiseProject:
         )
         for _, (mid, chunks) in enumerate(stream):
             video = chunks["video"]
-            logger.debug(f"media_id: {mid}, pts: {video.pts}")
+            logger.debug("media_id: %d, pts: %f", mid, video.pts)
             if not video:
                 break
 
@@ -763,7 +763,7 @@ class WiseProject:
                 break
 
             n = int((timestamp - video.pts) // 0.5)
-            logger.debug(f"index: {n}, pts: {video.pts}, ts: {timestamp}")
+            logger.debug("index: %d, pts: %f, ts: %f", n, video.pts, timestamp)
             arr = video.tensor[n].numpy().astype(np.uint8).transpose(1, 2, 0)
             with Image.fromarray(arr) as im:
                 buf = io.BytesIO()
@@ -1031,8 +1031,9 @@ class WiseProject:
                 # Added to ensure projects created with older versions
                 # remain compatible (TODO: remove this in the future)
                 logger.warning(
-                    f"Media type {media_type} is not supported. "
-                    "Please use IMAGE, VIDEO, or AUDIO media types."
+                    "Media type %s is not supported. Please use IMAGE, VIDEO,"
+                    " or AUDIO media types.",
+                    media_type
                 )
                 continue
             for feature_extractor_id in project_assets[media_type]:
@@ -1054,7 +1055,9 @@ class WiseProject:
                     ].get_index_filename(index_type_to_load)
                     if not os.path.exists(preferred_index_filename):
                         logger.warning(
-                            f"Index file not found for preferred index type {index_type_to_load}. Will try to load any other available index."
+                            "Index file not found for preferred index type %s."
+                            " Will try to load any other available index.",
+                            index_type_to_load,
                         )
                         index_type_to_load = None
 
@@ -1069,17 +1072,21 @@ class WiseProject:
                             1
                         ]
                         logger.info(
-                            f"Loading available index of type {index_type_to_load}"
+                            "Loading available index of type %s",
+                            index_type_to_load
                         )
                     else:
                         logger.error(
-                            f"No index files found for {media_type} and {feature_extractor_id}"
+                            "No index files found for %s and %s",
+                            media_type,
+                            feature_extractor_id
                         )
                         del search_indices[media_type][feature_extractor_id]
                         continue
 
                 logger.info(
-                    f"Loading faiss index from {search_indices[media_type][feature_extractor_id].get_index_filename(index_type_to_load)}"
+                    "Loading faiss index from %s",
+                    search_indices[media_type][feature_extractor_id].get_index_filename(index_type_to_load)
                 )
                 if not search_indices[media_type][feature_extractor_id].load_index(
                     index_type_to_load
@@ -1106,9 +1113,14 @@ class WiseProject:
                         feature_extractor_id
                     ].is_internal_search_supported:
                         logger.info(
-                            "This faiss index does not support internal search. To enable "
-                            "internal search, please re-create the index by running "
-                            f'`python -m wise create-index --project-dir "{self.project_dir}" --media-type {media_type} --index-type {search_indices[media_type][feature_extractor_id].index_type} --overwrite`',
+                            "This faiss index does not support internal search."
+                            " To enable internal search, please re-create the"
+                            " index by running `python -m wise create-index"
+                            " --project-dir '%s' --media-type %s "
+                            " --index-type %s --overwrite`",
+                            self.project_dir,
+                            media_type,
+                            search_indices[media_type][feature_extractor_id].index_type,
                         )
             # TODO: Fix this to handle audio when support gets added
             if fts_search_index is not None and media_type in {
@@ -1204,7 +1216,7 @@ class WiseProject:
                 pbar.update(len(batch_sc))
 
         logger.info("Updated source collection map")
-        logger.debug(f"{source_collection_id_map}")
+        logger.debug("source collection map: %s", source_collection_id_map)
 
         # find matching media by checksum, path, size_in_bytes and the new source_collection_id
         # if found, map the media_id to the existing media_id. Else return id to be copied over
@@ -1390,7 +1402,7 @@ class WiseProject:
                 pbar.update(len(batch_media))
 
         logger.info("Updated media map")
-        logger.debug(f"{media_id_map}")
+        logger.debug("Media ID Map: %s", media_id_map)
 
         def get_matching_thumbnails_fn():
             thumbnail_columns = [
@@ -1544,7 +1556,7 @@ class WiseProject:
 
         with self.db_engine.connect() as conn:
             min_time_stamp_per_media_id = get_last_vector_timestamps(conn)
-        logger.debug(f"vector timestamp - {min_time_stamp_per_media_id}")
+        logger.debug("vector timestamp - %s", min_time_stamp_per_media_id)
 
         def copy_vectors(
             conn: sa.Connection,
@@ -1554,7 +1566,7 @@ class WiseProject:
             other_store: FeatureStore,
         ):
             logger.info(
-                f"copying for feature_extractor - {feature_extractor_id} ({media_type})"
+                "copying for feature_extractor - %s (%s)", feature_extractor_id, media_type
             )
             feature_count = other_store.feature_count
             self.create_features_dir(feature_extractor_id)
@@ -1725,19 +1737,20 @@ class WiseProject:
                 for feature_extractor_id in other_assets[media_type]:
                     if media_type not in supported_assets:
                         for p in self.features_dir(feature_extractor_id).rglob(f'{media_type}-*'):
-                            logger.info(f'deleting - {p}')
+                            logger.info("Deleting '%s'", p)
                             p.unlink(missing_ok=True)
 
                     elif feature_extractor_id not in supported_assets[media_type]:
                         logger.info(
-                            f"deleting directory of {feature_extractor_id} from project"
+                            "Deleting directory of %s from project",
+                            feature_extractor_id
                         )
                         shutil.rmtree(self.features_root(feature_extractor_id))
 
                     else:
                         for p in self.features_dir(feature_extractor_id).rglob(f'{media_type}-*'):
                             if p.name not in supported_assets[media_type][feature_extractor_id]['features_files']:
-                                logger.info(f'deleting - {p}')
+                                logger.info("Deleting '%s'", p)
                                 p.unlink(missing_ok=True)
 
         def cleanup_tables():
@@ -1746,7 +1759,7 @@ class WiseProject:
                 if _id is None:
                     return
 
-                logger.info(f"deleting rows from {table.name} with id > {_id}")
+                logger.info("deleting rows from %s with id > %s", table.name, _id)
                 with self.db_engine.connect() as conn:
                     res = conn.execute(
                         sa.delete(
@@ -1759,7 +1772,11 @@ class WiseProject:
                         extra_rows = []
                         for r in conn.execute(sa.select(table.c.id).where(table.c.id > _id)).scalar_one():
                             extra_rows.append(r)
-                        logger.error(f'ERROR - dry run inserted rows in {table} - {extra_rows}')
+                        logger.error(
+                            "Dry run inserted rows in %s - %s",
+                            table,
+                            extra_rows,
+                        )
                     else:
                         conn.commit()
 

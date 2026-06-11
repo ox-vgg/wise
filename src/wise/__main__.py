@@ -94,7 +94,7 @@ def main(argv: list[str]):
         return wise._main.serve.main(argv[1:])
     else:
         ## Panic!  argparse should never let us get here.
-        _logger.critical(f"Unknown command '{args.command}'")
+        _logger.critical("Unknown command '%s'", args.command)
         return 1
 
 

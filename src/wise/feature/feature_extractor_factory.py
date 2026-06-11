@@ -169,7 +169,9 @@ def FeatureExtractorFactory(id, config: dict[str, dict] = {}):
         model_config["url"] = url
 
     logger.info(
-        f"Creating{is_triton and ' Triton-enabled ' or ' '}feature extractor "
-        f"for {model_id} with config: {model_config}"
+        "Creating %sfeature extractor for %s with config: %s",
+        "Triton-enabled " if is_triton else "",
+        model_id,
+        model_config,
     )
     return cls.from_config(model_id, config=model_config)

@@ -325,7 +325,7 @@ class MediaDataset(torch_data.IterableDataset):
 
                     yield _id, media_chunks
             except Exception:
-                logger.exception(f'Exception when processing "{_id}: {path}"')
+                logger.exception("Exception when processing '%s: %s'", _id, path)
 
     def __iter__(self) -> Generator[tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
         """
@@ -515,7 +515,7 @@ def get_metadata_for_valid_files(paths: list[Path]):
             metadata = get_media_metadata(str(p), media_type, mimetype)
             media_metadata.append(metadata)
         except Exception:
-            logger.exception(f'Exception while reading file - {p}, skipping')
+            logger.exception("Exception while reading file '%s', skipping", p)
             unknown_files.append(p)
 
     return media_metadata, unknown_files

@@ -64,7 +64,11 @@ def initialize_feature_extractors(
     feature_extractors = {}
     for _id in feature_extractor_ids:
         if _id in feature_extractors:
-            logger.warning(f"Feature extractor {_id} is already initialized. Ignoring duplicate.")
+            logger.warning(
+                "Feature extractor '%s' is already initialized."
+                " Ignoring duplicate.",
+                _id,
+            )
             continue
 
         feature_extractor = FeatureExtractorFactory(_id, config)
