@@ -148,7 +148,7 @@ class FeatureSearchIndex(SearchIndex):
     @property
     def is_internal_search_supported(self):
         """
-        Checks if the faiss index supports internal search (i.e. reconstructing 
+        Checks if the faiss index supports internal search (i.e. reconstructing
         vectors from their ids). This should be enabled by default for new
         projects created using our latest code, but older projects might not
         support this, so we need to perform some checks.

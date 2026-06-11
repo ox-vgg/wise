@@ -139,7 +139,7 @@ if args.export:
     audio_inputs = (preprocessed_audio.squeeze(1),) if preprocessed_audio is not None else tuple()
     text_inputs = (preprocessed_text['input_ids'],)
     text_inputs += (preprocessed_text["attention_mask"],) if "attention_mask" in preprocessed_text else tuple()
-        
+
     with torch.inference_mode():
         model.export_to_onnx(
             output,
@@ -203,7 +203,7 @@ if preprocessed_image is not None:
         images = feature_extractor.processor(images=image_tensor, return_tensors="pt")[
             "pixel_values"
         ]  # shape: (B, C, 960, 960)
-    
+
     ort_outputs = _run(session_image, {
         "images": images,
     })
@@ -229,7 +229,7 @@ if preprocessed_image is not None:
         assert np.allclose(a.vectors, b.vectors, rtol=1e-5, atol=1e-3), f"Feature vectors do not match"
         assert len(a.metadata) == len(b.metadata), f"Metadata length mismatch: {len(a.metadata)} != {len(b.metadata)}"
 
-            
+
         for c, d in zip(a.metadata, b.metadata):
             x_arr = np.array([
                 c.objectness_score,
@@ -246,7 +246,7 @@ if preprocessed_image is not None:
                 d.bbox.h,
             ])
             assert np.allclose(x_arr, y_arr, rtol=1e-5, atol=1e-3), f"Metadata mismatch: {c} != {d}"
-            
+
     else:
         _verify_outputs(ort_outputs, {
             "embeddings": np.concatenate([x.vectors for x in image_features]),

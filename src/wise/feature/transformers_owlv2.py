@@ -244,7 +244,7 @@ class TransformersOWLv2Model(MultiModalModel):
     """
     A MultiModalModel wrapper for the OWLv2 model from HuggingFace Transformers.
     This class is used to load the OWLv2 model and perform inference on it.
-    """ 
+    """
     @cached_property
     def model(self) -> Owlv2ForObjectDetection:
         """

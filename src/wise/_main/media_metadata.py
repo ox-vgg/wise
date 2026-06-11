@@ -108,7 +108,7 @@ def import_shots(args):
         with db_engine.connect() as conn:
             for idx, m in enumerate(tqdm(_metadata), start=1):
                 VideoShotsRepo.create(
-                    conn, 
+                    conn,
                     data=VideoShot(
                         id=m['id'],
                         media_id=m['media_id'],
@@ -186,14 +186,14 @@ def import_shots(args):
     csv_filename = Path(args.from_csv)
     if not csv_filename.exists():
         raise ValueError(f'csv file does not exist: {csv_filename}')
-    
+
     csv_colnames = get_csv_header(csv_filename)
     if 'media_id' not in csv_colnames and 'media_path' not in csv_colnames:
         raise ValueError('media_id or media_path columns missing from CSV')
-    
+
     if 'id' not in csv_colnames or 'timestamp' not in csv_colnames or 'end_timestamp' not in csv_colnames:
         raise ValueError('id / timestamp / end_timestamp columns missing from CSV - make sure the correct script was used to geenrate the shots csv')
-    
+
     metadata = load_metadata_from_csv(args.from_csv, args)
     if 'media_path' in csv_colnames:
         resolve_media_path(db_engine, metadata)

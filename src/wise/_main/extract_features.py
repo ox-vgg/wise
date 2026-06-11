@@ -405,7 +405,7 @@ def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, ar
 
     if mode == ExtractFeatureMode.create:
         return feature_extractor_ids
-    
+
     project_feature_extractor_ids = get_feature_extractor_ids_from_project(project)
 
     # Add feature extractor mode
@@ -438,7 +438,7 @@ def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, ar
             )
         # Use existing feature extractor ids in the project, ignoring any provided in the command line args
         return project_feature_extractor_ids
-    
+
     return feature_extractor_ids
 
 def get_media_files_for_dataset(

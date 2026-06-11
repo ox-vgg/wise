@@ -398,7 +398,7 @@ class FeatureExtractor:
         models like OWLv2 which requires feature vectors to be 'augmented'. See
         src/feature/transformers_owlv2.py::extract_image_features() for an example.
 
-        This method can be overridden by subclasses to apply specific 
+        This method can be overridden by subclasses to apply specific
         transformations to internal image queries. By default, it does nothing.
 
         Parameters
@@ -420,8 +420,8 @@ class FeatureExtractor:
         scores returned by Faiss. This transformation ensures that similarity scores
         are in the range of 0 and 1 and therefore ready for the frontend.
 
-        This method can be overridden by subclasses to apply specific 
-        transformations to the distance scores returned by Faiss. By default, 
+        This method can be overridden by subclasses to apply specific
+        transformations to the distance scores returned by Faiss. By default,
         it does nothing.
 
         Parameters
@@ -516,7 +516,7 @@ def get_torch_device(device: str | torch.device | None = None):
     """
     if isinstance(device, torch.device):
         return device
-    
+
     _default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
     _device = device or _default_device
     return torch.device(_device)

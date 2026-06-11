@@ -52,8 +52,8 @@ def _load_openclip_model(
 
 
 class MlfoundationsOpenClipModel(MultiModalModel):
-    
-    @cached_property       
+
+    @cached_property
     def model(self):
         logger.info(
             f"Initialising model mlfoundations/openclip model - {self.model_id} ({self.pretraining_dataset}, device={self.DEVICE})"

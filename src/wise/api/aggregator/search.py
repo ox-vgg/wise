@@ -73,7 +73,7 @@ async def handle_get_featured(
     random_seed: int = fastapi.Query(123),
 ):
     start, end = common.clamp_search_window(start, end, config.max_search_results)
-    # modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in) 
+    # modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in)
     response = await cast(RemoteSearchService, search_service).featured(
         featured_in, feature_extractor_id, start, end, random_seed
     )
@@ -245,7 +245,7 @@ async def handle_post_search(
         raise HTTPException(400, {"message": "Missing search query"})
     elif len(q) > 5:
         raise HTTPException(400, {"message": "Too many query items"})
-    
+
     response = await _search(
         config,
         embedding_service,

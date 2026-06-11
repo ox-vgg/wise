@@ -1085,7 +1085,7 @@ class WiseProject:
         """
         WARNING: EXPERIMENTAL
 
-        Merges another wise project with this one. 
+        Merges another wise project with this one.
 
         Doesnt support metadata tables - use sqlite3 dump and import for now
 

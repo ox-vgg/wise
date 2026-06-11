@@ -214,10 +214,10 @@ def parse_fts_config(fts_config: dict):
                 old_name, new_name = c.split(":", 1)
             else:
                 old_name, new_name = c, c
-            
+
             column2fts[table][old_name] = new_name
             fts2column[table][new_name] = old_name
-    
+
     return column2fts, fts2column
 
 def get_metadata_selectable_from_fts5_config(

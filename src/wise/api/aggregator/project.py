@@ -37,7 +37,7 @@ async def get_related_vectors(_vector_id: int, media_id: str, projects: ProjectS
     project = projects.get(shard_id)
     if project is None:
         raise HTTPException(status_code=404, detail=f"Project shard {shard_id} not found!")
-    
+
     response = await project.related_vectors(_vector_id)
     return response
 
@@ -51,11 +51,11 @@ async def forward(shard_id: str, full_path: str, request: Request,  projects: Pr
     Forward the request to a remote project based on the project_id
     """
     logger.info('Forwarding request to remote shard %s for path %s', shard_id, full_path)
-    
+
     project = projects.get(shard_id)
     if project is None:
         raise HTTPException(status_code=404, detail=f"Project shard {shard_id} not found!")
-    
+
     response = await project.forward(full_path, request)
     return response
 

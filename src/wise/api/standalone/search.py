@@ -466,14 +466,14 @@ def _search_metadata(
         raise HTTPException(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
-    
+
     media_type = get_media_type(search_in)
     text_queries = [x.txt for x in q]
     # TODO escape special characters
     text = " ".join(text_queries)
     fts_q = WISEFTSQuery.model_validate({"$match": text})
     search_output = search_service.asr_search(fts_q, media_type, start, end)
-    
+
     return search_output_to_response(
         config,
         project_service,
@@ -621,7 +621,7 @@ async def _search_multimodal(
         negative_queries_weight=config.negative_queries_weight,
     )
     features = embedding_service.embed(feature_extractor_id, embedding_config, q)
-    
+
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
     media_type = get_media_type(search_in)
     search_output = search_service.search_with_feature(

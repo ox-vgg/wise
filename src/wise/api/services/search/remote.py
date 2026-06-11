@@ -37,7 +37,7 @@ def merge_response(a: common.SearchResponse, b: common.SearchResponse) -> common
         a.image_results.images.update(b.image_results.images)
     elif b.image_results:
         a.image_results = b.image_results
-    
+
     if a.video_results and b.video_results:
         a.video_results.total += b.video_results.total
         a.video_results.unmerged_windows.extend(b.video_results.unmerged_windows)
@@ -71,12 +71,12 @@ class RemoteSearchService:
     def __init__(self, remote_projects: dict[str, RemoteWiseProjectService], embedding_service: EmbeddingService):
         self.project_services = remote_projects
         self.embedding_service = embedding_service
-    
+
     async def featured(
             self,
             media_type: MediaType,
-            feature_extractor_id: str, 
-            start: int, 
+            feature_extractor_id: str,
+            start: int,
             end: int,
             random_seed: int = 42,
         ):
@@ -89,7 +89,7 @@ class RemoteSearchService:
         response = functools.reduce(merge_response, all_responses)
         response = sort_response(response)
         return response
-    
+
     async def search(
             self,
             request: Request,
@@ -105,13 +105,13 @@ class RemoteSearchService:
         response = functools.reduce(merge_response, all_responses)
         response = sort_response(response)
         return response
-    
+
     async def search_with_feature(
             self,
             features: np.ndarray,
             search_in: MediaType,
-            feature_extractor_id: str, 
-            start: int, 
+            feature_extractor_id: str,
+            start: int,
             end: int,
             thumbnails_to_send: int = 0,
             shot_scale: list[int] | None = None,
@@ -134,11 +134,11 @@ class RemoteSearchService:
             if len(parts) != 3:
                 raise ValueError(f"Invalid internal_id: {internal_id}")
             project_id, _, vector_id = parts
-            
+
             project_service = self.project_services.get(project_id)
             if project_service is None:
                 raise ValueError(f"Project {project_id} not found")
-            
+
             vectors = await project_service.reconstruct_vectors(
                 media_type, feature_extractor_id, [vector_id]
             )
@@ -147,5 +147,5 @@ class RemoteSearchService:
         all_vectors = await asyncio.gather(*[
             handle_internal_id(v) for v in internal_ids
         ])
-        
+
         return all_vectors

@@ -94,7 +94,7 @@ def load_audio(x: list[io.BytesIO]) -> torch.Tensor:
         raise ValueError("No audio file was specified")
     elif len(x) > 1:
         raise NotImplementedError("Please specify 1 audio file only")
-    
+
     target_sample_rate = 48_000 # TODO set this based on model?
     audio_file = x[0]
     waveform, original_sample_rate = torchaudio.load(audio_file)
