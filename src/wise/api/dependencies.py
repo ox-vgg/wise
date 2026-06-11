@@ -70,7 +70,6 @@ def get_project_service(config: ConfigDep):
                     raise ValueError(
                         f"Local path does not exist or is not a directory: {project_path}"
                     )
-                from wise.api.services.project import LocalWiseProjectService
                 from wise.wise_project import WiseProject
                 project = WiseProject(project_path, read_only=True)
                 project.load_search_indices(config.index_type, config.nprobe)

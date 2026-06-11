@@ -19,7 +19,7 @@ import functools
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Callable, Literal, Optional
+from typing import Annotated, Literal, Optional
 
 import numpy as np
 from fastapi import HTTPException, Request, Response, UploadFile

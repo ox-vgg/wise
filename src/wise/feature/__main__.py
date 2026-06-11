@@ -157,9 +157,6 @@ if not args.verify:
 #         f"Output path {output} does not exist. Please export the model first."
 #     )
 
-import onnxruntime as ort
-
-
 providers = ['CPUExecutionProvider']
 if args.device.startswith('cuda:'):
     provders = ['CUDAExecutionProvider']
