@@ -66,6 +66,7 @@ class TestWithEmptyProject(unittest.TestCase):
                 "num_thumbnails": 0,
                 "num_shots": 0,
                 "media_file_counts": {},
+                "max_search_results": 1000,
                 "total_duration": 0.0,
                 "models": {},
                 "shot_based_filters": None,
