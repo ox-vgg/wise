@@ -317,7 +317,7 @@ class VectorInfo(BaseModel):
     @classmethod
     def cast_bbox(cls, v):
         if isinstance(v, tuple):  # v is the NamedTuple in feature_extractor module
-           return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
+            return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
         else:
             return v
 

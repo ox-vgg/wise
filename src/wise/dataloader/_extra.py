@@ -80,7 +80,7 @@ def get_input_transform_for_model(clip_model):
     )
 
 class _CLIPModel(str, enum.Enum):
-        pass
+    pass
 
 CLIPModel = _CLIPModel("CLIPModel", {x: x for x in AVAILABLE_MODELS} | {"None": None})
 
