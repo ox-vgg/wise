@@ -459,7 +459,7 @@ class FeatureExtractor:
                 round(region.h * image.shape[1]),
                 round(region.w * image.shape[2]),
             )
-            return self.proprocess_image(crop.unsqueeze(0))
+            return self.preprocess_image(crop.unsqueeze(0))
         elif isinstance(image, Image.Image):
             crop = image.crop(
                 round(region.x * image.width),
