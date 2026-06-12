@@ -39,11 +39,6 @@ class ModalityType(str, enum.Enum):
     VIDEO = "video"
     AUDIO = "audio"
 
-class QueryType(str, enum.Enum):
-    NATURAL_LANGUAGE_QUERY = "NATURAL_LANGUAGE_QUERY"
-    IMAGE_QUERY = "IMAGE_QUERY"
-    IMAGE_CLASSIFICATION_QUERY = "IMAGE_CLASSIFICATION_QUERY"
-
 
 class SourceCollection(BaseModel):
     id: Optional[int] = None

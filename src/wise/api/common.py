@@ -369,69 +369,12 @@ class ImageResults(BaseModel):
     vectors: list[ImageVector]
     images: dict[str, ImageInfo]
 
-class FaceTextShardResults(BaseModel):
-    video_audio_results: Optional[VideoAudioResults] = None
-    video_results: Optional[VideoResults] = None
-    image_results: Optional[ImageResults] = None
-
 class SearchResponse(BaseModel):
     time: float # backend search time in seconds
     query: Query | QueryInForm
     video_audio_results: Optional[VideoAudioResults] # search results from audio stream of video files
     video_results: Optional[VideoResults] # search results from video stream of video files
     image_results: Optional[ImageResults] # search results from image files
-
-def split_query_terms(query: Query):
-    text_queries: list[str] = []
-    negative_text_queries: list[str] = []
-    image_file_queries: list[bytes] = []
-    image_url_queries: list[HttpUrl] = []
-    internal_image_queries: list[str] = []
-    negative_image_file_queries: list[bytes] = []
-    negative_image_url_queries: list[HttpUrl] = []
-    negative_internal_image_queries: list[str] = []
-    audio_file_queries: list[bytes] = []
-    audio_url_queries: list[HttpUrl] = []
-    negative_audio_file_queries: list[bytes] = []
-    negative_audio_url_queries: list[HttpUrl] = []
-
-    for term in query:
-        if isinstance(term, TextQueryTerm):
-            if term.is_negative:
-                negative_text_queries.append(term.txt)
-            else:
-                text_queries.append(term.txt)
-        elif isinstance(term, MediaQueryTerm):
-            if term.qtype == "visual":
-                if isinstance(term.src, bytes):
-                    (negative_image_file_queries if term.is_negative else image_file_queries).append(term.src)
-                elif isinstance(term.src, HttpUrl):
-                    (negative_image_url_queries if term.is_negative else image_url_queries).append(term.src)
-            elif term.qtype == "audio":
-                if isinstance(term.src, bytes):
-                    (negative_audio_file_queries if term.is_negative else audio_file_queries).append(term.src)
-                elif isinstance(term.src, HttpUrl):
-                    (negative_audio_url_queries if term.is_negative else audio_url_queries).append(term.src)
-        elif isinstance(term, VectorQueryTerm):
-            if term.is_negative:
-                negative_internal_image_queries.append(term.vector_id)
-            else:
-                internal_image_queries.append(term.vector_id)
-
-    return (
-        text_queries,
-        negative_text_queries,
-        image_file_queries,
-        image_url_queries,
-        internal_image_queries,
-        negative_image_file_queries,
-        negative_image_url_queries,
-        negative_internal_image_queries,
-        audio_file_queries,
-        audio_url_queries,
-        negative_audio_file_queries,
-        negative_audio_url_queries,
-    )
 
 
 def patch_precision(config: APIConfig):

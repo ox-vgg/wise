@@ -107,7 +107,3 @@ def get_mimetype_and_media_type_for_file(p: Path):
 
 def get_files_from_directory_with_extensions(dir: Path, extensions: list[str]):
     return (x for ext in extensions for x in dir.rglob(ext) if x.is_file())
-
-
-Identity = lambda *args, **kwargs: (args, kwargs)
-NoOp = lambda *args, **kwargs: None

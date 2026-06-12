@@ -50,7 +50,6 @@ class TestWithEmptyProject(unittest.TestCase):
             project_dir=self.project_dir,
             command="serve",
         )
-        self.assets_dir = self.project_dir
         self.app = create_app(self.api_config, self.project_dir)
         self.client = TestClient(self.app)
 

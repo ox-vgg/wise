@@ -136,18 +136,6 @@ class FeatureExtMetadata:
     bbox: Optional[BBoxXYWH] = None
 
 
-def check_config_in_init_args(cls: Type["FeatureExtractor"]) -> bool:
-    """Check if the class constructor accepts a config argument."""
-    parameters = inspect.signature(cls.__init__).parameters
-    if "config" not in parameters:
-        return False
-    param = parameters["config"]
-    return issubclass(param.annotation, FeatureExtractorConfig) and param.kind in (
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        inspect.Parameter.KEYWORD_ONLY,
-    )
-
-
 class MultiModalModel(ABC):
     """Base class for multi-modal models.
 

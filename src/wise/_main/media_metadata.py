@@ -338,21 +338,6 @@ def add_media_metadata(db_engine, metadata_tablename, csv_colnames, media_metada
     )
 
 ##
-## Helper functions
-##
-
-def hhmmss_to_sec(hhmmss):
-    tok = hhmmss.split(':')
-    assert len(tok) == 3
-    hh = int(tok[0])
-    mm = int(tok[1])
-    ssms_tok = tok[2].split('.')
-    ss = int(ssms_tok[0])
-    ms = int(ssms_tok[1])
-    sec = hh*60*60 + mm*60 + ss + ms/100.0
-    return float(sec)
-
-##
 ## Import Shot Scale
 ## e.g. shot_scale \in { 0:'extreme close-up', 1:'close-up', 2:'medium shot', 3:'full shot', 4:'long shot'}
 ##

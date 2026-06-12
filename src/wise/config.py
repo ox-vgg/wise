@@ -55,7 +55,6 @@ class APIConfig(BaseSettings):
     mode: Literal['production', 'development'] = 'production'
     listen_address: str = "0.0.0.0"
     port: int = 9670
-    top_k: int = 10
     max_search_results: int = 1000  # Higher values increase latency, memory use, and payload size.
     precision: int = 3
     query_prefix: str = "This is a photo of a"
@@ -65,7 +64,6 @@ class APIConfig(BaseSettings):
     nprobe: int = 1024
     project_dir: Path
     remote_projects: set[str] = set()
-    thumbnail_project_dir: Optional[Path] = None # "condensed-movies-roberta-2013"
 
     # If you want to serve the media files from a different static file server,
     # set redirect_media_url_by_path to True to redirect the media urls from
