@@ -58,6 +58,9 @@ testpaths = ["src"]
 
 [tool.vulture]
 ignore_decorators = [
+    "@field_serializer",
+    "@field_validator",
+    "@model_validator",
     "@router.api_route",
     "@router.get",
     "@router.post",
