@@ -207,7 +207,7 @@ class EmbeddingService:
                         au = io.BytesIO(qterm.src)
                         feature_vector = extract_audio_features(load_audio([au]))
                     elif _is_HttpUrl(qterm.src):
-                        logger.info("Downloading", qterm.src, "to file")
+                        logger.info("Downloading '%s' to file", qterm.src)
                         with NamedTemporaryFile() as tmpfile:
                             download_url_to_file(qterm.src, tmpfile.name)
                             with open(tmpfile.name, mode='rb') as f:
