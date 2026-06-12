@@ -457,7 +457,7 @@ class FeatureExtractor:
             )
             return self.preprocess_image([crop])
         else:
-            raise TypeError("unexpected input images of type %s" % type(images))
+            raise TypeError("unexpected input images of type %s" % type(image))
 
     def _preprocess_image_region_nocrop(
         self, image: torch.Tensor | Image.Image, region: BBoxXYWH
@@ -471,7 +471,7 @@ class FeatureExtractor:
         elif isinstance(image, Image.Image):
             return self.preprocess_image([image])
         else:
-            raise TypeError("unexpected input images of type %s" % type(images))
+            raise TypeError("unexpected input images of type %s" % type(image))
 
     def _extract_image_region_features_highest_iou(
         self, image: torch.Tensor, region: BBoxXYWH
