@@ -127,9 +127,6 @@ class FeatureSearchIndex(SearchIndex):
         faiss.write_index(index, index_fn.as_posix())
         logger.info("Saved index to '%s'", index_fn)
 
-    def is_index_loaded(self):
-        return hasattr(self, 'index')
-
     def load_index(self, index_type):
         self.index_type = index_type
         index_fn = self.get_index_filename(index_type)

@@ -103,9 +103,6 @@ class SqliteSearchIndex(SearchIndex):
             cursor.executemany(sql, fts_data)
             cursor.execute(f'END TRANSACTION')
 
-    def is_index_loaded(self):
-        return hasattr(self, 'index')
-
     def load_index(self, index_type):
         exists = self.sqlite_table_exists(self.metadata_db, self.metadata_table_fts)
 

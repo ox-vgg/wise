@@ -30,9 +30,6 @@ class SearchIndex:
     def create_index(self, index_type, overwrite=False):
         raise NotImplementedError
 
-    def is_index_loaded(self):
-        raise NotImplementedError
-
     def load_index(self, index_type):
         raise NotImplementedError
 
