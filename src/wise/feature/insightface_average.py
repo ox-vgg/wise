@@ -18,8 +18,9 @@ import logging
 
 import numpy as np
 import torch
+from PIL import Image
 
-from wise.feature.feature_extractor import FeatureExtractor, Features
+from wise.feature.feature_extractor import BBoxXYWH, FeatureExtractor, Features
 from wise.feature.insightface import InsightFaceFeatureExtractor
 
 

@@ -14,8 +14,6 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from __future__ import annotations
-
 import io
 import itertools
 import logging
@@ -1081,7 +1079,7 @@ class WiseProject:
         self._search_indices = search_indices
         return search_indices
 
-    def _merge(self, other: WiseProject, dry_run: bool = True):
+    def _merge(self, other: "WiseProject", dry_run: bool = True):
         """
         WARNING: EXPERIMENTAL
 
@@ -1318,7 +1316,7 @@ class WiseProject:
                     )
 
         # merge tables in database
-    def merge(self, other: WiseProject, dry_run: bool = True):
+    def merge(self, other: "WiseProject", dry_run: bool = True):
 
         # Source collection
         with self.db_engine.connect() as conn, self.thumbsdb_engine.connect() as thumbs_conn:

@@ -14,15 +14,13 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from __future__ import annotations
-
 import bisect
 import functools
 import itertools
 import json
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated, Literal
 
 import sqlalchemy as sa
 from pydantic import Field, RootModel
@@ -37,9 +35,6 @@ from wise.data_models import (
     VectorAndMediaMetadata,
 )
 
-
-if TYPE_CHECKING:
-    from wise.wise_project import WiseProject
 
 logger = logging.getLogger(__name__)
 
@@ -355,7 +350,7 @@ class WISEFTSQuery(RootModel[OperatorQuery]):
 class FTSSearch:
     is_internal_search_supported = False
     table_name =  db._WISE_FTS_TABLE
-    def __init__(self, project: WiseProject, metadata):
+    def __init__(self, project: "WiseProject", metadata):
         self.project = project
         self.db_metadata = metadata
 

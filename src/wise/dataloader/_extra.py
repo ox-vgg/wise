@@ -14,10 +14,9 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from __future__ import annotations
-
 import enum
 import logging
+from collections.abc import Callable
 
 import numpy as np
 import open_clip
@@ -85,5 +84,5 @@ class _CLIPModel(str, enum.Enum):
 CLIPModel = _CLIPModel("CLIPModel", {x: x for x in AVAILABLE_MODELS} | {"None": None})
 
 
-def _preprocess(preprocess_fn: callable, x: torch.Tensor) -> callable[[torch.Tensor], torch.Tensor]:
+def _preprocess(preprocess_fn: Callable, x: torch.Tensor) -> Callable[[torch.Tensor], torch.Tensor]:
     return torch.stack([preprocess_fn(xi) for xi in x])

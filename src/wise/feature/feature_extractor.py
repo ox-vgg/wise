@@ -14,8 +14,6 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from __future__ import annotations
-
 import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -27,6 +25,7 @@ import torch
 import torchvision.transforms.v2.functional as F
 from PIL import Image
 from pydantic import BaseModel, ConfigDict
+from torch import Tensor
 from torchvision.ops import box_iou
 
 
@@ -201,7 +200,7 @@ class FeatureExtractor:
         cls,
         model_id: str,
         config: dict[str, Any] = {},
-    ) -> FeatureExtractor:
+    ) -> "FeatureExtractor":
         """Create a feature extractor instance from the given configuration."""
         _config = cls.Config.model_validate(config)
 
