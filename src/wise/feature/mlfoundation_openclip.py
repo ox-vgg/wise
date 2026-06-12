@@ -340,7 +340,7 @@ class MlfoundationOpenClipFeatureExtractor(FeatureExtractor):
     def preprocess_image_region(
         self, image: torch.Tensor | Image.Image, region: BBoxXYWH
     ) -> torch.Tensor:
-        return self._proprocess_image_region_crop(image, region)
+        return self._preprocess_image_region_crop(image, region)
 
     def extract_image_region_features(
         self, image: torch.Tensor, region: BBoxXYWH
