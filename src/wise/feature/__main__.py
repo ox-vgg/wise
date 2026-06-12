@@ -159,7 +159,7 @@ if not args.verify:
 
 providers = ['CPUExecutionProvider']
 if args.device.startswith('cuda:'):
-    provders = ['CUDAExecutionProvider']
+    providers = ['CUDAExecutionProvider']
 
 def _get_normalizer():
     if feature_extractor.__class__.__name__ == 'TransformersOWLv2FeatureExtractor':
