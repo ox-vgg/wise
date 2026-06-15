@@ -50,35 +50,11 @@
   <summary><b>Different ways to perform searches</b></summary>
   <p>Searches can be performed via:</p>
   <ul>
-    <li>CLI</li>
     <li>REST API</li>
     <li>Web frontend</li>
   </ul>
-  <p>(Note: currently the search functionality in the CLI may be missing some features.)</p>
 </details>
 
-<details>
-  <summary><b>Safety features</b></summary>
-  <ul>
-    <li>Specify a list of search terms that users should be blocked from searching</li>
-    <li>'Report image' button allows users to report inappropriate/offensive/etc images (temporarily removed; will be added back soon)</li>
-  </ul>
-</details>
-
-## Roadmap
-
-We are planning on implementing the following features soon. Stay tuned!
-
-<ul>
-  <li>
-    Object search, face search, ASR (speech transcript) search, and metadata search will be available in the next stable release. (These features have been implemented in the current branch but are not stable yet.)
-  </li>
-  <li>
-  Cross platform easy installation
-  <br>
-  We are working on creating an easy-to-use installer which allows users to install WISE on Mac, Windows, and Linux without needing to use the command line.
-  </li>
-</ul>
 
 ## Colab demo
 
