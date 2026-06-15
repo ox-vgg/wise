@@ -103,6 +103,7 @@ Here are some documents for users and developers of WISE.
   - [Install](docs/Install.md) : describes the process for installing WISE
   - [User Guide](docs/UserGuide.md) : demonstrates the usage of WISE using a sample video dataset
     - User guide for the [Cinephile-2025](https://meru.robots.ox.ac.uk/cinephile/) online demo : [pdf](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.pdf), [odt](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.odt), [docx](https://www.robots.ox.ac.uk/~vgg/software/wise/data/cinephile2025/WISE%20User%20Guide.docx)
+  - [Video](https://www.robots.ox.ac.uk/~vgg/software/wise/data/wise-search-engine-2min-demo.mp4): a 2 minute video showcasing visual, face, audio, metadata and object search capabilities of WISE.
   - [Metadata](docs/Metadata.md) : describes support for text metadata search in WISE
   - Developer Resources
     - [Data Loading](docs/data-loading.md): describes interface for loading media files
