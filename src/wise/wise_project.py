@@ -23,6 +23,9 @@ import sqlite3
 from collections import defaultdict
 from functools import cached_property
 from pathlib import Path
+from functools import partial
+
+from wise.utils import batched
 
 import numpy as np
 import sqlalchemy as sa
@@ -32,12 +35,10 @@ from tqdm import tqdm
 from wise import db as wise_db
 from wise.data_models import (
     DatasetPayload,
-    MediaMetadata,
     MediaMetadataWithSource,
     MediaType,
     ModalityType,
     SourceCollection,
-    ThumbnailMetadata,
     VectorAndMediaMetadata,
     VideoShot,
 )
@@ -51,11 +52,7 @@ from wise.feature.store import (
 from wise.index.search_index import SearchIndex
 from wise.index.search_index_factory import SearchIndexFactory
 from wise.repository import (
-    MediaRepo,
     SourceCollectionRepo,
-    ThumbnailRepo,
-    VectorRepo,
-    VideoShotsRepo,
 )
 from wise.search.fts import FTSSearch
 
@@ -78,6 +75,58 @@ def get_cte_from_ids(ids: list[int], label="media_id"):
     )
 
     return cte
+
+
+# utility to scan columns from a table in batches, either as a row tuple or dict
+def batch_select(
+    conn: sa.Connection,
+    stmt,
+    batch_size: int | None = None,
+    as_dict: bool = False,
+):
+    _conn = conn
+    if batch_size is not None:
+        _conn = conn.execution_options(stream_results=True)
+
+    result = _conn.execute(stmt)
+
+    while rows := result.fetchmany(batch_size):
+        if as_dict:
+            yield [r._asdict() for r in rows]
+        else:
+            yield rows
+
+
+# utility to insert a batch of rows into a table, and optionally return the inserted ids
+def batch_insert(
+    conn: sa.Connection, table: sa.Table, batch: list[dict], return_ids: bool = True
+):
+    stmt = table.insert()
+    if return_ids:
+        stmt = stmt.returning(table.c.id)
+
+    result = conn.execute(
+        stmt,
+        batch,
+    )
+    if return_ids:
+        return result.scalars().all()
+
+
+# utility to query a table by a column with a list of values, preserving the order of the input list
+def batch_query_by_column(
+    conn: sa.Connection, table: sa.Table, column: str, vals: list
+):
+    if column not in table.c:
+        raise ValueError(f"column {column} not found in table {table.name}")
+
+    id_ordering = sa.case(
+        {_id: index for index, _id in enumerate(vals)},
+        value=table.c.id,
+    )
+
+    stmt = sa.select(table).where(table.c[column].in_(vals)).order_by(id_ordering)
+    return conn.execute(stmt).mappings().all()
 
 
 class WiseProject:
@@ -1101,219 +1150,561 @@ class WiseProject:
                     feature_extractor_id
                 )
                 feature_extractor_cls.create_vector_metadata_table(self.db_engine)
+
+        # Merge source collections by location and type
+        def handle_source_collection(
+            conn: sa.Connection, other_source_collection: SourceCollection
+        ):
+            # Find the source collection by location and type in the destination project
+            existing_source_collection_id = conn.execute(
+                sa.select(wise_db.source_collections_table.c.id).where(
+                    wise_db.source_collections_table.c.location
+                    == other_source_collection.location,
+                    wise_db.source_collections_table.c.type
+                    == other_source_collection.type,
+                )
+            ).scalar_one_or_none()
+
+            # if not found, create new. Else return existing id
+            if existing_source_collection_id is None:
+                logger.debug(
+                    f"could not find source collection {other_source_collection} - copying over"
+                )
+                # none match, create new
+                existing_source_collection = SourceCollectionRepo.create(
+                    conn, data=other_source_collection.model_copy(update=NO_ID)
+                )
+                existing_source_collection_id = existing_source_collection.id
+
+            else:
+                logger.debug(
+                    f"found existing source collection at id - {existing_source_collection_id}"
+                )
+
+            return other_source_collection.id, existing_source_collection_id
+
+        # Update source collection
+        # if an equivalent source collection exists, use that id. Else create a new one and use that id
+        source_collection_id_map = {}
         with (
             self.db_engine.connect() as conn,
             other.db_engine.connect() as other_conn,
-            self.thumbsdb_engine.connect() as thumbs_conn,
-            other.thumbsdb_engine.connect() as other_thumbs_conn
+            tqdm(
+                total=SourceCollectionRepo.get_count(other_conn),
+                desc="Source collections",
+            ) as pbar,
         ):
-            # Merge source collections by location and type
-            def handle_source_collection(other_source_collection: SourceCollection):
-                existing_source_collection = conn.execute(
-                    sa.select(
-                        wise_db.source_collections_table.c.id
-                    ).where(
-                        wise_db.source_collections_table.c.location == other_source_collection.location,
-                        wise_db.source_collections_table.c.type == other_source_collection.type,
-                    )
-                ).scalar_one_or_none()
-                if existing_source_collection is None:
-                    logger.debug(
-                        f"could not find source collection {other_source_collection} - copying over"
-                    )
-                    # none match, create new
-                    existing_source_collection = SourceCollectionRepo.create(
-                        conn,
-                        data=other_source_collection.model_copy(update=NO_ID)
-                    )
-                else:
-                    logger.debug(f'found existing source collection at id - {existing_source_collection}')
-                    existing_source_collection = SourceCollectionRepo.get(conn, existing_source_collection)
-                return other_source_collection.id, existing_source_collection.id
-
-            source_collection_id_map = dict(map(handle_source_collection, SourceCollectionRepo.list(other_conn)))
-            logger.info(f'Updated source collection map - {source_collection_id_map}')
-            if not dry_run:
-                conn.commit()
-
-            # Merge media by full path, checksum, size
-            def handle_media(other_media: MediaMetadata):
-                source_collection = SourceCollectionRepo.get(
-                    conn,
-                    source_collection_id_map[other_media.source_collection_id]
+            _handle_source_collection = partial(handle_source_collection, conn)
+            for batch_sc in batched(SourceCollectionRepo.list(other_conn), 16):
+                source_collection_id_map |= dict(
+                    map(_handle_source_collection, batch_sc)
                 )
+                if not dry_run:
+                    conn.commit()
+                pbar.update(len(batch_sc))
 
-                existing_media_id = conn.execute(
-                    sa.select(wise_db.media_table.c.id).select_from(wise_db.media_table.join(wise_db.source_collections_table)).where(
-                        sa.and_(
-                            wise_db.source_collections_table.c.location == source_collection.location,
-                            wise_db.source_collections_table.c.type == source_collection.type,
-                            wise_db.media_table.c.path == other_media.path,
-                            wise_db.media_table.c.checksum == other_media.checksum,
-                            wise_db.media_table.c.size_in_bytes == other_media.size_in_bytes
-                        )
-                    )
-                ).scalar_one_or_none()
-                if not existing_media_id:
-                    # new media
-                    logger.debug(
-                        f"could not find media {other_media} - copying over metadata and shots"
-                    )
-                    existing_media_id = MediaRepo.create(
-                        conn,
-                        data=other_media.model_copy(update= NO_ID | {'source_collection_id': source_collection.id})
-                    )
-                    for shot in VideoShotsRepo.list(other_conn, batch_size = 1024):
-                        VideoShotsRepo.create(
-                            conn,
-                            data=shot.model_copy(update={'media_id': existing_media_id.id})
-                        )
-                else:
-                    existing_media_id = MediaRepo.get(conn, existing_media_id)
+        logger.info("Updated source collection map")
+        logger.debug(f"{source_collection_id_map}")
 
-                return other_media.id, existing_media_id.id
-
-            media_id_map = dict(map(handle_media, MediaRepo.list(other_conn)))
-            if not dry_run:
-                conn.commit()
-
-            logger.info(f'Updated media map - {media_id_map}')
-
-            # Merge thumbnails, shots
-            def handle_thumbnail(t: ThumbnailMetadata):
-                media_id = media_id_map[t.media_id]
-                existing_thumbnail = thumbs_conn.execute(
-                    sa.select(wise_db.thumbnails_table.c.id).where(
-                        sa.and_(
-                            wise_db.thumbnails_table.c.media_id == media_id,
-                            wise_db.thumbnails_table.c.timestamp == t.timestamp
-                        )
-                    )
-                ).scalar_one_or_none()
-                if not existing_thumbnail:
-                    logger.debug(
-                        f"could not find thumbnail ({t.media_id}, {t.timestamp}) - copying over"
-                    )
-                    ThumbnailRepo.create(
-                        thumbs_conn,
-                        data=t.model_copy(update= NO_ID | {'media_id': media_id})
-                    )
-                    return 1
-                return 0
-
-            num_copied_thumbnails = sum(
-                map(
-                    handle_thumbnail,
-                    ThumbnailRepo.list(other_thumbs_conn, batch_size=1024),
-                )
+        # find matching media by checksum, path, size_in_bytes and the new source_collection_id
+        # if found, map the media_id to the existing media_id. Else return id to be copied over
+        def get_match_media_fn():
+            # columns to filter and match against
+            media_columns = [
+                "id",
+                "source_collection_id",
+                "path",
+                "checksum",
+                "size_in_bytes",
+            ]
+            media_row_query = sa.select(
+                *[wise_db.media_table.c[x] for x in media_columns]
             )
-            logger.info(f"copied over {num_copied_thumbnails} thumbnails")
-            if not dry_run:
-                thumbs_conn.commit()
 
-            def get_last_vector_timestamps():
-                vector_timestamp_limits = {}
-                result = conn.execute(
-                    sa.select(
-                        wise_db.vectors_table.c.media_id,
-                        wise_db.vectors_table.c.modality,
-                        wise_db.vectors_table.c.feature_extractor_id,
-                        sa.func.max(wise_db.vectors_table.c.timestamp),
-                    ).group_by(
-                        wise_db.vectors_table.c.media_id,
-                        wise_db.vectors_table.c.modality,
-                        wise_db.vectors_table.c.feature_extractor_id,
-                    ).order_by(
-                        wise_db.vectors_table.c.media_id.asc()
+            # left join to find matching media
+            def get_matching_media_stmt(cte: sa.CTE):
+                return sa.select(cte.c.id, wise_db.media_table.c.id).select_from(
+                    cte.join(
+                        wise_db.media_table,
+                        onclause=sa.and_(
+                            wise_db.media_table.c.checksum == cte.c.checksum,
+                            wise_db.media_table.c.path == cte.c.path,
+                            wise_db.media_table.c.source_collection_id
+                            == cte.c.source_collection_id,
+                            wise_db.media_table.c.size_in_bytes == cte.c.size_in_bytes,
+                        ),
+                        isouter=True,
                     )
                 )
-                for media_id, modality, feature_extractor_id, timestamp in result.all():
-                    vector_timestamp_limits[(media_id, modality, feature_extractor_id)] = timestamp
 
-                return vector_timestamp_limits
+            # run is a function that
+            # iterates over an incoming batch of media from the "other" project and
+            # returns a mapping of other media_id to existing media_id in the current project
+            # using the prepared statement above. if no match is found, the existing media_id will be None
+            # and the row will be copied over to the current project in the next step
+            run = wise_db.prepare_filter_stmt(
+                wise_db.media_table,
+                media_columns,
+                get_matching_media_stmt,
+            )
 
-            min_time_stamp_per_media_id = get_last_vector_timestamps()
-            logger.debug(f"vector timestamp - {min_time_stamp_per_media_id}")
+            def find_matching_media(conn: sa.Connection, batch_media: list):
+                media_id_map = {}
+                _needs_copy = []
+                mapped_batch_media = [
+                    (x[0], source_collection_id_map[x[1]]) + tuple(x[2:])
+                    for x in batch_media
+                ]
+                _id_map = run(conn, mapped_batch_media).all()
+                assert len(_id_map) == len(batch_media)
+                for other_media_id, existing_media_id in _id_map:
+                    if existing_media_id is not None:
+                        media_id_map[other_media_id] = existing_media_id
+                    else:
+                        _needs_copy.append(other_media_id)
 
-            def copy_vectors(
-                modality_type: ModalityType,
-                feature_extractor_id: str,
-                other_store: FeatureStore,
+                return media_id_map, _needs_copy
+
+            return media_row_query, find_matching_media
+
+        def get_handle_new_media_fn():
+            def get_media_by_ids_stmt(cte: sa.CTE):
+                return (
+                    sa.select(wise_db.media_table)
+                    .select_from(
+                        cte.join(
+                            wise_db.media_table,
+                            onclause=wise_db.media_table.c.id == cte.c.id,
+                        )
+                    )
+                    .order_by(cte.c.rank)
+                )
+
+            # the prepared statement takes the ids as input and binds it to the cte
+            # used in the get_media_by_ids_stmt
+            run = wise_db.prepare_filter_stmt(
+                wise_db.media_table,
+                ["id"],
+                get_media_by_ids_stmt,
+                include_ordering=True,
+            )
+
+            def get_shots_by_media_ids_stmt(cte: sa.CTE):
+                return (
+                    sa.select(wise_db.shots_table)
+                    .select_from(
+                        cte.join(
+                            wise_db.shots_table,
+                            onclause=wise_db.shots_table.c.media_id == cte.c.media_id,
+                        )
+                    )
+                    .order_by(cte.c.rank)
+                )
+
+            run_shots = wise_db.prepare_filter_stmt(
+                wise_db.shots_table,
+                ["media_id"],
+                get_shots_by_media_ids_stmt,
+                include_ordering=True,
+            )
+
+            def handle_new_media(
+                conn: sa.Connection,
+                other_conn: sa.Connection,
+                other_media_ids: list[int],
             ):
-                logger.info(f'copying for feature_extractor - {feature_extractor_id} ({modality_type})')
-                feature_count = other_store.feature_count
-                self.create_features_dir(feature_extractor_id)
-                try:
-                    store = FeatureStoreFactory.load_store(
-                        modality_type, self.features_dir(feature_extractor_id)
-                    )
-                except ValueError:
-                    store = FeatureStoreFactory.create_store(
-                        FeatureStoreType.FAISS,
-                        modality_type,
-                        self.features_dir(feature_extractor_id),
-                    )
-                store.enable_write()
+                other_media = (
+                    run(other_conn, [(x,) for x in other_media_ids]).mappings().all()
+                )
+                other_media = [
+                    dict(x)
+                    | NO_ID
+                    | {
+                        "source_collection_id": source_collection_id_map[
+                            x["source_collection_id"]
+                        ]
+                    }
+                    for x in other_media
+                ]
 
-                feature_extractor_cls = get_feature_extractor_class(
-                    feature_extractor_id
+                # new media
+                new_media_ids = batch_insert(conn, wise_db.media_table, other_media)
+
+                # query all shots and map to new media ids
+                media_id_map: dict[int, int] = dict(zip(other_media_ids, new_media_ids))
+
+                shots = (
+                    run_shots(other_conn, [(x,) for x in other_media_ids])
+                    .mappings()
+                    .all()
                 )
 
-                total_copied = 0
-                try:
-                    with tqdm(total=feature_count) as pbar:
-                        for feature_ids, features in other_store.iter_batch(1024):
-                            feature_id_list = feature_ids.tolist()
-                            vectors = [VectorRepo.get(other_conn, _id) for _id in feature_id_list]
+                if shots:
+                    shots = [
+                        x | {"media_id": media_id_map[x["media_id"]]} for x in shots
+                    ]
+                    batch_insert(conn, wise_db.shots_table, shots, return_ids=False)
 
-                            old_vector_ids = []
-                            new_vector_ids = []
+                return media_id_map
 
-                            for feature, vector in zip(features, vectors):
-                                if vector is None:
-                                    logger.info('skipping missing vector')
-                                    continue
-                                new_media_id = media_id_map[vector.media_id]
-                                min_ts = min_time_stamp_per_media_id.get(
-                                    (new_media_id, modality_type, feature_extractor_id),
-                                    min_time_stamp_per_media_id.get(
-                                        (new_media_id, modality_type, ''), -1
-                                    )
-                                )
-                                if vector.timestamp <= min_ts:
-                                    continue
+            return handle_new_media
 
-                                new_vector = VectorRepo.create(
-                                    conn,
-                                    data=vector.model_copy(update= NO_ID | {'media_id': new_media_id, 'feature_extractor_id': feature_extractor_id})
-                                )
-                                store.add(new_vector.id, np.expand_dims(feature, axis=0))
-                                old_vector_ids.append(vector.id)
-                                new_vector_ids.append(new_vector.id)
+        media_id_map = {}
+        media_count = other.num_media
+        batch_size = 2048
 
-                            if old_vector_ids:
-                                total_copied += len(old_vector_ids)
-                                ext_vector_metadata = feature_extractor_cls.get_vector_metadata(other_conn, old_vector_ids)
-                                feature_extractor_cls.add_to_vector_metadata_table(
-                                    conn, new_vector_ids, ext_vector_metadata
-                                )
+        with (
+            self.db_engine.connect() as conn,
+            other.db_engine.connect() as other_conn,
+            tqdm(
+                total=media_count,
+                desc="Processing Media",
+            ) as pbar,
+        ):
+            _needs_copy = []
+            media_row_query, find_matching_media = get_match_media_fn()
+            for batch_media in batch_select(
+                other_conn, media_row_query, batch_size=batch_size
+            ):
+                # map the source collection ids to the new project
+                media_id_map_batch, needs_copy_batch = find_matching_media(
+                    conn, batch_media
+                )
+                media_id_map |= media_id_map_batch
+                _needs_copy.extend(needs_copy_batch)
+                pbar.update(len(batch_media))
 
-                            if not dry_run:
-                                conn.commit()
+        with (
+            self.db_engine.connect() as conn,
+            other.db_engine.connect() as other_conn,
+            tqdm(
+                total=len(_needs_copy),
+                desc="Copying Media",
+            ) as pbar,
+        ):
+            handle_new_media = get_handle_new_media_fn()
+            for batch_media in batched(_needs_copy, batch_size):
+                media_id_map |= handle_new_media(conn, other_conn, batch_media)
+                if not dry_run:
+                    conn.commit()
+                pbar.update(len(batch_media))
 
-                            pbar.update(len(feature_id_list))
-                finally:
-                    store.close()
-                logger.info(f'copied {total_copied} vectors over for feature extractor - {feature_extractor_id} ({modality_type})')
+        logger.info("Updated media map")
+        logger.debug(f"{media_id_map}")
 
-            for modality_type in supported_assets:
-                for feature_extractor_id in supported_assets[modality_type]:
+        def get_matching_thumbnails_fn():
+            thumbnail_columns = [
+                "id",
+                "media_id",
+                "timestamp",
+            ]
+            thumbs_row_query = sa.select(
+                *[wise_db.thumbnails_table.c[x] for x in thumbnail_columns]
+            )
+            def get_thumbnail_ids_to_copy_stmt(cte: sa.CTE):
+                return (
+                    sa.select(cte.c.id)
+                    .select_from(
+                        cte.join(
+                            wise_db.thumbnails_table,
+                            onclause=sa.and_(
+                                wise_db.thumbnails_table.c.media_id == cte.c.media_id,
+                                wise_db.thumbnails_table.c.timestamp == cte.c.timestamp,
+                            ),
+                            isouter=True,
+                        )
+                    )
+                    .where(wise_db.thumbnails_table.c.id == None)
+                )
+
+            run = wise_db.prepare_filter_stmt(
+                wise_db.thumbnails_table,
+                thumbnail_columns,
+                get_thumbnail_ids_to_copy_stmt,
+            )
+
+            def get_thumbnail_ids_to_copy(conn: sa.Connection, batch_thumbnails: list):
+                mapped_batch_thumbnails = [
+                    (x[0], media_id_map[x[1]], x[2]) for x in batch_thumbnails
+                ]
+                _needs_copy = run(conn, mapped_batch_thumbnails).scalars().all()
+                return _needs_copy
+
+            return thumbs_row_query, get_thumbnail_ids_to_copy
+
+        def get_handle_new_thumbnail_fn():
+
+            def get_thumbnails_by_ids_stmt(cte: sa.CTE):
+                return (
+                    sa.select(wise_db.thumbnails_table)
+                    .select_from(
+                        cte.join(
+                            wise_db.thumbnails_table,
+                            onclause=wise_db.thumbnails_table.c.id == cte.c.id,
+                        )
+                    )
+                    .order_by(cte.c.rank)
+                )
+
+            run = wise_db.prepare_filter_stmt(
+                wise_db.thumbnails_table,
+                ["id"],
+                get_thumbnails_by_ids_stmt,
+                include_ordering=True,
+            )
+
+            def handle_new_thumbnail(
+                thumbs_conn: sa.Connection,
+                other_thumbs_conn: sa.Connection,
+                other_thumbnail_ids: list,
+            ):
+
+                other_thumbnails = (
+                    run(other_thumbs_conn, [(x,) for x in other_thumbnail_ids])
+                    .mappings()
+                    .all()
+                )
+
+                other_thumbnails = [
+                    dict(x) | NO_ID | {"media_id": media_id_map[x["media_id"]]}
+                    for x in other_thumbnails
+                ]
+                batch_insert(
+                    thumbs_conn,
+                    wise_db.thumbnails_table,
+                    other_thumbnails,
+                    return_ids=False,
+                )
+
+            return handle_new_thumbnail
+
+        batch_size = 2048
+        thumbnail_count = other.num_thumbnails
+        with (
+            self.thumbsdb_engine.connect() as thumbs_conn,
+            other.thumbsdb_engine.connect() as other_thumbs_conn,
+            tqdm(
+                total=thumbnail_count,
+                desc="Processing Thumbnails",
+            ) as pbar,
+        ):
+            _needs_copy = []
+            thumbnail_row_query, get_thumbnail_ids_to_copy = (
+                get_matching_thumbnails_fn()
+            )
+            for batch_thumbnail in batch_select(
+                other_thumbs_conn, thumbnail_row_query, batch_size=batch_size
+            ):
+                _needs_copy_batch = get_thumbnail_ids_to_copy(
+                    thumbs_conn, batch_thumbnail
+                )
+                _needs_copy.extend(_needs_copy_batch)
+                pbar.update(len(batch_thumbnail))
+
+        with (
+            self.thumbsdb_engine.connect() as thumbs_conn,
+            other.thumbsdb_engine.connect() as other_thumbs_conn,
+            tqdm(
+                total=len(_needs_copy),
+                desc="Copying Thumbnails",
+            ) as pbar,
+        ):
+            handle_new_thumbnail = get_handle_new_thumbnail_fn()
+            for batch_thumbs in batched(_needs_copy, batch_size):
+                handle_new_thumbnail(thumbs_conn, other_thumbs_conn, batch_thumbs)
+                if not dry_run:
+                    thumbs_conn.commit()
+                pbar.update(len(batch_thumbs))
+
+        logger.info("thumbnails copied over")
+
+        def get_last_vector_timestamps(conn: sa.Connection):
+            vector_timestamp_limits = {}
+
+            result = conn.execute(
+                sa.select(
+                    wise_db.vectors_table.c.media_id,
+                    wise_db.vectors_table.c.modality,
+                    wise_db.vectors_table.c.feature_extractor_id,
+                    sa.func.max(wise_db.vectors_table.c.timestamp),
+                )
+                .group_by(
+                    wise_db.vectors_table.c.media_id,
+                    wise_db.vectors_table.c.modality,
+                    wise_db.vectors_table.c.feature_extractor_id,
+                )
+                .order_by(wise_db.vectors_table.c.media_id.asc())
+            )
+            for media_id, modality, feature_extractor_id, timestamp in result.all():
+                vector_timestamp_limits[(media_id, modality, feature_extractor_id)] = (
+                    timestamp
+                )
+
+            return vector_timestamp_limits
+
+        with self.db_engine.connect() as conn:
+            min_time_stamp_per_media_id = get_last_vector_timestamps(conn)
+        logger.debug(f"vector timestamp - {min_time_stamp_per_media_id}")
+
+        def copy_vectors(
+            conn: sa.Connection,
+            other_conn: sa.Connection,
+            media_type: ModalityType,
+            feature_extractor_id: str,
+            other_store: FeatureStore,
+        ):
+            logger.info(
+                f"copying for feature_extractor - {feature_extractor_id} ({media_type})"
+            )
+            feature_count = other_store.feature_count
+            self.create_features_dir(feature_extractor_id)
+            try:
+                store = FeatureStoreFactory.load_store(
+                    media_type, self.features_dir(feature_extractor_id)
+                )
+            except ValueError:
+                store = FeatureStoreFactory.create_store(
+                    FeatureStoreType.FAISS,
+                    media_type,
+                    self.features_dir(feature_extractor_id),
+                )
+            store.enable_write()
+
+            feature_extractor_cls = get_feature_extractor_class(feature_extractor_id)
+
+            if store.__class__.__name__ == "FaissFeatureStore":
+
+                def add_to_store(feature_ids, features):
+                    store.add(feature_ids, features)
+
+            else:
+
+                def add_to_store(feature_ids, features):
+                    for fid, feat in zip(feature_ids, features):
+                        store.add(fid, np.expand_dims(feat, axis=0))
+
+            total_copied = 0
+            batch_size = 4096
+
+            def get_handle_new_vectors_fn():
+                def get_vectors_by_ids_stmt(cte: sa.CTE):
+                    return (
+                        sa.select(wise_db.vectors_table)
+                        .select_from(
+                            cte.join(
+                                wise_db.vectors_table,
+                                onclause=wise_db.vectors_table.c.id == cte.c.id,
+                            )
+                        )
+                        .order_by(cte.c.rank)
+                    )
+
+                run = wise_db.prepare_filter_stmt(
+                    wise_db.vectors_table,
+                    ["id"],
+                    get_vectors_by_ids_stmt,
+                    include_ordering=True,
+                )
+
+                def handle_new_vectors(
+                    conn: sa.Connection,
+                    other_conn: sa.Connection,
+                    other_vector_ids: np.ndarray,
+                    other_features: np.ndarray,
+                ):
+                    feature_id_list = other_vector_ids.tolist()
+                    other_vectors = (
+                        run(other_conn, [(x,) for x in feature_id_list])
+                        .mappings()
+                        .all()
+                    )
+                    other_vectors = {r["id"]: dict(r) for r in other_vectors}
+
+                    other_vectors = {
+                        k: v
+                        | {
+                            "media_id": media_id_map[v["media_id"]],
+                            "feature_extractor_id": feature_extractor_id,
+                        }
+                        for k, v in other_vectors.items()
+                    }
+
+                    _needs_copy = []
+                    _copy_idx = []
+                    for idx, feature_id in enumerate(feature_id_list):
+                        if feature_id not in other_vectors:
+                            logger.debug("skipping missing vector")
+                            continue
+
+                        vector = other_vectors[feature_id]
+                        new_media_id = vector["media_id"]
+                        min_ts = min_time_stamp_per_media_id.get(
+                            (new_media_id, media_type, feature_extractor_id),
+                            min_time_stamp_per_media_id.get(
+                                (new_media_id, media_type, ""), -1
+                            ),
+                        )
+                        if vector["timestamp"] <= min_ts:
+                            continue
+
+                        _needs_copy.append(feature_id)
+                        _copy_idx.append(idx)
+
+                    if _needs_copy:
+                        # bulk insert and get new ids
+                        vectors_to_insert = [
+                            other_vectors[oid] | NO_ID for oid in _needs_copy
+                        ]
+                        new_vector_ids = batch_insert(
+                            conn, wise_db.vectors_table, vectors_to_insert
+                        )
+                        # copy to store
+                        add_to_store(new_vector_ids, other_features[_copy_idx])
+
+                        ext_vector_metadata = feature_extractor_cls.get_vector_metadata(
+                            other_conn, _needs_copy
+                        )
+                        feature_extractor_cls.add_to_vector_metadata_table(
+                            conn, new_vector_ids, ext_vector_metadata
+                        )
+                    return len(_needs_copy)
+
+                return handle_new_vectors
+
+            handle_new_vectors = get_handle_new_vectors_fn()
+            try:
+                with (
+                    tqdm(total=feature_count, desc="Processing vectors") as pbar,
+                ):
+                    for feature_ids, features in other_store.iter_batch(batch_size):
+
+                        total_copied += handle_new_vectors(
+                            conn, other_conn, feature_ids, features
+                        )
+                        if not dry_run:
+                            conn.commit()
+
+                        pbar.update(len(feature_ids))
+            finally:
+                store.close()
+            logger.info(
+                f"copied {total_copied} vectors over for feature extractor - {feature_extractor_id} ({media_type})"
+            )
+
+        with (
+            self.db_engine.connect() as conn,
+            other.db_engine.connect() as other_conn,
+        ):
+            for media_type in supported_assets:
+                for feature_extractor_id in supported_assets[media_type]:
                     other_store = FeatureStoreFactory.load_store(
-                        modality_type, other.features_dir(feature_extractor_id)
+                        media_type, other.features_dir(feature_extractor_id)
                     )
                     copy_vectors(
-                        modality_type, feature_extractor_id, other_store
+                        conn, other_conn, media_type, feature_extractor_id, other_store
                     )
+                    if not dry_run:
+                        conn.commit()
 
         # merge tables in database
     def merge(self, other: "WiseProject", dry_run: bool = True):
@@ -1350,7 +1741,12 @@ class WiseProject:
                                 p.unlink(missing_ok=True)
 
         def cleanup_tables():
-            def delete_rows_from_id(table, _id):
+
+            def delete_rows_from_id(table: sa.Table, _id):
+                if _id is None:
+                    return
+
+                logger.info(f"deleting rows from {table.name} with id > {_id}")
                 with self.db_engine.connect() as conn:
                     res = conn.execute(
                         sa.delete(
@@ -1407,10 +1803,10 @@ if __name__ == "__main__":
 
     @app.command()
     def merge(
-        other_projects: list[str] = typer.Argument(
+        other_projects: list[Path] = typer.Argument(
             ..., help="the source project directory to merge from"
         ),
-        into: str = typer.Option(..., help="the target project directory"),
+        into: Path = typer.Option(..., help="the target project directory"),
         dry_run: bool = typer.Option(False, help="if set, will not make any changes"),
     ):
         """

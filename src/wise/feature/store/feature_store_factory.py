@@ -46,7 +46,9 @@ class FeatureStoreFactory:
         # infer the store type
         shard_suffixes = set([p.suffix for p in features_dir.glob(store_name_prefix + '-*')])
         if len(shard_suffixes) == 0:
-            raise ValueError(f"found no feature store files '{features_dir}{store_name_prefix}-*'")
+            raise ValueError(
+                f"found no feature store files '{features_dir}/{store_name_prefix}-*'"
+            )
         elif len(shard_suffixes) > 1:
             raise ValueError(f"failed to infer type of '{features_dir}/{store_name_prefix}-*' feature store files because there are multiple file types present ({shard_suffixes})")
 
