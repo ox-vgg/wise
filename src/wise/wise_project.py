@@ -23,9 +23,9 @@ import sqlite3
 from collections import defaultdict
 from functools import cached_property
 from pathlib import Path
-from typing import Callable
+from functools import partial
 
-from wise.utils import batched, profiled
+from wise.utils import batched
 
 import numpy as np
 import sqlalchemy as sa
@@ -35,12 +35,10 @@ from tqdm import tqdm
 from wise import db as wise_db
 from wise.data_models import (
     DatasetPayload,
-    MediaMetadata,
     MediaMetadataWithSource,
     MediaType,
     ModalityType,
     SourceCollection,
-    ThumbnailMetadata,
     VectorAndMediaMetadata,
     VideoShot,
 )
@@ -54,11 +52,7 @@ from wise.feature.store import (
 from wise.index.search_index import SearchIndex
 from wise.index.search_index_factory import SearchIndexFactory
 from wise.repository import (
-    MediaRepo,
     SourceCollectionRepo,
-    ThumbnailRepo,
-    VectorRepo,
-    VideoShotsRepo,
 )
 from wise.search.fts import FTSSearch
 
@@ -1161,7 +1155,6 @@ class WiseProject:
         def handle_source_collection(
             conn: sa.Connection, other_source_collection: SourceCollection
         ):
-
             # Find the source collection by location and type in the destination project
             existing_source_collection_id = conn.execute(
                 sa.select(wise_db.source_collections_table.c.id).where(
@@ -1191,6 +1184,7 @@ class WiseProject:
             return other_source_collection.id, existing_source_collection_id
 
         # Update source collection
+        # if an equivalent source collection exists, use that id. Else create a new one and use that id
         source_collection_id_map = {}
         with (
             self.db_engine.connect() as conn,
@@ -1209,9 +1203,11 @@ class WiseProject:
                     conn.commit()
                 pbar.update(len(batch_sc))
 
-        logger.info(f"Updated source collection map")
+        logger.info("Updated source collection map")
         logger.debug(f"{source_collection_id_map}")
 
+        # find matching media by checksum, path, size_in_bytes and the new source_collection_id
+        # if found, map the media_id to the existing media_id. Else return id to be copied over
         def get_match_media_fn():
             # columns to filter and match against
             media_columns = [
@@ -1241,6 +1237,11 @@ class WiseProject:
                     )
                 )
 
+            # run is a function that
+            # iterates over an incoming batch of media from the "other" project and
+            # returns a mapping of other media_id to existing media_id in the current project
+            # using the prepared statement above. if no match is found, the existing media_id will be None
+            # and the row will be copied over to the current project in the next step
             run = wise_db.prepare_filter_stmt(
                 wise_db.media_table,
                 media_columns,
@@ -1250,7 +1251,11 @@ class WiseProject:
             def find_matching_media(conn: sa.Connection, batch_media: list):
                 media_id_map = {}
                 _needs_copy = []
-                _id_map = run(conn, batch_media).all()
+                mapped_batch_media = [
+                    (x[0], source_collection_id_map[x[1]]) + tuple(x[2:])
+                    for x in batch_media
+                ]
+                _id_map = run(conn, mapped_batch_media).all()
                 assert len(_id_map) == len(batch_media)
                 for other_media_id, existing_media_id in _id_map:
                     if existing_media_id is not None:
@@ -1361,6 +1366,7 @@ class WiseProject:
             for batch_media in batch_select(
                 other_conn, media_row_query, batch_size=batch_size
             ):
+                # map the source collection ids to the new project
                 media_id_map_batch, needs_copy_batch = find_matching_media(
                     conn, batch_media
                 )
@@ -1383,7 +1389,7 @@ class WiseProject:
                     conn.commit()
                 pbar.update(len(batch_media))
 
-        logger.info(f"Updated media map")
+        logger.info("Updated media map")
         logger.debug(f"{media_id_map}")
 
         def get_matching_thumbnails_fn():
@@ -1417,11 +1423,14 @@ class WiseProject:
                 get_thumbnail_ids_to_copy_stmt,
             )
 
-            def get_thumbnial_ids_to_copy(conn: sa.Connection, batch_thumbnails: list):
-                _needs_copy = run(conn, batch_thumbnails).scalars().all()
+            def get_thumbnail_ids_to_copy(conn: sa.Connection, batch_thumbnails: list):
+                mapped_batch_thumbnails = [
+                    (x[0], media_id_map[x[1]], x[2]) for x in batch_thumbnails
+                ]
+                _needs_copy = run(conn, mapped_batch_thumbnails).scalars().all()
                 return _needs_copy
 
-            return thumbs_row_query, get_thumbnial_ids_to_copy
+            return thumbs_row_query, get_thumbnail_ids_to_copy
 
         def get_handle_new_thumbnail_fn():
 
@@ -1480,13 +1489,13 @@ class WiseProject:
             ) as pbar,
         ):
             _needs_copy = []
-            thumbnail_row_query, get_thumbanil_ids_to_copy = (
+            thumbnail_row_query, get_thumbnail_ids_to_copy = (
                 get_matching_thumbnails_fn()
             )
             for batch_thumbnail in batch_select(
                 other_thumbs_conn, thumbnail_row_query, batch_size=batch_size
             ):
-                _needs_copy_batch = get_thumbanil_ids_to_copy(
+                _needs_copy_batch = get_thumbnail_ids_to_copy(
                     thumbs_conn, batch_thumbnail
                 )
                 _needs_copy.extend(_needs_copy_batch)
@@ -1507,7 +1516,7 @@ class WiseProject:
                     thumbs_conn.commit()
                 pbar.update(len(batch_thumbs))
 
-        logger.info(f"thumbnails copied over")
+        logger.info("thumbnails copied over")
 
         def get_last_vector_timestamps(conn: sa.Connection):
             vector_timestamp_limits = {}
@@ -1540,7 +1549,7 @@ class WiseProject:
         def copy_vectors(
             conn: sa.Connection,
             other_conn: sa.Connection,
-            media_type: str,
+            media_type: ModalityType,
             feature_extractor_id: str,
             other_store: FeatureStore,
         ):
@@ -1555,7 +1564,9 @@ class WiseProject:
                 )
             except ValueError:
                 store = FeatureStoreFactory.create_store(
-                    "faiss", media_type, self.features_dir(feature_extractor_id)
+                    FeatureStoreType.FAISS,
+                    media_type,
+                    self.features_dir(feature_extractor_id),
                 )
             store.enable_write()
 
@@ -1792,10 +1803,10 @@ if __name__ == "__main__":
 
     @app.command()
     def merge(
-        other_projects: list[str] = typer.Argument(
+        other_projects: list[Path] = typer.Argument(
             ..., help="the source project directory to merge from"
         ),
-        into: str = typer.Option(..., help="the target project directory"),
+        into: Path = typer.Option(..., help="the target project directory"),
         dry_run: bool = typer.Option(False, help="if set, will not make any changes"),
     ):
         """
