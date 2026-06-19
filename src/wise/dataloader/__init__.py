@@ -30,3 +30,4 @@ from wise.dataloader.dataset import (
     get_metadata_for_valid_files,
 )
 from wise.dataloader.shot import ShotStream
+from wise.dataloader.video_segment_dataset import VideoSegmentDataset

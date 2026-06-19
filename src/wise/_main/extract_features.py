@@ -53,6 +53,7 @@ from wise.feature.feature_extractor_factory import (
     FeatureExtractorFactory,
     get_canonical_feature_extractor_id,
 )
+from wise.feature.hf_models import get_segment_params, is_segment_level_extractor
 from wise.feature.store import (
     FeatureStore,
     FeatureStoreFactory,
@@ -138,6 +139,12 @@ def initialise_feature_extractors(
 
     return feature_extractors, feature_stores
 
+def _is_segment_level_video_run(feature_extractors: dict[ModalityType, dict[str, FeatureExtractor]]) -> bool:
+    """Return True if all video extractors are segment-level (Qwen3-VL style)."""
+    video_ids = list(feature_extractors.get(ModalityType.VIDEO, {}).keys())
+    return bool(video_ids) and all(is_segment_level_extractor(fid) for fid in video_ids)
+
+
 def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureExtractor]], thumbnails: bool) -> dict:
     ## dataset
     ## TODO move parameters to args / config
@@ -148,20 +155,36 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
     audio_segment_length = segment_length  # seconds
     audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
 
+    # Segment-level video (e.g. Qwen3-VL) uses VideoSegmentDataset directly;
+    # pass zeros so the standard AVDataset/VideoDataset skips video streams.
+    segment_level = _is_segment_level_video_run(feature_extractors)
+
     params = {
         "video_frames_per_chunk": (
-            video_frames_per_chunk if ModalityType.VIDEO in feature_extractors else 0
+            0 if segment_level else
+            (video_frames_per_chunk if ModalityType.VIDEO in feature_extractors else 0)
         ),
         "video_frame_rate": video_frame_rate,
         "video_preprocessing_function_map": (
-            {
-                feature_extractor_id: feature_extractors[ModalityType.VIDEO][
-                    feature_extractor_id
-                ].preprocess_image
-                for feature_extractor_id in feature_extractors.get(
-                    ModalityType.VIDEO, {}
-                )
-            }
+            (
+                {
+                    feature_extractor_id: feature_extractors[ModalityType.VIDEO][
+                        feature_extractor_id
+                    ].preprocess_video_segment
+                    for feature_extractor_id in feature_extractors.get(
+                        ModalityType.VIDEO, {}
+                    )
+                }
+                if segment_level
+                else {
+                    feature_extractor_id: feature_extractors[ModalityType.VIDEO][
+                        feature_extractor_id
+                    ].preprocess_image
+                    for feature_extractor_id in feature_extractors.get(
+                        ModalityType.VIDEO, {}
+                    )
+                }
+            )
             if ModalityType.VIDEO in feature_extractors
             else None
         ),
@@ -195,10 +218,26 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
         ),
         "offset": None,
         "thumbnails": thumbnails,
+        # Segment-level params (used by get_dataset_stream)
+        "_segment_level": segment_level,
+        "_segment_video_ids": list(feature_extractors.get(ModalityType.VIDEO, {}).keys()),
+        "_segment_video_files": None,  # filled in by caller
     }
 
-    logger.info(f"Dataset parameters: {pprint.pformat(params)}")
-    return params, segment_length
+    if segment_level:
+        seg_ids = list(feature_extractors.get(ModalityType.VIDEO, {}).keys())
+        seg_p = get_segment_params(seg_ids[0]) if seg_ids else {}
+        _log_params = {
+            **params,
+            "video_frame_rate": seg_p.get("segment_num_frames", 0) / seg_p.get("segment_duration", 1),
+            "video_frames_per_chunk": seg_p.get("segment_num_frames", 0),
+            "segment_duration": seg_p.get("segment_duration"),
+            "segment_overlap": seg_p.get("segment_overlap"),
+        }
+    else:
+        _log_params = params
+    logger.info(f"Dataset parameters: {pprint.pformat(_log_params)}")
+    return params, segment_length, segment_level
 
 def get_dataset_stream(
     project: WiseProject,
@@ -206,9 +245,40 @@ def get_dataset_stream(
     params: dict,
     use_shots: bool,
 ):
-    uniform_stream = torch_data.ChainDataset(
-        get_dataset(all_metadata, params)
-    )
+    # Pop internal segment-level keys before passing params to standard get_dataset
+    segment_level = params.pop("_segment_level", False)
+    segment_video_ids = params.pop("_segment_video_ids", [])
+    params.pop("_segment_video_files", None)
+
+    datasets = get_dataset(all_metadata, params)
+
+    if segment_level and segment_video_ids:
+        from wise.dataloader.video_segment_dataset import VideoSegmentDataset
+
+        # Build the per-file dict for video/AV files only
+        video_files: dict[str, str] = {
+            x.id: x.path
+            for x in all_metadata
+            if x.media_type in (SourceMediaType.VIDEO, SourceMediaType.AV)
+        }
+
+        # Derive segment params from the first segment-level video extractor id
+        seg_params = get_segment_params(segment_video_ids[0])
+
+        preprocessing_map = params["video_preprocessing_function_map"]
+
+        if video_files:
+            seg_dataset = VideoSegmentDataset(
+                input_files=video_files,
+                segment_duration=seg_params["segment_duration"],
+                segment_overlap=seg_params["segment_overlap"],
+                num_frames_per_segment=seg_params["segment_num_frames"],
+                preprocessing_function_map=preprocessing_map,
+                thumbnails=params.get("thumbnails", True),
+            )
+            datasets = list(datasets) + [seg_dataset]
+
+    uniform_stream = torch_data.ChainDataset(datasets)
     if use_shots:
         logger.info("Extracting features from center frame of each shot in videos")
         shots = project.get_shots()
@@ -694,6 +764,33 @@ def main(argv: list[str]):
             )
         exit(0)
 
+    # Validate: frame-level and segment-level video extractors must not be mixed
+    video_ids = feature_extractor_ids.get(ModalityType.VIDEO, [])
+    has_segment = any(is_segment_level_extractor(fid) for fid in video_ids)
+    has_frame = any(not is_segment_level_extractor(fid) for fid in video_ids)
+    if has_segment and has_frame:
+        logger.error(
+            "Frame-level and segment-level video feature extractors cannot be "
+            "combined in a single run. Please run extract-features.py separately "
+            "for each type."
+        )
+        exit(1)
+
+    if has_segment:
+        segment_ids = [fid for fid in video_ids if is_segment_level_extractor(fid)]
+        logger.warning(
+            "EXPERIMENTAL: Video segment-based feature extraction is not yet stable "
+            "(extractor(s): %s)", ", ".join(segment_ids)
+        )
+
+    if has_segment and args.use_shots:
+        segment_ids = [fid for fid in video_ids if is_segment_level_extractor(fid)]
+        logger.error(
+            "--use-shots is not yet supported for video segment-based feature extractors: "
+            + ", ".join(segment_ids)
+        )
+        exit(1)
+
     feature_extractors, feature_stores = initialise_feature_extractors(
         project,
         feature_extractor_ids,
@@ -703,7 +800,7 @@ def main(argv: list[str]):
         db_engine,
     )
 
-    params, segment_length = get_dataset_params(feature_extractors, args.thumbnails)
+    params, segment_length, _segment_level_run = get_dataset_params(feature_extractors, args.thumbnails)
     stream = get_dataset_stream(project, all_metadata, params, args.use_shots)
     av_data_loader = get_dataloader(stream, args.num_workers)
 
@@ -739,13 +836,20 @@ def main(argv: list[str]):
             feature_extractor = feature_extractors[media_type][feature_extractor_id]
             feature_store = feature_stores[media_type][feature_extractor_id]
 
-            if media_type == "image" or media_type == "video":
+            if media_type == MediaType.VIDEO and _segment_level_run:
+                # Segment-level video extractor (e.g. Qwen3-VL): one vector per segment
+                segment_feature = feature_extractor.extract_video_segment_features(
+                    segment_tensor
+                )
+                pbar.update(1)
+
+            elif media_type == MediaType.IMAGE or media_type == MediaType.VIDEO:
                 segment_feature = feature_extractor.extract_image_features(
                     segment_tensor
                 )
                 pbar.update(segment_tensor.shape[0])
 
-            elif media_type == "audio":
+            elif media_type == MediaType.AUDIO:
                 if segment_tensor.shape[2] < audio_frames_per_chunk:
                     # we discard any malformed audio segments
                     return
@@ -757,7 +861,21 @@ def main(argv: list[str]):
                 raise ValueError(f"Unknown media_type {media_type}")
 
             # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
-            if media_type == MediaType.VIDEO or media_type == MediaType.IMAGE:
+            if _segment_level_run and media_type == MediaType.VIDEO:
+                # Store one vector for the whole segment with (timestamp, end_timestamp)
+                feature_metadata = VectorRepo.create(
+                    conn,
+                    data=VectorMetadata(
+                        modality=media_type,
+                        feature_extractor_id=feature_extractor_id,
+                        media_id=mid,
+                        timestamp=segment_pts,
+                        end_timestamp=chunk.end_pts,
+                    ),
+                )
+                feature_store.add(feature_metadata.id, segment_feature.vectors)
+            elif media_type == MediaType.IMAGE or media_type == MediaType.VIDEO:
+                # Frame-level: one vector per frame (image or frame-level video)
                 for frame_idx, frame_features in enumerate(segment_feature):
                     vector_ids: list[int] = []
                     if type(segment_pts) is list and args.use_shots:
@@ -786,7 +904,7 @@ def main(argv: list[str]):
                         conn, vector_ids, frame_features.metadata
                     )
             else:
-                # Add whole segment
+                # Add whole segment (audio)
                 _start_time = segment_pts
                 _end_time = segment_pts + audio_segment_length
                 feature_metadata = VectorRepo.create(

@@ -176,6 +176,7 @@ def JpegTransform(x: torch.Tensor):
 class MediaChunk:
     tensor: torch.Tensor | list[torch.Tensor]
     pts: float
+    end_pts: float | None = None
 
 
 def validate_segment_lengths_from_options(stream_opts: list[StreamOutputOptions]):
