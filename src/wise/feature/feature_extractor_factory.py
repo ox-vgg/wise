@@ -99,6 +99,11 @@ def get_feature_extractor_class(_id: str):
 
         return InsightFaceAverageFeatureExtractor
 
+    if _id.startswith("hf/Qwen/Qwen3-VL-Embedding/"):
+        from wise.feature.qwen3vl import Qwen3VLEmbeddingFeatureExtractor
+
+        return Qwen3VLEmbeddingFeatureExtractor
+
     if _id.startswith("hf/"):
         from wise.feature.hf_feature_extractor import (
             HFMultiModalFeatureExtractor,

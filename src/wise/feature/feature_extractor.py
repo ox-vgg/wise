@@ -357,6 +357,21 @@ class FeatureExtractor:
         raise NotImplementedError
 
 
+    def extract_video_segment_features(self, frames: torch.Tensor) -> Features:
+        """Extract a single embedding for a multi-frame video segment.
+
+        Parameters
+        ----------
+        frames : torch.Tensor
+            Tensor of shape (N, C, H, W) — N frames from one temporal segment.
+
+        Returns
+        -------
+        Features
+            One embedding vector representing the entire segment.
+        """
+        raise NotImplementedError
+
     def preprocess_text(self, text: str) -> str:
         raise NotImplementedError
 
