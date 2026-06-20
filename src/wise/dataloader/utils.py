@@ -74,13 +74,13 @@ def get_mime_type(p: Path):
         mimetype = m.mime
         # extension possibly unseen, keep it for next time
         SEEN_EXTENSIONS[extension] = mimetype
-        logger.debug(f"Adding {extension} for {mimetype} to known list")
+        logger.debug("Adding '%s' for '%s' to known list", extension, mimetype)
         return mimetype
 
     # Fallback to python-magic
     logger.debug("Falling back to magic...")
     mimetype = magic.from_file(p, mime=True)
-    logger.debug(f"Mime for {p} from magic: {mimetype}")
+    logger.debug("Mime for '%s' from magic: '%s'", p, mimetype)
     return mimetype
 
 

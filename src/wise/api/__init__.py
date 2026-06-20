@@ -122,7 +122,7 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
                 else:
                     return await call_next(request)
 
-    logger.info(f"Loading html user interface from {theme_asset_dir}")
+    logger.info("Loading html user interface from '%s'", theme_asset_dir)
     app.include_router(setup_routers(config))
 
     app.mount(

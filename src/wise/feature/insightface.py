@@ -241,7 +241,7 @@ class InsightFaceModel(MultiModalModel):
         ## third element --- the fourth is ignored).  If that fails,
         ## then we try the Hugging Face Hub with both elements.
 
-        _logger.info(f"Initialising model {self.model_id}")
+        _logger.info("Initialising model %s", self.model_id)
         insightface_model_id = self.model_id.split("/", maxsplit=1)[0]
         huggingface_hub_model_id = self.model_id
 

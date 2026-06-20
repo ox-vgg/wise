@@ -95,7 +95,9 @@ class MicrosoftClapModel(MultiModalModel):
     def _clap_wrapper(self):
         use_cuda = self.DEVICE.type == 'cuda'
         logger.info(
-            f"Initialising microsoft/clap (version={self.model_id}, use_cuda={use_cuda})"
+            "Initialising microsoft/clap (version=%s, use_cuda=%s)",
+            self.model_id,
+            use_cuda,
         )
         instance = CLAP(version=self.model_id, use_cuda=use_cuda)
         instance.clap.to(self.DEVICE)
@@ -105,7 +107,7 @@ class MicrosoftClapModel(MultiModalModel):
             backend = "inductor"
             if "tensorrt" in available_backends:
                 backend = "tensorrt"
-            logger.info(f"Compiling model with backend {backend}")
+            logger.info("Compiling model with backend %s", backend)
             instance.clap.compile(mode="reduce-overhead", backend=backend)
         return instance
 
@@ -149,7 +151,7 @@ class MicrosoftClapModel(MultiModalModel):
         model = self.model
         model.eval()
 
-        logger.info(f"Exporting audio model")
+        logger.info("Exporting audio model")
         output_path = Path(f"{save_path}--audio")
         output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "model.onnx"
@@ -180,7 +182,7 @@ class MicrosoftClapModel(MultiModalModel):
             opset_version=20,
             report=True,
         )
-        logger.info(f"Successfully exported audio model to {output_path}")
+        logger.info("Successfully exported audio model to '%s'", output_path)
 
         class CustomTextEncoder(torch.nn.Module):
             def __init__(self, model):
@@ -194,7 +196,7 @@ class MicrosoftClapModel(MultiModalModel):
                 }
                 return self.caption_encoder(x)
 
-        logger.info(f"Exporting text model")
+        logger.info("Exporting text model")
         output_path = Path(f"{save_path}--text")
         output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "model.onnx"
@@ -213,7 +215,7 @@ class MicrosoftClapModel(MultiModalModel):
             dynamo=True,
             verify=True,
         )
-        logger.info(f"Successfully exported text model to {output_path}")
+        logger.info("Successfully exported text model to %s", output_path)
 
 class MicrosoftClapFeatureExtractor(FeatureExtractor):
     """

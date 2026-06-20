@@ -44,7 +44,7 @@ def create_fts_index(project, args):
     with fts_config.open() as f:
         fts_tables_columns = json.load(f)
 
-    logger.info(f'creating fts index with config {fts_tables_columns}')
+    logger.info("Creating fts index with config %s", fts_tables_columns)
     project_engine = project.db_engine
     db.reflect_external_metadata(project_engine)
     try:

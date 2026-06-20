@@ -150,7 +150,10 @@ def _update_video_info(streamer: StreamReader, video_stream_info):
     fps: Optional[float] = video_stream_info.frame_rate
 
     logger.debug(
-        f"Initial values - FPS: {fps}, duration: {duration}, n_images: {n_images}"
+        "Initial values - FPS: %s, duration: %s, n_images: %s",
+        fps,
+        duration,
+        n_images,
     )
     if n_images is None:
         logger.debug("Guessing n_images")
@@ -171,19 +174,19 @@ def _update_video_info(streamer: StreamReader, video_stream_info):
             for _ in streamer.stream():
                 n_images += 1
 
-        logger.debug(f"Num images: {n_images}")
+        logger.debug("Num images: %d", n_images)
 
     if not fps:
         # Guess from n_images and duration
         if duration:
             fps = n_images / duration
-        logger.debug(f"FPS: {fps}")
+        logger.debug("FPS: %f", fps)
 
     if not duration:
         # Guess from fps and n_images
         if fps:
             duration = n_images / fps
-        logger.debug(f"Duration: {duration}")
+        logger.debug("Duration: %d", duration)
 
     video_stream_info.frame_rate = fps
     video_stream_info.num_frames = n_images
@@ -214,10 +217,12 @@ def get_media_info(url: str, guess_missing_video_info: bool = False):
 def get_stream_reader(url: str, output_stream_opts: list[BaseStreamOutputOptions] = []) -> StreamReader:
     streamer = StreamReader(url)
 
-    logger.debug(f"StreamReader: (metadata) {streamer.get_metadata()}")
-    logger.debug(f"StreamReader: {url} contains {streamer.num_src_streams} streams")
+    logger.debug("StreamReader: (metadata) %s", streamer.get_metadata())
+    logger.debug(
+        "StreamReader: %s contains %s streams", url, streamer.num_src_streams
+    )
     for i in range(streamer.num_src_streams):
-        logger.debug(f"{i}: {streamer.get_src_stream_info(i)}")
+        logger.debug("%d: %s", i, streamer.get_src_stream_info(i))
 
     for opts in output_stream_opts:
         # Add output video stream
@@ -233,9 +238,9 @@ def get_stream_reader(url: str, output_stream_opts: list[BaseStreamOutputOptions
         else:
             streamer.add_basic_audio_stream(**_stream_opts)
 
-    logger.debug(f"StreamReader: {streamer.num_out_streams} output stream(s)")
+    logger.debug("StreamReader: %d output stream(s)", streamer.num_out_streams)
     for i in range(streamer.num_out_streams):
-        logger.debug(f"Output stream {i}: {streamer.get_out_stream_info(i)}")
+        logger.debug("Output stream %d: %s", i, streamer.get_out_stream_info(i))
 
     return streamer
 

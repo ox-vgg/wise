@@ -249,7 +249,11 @@ class TransformersOWLv2Model(MultiModalModel):
         """
         Returns the OWLv2ForObjectDetection model instance.
         """
-        logger.info(f"Initialising OWLv2 model {self.model_id} on device {self.DEVICE}")
+        logger.info(
+            "Initialising OWLv2 model %s on device %s",
+            self.model_id,
+            self.DEVICE,
+        )
         _model = Owlv2ForObjectDetection.from_pretrained(
             self.model_id, **self.model_kwargs
         ).to(self.DEVICE)
@@ -259,7 +263,7 @@ class TransformersOWLv2Model(MultiModalModel):
             backend = "inductor"
             if "tensorrt" in available_backends:
                 backend = "tensorrt"
-            logger.info(f"Compiling model with backend {backend}")
+            logger.info("Compiling model with backend %s", backend)
             _model.compile(mode="reduce-overhead", backend=backend)
         return _model
 
@@ -309,7 +313,7 @@ class TransformersOWLv2Model(MultiModalModel):
         model = self.model
         model.eval()
 
-        logger.info(f"Exporting vision model...")
+        logger.info("Exporting vision model...")
         output_path = Path(f"{save_path}--image")
         output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "model.onnx"
@@ -347,7 +351,7 @@ class TransformersOWLv2Model(MultiModalModel):
             report=True,
         )
 
-        logger.info(f"Successfully exported vision model to {output_path}")
+        logger.info("Successfully exported vision model to '%s'", output_path)
 
         class CustomOWLv2TextModel(torch.nn.Module):
             def __init__(self, model):
@@ -361,7 +365,7 @@ class TransformersOWLv2Model(MultiModalModel):
         custom_text_model.eval()
         # custom_text_model(*text_inputs)
 
-        logger.info(f"Exporting text model")
+        logger.info("Exporting text model")
         output_path = Path(f"{save_path}--text")
         output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "model.onnx"
@@ -383,7 +387,7 @@ class TransformersOWLv2Model(MultiModalModel):
             dynamo=True,
             verify=True,
         )
-        logger.info(f"Successfully exported text model to {output_path}")
+        logger.info("Successfully exported text model to '%s'", output_path)
 
 
 class TransformersOWLv2FeatureExtractor(FeatureExtractor):

@@ -60,7 +60,7 @@ def get_input_transform_for_model(clip_model):
         )
 
     model_name, _ = clip_model.value.split(":", 1)
-    logger.info(f"Loading CLIP (model: {model_name})...")
+    logger.info("Loading CLIP (model: %s)...", model_name)
     model = open_clip.create_model(model_name, None)
     preprocess = open_clip.transform.image_transform_v2(
         open_clip.transform.PreprocessCfg(**model.visual.preprocess_cfg),
