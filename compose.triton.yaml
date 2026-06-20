@@ -9,7 +9,7 @@ services:
     
     environment:
       HF_HOME: "/cache/"
-      PYTHONPATH: "/workspace/:"
+      PYTHONPATH: "/workspace/wise/src/:"
     
     volumes:
       - ./triton/models:/models

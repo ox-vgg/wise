@@ -21,7 +21,7 @@ import yaml
 import triton_python_backend_utils as pb_utils
 import torch
 from torch.utils.dlpack import from_dlpack
-import wise.src.feature as wise_feature
+import wise.feature as wise_feature
 
 
 class TritonPythonModel:
