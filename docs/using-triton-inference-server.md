@@ -52,13 +52,13 @@ We will provide a CLI / migrate to [PyTriton](https://triton-inference-server.gi
 ```bash
 FEATURE_ID='deepinsight/insightface/buffalo_l/_unknown'
 
-MODEL_DIR="triton/models/${FEATURE_ID#/#--}--image"
+MODEL_DIR="triton/models/${FEATURE_ID//\//--}--image"
 
 mkdir -p ${MODEL_DIR}/1
 (cd ${MODEL_DIR}/1 && ln -sf ../../model.py .)
 
 cat <<EOF > ${MODEL_DIR}/config.pbtxt
-name: "${FEATURE_ID#/#--}--image"
+name: "${FEATURE_ID//\//--}--image"
 backend: "python"
 max_batch_size: 0
 
