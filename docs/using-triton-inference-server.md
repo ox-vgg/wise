@@ -139,3 +139,48 @@ python3 -m wise.feature --feature-extractor mlfoundations/open_clip/ViT-L-16-Sig
 python3 -m wise.feature --feature-extractor microsoft/clap/2023/four-datasets onnx_models --verify --export --batch_size 1
 python3 -m wise.feature --feature-extractor transformers/owlv2/google/owlv2-large-patch14-ensemble output --verify --export
 ```
+
+## FAQ
+
+**1. Getting "No space left on device" error when running `venv-pack` / `conda-pack`**
+
+This usually happens when the default temporary directory does not have sufficient space to hold the packed env tar.
+
+The workaround is to set the environment variable `TMPDIR` (or `TEMP` or `TMP`) to point to a folder that has space.
+
+```bash
+mkdir -p /PATH/TO/FOLDER/WITH/ENOUGH/SPACE
+
+TMPDIR=/PATH/TO/FOLDER/WITH/ENOUGH/SPACE conda-pack ... # or venv-pack
+```
+
+*Note: Make sure to create the directory before setting TMPDIR to it, otherwise it will silently switch back to default directory*
+
+**2. CondaPackError: Files managed by conda were found to hav ebeen deleted / overwritten in the following packages**
+
+This happens when pip dependencies sometimes clobber the conda environment.
+
+The fix usually is to pack the env as-is and not let conda-pack do any kind of magic
+
+So if you see the following error
+```
+Collecting packages...
+CondaPackError: 
+Files managed by conda were found to have been deleted/overwritten in the
+following packages:
+
+- PACKAGE A X.Y.Z:
+    file1
+    file2
+    + N others
+- PACKAGE B U.V.W:
+    ...
+...
+
+This is usually due to `pip` uninstalling or clobbering conda managed files,
+resulting in an inconsistent environment. Please check your environment for
+conda/pip conflicts using `conda list`, and fix the environment by ensuring
+only one version of each package is installed (conda preferred).
+```
+
+Then try running the `conda-pack` command with `--ignore-missing-files` option. If it still fails, then try the `venv-pack` option
