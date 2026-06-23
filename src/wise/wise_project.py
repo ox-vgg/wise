@@ -1180,7 +1180,8 @@ class WiseProject:
             # if not found, create new. Else return existing id
             if existing_source_collection_id is None:
                 logger.debug(
-                    f"could not find source collection {other_source_collection} - copying over"
+                    "could not find source collection %s - copying over",
+                    other_source_collection
                 )
                 # none match, create new
                 existing_source_collection = SourceCollectionRepo.create(
@@ -1190,7 +1191,8 @@ class WiseProject:
 
             else:
                 logger.debug(
-                    f"found existing source collection at id - {existing_source_collection_id}"
+                    "found existing source collection at id - %s",
+                    existing_source_collection_id
                 )
 
             return other_source_collection.id, existing_source_collection_id
@@ -1700,7 +1702,10 @@ class WiseProject:
             finally:
                 store.close()
             logger.info(
-                f"copied {total_copied} vectors over for feature extractor - {feature_extractor_id} ({media_type})"
+                "copied %d vectors over for feature extractor - %s (%s)",
+                total_copied,
+                feature_extractor_id,
+                media_type,
             )
 
         with (
