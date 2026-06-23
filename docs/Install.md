@@ -59,27 +59,31 @@ pip install .
 
 #### FAISS Python package
 
-[FAISS](https://faiss.ai/) does not currently provide Python packages
-other than those in Conda.  There are currently three options:
+The [FAISS](https://faiss.ai/) Python package is named `faiss` but its
+official distribution on PyPI is named `faiss-cpu`, i.e., the
+`faiss-cpu` distribution installs the package named `faiss`.
 
-- Install one of the unofficial FAISS distributions, namely
-  [`faiss-cpu` on PyPI](https://pypi.org/project/faiss-cpu/)
+Currently, `requirements.txt` lists a requirement on `faiss-cpu`.  If
+you build FAISS from source, or if you install it with Conda, you will
+end up with the `faiss` package installed from a distribution named
+`faiss`.  The package installed from this distribution will then clash
+with the package installed from the `faiss-cpu` distribution (see
+[issue #232](https://gitlab.com/vgg/wise/wise/-/issues/232) for
+details).  To avoid issues, if you do not want to use the `faiss-cpu`
+distribution, you can either:
 
-- Install FAISS with Conda (the `faiss-cpu` Conda package is enough
-  since WISE does not use the GPU with FAISS);
+- uninstall `faiss-cpu` after installing wise and then install the
+  build of FAISS you want to use, or;
 
-- Build [FAISS from
-  source](https://github.com/facebookresearch/faiss/blob/main/INSTALL.md);
+- if you are installing wise from development sources, remove
+  `faiss-cpu` from the `requirements.txt`.
 
-Currently, `requirements.txt` lists a requirement on `faiss-cpu`.
-This is the name of the PyPI distribution that installs a `faiss`
-package.  If you build FAISS from source or if you install it with
-Conda, rename `faiss-cpu` on `requirements.txt` to `faiss` to avoid
-getting the package overwritten by the PyPI distribution.
+Note that WISE does not use the GPU with FAISS even if FAISS was built
+with GPU support so `faiss-cpu` is enough.
 
-Note that there is also a `faiss` Python distribution on PyPI.  That
-is an "unofficial" distribution of FAISS, unmaintained since 2019 and
-still in version 1.5.3.
+There is also a `faiss` Python distribution on PyPI.  That is an
+"unofficial" distribution of FAISS, unmaintained since 2019 and still
+in version 1.5.3.
 
 #### PyTorch (torch, torchvision, and torchaudio)
 

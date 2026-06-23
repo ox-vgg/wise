@@ -7,7 +7,6 @@ channels:
 dependencies:
   - python>=3.10
   - pip>=24
-  - pytorch::faiss-cpu>=1.7.4
   - conda-forge::ffmpeg>=6,<7
   - libmagic
   - sqlite
