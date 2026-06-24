@@ -12,7 +12,7 @@ wise --help
 
 ## Step 2: Download sample videos (optional)
 You can use WISE on your own folder of images and/or videos. If you do not have
-one, you can download a set of sample videos which can be used to test the 
+one, you can download a set of sample videos which can be used to test the
 audio and visual search capabilities of WISE.
 
 ```bash
@@ -30,20 +30,20 @@ us to perform audio and visual search on the video collection.
 ```bash
 mkdir -p wise-projects/
 wise extract-features \
-  wise-data/Kinetics-6/ \                   # input media folder 
+  wise-data/Kinetics-6/ \                   # input media folder
   --project-dir wise-projects/Kinetics-6/   # WISE project folder
 ```
 Notes:
 - Replace `wise-data/Kinetics-6/` in the command above with the appropriate
-  folder path if you want to use WISE on your own folder of media files. You 
+  folder path if you want to use WISE on your own folder of media files. You
   can also pass in multiple folders, separated by spaces
 - A WISE project will be created in `--project-dir` - this will be used to
   store project assets such as feature vectors, indices, thumbnails, and
   metadata
 - <details>
     <summary>Specify feature extraction model(s)</summary>
-   
-    - You can specify the feature extraction model(s) used for different media 
+
+    - You can specify the feature extraction model(s) used for different media
     types with the following optional parameters:
       - `--image-feature-id`: feature extractor used for image files
         - You can specify any OpenCLIP model here. Default: `mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli`

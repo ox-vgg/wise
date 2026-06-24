@@ -4,7 +4,7 @@ Starting 2.1.0, WISE releases will have a corresponding docker image, allowing d
 
 ## Pre-requisites
 
-To use WISE with docker, please make sure you have [Docker](https://docs.docker.com/get-started/get-docker/) running on your system. To enable NVIDIA GPU support, please install the [Driver](https://www.nvidia.com/en-us/drivers/) and the [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) from NVIDIA. 
+To use WISE with docker, please make sure you have [Docker](https://docs.docker.com/get-started/get-docker/) running on your system. To enable NVIDIA GPU support, please install the [Driver](https://www.nvidia.com/en-us/drivers/) and the [Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) from NVIDIA.
 
 On Windows, GPU support for docker containers is available through the WSL2 backend - See [here](https://docs.docker.com/desktop/features/gpu/) to check the pre-requisites and links with details on how to enable it.
 
@@ -39,7 +39,7 @@ The default build includes the GPU libraries. While it can run on all machines, 
 
 To use the CPU only version, run `docker compose -f compose.yaml -f compose.cpu.yaml` instead in the above commands.
 
-To make things simpler, consider setting an alias in bash. Add these to your bashrc to make it persistent. 
+To make things simpler, consider setting an alias in bash. Add these to your bashrc to make it persistent.
 ```bash
 alias wise='docker compose run --rm -it wise'
 alias wise-cpu='docker compose -f compose.yaml -f compose.cpu.yaml run --rm -it wise'

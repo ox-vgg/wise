@@ -104,7 +104,7 @@ def FeatureExtractorFactory(id):
 ```
 
 Now, you can use this newly created feature extractor in the WISE software. Here
-is an example of how we can use the `RandomFeatures` feature extractor in a 
+is an example of how we can use the `RandomFeatures` feature extractor in a
 new WISE project.
 
 ```bash
