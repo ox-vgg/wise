@@ -1,6 +1,2 @@
-bump-pydantic
-jupyter-console
-matplotlib
 pyinstrument
 pytest
-scikit-learn
