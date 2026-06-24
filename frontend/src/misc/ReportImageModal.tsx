@@ -70,7 +70,7 @@ const ReportImageModal: React.FunctionComponent<ReportImageModalProps> = ({dataS
     setErrorMessage('');
     setSelectedImageId(); // This closes the modal
   }
-  
+
   return <>
     <Modal title={<><FlagTwoTone twoToneColor="#faad14" /><span>Report image</span></>}
                   open={!!selectedImageId} closable={true} maskClosable={true}
