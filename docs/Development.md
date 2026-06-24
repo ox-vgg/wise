@@ -2,7 +2,7 @@
 
 Here are some notes for developers:
 
-- Ensure you install the dev requirements, as per [install instructions](Install.md#development_install)
+- Ensure you install the dev requirements, as per [install instructions](Install.md#development-install)
 
 - This project uses [pre-commit](https://pre-commit.com/) - make sure you install the hooks using `pre-commit install --install-hooks` (after you clone and install the dev dependencies) in your repo
 
