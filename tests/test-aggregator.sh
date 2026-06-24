@@ -624,7 +624,7 @@ TEST_EQUIVALENCE() {
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
     ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "${TEST_MAJOR_NUM}.4" "identical results for object search query '${SEARCH_QUERY}'" "video_results" $TOP_K "json"
-    
+
     SEARCH_URL_SUFFIX="search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID3}"
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
@@ -650,7 +650,7 @@ TEST_EQUIVALENCE() {
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
     ASSERT_TOPK_EQUAL "$AGGREGATOR_SEARCH_URL" "$MERGED_SEARCH_URL" "${TEST_MAJOR_NUM}.5" "identical results for face search query" "video_results" $TOP_K "multipart" \
                                 '-F' "image_file_queries=@${FACE_IMG_FILE}" \
-    
+
     SEARCH_URL_SUFFIX="search2?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID2}"
     AGGREGATOR_SEARCH_URL="${AGGREGATOR_URL}${SEARCH_URL_SUFFIX}"
     MERGED_SEARCH_URL="${MERGED_URL}${SEARCH_URL_SUFFIX}"
