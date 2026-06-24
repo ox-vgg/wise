@@ -27,6 +27,7 @@ from torchaudio.io import StreamReader
 from wise.data_models import MediaChunkType
 from wise.dataloader.dataset import MediaChunk
 
+
 logger = logging.getLogger(__name__)
 
 THUMBNAIL_FPS = 2

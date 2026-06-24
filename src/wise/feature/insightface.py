@@ -19,7 +19,7 @@ import logging
 import os
 import os.path
 from dataclasses import dataclass
-from functools import cached_property, cache
+from functools import cache, cached_property
 
 import huggingface_hub
 import numpy as np
@@ -60,7 +60,7 @@ import onnxruntime  # import before insightface for cleaner error
 import insightface.app
 # isort: on
 
-from wise.db import project_metadata_obj, prepare_filter_stmt
+from wise.db import prepare_filter_stmt, project_metadata_obj
 from wise.feature.feature_extractor import (
     BBoxXYWH,
     FeatureExtMetadata,

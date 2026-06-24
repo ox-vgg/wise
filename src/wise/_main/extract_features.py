@@ -53,7 +53,10 @@ from wise.feature.feature_extractor_factory import (
     FeatureExtractorFactory,
     get_canonical_feature_extractor_id,
 )
-from wise.feature.hf_models import get_segment_params, is_segment_level_extractor
+from wise.feature.hf_models import (
+    get_segment_params,
+    is_segment_level_extractor,
+)
 from wise.feature.store import (
     FeatureStore,
     FeatureStoreFactory,

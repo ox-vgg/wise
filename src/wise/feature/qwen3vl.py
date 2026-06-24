@@ -14,19 +14,25 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from functools import cached_property
 import logging
+from functools import cached_property
 
 import numpy as np
 import torch
 import torchvision.transforms.functional as TF
 from qwen_vl_utils import process_vision_info
 from transformers.models.qwen3_vl.modeling_qwen3_vl import (
-    Qwen3VLPreTrainedModel, Qwen3VLModel,
+    Qwen3VLModel,
+    Qwen3VLPreTrainedModel,
 )
 
-from wise.feature.feature_extractor import FeatureExtractor, Features, get_torch_device
+from wise.feature.feature_extractor import (
+    FeatureExtractor,
+    Features,
+    get_torch_device,
+)
 from wise.feature.hf_models import get_model_info
+
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +114,9 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
 
     @cached_property
     def _model_and_processor(self):
-        from transformers import AutoProcessor
-
         import logging as _logging
+
+        from transformers import AutoProcessor
         logger.info(
             "Loading Qwen3-VL-Embedding model %s on %s", self._hf_model_id, self.DEVICE
         )

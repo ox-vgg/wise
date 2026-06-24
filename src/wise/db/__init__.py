@@ -46,12 +46,13 @@ instantiated in the `repository` module.
 
 """
 
+import logging
+import time
 from sqlite3 import Connection as SQLite3Connection
 
 from sqlalchemy import Engine, MetaData, create_engine, event
 
 from wise.db.base import project_metadata_obj, thumbs_metadata_obj
-from wise.db.utils import prepare_filter_stmt
 from wise.db.tables import (
     imported_metadata_table,
     media_table,
@@ -60,9 +61,8 @@ from wise.db.tables import (
     thumbnails_table,
     vectors_table,
 )
+from wise.db.utils import prepare_filter_stmt
 
-import time
-import logging
 
 logger = logging.getLogger(__name__)
 

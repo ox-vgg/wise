@@ -22,7 +22,7 @@
 
 import logging
 from dataclasses import dataclass
-from functools import cached_property, cache
+from functools import cache, cached_property
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +33,7 @@ from PIL import Image
 from torchvision.transforms.functional import pil_to_tensor
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 
-from wise.db import project_metadata_obj, prepare_filter_stmt
+from wise.db import prepare_filter_stmt, project_metadata_obj
 from wise.feature.feature_extractor import (
     BBoxXYWH,
     FeatureExtMetadata,
@@ -42,6 +42,7 @@ from wise.feature.feature_extractor import (
     MultiModalModel,
     get_torch_device,
 )
+
 
 logger = logging.getLogger(__name__)
 

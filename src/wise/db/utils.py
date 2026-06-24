@@ -1,5 +1,7 @@
-import sqlalchemy as sa
 from typing import Callable
+
+import sqlalchemy as sa
+
 
 def prepare_filter_stmt(
     table: sa.Table,

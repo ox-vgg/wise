@@ -14,13 +14,12 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import itertools
-from base64 import b64encode
-
+import contextlib
 import cProfile
 import io
+import itertools
 import pstats
-import contextlib
+from base64 import b64encode
 
 
 @contextlib.contextmanager

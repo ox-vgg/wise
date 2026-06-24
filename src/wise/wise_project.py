@@ -21,11 +21,8 @@ import os
 import shutil
 import sqlite3
 from collections import defaultdict
-from functools import cached_property
+from functools import cached_property, partial
 from pathlib import Path
-from functools import partial
-
-from wise.utils import batched
 
 import numpy as np
 import sqlalchemy as sa
@@ -55,6 +52,7 @@ from wise.repository import (
     SourceCollectionRepo,
 )
 from wise.search.fts import FTSSearch
+from wise.utils import batched
 
 
 logger = logging.getLogger(__name__)
