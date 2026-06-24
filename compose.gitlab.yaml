@@ -7,11 +7,11 @@ services:
         - PYTHON_IMAGE
         - NODE_IMAGE
         - APP=${APP?}
-      
+
       cache_from:
         - type=registry,ref=${REGISTRY?}/wisecache:${CACHE_TAG?}
         - type=registry,ref=${REGISTRY?}/${APP?}:latest
-      
+
       x-bake:
         output:
           - type=registry,name-canonical=true,push-by-digest=true

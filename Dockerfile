@@ -105,8 +105,8 @@ COPY --from=wise-frontend --chown=nonroot:nonroot --chmod=3775 \
 
 # For libmagic to find the database in a non standard location
 # allow getpwuid command to work by setting the USER variable
-# we also set HOME to /tmp in the previous ENV instruction, 
-# to avoid permission issues with some libraries 
+# we also set HOME to /tmp in the previous ENV instruction,
+# to avoid permission issues with some libraries
 # that try to write to the home directory
 ENV MAGIC='/env/share/misc/magic' \
     LD_LIBRARY_PATH="/env/lib/:${LD_LIBRARY_PATH}" \
