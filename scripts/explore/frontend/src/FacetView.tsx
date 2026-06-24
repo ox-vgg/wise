@@ -5,7 +5,7 @@ import { PlusOutlined, CloseCircleFilled, MergeCellsOutlined, StarFilled, StarOu
 const FacetView: React.FC<{ state: any }> = ({ state }) => {
   const [clusters, setClusters] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   const getInitialPage = () => {
     const params = new URLSearchParams(window.location.search);
     const p = params.get('page');
@@ -16,7 +16,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
     const params = new URLSearchParams(window.location.search);
     return params.get(param) || defaultVal;
   };
-  
+
   const [page, setPage] = useState(getInitialPage());
   const [pageSize, setPageSize] = useState(10);
   const [layout, setLayout] = useState('2x2');
@@ -59,7 +59,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
       body: JSON.stringify({ status: newStatus })
     }).then(res => {
       if(res.ok) {
-        setClusters(prevClusters => 
+        setClusters(prevClusters =>
           prevClusters.map(c => c.id === clusterId ? { ...c, status: newStatus } : c)
         );
         message.success('Status updated');
@@ -72,7 +72,7 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
       method: 'POST'
     }).then(res => {
       if(res.ok) {
-        setClusters(prevClusters => 
+        setClusters(prevClusters =>
           prevClusters.map(c => c.id === clusterId ? { ...c, starred: !currentStarred } : c)
         );
         message.success(currentStarred ? 'Removed from starred' : 'Added to starred');
@@ -151,11 +151,11 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
   return (
     <div style={{ paddingBottom: mergeQueue.length > 0 ? '160px' : '0' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, alignItems: 'center', gap: '16px' }}>
-        <Pagination 
-          current={page} 
-          onChange={(p, s) => { setPage(p); setPageSize(s); }} 
+        <Pagination
+          current={page}
+          onChange={(p, s) => { setPage(p); setPageSize(s); }}
           onShowSizeChange={(current, size) => { setPageSize(size); setPage(1); }}
-          total={totalClusters} 
+          total={totalClusters}
           pageSize={pageSize}
         />
         <Select value={layout} onChange={setLayout} style={{ width: 100 }}>
@@ -195,11 +195,11 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
         {loading ? <Spin /> : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center' }}>
           {clusters.map((cluster: any) => (
-            <Card 
-              key={cluster.id} 
+            <Card
+              key={cluster.id}
               title={
                 <div>
-                  {cluster.cluster_label || `Cluster ${cluster.id}`} 
+                  {cluster.cluster_label || `Cluster ${cluster.id}`}
                   <div style={{ fontSize: '12px', fontWeight: 'normal', color: '#888' }}>
                     ({cluster.size} instances in {cluster.unique_media_count} videos)
                   </div>
@@ -243,13 +243,13 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
                 {cluster.representative_faces?.slice(0, gridConfig.limit).map((face: any, idx: number) => (
                   <div key={idx} style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     <div style={{ position: 'relative', width: '100%' }}>
-                      <img 
+                      <img
                         src={`/${state.project_name}/api/thumbnail?media_id=${face.media_id}&timestamp=${face.timestamp}`}
                         style={{ width: '100%', height: 'auto', display: 'block' }}
                         alt="Representative Face"
                       />
                       {face.bbox && (
-                        <div 
+                        <div
                           style={{
                             position: 'absolute',
                             border: '2px solid yellow',
@@ -272,9 +272,9 @@ const FacetView: React.FC<{ state: any }> = ({ state }) => {
                     font-weight: 500;
                   }
                 `}</style>
-                <Segmented 
+                <Segmented
                   className="custom-segmented"
-                  value={cluster.status} 
+                  value={cluster.status}
                   onChange={(val) => handleStatusChange(cluster.id, val as string)}
                   options={[
                     { label: 'Draft', value: 'draft' },

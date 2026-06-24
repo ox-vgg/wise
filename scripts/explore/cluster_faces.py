@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int, fallback_similarity_threshold: float):
     logger.info(f"Loading WISE project from {project_dir}")
     project = WiseProject(project_dir)
-    
+
     logger.info("Initializing explore.db")
     engine, SessionLocal = init_explore_db(project_dir)
-    
+
     with SessionLocal() as session:
         facet = session.query(Facet).filter_by(name="Face", feature_extractor_id=feature_extractor_id).first()
         if not facet:
@@ -33,7 +33,7 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
             session.commit()
             session.refresh(facet)
         facet_id = facet.id
-        
+
         logger.info("Clearing old draft clusters...")
         draft_cluster_ids = session.query(Cluster.id).filter_by(facet_id=facet_id, status=ClusterStatus.draft).all()
         if draft_cluster_ids:
@@ -43,7 +43,7 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
 
         logger.info("Loading known face clusters from database...")
         known_clusters_data = session.query(KnownFaceCluster).all()
-        
+
     known_vector_to_cluster = {kc.vector_id: kc.cluster_id for kc in known_clusters_data}
     cluster_to_known_vectors = collections.defaultdict(list)
     for kc in known_clusters_data:
@@ -56,7 +56,7 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
     all_valid_vector_ids = set()
     with project.db_engine.connect() as conn:
         query = sa.text('''
-            SELECT v.id, v.media_id, v.timestamp, (vmi.bbox_w * m.width), (vmi.bbox_h * m.height) 
+            SELECT v.id, v.media_id, v.timestamp, (vmi.bbox_w * m.width), (vmi.bbox_h * m.height)
             FROM vectors v
             JOIN media m ON v.media_id = m.id
             JOIN vector_metadata_insightface vmi ON v.id = vmi.vector_id
@@ -91,7 +91,7 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
 
     logger.info("Reconstructing all valid vectors from FAISS index...")
     # Doing this one-by-one is slow but safe for 1.3M if memory is a concern.
-    # With 300GB RAM, we could theoretically do index.reconstruct_n(0, index.ntotal) and slice it, 
+    # With 300GB RAM, we could theoretically do index.reconstruct_n(0, index.ntotal) and slice it,
     # but let's stick to the robust method that matches the exact IDs we validated.
     all_embeddings = np.array([index.reconstruct(int(vid)) for vid in all_vector_ids]).astype(np.float32)
     faiss.normalize_L2(all_embeddings)
@@ -102,7 +102,7 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
         logger.info("Calibrating DBSCAN epsilon based on intra-cluster distances of reviewed clusters...")
         intra_distances = []
         local_vid_to_idx = {vid: idx for idx, vid in enumerate(all_vector_ids)}
-        
+
         for cid, vids in cluster_to_known_vectors.items():
             if len(vids) > 1:
                 indices = [local_vid_to_idx[vid] for vid in vids if vid in local_vid_to_idx]
@@ -125,15 +125,15 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
     dim = all_embeddings.shape[1]
     index_all = faiss.IndexFlatIP(dim)
     index_all.add(all_embeddings)
-    
+
     k_nn = min(k_neighbors * 2, len(all_embeddings))
     logger.info(f"Searching for {k_nn} nearest neighbors...")
     similarities, knn_indices = index_all.search(all_embeddings, k_nn)
-    
+
     logger.info("Constructing constraint-aware sparse distance matrix...")
     n_samples = len(all_embeddings)
     distances = 1.0 - np.clip(similarities, -1.0, 1.0)
-    
+
     # Vectorized edge extraction
     rows_arr = np.repeat(np.arange(n_samples), k_nn)
     cols_arr = knn_indices.flatten()
@@ -294,7 +294,7 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
                 "unique_media_count": unique_media_count,
                 "size": len(all_c_vids)
             })
-            
+
 
         # Build the set of IDs of known clusters that received new assignments
         known_cids_receiving_vectors = {
@@ -316,7 +316,7 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
             # Only insert if this exact assignment doesn't already exist
             if (int(vec_id), int(cluster_id)) not in existing_assignments:
                 assignments_to_insert.append(Assignment(vector_id=int(vec_id), cluster_id=cluster_id))
-            
+
         session.bulk_save_objects(assignments_to_insert)
         session.commit()
 
@@ -359,5 +359,5 @@ if __name__ == "__main__":
     parser.add_argument("--k-neighbors", type=int, default=50, help="Number of nearest neighbors to build the sparse graph for DBSCAN.")
     parser.add_argument("--similarity-threshold", type=float, default=0.7, help="Fallback cosine similarity threshold if automatic calibration fails.")
     args = parser.parse_args()
-    
+
     cluster_faces(Path(args.project_dir), args.feature_extractor_id, args.k_neighbors, args.similarity_threshold)

@@ -38,7 +38,7 @@ def evaluate_performance(wise_url, queries, strategy_func, verbose=False):
     for i, item in enumerate(queries):
         prompt = item['prompt']
         expected_files = set(item['expected_files'])
-        
+
         text_query = strategy_func(prompt)
 
         search_params = {
@@ -52,7 +52,7 @@ def evaluate_performance(wise_url, queries, strategy_func, verbose=False):
         }
 
         search_url = f"{wise_url}/search"
-        
+
         try:
             if verbose:
                 print(f"Query {i+1}/{total_queries}: {text_query}")
@@ -189,7 +189,7 @@ def main():
     }
 
     results = []
-    
+
     # 3. Evaluate each strategy silently
     print("\nEvaluating strategies...")
     for desc, func in strategies.items():
@@ -202,7 +202,7 @@ def main():
 
     # 4. Sort results to find the best one
     results.sort(key=lambda x: x["recall"], reverse=True)
-    
+
     # 5. Run the best strategy again with verbose logging
     if results:
         best_strategy = results[0]

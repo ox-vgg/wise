@@ -108,8 +108,8 @@ const MetadataSettingsView: React.FC<{ state: any }> = ({ state }) => {
       dataIndex: 'key_name',
       key: 'key_name',
       render: (text: string, record: any) => (
-        <Input 
-          defaultValue={text} 
+        <Input
+          defaultValue={text}
           onBlur={(e) => {
             if (e.target.value !== text) {
               Modal.confirm({
@@ -127,8 +127,8 @@ const MetadataSettingsView: React.FC<{ state: any }> = ({ state }) => {
       dataIndex: 'data_type',
       key: 'data_type',
       render: (text: string, record: any) => (
-        <Select 
-          defaultValue={text} 
+        <Select
+          defaultValue={text}
           onChange={(val) => {
             Modal.confirm({
               title: 'Are you sure you want to change the data type?',
@@ -181,10 +181,10 @@ const MetadataSettingsView: React.FC<{ state: any }> = ({ state }) => {
              + Add Metadata Field
           </Button>
         </div>
-        <Table 
-          dataSource={schema} 
-          columns={columns} 
-          rowKey="id" 
+        <Table
+          dataSource={schema}
+          columns={columns}
+          rowKey="id"
           loading={loading}
           pagination={false}
         />
@@ -192,14 +192,14 @@ const MetadataSettingsView: React.FC<{ state: any }> = ({ state }) => {
 
       <Card title="Starred Clusters">
         <p>Enter values below to instantly apply them to <strong>ALL clusters you have marked with a Star</strong> in the overview grid. This action will also mark all those clusters as 'Reviewed'.</p>
-        
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '600px' }}>
           {schema.map(field => (
              <div key={field.key_name} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                <span style={{ fontWeight: 'bold', width: '150px', textTransform: 'capitalize' }}>
                  {field.key_name.replace(/_/g, ' ')}
                </span>
-               <Input 
+               <Input
                  type={field.data_type === 'number' ? 'number' : field.data_type === 'date' ? 'date' : 'text'}
                  value={batchMetadata[field.key_name] || ''}
                  onChange={e => setBatchMetadata({ ...batchMetadata, [field.key_name]: e.target.value })}
@@ -221,7 +221,7 @@ const MetadataSettingsView: React.FC<{ state: any }> = ({ state }) => {
               Apply to Starred Clusters
             </Button>
           </Popconfirm>
-          
+
           <Popconfirm
             title="Clear All Stars"
             description="Are you sure you want to clear the star from ALL clusters in this facet?"

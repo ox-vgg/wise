@@ -24,7 +24,7 @@ python3 media-metadata.py import \
     --project-dir ... \
     --metadata-id wikimedia-motd \
     --metadata-type media \
-    --from-csv /tmp/wise-motd-metadata.csv  
+    --from-csv /tmp/wise-motd-metadata.csv
 
 # 4. Create Full Text Search (FTS) index
 export FTS_CONFIG='{"metadata-wikimedia-motd": ["media_id","image_description","date_time_original","artist","usage_terms","license_url","credit","restrictions"]}'

@@ -71,7 +71,7 @@ export COMPOSE_FILE="scripts/cinephile/compose.yml"
 # folder to store all data
 # change this if you want to store the data elsewhere
 # NOTE: Must be either an absolute path or be relative to the COMPOSE_FILE
-export CINEPHILE_DATA_DIR="$PWD/data/cinephile/" 
+export CINEPHILE_DATA_DIR="$PWD/data/cinephile/"
 mkdir -p ${CINEPHILE_DATA_DIR}
 
 # pull pre-built docker image
@@ -93,7 +93,7 @@ as follows:
 # make sure to change the CINEPHILE_DATA_DIR if you have a different path
 # cd /path/to/wise/
 # export COMPOSE_FILE="scripts/cinephile/compose.yml"
-# export CINEPHILE_DATA_DIR="$PWD/data/cinephile/" 
+# export CINEPHILE_DATA_DIR="$PWD/data/cinephile/"
 
 # Serve
 docker compose up wise
@@ -218,7 +218,7 @@ docker compose up wise
 
 ## Methodology
 
-The WISE search engine has the following five search modes: Visual, Face, Object, Metadata and Audio. 
+The WISE search engine has the following five search modes: Visual, Face, Object, Metadata and Audio.
 The Visual search mode is based on vision-language models (e.g. [CLIP](https://github.com/mlfoundations/open_clip/)) and has already been described in [1].
 The Audio search mode relies on audio-language model (e.g. [CLAP](https://github.com/microsoft/CLAP)) for feature representation of audio content and operates in a way similar to the Visual mode.
 The Face search mode uses [Insightface](https://github.com/deepinsight/insightface) model to represent each automatically detected face region using a feature vector followed by a nearest neighbour search (e.g. using [faiss](https://github.com/facebookresearch/faiss) library) to find other matching faces in a large collection of images or videos.
