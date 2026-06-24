@@ -5,6 +5,7 @@ faiss-cpu>=1.7.4
 fastapi[all]
 filetype
 huggingface_hub
+httpx
 insightface
 numpy
 msclap>=1.3.4  # 1.3.4 dropped incompatible req on torchvision (see #133)

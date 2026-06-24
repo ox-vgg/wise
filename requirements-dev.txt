@@ -1,5 +1,4 @@
 bump-pydantic
-httpx[cli]
 jupyter-console
 matplotlib
 pyinstrument
