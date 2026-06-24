@@ -5,7 +5,7 @@ variables:
   PYTHON_IMAGE: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/python:3.10-slim
   NODE_IMAGE: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/node:22-slim
   REGISTRY: ${CI_REGISTRY_IMAGE}
-  
+
 
 stages:
   - lint
@@ -26,13 +26,13 @@ pages:
   cache:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
-      - ~/.cache/ 
+      - ~/.cache/
   artifacts:
     paths:
       - public
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-  tags: 
+  tags:
     - saas-linux-small-amd64
 
 pre-commit:
@@ -51,7 +51,7 @@ pre-commit:
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  tags: 
+  tags:
     - saas-linux-small-amd64
 
 .docker-changes: &docker-changes
@@ -100,7 +100,7 @@ default:
     - docker context create buildx-builder
     - apk update && apk add jq
 
-  tags: 
+  tags:
     - saas-linux-small-amd64
 
 build-only:
@@ -125,11 +125,11 @@ build-only:
       - PLATFORM: [arm64]
         APP: [wise-cpu]
         SIZE: [small]
-  tags: 
+  tags:
     - saas-linux-${SIZE}-${PLATFORM}
 
 build:
-  stage: build  
+  stage: build
   artifacts:
     name: ${APP}-${PLATFORM}-image-digest
     paths:
@@ -152,7 +152,7 @@ build:
       when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: never # change to always to re-enable docker build
-  tags: 
+  tags:
     - saas-linux-${SIZE}-${PLATFORM}
 
 # this job only runs on default branch
@@ -176,7 +176,7 @@ build:
 
 push-manifest:
   <<: *push-manifest
-  needs: 
+  needs:
     - job: build
       parallel:
         matrix:
@@ -190,7 +190,7 @@ push-manifest:
 
 push-manifest-cpu:
   <<: *push-manifest
-  needs: 
+  needs:
     - job: build
       parallel:
         matrix:
