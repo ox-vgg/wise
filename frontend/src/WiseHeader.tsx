@@ -954,4 +954,3 @@ const WiseHeader: React.FunctionComponent<WiseHeaderProps> = ({
 };
 
 export default WiseHeader;
-

@@ -60,4 +60,3 @@ The projects created by WISE will be stored in the `projects/PROJECT_NAME` folde
 
 - Publish multiarch images for better compatibility
 - Add a docker based development environment (devcontainer) and VSCode extensions recommendations
-

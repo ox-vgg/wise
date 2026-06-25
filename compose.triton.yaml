@@ -31,4 +31,3 @@ services:
               capabilities: [gpu]
 
     restart: unless-stopped
-

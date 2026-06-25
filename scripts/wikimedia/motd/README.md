@@ -34,4 +34,3 @@ python3 create-index.py \
   --fts-config /tmp/wise-fts-config.json \
   --project-dir ...
 ```
-
