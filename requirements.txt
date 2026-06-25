@@ -27,8 +27,8 @@ torchvision>=0.17.2,<0.24
 tqdm
 ## [sentencepiece] required by open-clip-torch to load many
 ## HuggingFace models, namely the SigLIP models that we use.
-transformers[sentencepiece]>=4.44.0
-qwen-vl-utils  # required by Qwen3-VL-Embedding feature extractor
+transformers[sentencepiece]>=4.57.0  # 4.57.0 added Qwen3-VL-Embedding support
+qwen-vl-utils>=0.0.14  # required by Qwen3-VL-Embedding feature extractor
 tritonclient[all]
 typer
 webvtt-py
