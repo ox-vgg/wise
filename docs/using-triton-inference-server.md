@@ -39,7 +39,7 @@ _Note:_ If using conda, run `conda-unpack` as an additional step
 
 ## Getting started
 
-To get started with Triton, we need to create a folder under `triton/models` corresponding to the feature extractor you are interested in. 
+To get started with Triton, we need to create a folder under `triton/models` corresponding to the feature extractor you are interested in.
 
 Triton requires your models directories to follow a specific structure and doesnt support models deep inside other folders. It needs to be flat.
 
@@ -123,7 +123,7 @@ docker compose -f compose.triton.yaml up -d
 ```
 
 Now, with WISE, prefix the feature id with `triton:///` - this will automatically use the triton client
-in WISE to forward the requests to `localhost:8001`. If you are running this on a separate machine, you can pass it as 
+in WISE to forward the requests to `localhost:8001`. If you are running this on a separate machine, you can pass it as
 `triton://HOST:PORT/${FEATURE_ID}`
 
 You can provide feature extractor config by providing `${MODEL_DIR}/1/config.yaml` (optional - useful for open_clip / HF model overrides)
@@ -165,7 +165,7 @@ The fix usually is to pack the env as-is and not let conda-pack do any kind of m
 So if you see the following error
 ```
 Collecting packages...
-CondaPackError: 
+CondaPackError:
 Files managed by conda were found to have been deleted/overwritten in the
 following packages:
 

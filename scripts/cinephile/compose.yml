@@ -50,14 +50,14 @@ services:
       context: ../../
       dockerfile: scripts/cinephile/Dockerfile
       target: wise
-    
+
     image: ${REGISTRY:-$USER}/wise:${VERSION:-cinephile}
     environment:
       <<: *env
       ENV_NAME: wise-env # default micromamba environment
       PORT: ${WISE_HOST_PORT:-10001}  # Port to run the WISE server on
       USE_SHOTS: 1
-    
+
     ports:
       # Set the WISE_HOST_PORT environment variable to map a different host port.
       # Example: export WISE_HOST_PORT=12345
@@ -77,7 +77,7 @@ services:
   shot-detection:
     # add common settings
     <<: *common
-    
+
     build:
       context: ../../
       dockerfile: scripts/cinephile/Dockerfile

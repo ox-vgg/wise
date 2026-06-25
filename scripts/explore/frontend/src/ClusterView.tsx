@@ -24,7 +24,7 @@ const VideoPlayerWithPoster: React.FC<{ project_name: string, face: any }> = ({ 
         onPlay={() => setHasPlayed(true)}
       />
       {face.bbox && !hasPlayed && (
-        <div 
+        <div
           style={{
             position: 'absolute',
             border: '2px solid yellow',

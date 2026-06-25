@@ -176,7 +176,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     } else if (viewModality == 'Video' || viewModality == 'VideoAudio' || viewModality == 'Audio') {
       if (viewMode == 'UnmergedSegments') {
         _searchResults = searchResults[viewModality].unmerged_windows;
-        
+
         if (!featureExtractorId.includes('insightface')) {
           // show unique frames instead of duplicated frames, when there are multiple vectors/boxes per frame
           const uniqueFrames = new Map<string, ProcessedVideoSegment>();
@@ -276,14 +276,14 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
       if (video.shots.length == 0) {
         console.error('Occurrences length is 0 for video ' + videoId);
       }
-  
+
       const topMatch = video.shots.reduce((maxScoreOccurrence, currentOccurrence) => {
         return (maxScoreOccurrence.distance > currentOccurrence.distance) ? maxScoreOccurrence : currentOccurrence;
       });
       const thumbnail = topMatch.thumbnail;
       const previewVideoLink = topMatch.link;
       // const distance = topMatch.distance;
-  
+
       return (
         <div className="wise-video-wrapper" key={videoId}
             onClick={() => setImageDetails(topMatch)}
@@ -310,7 +310,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
           </div>
         </div>
       )
-    });  
+    });
   }
 
   const exportToJSON = () => {
@@ -436,7 +436,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
   }
 
   const isLoadingFeaturedImages = (isHomePage && searchResultsHTML.length === 0);
-  
+
   let pagination = (<Pagination
     total={totalResultsCount}
     showTotal={showTotal}
@@ -488,7 +488,7 @@ const SearchResults: React.FunctionComponent<SearchResultsProps> = ({
     </Row>
 
     <section id="search-results">
-      {(searchResultsHTML.length === 0) ? 
+      {(searchResultsHTML.length === 0) ?
         ((isLoadingNewSearch || isLoadingFeaturedImages) ?
           <div className="wise-large-loading-screen"><LoadingOutlined /></div>
           : <div className="wise-large-loading-screen"><p>No results found!</p></div>

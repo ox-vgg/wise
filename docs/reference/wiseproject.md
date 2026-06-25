@@ -8,4 +8,3 @@ from wise import WiseProject
 
 ::: wise.wise_project.WiseProject
 
-        

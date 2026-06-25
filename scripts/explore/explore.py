@@ -128,9 +128,9 @@ async def view_facet(request: Request, project_name: str, facet_name: str, featu
     facet = db.query(Facet).filter(Facet.name.ilike(facet_name), Facet.feature_extractor_id.contains(feature_extractor_slug)).first()
     if not facet:
         raise HTTPException(status_code=404, detail="Facet not found")
-        
+
     total_clusters = db.query(Cluster).filter_by(facet_id=facet.id).count()
-    
+
     # State injection for React
     initial_state = {
         "view": "facet",
@@ -138,7 +138,7 @@ async def view_facet(request: Request, project_name: str, facet_name: str, featu
         "facet": {"id": facet.id, "name": facet.name, "feature_extractor_id": facet.feature_extractor_id},
         "total_clusters": total_clusters
     }
-    
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "initial_state": json.dumps(initial_state),
@@ -152,13 +152,13 @@ async def view_metadata_settings(request: Request, project_name: str, facet_name
     facet = db.query(Facet).filter(Facet.name.ilike(facet_name), Facet.feature_extractor_id.contains(feature_extractor_slug)).first()
     if not facet:
         raise HTTPException(status_code=404, detail="Facet not found")
-        
+
     initial_state = {
         "view": "metadata",
         "project_name": project_name,
         "facet": {"id": facet.id, "name": facet.name, "feature_extractor_id": facet.feature_extractor_id}
     }
-    
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "initial_state": json.dumps(initial_state),
@@ -175,17 +175,17 @@ async def view_cluster(request: Request, project_name: str, facet_name: str, fea
     cluster = db.query(Cluster).filter_by(id=cluster_id, facet_id=facet.id).first()
     if not cluster:
         raise HTTPException(status_code=404, detail="Cluster not found")
-    
+
     cluster_label = cluster.cluster_label if cluster.cluster_label else f"{facet.name} {cluster.id}"
     cluster_size = db.query(Assignment).filter_by(cluster_id=cluster.id).count()
-    
+
     initial_state = {
         "view": "cluster",
         "project_name": project_name,
         "facet": {"id": facet.id, "name": facet.name, "feature_extractor_id": facet.feature_extractor_id},
         "cluster": {"id": cluster.id, "cluster_label": cluster_label, "status": cluster.status.value, "metadata": cluster.metadata_json, "size": cluster_size}
     }
-    
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "initial_state": json.dumps(initial_state),
@@ -213,15 +213,15 @@ def get_media_file(request: Request, project_name: str, media_id: int):
         metadata = app_state.project.metadata(media_id)
         if metadata is None:
             raise HTTPException(status_code=404, detail="Media not found")
-        
+
         file_path = metadata.full_path
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found on disk")
-            
+
         if metadata.media_type in {MediaType.VIDEO, MediaType.AV, MediaType.AUDIO}:
             file_size = file_path.stat().st_size
             range_header = request.headers.get("range")
-            
+
             content_type = f"{metadata.media_type.value}/{metadata.format}" if metadata.media_type == MediaType.AUDIO else f"video/mp4"
             headers = {
                 "content-type": content_type,
@@ -232,14 +232,14 @@ def get_media_file(request: Request, project_name: str, media_id: int):
             start = 0
             end = file_size - 1
             status_code = 200
-            
+
             if range_header is not None:
                 start, end = _get_range_header(range_header, file_size)
                 size = end - start + 1
                 headers["content-length"] = str(size)
                 headers["content-range"] = f"bytes {start}-{end}/{file_size}"
                 status_code = 206
-                
+
             return StreamingResponse(
                 send_bytes_range_requests(open(file_path, mode="rb"), start, end),
                 headers=headers,
@@ -247,7 +247,7 @@ def get_media_file(request: Request, project_name: str, media_id: int):
             )
         else:
             return FileResponse(file_path, media_type=f"image/{metadata.format.lower()}")
-            
+
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -262,12 +262,12 @@ def get_facet_schema(project_name: str, facet_id: int, db = Depends(get_db)):
 def create_facet_schema(project_name: str, facet_id: int, schema_create: SchemaCreate, db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     # Check if key already exists
     existing = db.query(FacetMetadataSchema).filter_by(facet_id=facet_id, key_name=schema_create.key_name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Key already exists in schema")
-        
+
     new_schema = FacetMetadataSchema(
         facet_id=facet_id,
         key_name=schema_create.key_name,
@@ -282,30 +282,30 @@ def create_facet_schema(project_name: str, facet_id: int, schema_create: SchemaC
 def update_facet_schema(project_name: str, facet_id: int, schema_id: int, schema_update: SchemaUpdate, db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     schema_entry = db.query(FacetMetadataSchema).filter_by(id=schema_id, facet_id=facet_id).first()
     if not schema_entry:
         raise HTTPException(status_code=404, detail="Schema entry not found")
-        
+
     old_key = schema_entry.key_name
     new_key = schema_update.key_name if schema_update.key_name else old_key
-    
+
     if new_key != old_key:
         existing = db.query(FacetMetadataSchema).filter_by(facet_id=facet_id, key_name=new_key).first()
         if existing:
             raise HTTPException(status_code=400, detail="Key already exists in schema")
-            
+
         clusters = db.query(Cluster).filter_by(facet_id=facet_id).all()
         for cluster in clusters:
             if old_key in cluster.metadata_json:
                 cluster.metadata_json[new_key] = cluster.metadata_json.pop(old_key)
                 cluster.metadata_json = dict(cluster.metadata_json)
-                
+
     if schema_update.key_name is not None:
         schema_entry.key_name = schema_update.key_name
     if schema_update.data_type is not None:
         schema_entry.data_type = schema_update.data_type
-        
+
     db.commit()
     return {"id": schema_entry.id, "key_name": schema_entry.key_name, "data_type": schema_entry.data_type}
 
@@ -313,18 +313,18 @@ def update_facet_schema(project_name: str, facet_id: int, schema_id: int, schema
 def delete_facet_schema(project_name: str, facet_id: int, schema_id: int, db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     schema_entry = db.query(FacetMetadataSchema).filter_by(id=schema_id, facet_id=facet_id).first()
     if not schema_entry:
         raise HTTPException(status_code=404, detail="Schema entry not found")
-        
+
     key_to_delete = schema_entry.key_name
     clusters = db.query(Cluster).filter_by(facet_id=facet_id).all()
     for cluster in clusters:
         if key_to_delete in cluster.metadata_json:
             del cluster.metadata_json[key_to_delete]
             cluster.metadata_json = dict(cluster.metadata_json)
-            
+
     db.delete(schema_entry)
     db.commit()
     return {"status": "success"}
@@ -333,7 +333,7 @@ def delete_facet_schema(project_name: str, facet_id: int, schema_id: int, db = D
 def clear_starred_clusters(project_name: str, facet_id: int, db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     db.query(Cluster).filter_by(facet_id=facet_id).update({"is_starred": False})
     db.commit()
     return {"status": "success"}
@@ -342,29 +342,29 @@ def clear_starred_clusters(project_name: str, facet_id: int, db = Depends(get_db
 def toggle_star_cluster(project_name: str, cluster_id: int, db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     cluster = db.query(Cluster).filter_by(id=cluster_id).first()
     if not cluster:
         raise HTTPException(status_code=404, detail="Cluster not found")
-        
+
     cluster.is_starred = not cluster.is_starred
     db.commit()
-    
+
     return {"status": "success", "starred": cluster.is_starred}
 
 @app.post("/{project_name}/api/facet/{facet_id}/metadata/batch")
 def batch_update_metadata(project_name: str, facet_id: int, batch_update: BatchMetadataUpdate, db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     starred_clusters = db.query(Cluster).filter(Cluster.facet_id == facet_id, Cluster.is_starred == True).all()
-    
+
     for cluster in starred_clusters:
         new_meta = dict(cluster.metadata_json)
         new_meta.update(batch_update.metadata_json)
         cluster.metadata_json = new_meta
         cluster.status = ClusterStatus.reviewed
-        
+
     db.commit()
     return {"status": "success", "updated_count": len(starred_clusters)}
 
@@ -379,7 +379,7 @@ def get_facets(project_name: str, db = Depends(get_db)):
 def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int = 10, status_filter: str = "All", machine_feedback: str = "All", db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     total_query = db.query(Cluster).filter(Cluster.facet_id == facet_id)
     if status_filter == "starred":
         total_query = total_query.filter(Cluster.is_starred == True)
@@ -390,15 +390,15 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         total_query = total_query.filter(Cluster.machine_feedback.contains(machine_feedback))
 
     total_count = total_query.count()
-        
+
     # Get paginated clusters sorted by pre-calculated size (descending)
     query = db.query(Cluster).filter(Cluster.facet_id == facet_id)
-    
+
     if status_filter == "starred":
         query = query.filter(Cluster.is_starred == True)
     elif status_filter != "All":
         query = query.filter(Cluster.status == ClusterStatus(status_filter))
-        
+
     if machine_feedback != "All":
         query = query.filter(Cluster.machine_feedback.contains(machine_feedback))
 
@@ -408,10 +408,10 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         .limit(page_size)
         .all()
     )
-    
+
     if not clusters:
         return {"clusters": [], "total": total_count}
-        
+
     cluster_ids = [c.id for c in clusters]
 
     # Fetch assignments for each cluster efficiently by limiting to 100 per cluster natively in SQL
@@ -419,7 +419,7 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
     sampled_query = sa.text(f"""
         SELECT cluster_id, vector_id
         FROM (
-            SELECT cluster_id, vector_id, 
+            SELECT cluster_id, vector_id,
                    ROW_NUMBER() OVER (PARTITION BY cluster_id ORDER BY RANDOM()) as rn
             FROM assignments
             WHERE cluster_id IN ({cluster_ids_str})
@@ -427,15 +427,15 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
         WHERE rn <= 100
     """)
     result = db.execute(sampled_query).fetchall()
-    
+
     from collections import defaultdict
-    
+
     cluster_to_sampled_vectors = defaultdict(list)
     all_sampled_vector_ids = []
     for row in result:
         cluster_to_sampled_vectors[row.cluster_id].append(row.vector_id)
         all_sampled_vector_ids.append(row.vector_id)
-    
+
     vector_info = {}
     if all_sampled_vector_ids:
         metadata_list = app_state.project.get_vector_media_metadata_for_ids(all_sampled_vector_ids)
@@ -453,13 +453,13 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
     clusters_data = []
     for c in clusters:
         cluster_label = c.cluster_label if c.cluster_label else f"{facet.name} {c.id}"
-        
+
         sampled_vids = cluster_to_sampled_vectors.get(c.id, [])
         unique_media_count = c.unique_media_count # READ FROM DB directly!
 
         vids_info = [vector_info[vid] for vid in sampled_vids if vid in vector_info]
         vids_info.sort(key=lambda x: x["area"], reverse=True)
-        
+
         reps = []
         seen_media_ids = set()
         for info in vids_info:
@@ -468,7 +468,7 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
                 seen_media_ids.add(info["media_id"])
                 if len(reps) == 9:
                     break
-                    
+
         # If we couldn't find 9 from distinct media_ids, fill the rest with largest remaining faces
         if len(reps) < 9:
             for info in vids_info:
@@ -476,10 +476,10 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
                     reps.append(info)
                     if len(reps) == 9:
                         break
-                        
+
         clusters_data.append({
-            "id": c.id, 
-            "cluster_label": cluster_label, 
+            "id": c.id,
+            "cluster_label": cluster_label,
             "status": c.status.value,
             "machine_feedback": c.machine_feedback,
             "size": c.size,
@@ -487,29 +487,29 @@ def get_clusters(project_name: str, facet_id: int, page: int = 1, page_size: int
             "unique_media_count": unique_media_count,
             "representative_faces": reps
         })
-        
+
     return {"clusters": clusters_data, "total": total_count}
 
 @app.get("/{project_name}/api/cluster/{cluster_id}/faces")
 def get_cluster_faces(project_name: str, cluster_id: int, page: int = 1, page_size: int = 50, db = Depends(get_db)):
     if project_name != app_state.project.name:
         raise HTTPException(status_code=404, detail="Project not found")
-        
+
     cluster = db.query(Cluster).filter_by(id=cluster_id).first()
     if not cluster:
         return []
     facet = db.query(Facet).filter_by(id=cluster.facet_id).first()
-    
+
     assignments = db.query(Assignment).filter_by(cluster_id=cluster_id).offset((page - 1) * page_size).limit(page_size).all()
     vector_ids = [a.vector_id for a in assignments]
-    
+
     if not vector_ids:
         return []
-        
+
     # Get metadata from internal.db
     metadata = app_state.project.get_vector_media_metadata_for_ids(vector_ids)
     ext_metadata = app_state.project.get_vector_ext_metadata_for_ids(facet.feature_extractor_id, vector_ids)
-    
+
     results = []
     for m, ext in zip(metadata, ext_metadata):
         results.append({
@@ -572,14 +572,14 @@ def update_cluster(project_name: str, cluster_id: int, update: ClusterUpdate, db
     cluster = db.query(Cluster).filter_by(id=cluster_id).first()
     if not cluster:
         raise HTTPException(status_code=404, detail="Cluster not found")
-        
+
     if update.cluster_label is not None:
         cluster.cluster_label = update.cluster_label
     if update.metadata_json is not None:
         cluster.metadata_json = update.metadata_json
     if update.status is not None:
         cluster.status = ClusterStatus(update.status)
-        
+
         if cluster.status == ClusterStatus.reviewed:
             # Populate the known_face_clusters table
             logger.info(f"Populating known-face-clusters for cluster {cluster_id}")
@@ -656,7 +656,7 @@ def update_assignments(project_name: str, update: AssignmentUpdate, db = Depends
     for a in assignments:
         a.cluster_id = update.new_cluster_id
         a.is_manual_override = True
-        
+
     db.commit()
     return {"status": "success"}
 
@@ -738,12 +738,12 @@ def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):
     facet = db.query(Facet).filter_by(id=facet_id).first()
     if not facet:
         raise HTTPException(status_code=404, detail="Facet not found")
-        
+
     reviewed_clusters = db.query(Cluster).filter_by(facet_id=facet_id, status=ClusterStatus.reviewed).all()
-    
+
     if not reviewed_clusters:
         return {"status": "no reviewed clusters to publish"}
-        
+
     internal_engine = app_state.project.db_engine
 
     # Ensure facet tables are created in internal.db before publishing
@@ -755,7 +755,7 @@ def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):
         existing_facet = conn.execute(
             sa.select(wise_tables.facets_table).where(wise_tables.facets_table.c.id == facet.id)
         ).first()
-        
+
         if not existing_facet:
             conn.execute(wise_tables.facets_table.insert().values([{
                 "id": facet.id,
@@ -767,7 +767,7 @@ def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):
             assignments = db.query(Assignment).filter_by(cluster_id=cluster.id).all()
             if not assignments:
                 continue
-                
+
             # Delete old records for this cluster to support updates
             conn.execute(
                 wise_tables.facet_metadata_table.delete().where(
@@ -779,9 +779,9 @@ def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):
                     wise_tables.cluster_metadata_table.c.cluster_id == cluster.id
                 )
             )
-                
+
             publish_label = cluster.cluster_label if cluster.cluster_label else f"{facet.name} {cluster.id}"
-            
+
             # Insert into cluster_metadata_table
             conn.execute(wise_tables.cluster_metadata_table.insert().values([{
                 "facet_id": facet.id,
@@ -797,15 +797,15 @@ def publish_facet(project_name: str, facet_id: int, db = Depends(get_db)):
                     "vector_id": a.vector_id,
                     "cluster_id": cluster.id
                 })
-            
+
             if insert_data:
                 conn.execute(wise_tables.facet_metadata_table.insert().values(insert_data))
-                
+
             # Mark as published
             cluster.status = ClusterStatus.published
-            
+
         db.commit()
-        
+
     return {"status": "success", "published_clusters": len(reviewed_clusters)}
 
 if __name__ == "__main__":
@@ -813,10 +813,10 @@ if __name__ == "__main__":
     parser.add_argument("--project-dir", type=str, required=True, help="WISE project directory")
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
-    
+
     project_dir = Path(args.project_dir)
     app_state.project_dir = project_dir
     app_state.project = WiseProject(project_dir)
     app_state.engine, app_state.SessionLocal = init_explore_db(project_dir)
-    
+
     uvicorn.run(app, host="0.0.0.0", port=args.port)

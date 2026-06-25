@@ -6,11 +6,11 @@ services:
       - "8800:8000"  # HTTP
       - "8801:8001"  # gRPC
       - "8802:8002"  # Metrics
-    
+
     environment:
       HF_HOME: "/cache/"
       PYTHONPATH: "/workspace/wise/src/:"
-    
+
     volumes:
       - ./triton/models:/models
       - ./triton/cache:/cache
@@ -29,6 +29,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    
+
     restart: unless-stopped
 

@@ -1,7 +1,7 @@
 # Integration Test
 
 We use the [wikimedia-commons-25](https://thor.robots.ox.ac.uk/wise/assets/test/wikimedia-commons-25.zip) dataset for quickly testing various
-functionalities of the WISE software. This dataset contains only 25 videos sourced from [Wikimedia Commons]() repository and therefore the 
+functionalities of the WISE software. This dataset contains only 25 videos sourced from [Wikimedia Commons]() repository and therefore the
 full test completes in less than 1 minute. This test can be executed as follows.
 
 ```bash
@@ -86,16 +86,16 @@ Test 8.3 PASSED
 *** All tests for wikimedia-commons-edited-videos completed in 60 sec. ***
 ```
 
-To use the triton inference server, run tests with the `FEATURE_EXTRACTOR_CONFIG` 
+To use the triton inference server, run tests with the `FEATURE_EXTRACTOR_CONFIG`
 environment variable defined as follows:
 ```bash
-export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}" 
+export FEATURE_EXTRACTOR_CONFIG="{\"default\": {\"url\": \"localhost:8801\"}}"
 bash test-wikimedia-commons-25.sh  $HOME/temp/
 bash tests/test-wikimedia-commons-images-25.sh $HOME/temp/
 bash tests/test-wikimedia-commons-edited-videos.sh $HOME/temp/
 ```
 
-The aggregator feature enables WISE to aggregate search response from multiple standalone 
+The aggregator feature enables WISE to aggregate search response from multiple standalone
 WISE projects. The aggregator feature can be tested as follows:
 
 ```bash

@@ -15,7 +15,7 @@
 ## limitations under the License.
 
 # Notes:
-# 1. CINEPHILE_DATA_DIR points to `/data/cinephile/` inside the container and is 
+# 1. CINEPHILE_DATA_DIR points to `/data/cinephile/` inside the container and is
 #    set inside the Dockerfile. This folder is volume mapped to a local folder
 #    (e.g. /path/to/local/folder) where all data related to the Cinephile project
 #    will be stored.

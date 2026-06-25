@@ -68,9 +68,9 @@ def load_metadata_from_sqlite(vise_metadata_db):
     # Assuming the table name is 'file_metadata' in the SQLite database
     cursor.execute("SELECT * FROM file_metadata")
     rows = cursor.fetchall()
-    
+
     colnames = [description[0] for description in cursor.description]
-    
+
     for row in rows:
         metadata = {}
         for i, colname in enumerate(colnames):
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Import metadata from VGG Image Search Engine (VISE) project")
     parser.add_argument("--vise-metadata-db", type=str, required=True, help="Path to the SQLite database created by VISE")
     parser.add_argument("--vise-join-colname", type=str, required=True, help="The column that maps to media_path")
-    
+
     parser.add_argument('--out-csv-file',
                         required=True,
                         type=str,

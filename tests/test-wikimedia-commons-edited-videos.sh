@@ -334,7 +334,7 @@ trap cleanup EXIT
 SERVER_URL="http://${HTTP_SERVER_HOST}:${HTTP_SERVER_PORT}/${TEST_ID}/"
 PROJECT_INFO_URL="${SERVER_URL}info"
 SLEEP_DURATION=5
-# Wait for the server to start  
+# Wait for the server to start
 # poll server every 5 seconds for 30 seconds
 for ((i=1; i<=MAX_POLL_SERVER_COUNT; i++)); do
     if curl -s --head --request GET "${PROJECT_INFO_URL}" | grep "200 OK" > /dev/null; then
@@ -477,7 +477,7 @@ if [ "$VIDEO_FEATURE_ID2" == "deepinsight/insightface/buffalo_l/_unknown" ]; the
         echo "Failed to download face image from ${FACE_IMG_URL}"
         exit 1
     fi
-    
+
 
     expected_json='{
     "results": [
@@ -530,7 +530,7 @@ validate_visual_response () {
 }
 # Test 8.3 : check if the server returns correct results (including metadata) for query on video
 if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli" ]; then
-   
+
     expected_json='{
       "merged_windows": [
         {
@@ -544,7 +544,7 @@ if [ "$VIDEO_FEATURE_ID1" == "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli
 
     SEARCH_QUERY="a%20person%20pulling%20a%20rope" # a person pulling a rope
     RESULT_COUNT=1
-    
+
     SEARCH_URL="${SERVER_URL}search?start=0&end=${RESULT_COUNT}&thumbs=0&search_in=video&feature_extractor_id=${VIDEO_FEATURE_ID1}&text_queries=${SEARCH_QUERY}"
     response=$(curl -s -X POST -H "Content-Type: application/json" "${SEARCH_URL}")
     validate_visual_response "8.3 (search)" "$response" "$expected_json"

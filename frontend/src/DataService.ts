@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { useState } from 'react';
-import { 
+import {
   DataServiceOutput,
   ProcessedSearchResults,
   ProcessedVideoSegment,
@@ -27,7 +27,7 @@ import {
   ProcessedImageVector,
   VectorInfo,
   ASRSegment,
-  ViewModality, 
+  ViewModality,
 } from './misc/types.ts';
 import config from './config.ts';
 import { fetchWithTimeout /*, chunk, getArrayOfEmptyArrays */ } from './misc/utils.ts';
@@ -98,7 +98,7 @@ const processShots = (shots: VideoSegment[], processedVideos: Map<string, Proces
 
 const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean = false): ProcessedSearchResponse => {
   console.log('Search response', results);
-  
+
   let processedSearchResults = {
     Image: {
       vectors: [],
@@ -178,7 +178,7 @@ const processSearchResults = (results: SearchResponse, isFeaturedImages: boolean
       processedVideo.shots = processedSearchResults.VideoAudio.merged_windows.filter(shot => shot.media_id === mediaId)
     }
   }
-  
+
   return {
     processedSearchResults,
     time: results.time,
@@ -283,7 +283,7 @@ const fetchSearchResults = (
   const start = pageStart*config.PAGE_SIZE;
   const end = Math.min(getMaxSearchResults(maxSearchResults), pageEnd*config.PAGE_SIZE);
   const metadataFilterQueries = queries.filter(q => q.type === "METADATA");
-  
+
   const formData = convertQueriesToFormData(queries.filter(q => q.type !== "METADATA"));
   const urlParamsArray = [
     ['start', start.toString()],
@@ -296,7 +296,7 @@ const fetchSearchResults = (
   ];
   const urlParams = new URLSearchParams(urlParamsArray);
   const endpoint = `search2?${urlParams.toString()}`;
-  
+
   return fetchWithTimeout(endpoint, config.FETCH_TIMEOUT, {
     method: 'POST',
     body: formData
@@ -381,7 +381,7 @@ export const useDataService = (maxSearchResults?: number): DataServiceOutput => 
   // // Navigate to a different page for the current query
   // const changePageNum = async (page: number) => {
   //   setPageNum(page);
-    
+
   //   // Fetch page if the page hasn't been fetched yet (multiple pages are fetched at once based on config.NUM_PAGES_PER_REQUEST)
   //   if (pagedResults[page].length === 0) {
   //     const fetchStartPageNum =
@@ -394,7 +394,7 @@ export const useDataService = (maxSearchResults?: number): DataServiceOutput => 
   //     } else {
   //       searchResponseJSON = await fetchSearchResults(searchingState.queries, fetchStartPageNum, fetchEndPageNum);
   //     }
-  
+
   //     // Page slicing
   //     setPagedResults(_pagedResults => {
   //       _pagedResults = [..._pagedResults];

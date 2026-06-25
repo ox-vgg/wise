@@ -11,9 +11,9 @@ const IndexView: React.FC<{ state: any }> = ({ state }) => {
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
         {state.facets.map((facet: any) => (
-          <Card 
-            key={facet.id} 
-            title={`${facet.name} Facet`} 
+          <Card
+            key={facet.id}
+            title={`${facet.name} Facet`}
             style={{ width: 300, cursor: 'pointer' }}
             hoverable
             onClick={() => window.location.href = `/${state.project_name}/explore/${facet.name.toLowerCase()}/${getSlug(facet.feature_extractor_id)}/`}

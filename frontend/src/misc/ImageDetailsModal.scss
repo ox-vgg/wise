@@ -85,7 +85,7 @@
             transform: unset;
           }
 
-          > .vds-slider-chapter:nth-of-type(even) {            
+          > .vds-slider-chapter:nth-of-type(even) {
             &::before, &::after {
               content: '';
               position: absolute;
@@ -191,7 +191,7 @@
         top: unset;
       }
     }
-    
+
     &:hover > .wise-image-hover-display, &.wise-image-dropdown-open > .wise-image-hover-display {
       display: block;
       visibility: visible;
@@ -199,7 +199,7 @@
       color: white;
     }
   }
-  
+
   &:hover > .wise-image-hover-display, &.wise-image-dropdown-open > .wise-image-hover-display {
     display: block;
     visibility: visible;

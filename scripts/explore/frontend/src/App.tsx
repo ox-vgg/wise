@@ -16,7 +16,7 @@ declare global {
 
 const App: React.FC = () => {
   const state = window.__INITIAL_STATE__ || { view: 'index', facets: [] };
-  
+
   const getSlug = (feature_extractor_id: string) => {
     const parts = feature_extractor_id.split('/');
     return parts.length > 1 ? parts[1] : feature_extractor_id;

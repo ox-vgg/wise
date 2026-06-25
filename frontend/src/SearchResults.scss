@@ -70,7 +70,7 @@ section#search-results {
       position: relative;
       cursor: pointer;
       box-sizing: border-box;
-      
+
       > i {
         display: block;
       }
@@ -138,7 +138,7 @@ section#search-results {
         text-overflow: ellipsis;
         font-size: 12px;
       }
-      
+
       &:hover > .wise-image-hover-display, &.wise-image-dropdown-open > .wise-image-hover-display {
         display: block;
         visibility: visible;
@@ -182,7 +182,7 @@ section#search-results {
         flex: 1;
         width: 1px; // temporary hack TODO implement better fix later
         margin-left: 20px;
-        
+
         > h1 {
           font-weight: normal;
           font-size: 1.3em;

@@ -39,12 +39,12 @@
         function init() {
             update_query_selector();
         }
-        
+
         function update_query_selector() {
             const query_selector = document.getElementById('query_selector')
             const relevancy_type_selector = document.getElementById('relevancy_type_selector')
             const relevancy_type = relevancy_type_selector.options[relevancy_type_selector.selectedIndex].value;
-            
+
             const payload_id = 'payload_' + relevancy_type
             console.log('setting payload to ' + payload_id)
             payload = eval(payload_id)
@@ -104,7 +104,7 @@
                 video.setAttribute('data-start', start_time)
                 video.setAttribute('data-stop', stop_time)
                 video.addEventListener('play', on_video_play)
-                
+
                 const source = document.createElement('source')
                 source.setAttribute('src', video_url)
                 source.setAttribute('type', 'video/mp4')

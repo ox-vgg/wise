@@ -6,7 +6,7 @@
 
 There are three main ways to update a WISE project:
 
-- **Add New Features:**  
+- **Add New Features:**
   Run `extract-features` on your project without specifying a folder path. Provide the desired feature extractor to process all media files in the project.
   Example (adding face search features):
   ```
@@ -16,7 +16,7 @@ There are three main ways to update a WISE project:
     --project-dir /data/wise/my-project/
   ```
 
-- **Add New Media:**  
+- **Add New Media:**
   Supply a folder containing new media files to `extract-features` to add them to your project.
   ```
   python -m wise extract-features \
@@ -25,7 +25,7 @@ There are three main ways to update a WISE project:
     --project-dir /data/wise/my-project/
   ```
 
-- **Merge Projects:**  
+- **Merge Projects:**
   Combine multiple WISE projects (with the same feature extraction setup but different media) into a new project. This is useful for handling large datasets in smaller chunks. The merge method copies features, thumbnails, media, and shots from source projects, and supports a dry run for review. Metadata merging is not yet automated and must be handled manually via SQLite dumps.
   ```
   python3 -m wise.wise_project merge --into DEST_PROJECT PROJECT_1 PROJECT_2 PROJECT_3 ...

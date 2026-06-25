@@ -25,13 +25,13 @@ type ConfigType = {
     ABOUT: string;
     DISCLAIMER: string;
   };
-  EXAMPLE_QUERIES: string[] | Record<string, string[]>;  
+  EXAMPLE_QUERIES: string[] | Record<string, string[]>;
   MULTIMODAL_EXAMPLE_QUERIES: Record<string, {
     url?: string;
     text?: string;
     displayText?: string;
   }[]>;
-  
+
   ENABLE_REPORT_MEDIA: boolean;
   SHOT_SCALE_FILTER_LABEL: { [key: number]: string };
   METADATA_TABLE_COLUMNS?: string[];

@@ -73,7 +73,7 @@ for id, chunks in stream:
     print(f"{id}:")
     print(f"\tvideo: {(video.tensor.shape, video.pts) if video else None}")
     print(f"\taudio: {(audio.tensor.shape, audio.pts) if audio else None}")
-    print(f"\tthumbnails: {(f'list length: {len(thumbnails.tensor)}', thumbnails.pts) if thumbnails else None}")    
+    print(f"\tthumbnails: {(f'list length: {len(thumbnails.tensor)}', thumbnails.pts) if thumbnails else None}")
 ```
 
 # Outputs

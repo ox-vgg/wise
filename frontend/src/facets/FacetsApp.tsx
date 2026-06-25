@@ -64,7 +64,7 @@ const FacetsApp: React.FC = () => {
           .then(data => {
             setState({
               view: 'index',
-              project_name: '', 
+              project_name: '',
               facets: data
             });
           })

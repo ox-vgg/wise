@@ -40,7 +40,7 @@ const process_example_queries = (exampleQueries: string[] | Record<string, strin
 const exampleQueries = process_example_queries(config.EXAMPLE_QUERIES);
 const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handleExampleQueryClick, projectInfo, tourVariables}) => {
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
-  
+
   const _handleExampleQueryClick = (query: string) => {
     setIsTourOpen(false); // Close the tour (and the search dropdown as well) when the user clicks on the example query inside the tour
     handleExampleQueryClick(query);
@@ -50,7 +50,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
     {
       title: 'Enter your search query here',
       description: <>
-        You can enter a detailed description such as 
+        You can enter a detailed description such as
         <Button size="small" shape="round" type='primary' ghost onClick={() => _handleExampleQueryClick('hand holding a cup')}>Hand holding a cup</Button>
         <br />
         WISE uses a language model to understand the meaning behind your query, allowing you to flexibly describe what you are looking for. WISE then tries to find images whose visual contents match what you are trying to look for.
@@ -167,7 +167,7 @@ const WiseOverviewCard: React.FunctionComponent<WiseOverviewCardProps> = ({handl
     'Overview': (
       <div className="wise-overview">
         {config.WISE_OVERVIEW_CARD.OVERVIEW ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(config.WISE_OVERVIEW_CARD.OVERVIEW) }}></div> : <></>}
-        {projectInfo.num_vectors ? 
+        {projectInfo.num_vectors ?
           <p>Here, you can search within a set of {projectInfo.num_media_files?.toLocaleString('en-us')} media files ({projectInfo.num_vectors?.toLocaleString('en-us')} vectors).</p>
           :
           <></>

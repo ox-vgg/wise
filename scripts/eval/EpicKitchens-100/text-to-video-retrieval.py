@@ -63,7 +63,7 @@ def get_video_vector_ids(project_dir, video_ids, start_times, stop_times, delta_
     if not index_exists:
         cursor.execute(
             f"CREATE INDEX {index_name} ON vectors (media_id, timestamp, modality, id)"
-        )    
+        )
 
     # Prepare final results
     for i, video_id in enumerate(tqdm(video_ids)):
@@ -72,7 +72,7 @@ def get_video_vector_ids(project_dir, video_ids, start_times, stop_times, delta_
         if media_id is not None:
             start_time = max(start_times[i] - delta_time, 0)
             stop_time = stop_times[i] + delta_time
-            
+
             cursor.execute(
                 "SELECT id FROM vectors WHERE media_id = ? AND timestamp BETWEEN ? AND ? AND modality = ?",
                 (media_id, start_time, stop_time, "VIDEO"),
@@ -80,7 +80,7 @@ def get_video_vector_ids(project_dir, video_ids, start_times, stop_times, delta_
 
             vector_id_list = [row[0] for row in cursor.fetchall()]
             video_vector_id_list.append(vector_id_list)
-            
+
             #print(f"[{i}/{len(video_ids)}] video_id: {video_id}, start_time: {start_time}, stop_time: {stop_time}, vector_id_list: {video_vector_id_list[i]}")
         else:
             video_vector_id_list.append([]) # an indicator of missing video
@@ -101,7 +101,7 @@ def get_video_embeddings(project_dir, video_vector_ids, vector_merge_type):
     index_type = 'IndexFlatIP'
     asset_id = list(project_assets[media_type].keys())[0]
     index_dir = Path(project_assets[media_type][asset_id]['index_dir'])
-    
+
     index_fn = index_dir / (media_type + '-' + index_type + '.faiss')
     index = faiss.read_index(index_fn.as_posix(), faiss.IO_FLAG_READ_ONLY)
     #print(f'loaded index with {index.ntotal} features of {index.d} dimensions')
@@ -126,7 +126,7 @@ def get_video_embeddings(project_dir, video_vector_ids, vector_merge_type):
                 else:
                     median_index = int((len(vector_ids) + 1) / 2)
                     video_embeddings[video_index] = features[median_index]
-    
+
     return video_embeddings
 
 def compute_text_embedding(project_dir, text_queries):
@@ -175,13 +175,13 @@ def calculate_mAP(sim_mat, relevancy_matrix):
     cumulative_rel_mat = np.cumsum(ranked_rel_mat, axis=1)
     #Mask this ensuring that it is non zero if the kth term is 1 (rel(k) above)
     cumulative_rel_mat[ranked_rel_mat != 1] = 0
-    
+
     #find the divisor for p(k)
     divisor = np.arange(ranked_rel_mat.shape[1]) + 1
 
     #find the number of relevant docs per query item
     number_rel_docs = np.sum(ranked_rel_mat==1, axis=1)
-    
+
     #find the average precision per query, within np.sum finds p(k) * rel(k)
     avg_precision = np.sum(cumulative_rel_mat / divisor, axis=1) / number_rel_docs
 
@@ -202,7 +202,7 @@ def get_media_ids(project_dir, video_ids):
 
     # Fetch all media IDs in one query
     cursor.execute(
-        f"SELECT id, path FROM media WHERE path IN ({','.join(['?']*len(media_paths))})", 
+        f"SELECT id, path FROM media WHERE path IN ({','.join(['?']*len(media_paths))})",
         media_paths
     )
     media_id_map = {path: media_id for media_id, path in cursor.fetchall()}
@@ -216,13 +216,13 @@ def get_media_ids(project_dir, video_ids):
     internal_db.close()
     return media_ids
 
-def visualise_retrieval_results(args, 
-                                text_queries, 
-                                video_ids, 
-                                start_times, 
-                                stop_times, 
-                                video_vector_ids, 
-                                similarity_scores, 
+def visualise_retrieval_results(args,
+                                text_queries,
+                                video_ids,
+                                start_times,
+                                stop_times,
+                                video_vector_ids,
+                                similarity_scores,
                                 relevancy_matrix):
     average_precision, mAP = calculate_mAP(similarity_scores, relevancy_matrix)
 
@@ -252,7 +252,7 @@ def visualise_retrieval_results(args,
         delta = 0.5 # for video segments with less than 0.5 sec duration
         video_thumbnails= get_video_thumbnails(args.project_dir, video_ids, start_times, stop_times, delta)
         print(f'retrieved {len(video_thumbnails)} thumbnails')
-    
+
         for i in range(len(video_thumbnails)):
             if len(video_thumbnails[i]) == 0:
                 continue
@@ -261,7 +261,7 @@ def visualise_retrieval_results(args,
         print(f'saved thumbnails to {thumb_dir}')
     else:
         print(f'using existing thumbnails from {thumb_dir}')
-    
+
     media_ids = get_media_ids(args.project_dir, video_ids)
     payload = {
         'video_ids': video_ids,
@@ -274,7 +274,7 @@ def visualise_retrieval_results(args,
         'mAP': mAP,
         'sorted_by_ap':[]
     }
-    
+
     MAX_RESULT = 20
     for ap, qi in sorted_pairs:
         query_results = {
@@ -297,7 +297,7 @@ def visualise_retrieval_results(args,
                 break
             if k >= MAX_RESULT:
                 break
-        
+
         payload['sorted_by_ap'].append(query_results)
     if args.binary_relevancy:
         suffix = 'binary_relevancy'
@@ -333,7 +333,7 @@ def get_video_thumbnails(project_dir, video_ids, start_times, stop_times, delta_
     media_paths = [f"{video_id.split('_')[0]}/videos/{video_id}.MP4" for video_id in video_ids] # P01/videos/P01_14.MP4
     # Fetch all media IDs in one query
     cursor.execute(
-        f"SELECT id, path FROM media WHERE path IN ({','.join(['?']*len(media_paths))})", 
+        f"SELECT id, path FROM media WHERE path IN ({','.join(['?']*len(media_paths))})",
         media_paths
     )
     media_id_map = {path: media_id for media_id, path in cursor.fetchall()}
@@ -438,7 +438,7 @@ if __name__ == '__main__':
     # cannot convert or read these videos in the EpicKitchens-100 dataset
     # P29_01.MP4, P29_05.MP4, P30_05.MP4, P30_08.MP4
     #missing_video_id = ['P29_01', 'P29_05', 'P30_05', 'P30_08']
-    
+
     # create a 8773x768 matrix containing feature vectors for 8773 video segments
     video_vector_ids_filename = os.path.join(args.out_dir, 'video_vector_ids.json')
     if not os.path.exists(video_vector_ids_filename):
@@ -451,10 +451,10 @@ if __name__ == '__main__':
         video_vector_ids = get_video_vector_ids(args.project_dir, video_ids, start_times, stop_times, delta_time)
         with open(video_vector_ids_filename, 'w') as f:
             json.dump(video_vector_ids, f)
-    
+
     with open(video_vector_ids_filename, 'r') as f:
         video_vector_ids = json.load(f)
-    
+
     assert len(video_ids) == len(video_vector_ids)
     print(f'loaded vector_ids for {len(video_ids)} segments')
 
@@ -476,12 +476,12 @@ if __name__ == '__main__':
         with open(video_embedding_filename, 'rb') as f:
             video_embeddings = np.load(video_embedding_filename)
     print(f'loaded video embeddings of shape {video_embeddings.shape}')
-    
+
     # CSV format: narration_id,narration
     query_data = pd.read_csv( Path(args.path_epic_annotations) / "EPIC_100_retrieval_test_sentence.csv")
     text_query_ids = query_data.values[:, 0]
     text_queries = query_data.values[:, 1]
-    
+
     # compute text embeddings
     text_embedding_filename = os.path.join(args.out_dir, 'text_embedding.npy')
     if not os.path.exists(text_embedding_filename):
@@ -492,11 +492,11 @@ if __name__ == '__main__':
         with open(text_embedding_filename, 'rb') as f:
             text_embeddings = np.load(text_embedding_filename)
     print(f'loaded text embeddings of shape {text_embeddings.shape}')
-    
+
     # compute similarity score between 3842 query sentences and 9668 videos segments
     # video_embeddings = 9668 x 1024
     # text_embeddings  = 3842 x 1024
-    # similarity_scores is a 3842x9668 matrix (S) with scores between 0 and 1 
+    # similarity_scores is a 3842x9668 matrix (S) with scores between 0 and 1
     # with S[i][j] representing the similarity between the ith video and the jth caption.
     # For references, see:
     # - https://github.com/adrianofragomeni/MI-MM/blob/main/src/testing.py
@@ -504,18 +504,18 @@ if __name__ == '__main__':
     # - https://github.com/adrianofragomeni/MI-MM/blob/main/src/evaluation/mAP.py
     similarity_scores = np.matmul(text_embeddings, video_embeddings.T)
     print(f'computed similarity score of shape {similarity_scores.shape}')
-    
+
     # load relevancy matrix created using
     # https://github.com/mwray/Joint-Part-of-Speech-Embeddings/blob/main/src/scripts/create_relevancy_files.py
     relevancy_matrix = pd.read_pickle(args.relevancy_matrix)
     relevancy_matrix = relevancy_matrix.T
     print(f'loaded relevancy matrix of shape {relevancy_matrix.shape}')
-    
+
     # update the relevancy matrix to take into account the missing video segments
     print(f'removing {len(missing_video_index)} missing video segments from relevancy matrix')
     for video_index in missing_video_index:
         relevancy_matrix[:, video_index] = 0
-    
+
     if args.binary_relevancy:
         relevancy_matrix[relevancy_matrix != 1 ] = 0
         print(f'forcing relevancy matrix to be a binary indicator')
@@ -531,11 +531,11 @@ if __name__ == '__main__':
             print(f'{text_query} : {ap:.2f}')
 
     if args.export_visualisation:
-        visualise_retrieval_results(args, 
-                                    text_queries, 
-                                    video_ids, 
-                                    start_times, 
-                                    stop_times, 
-                                    video_vector_ids, 
-                                    similarity_scores, 
+        visualise_retrieval_results(args,
+                                    text_queries,
+                                    video_ids,
+                                    start_times,
+                                    stop_times,
+                                    video_vector_ids,
+                                    similarity_scores,
                                     relevancy_matrix)
