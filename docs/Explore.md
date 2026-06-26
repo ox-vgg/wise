@@ -37,12 +37,17 @@ python3 scripts/explore/cluster_faces.py \
   --similarity-threshold 0.7
 
 # 3. Manually review the face clusters and set their status to "Reviewed"
-# if the cluster is well formed. Add other metadata such as "description"
-# "reference", etc. to the cluster and press "Publish" button in the
-# top-right corner. This creates the following three tables in the
+# if the cluster is well formed. If two or more clusters show the same
+# individual's face, they can be merged into a cluster. Metadata such
+# as "description", "reference_url", etc. can also be added to the clusters.
+# Ensure that all the clusters that you want to show in the WISE frontend
+# search interface have their status set to "Reviewed". Finally, press the
+# "Publish" button in the top-right corner. This creates the following
+# three tables in the
 # /tmp/wise/wise-test/wise-project/wikimedia-commons-25/metadata/internal.db
 # SQLite database:
 #     facets, cluster_metadata, facet_metadata
+#
 cd $HOME/wise/scripts/explore/frontend
 npm install && npm run build # needs to be done only once
 
@@ -51,25 +56,7 @@ python3 scripts/explore/explore.py \
   --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
   --port 10101
 
-# [Optional] 3b. Re-run the clustering algorithm to improve clusters based
-# on manually reviewed clusters.
-cd $HOME/wise/
-python3 scripts/explore/cluster_faces.py \
-  --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
-  --feature-extractor-id "deepinsight/insightface/buffalo_l/_unknown"\
-  --k-neighbors 50 \
-  --similarity-threshold 0.7
-
-# [Optional] 3c. Review updated face clusters and see if new face clusters
-# can be published.
-python3 scripts/explore/explore.py \
-  --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/ \
-  --port 10101
-
-# 4. [Optional] Repeat Steps 3b and 3c as required.
-# See scripts/explore/README.md for more details about the iterative workflow
-
-# 5. Serve project with facets enabled
+# 4. Serve project with facets enabled
 ENABLE_FACETS=true PORT=10102 wise serve \
   --project-dir /tmp/wise/wise-test/wise-project/wikimedia-commons-25/
 ```

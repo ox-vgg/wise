@@ -34,6 +34,24 @@ def cluster_faces(project_dir: Path, feature_extractor_id: str, k_neighbors: int
             session.refresh(facet)
         facet_id = facet.id
 
+        # Iterative refinement (2nd iteration), which refines clustering using
+        # manually-reviewed clusters as constraints, is not stable yet. The presence
+        # of reviewed and/or merged clusters means clustering has already been run and
+        # reviewed once, so terminate instead of running an unstable second iteration.
+        known_count = session.query(KnownFaceCluster.cluster_id).distinct().count()
+        reviewed_count = session.query(Cluster).filter(
+            Cluster.facet_id == facet_id,
+            Cluster.status != ClusterStatus.draft,
+        ).count()
+        if known_count > 0 or reviewed_count > 0:
+            logger.warning(
+                "Reviewed and/or merged clusters already exist for this facet. "
+                "Iterative refinement (2nd iteration) is disabled because it is not "
+                "stable yet, so clustering will not be re-run. To start over, clear the "
+                "existing clusters from explore.db before running this script again."
+            )
+            return
+
         logger.info("Clearing old draft clusters...")
         draft_cluster_ids = session.query(Cluster.id).filter_by(facet_id=facet_id, status=ClusterStatus.draft).all()
         if draft_cluster_ids:
