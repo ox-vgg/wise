@@ -33,6 +33,7 @@ class MediaType(str, enum.Enum):
     AUDIO = "audio"
     AV = "av"
 
+
 class ModalityType(str, enum.Enum):
     TEXT = "text"
     IMAGE = "image"
@@ -103,11 +104,13 @@ class ExtraMediaMetadata(BaseModel):
     external_id: Optional[str] = None
     metadata: dict[str, Any]  # TODO: narrow the type
 
+
 class ExploreFacet(BaseModel):
     id: Optional[int] = None
     name: str
     feature_extractor_id: str
     model_config = ConfigDict(from_attributes=True)
+
 
 class FacetMetadata(BaseModel):
     id: Optional[int] = None
@@ -115,6 +118,7 @@ class FacetMetadata(BaseModel):
     facet_id: int
     cluster_id: int
     model_config = ConfigDict(from_attributes=True)
+
 
 class ClusterMetadata(BaseModel):
     id: Optional[int] = None
@@ -129,6 +133,7 @@ class ClusterMetadata(BaseModel):
 class URL(str):
     pass
 
+
 class VideoShot(BaseModel):
     id: int
     media_id: int
@@ -138,17 +143,20 @@ class VideoShot(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class SourceMediaType(str, enum.Enum):
     AUDIO = "audio"
     VIDEO = "video"
     IMAGE = "image"
     AV = "av"
 
+
 class MediaChunkType(str, enum.Enum):
     AUDIO = "audio"
     VIDEO = "video"
     THUMBNAILS = "thumbnails"
-    IMAGE = 'image'
+    IMAGE = "image"
+
 
 @dataclasses.dataclass
 class DatasetPayload(object):

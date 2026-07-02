@@ -33,7 +33,6 @@ from wise.feature.feature_extractor import (
 )
 from wise.feature.hf_models import get_model_info
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -61,9 +60,9 @@ class _Qwen3VLForEmbedding(Qwen3VLPreTrainedModel):
 # FRAME_MAX_PIXELS caps each individual frame; MAX_TOTAL_PIXELS caps the total across
 # all frames in a segment, letting fetch_video do proportional smart-resize.
 _IMAGE_PATCH_SIZE = 16
-_IMAGE_FACTOR = _IMAGE_PATCH_SIZE * 2          # 32
-_FRAME_MAX_PIXELS = 768 * _IMAGE_FACTOR ** 2   # 786 432 ≈ 896×896 per frame
-_MAX_TOTAL_PIXELS = 10 * _FRAME_MAX_PIXELS     # 7 864 320 across all frames
+_IMAGE_FACTOR = _IMAGE_PATCH_SIZE * 2  # 32
+_FRAME_MAX_PIXELS = 768 * _IMAGE_FACTOR**2  # 786 432 ≈ 896×896 per frame
+_MAX_TOTAL_PIXELS = 10 * _FRAME_MAX_PIXELS  # 7 864 320 across all frames
 
 
 class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
@@ -117,8 +116,11 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
         import logging as _logging
 
         from transformers import AutoProcessor
+
         logger.info(
-            "Loading Qwen3-VL-Embedding model %s on %s", self._hf_model_id, self.DEVICE
+            "Loading Qwen3-VL-Embedding model %s on %s",
+            self._hf_model_id,
+            self.DEVICE,
         )
         # padding_side='right' is required for last-token pooling: with right-padding
         # the last real token is always at index (attention_mask.sum() - 1).
@@ -136,7 +138,11 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
             model = _Qwen3VLForEmbedding.from_pretrained(
                 self._hf_model_id,
                 trust_remote_code=True,
-                dtype=torch.float16 if self.DEVICE.type == "cuda" else torch.float32,
+                dtype=(
+                    torch.float16
+                    if self.DEVICE.type == "cuda"
+                    else torch.float32
+                ),
                 device_map={"": self.DEVICE},
             )
         finally:
@@ -144,7 +150,9 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
         model.eval()
         logger.info("Qwen3-VL-Embedding model loaded on %s", self.DEVICE)
         if self.compile and self.DEVICE.type == "cuda":
-            logger.info("Compiling Qwen3-VL model with torch.compile (this may take several minutes)")
+            logger.info(
+                "Compiling Qwen3-VL model with torch.compile (this may take several minutes)"
+            )
             model = torch.compile(model, mode="reduce-overhead")
         return model, processor
 
@@ -157,7 +165,9 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
         return self._model_and_processor[1]
 
     @staticmethod
-    def _last_token_pool(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    def _last_token_pool(
+        last_hidden_state: torch.Tensor, attention_mask: torch.Tensor
+    ) -> torch.Tensor:
         """Last-token pooling: take the final non-padding token's hidden state.
 
         Qwen3-VL is a causal decoder — position 0 (BOS) attends only to itself
@@ -168,7 +178,8 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
         sequence_lengths = attention_mask.sum(dim=1) - 1
         batch_size = last_hidden_state.shape[0]
         return last_hidden_state[
-            torch.arange(batch_size, device=last_hidden_state.device), sequence_lengths
+            torch.arange(batch_size, device=last_hidden_state.device),
+            sequence_lengths,
         ]
 
     def preprocess_video_segment(self, frames: torch.Tensor) -> torch.Tensor:
@@ -223,8 +234,10 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
             messages, tokenize=False, add_generation_prompt=True
         )
         image_inputs, video_inputs, video_kwargs = process_vision_info(
-            messages, image_patch_size=_IMAGE_PATCH_SIZE,
-            return_video_metadata=True, return_video_kwargs=True,
+            messages,
+            image_patch_size=_IMAGE_PATCH_SIZE,
+            return_video_metadata=True,
+            return_video_kwargs=True,
         )
         if video_inputs is not None:
             videos, video_metadata = zip(*video_inputs)
@@ -245,7 +258,9 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
 
         outputs = model(**inputs)
 
-        embedding = self._last_token_pool(outputs.last_hidden_state, inputs["attention_mask"])
+        embedding = self._last_token_pool(
+            outputs.last_hidden_state, inputs["attention_mask"]
+        )
         embedding = embedding.float()
         embedding = embedding / embedding.norm(dim=-1, keepdim=True)
         return Features(vectors=embedding.cpu().numpy(), metadata=None)
@@ -258,9 +273,13 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
         # the same embedding space as video segments (both use the same format).
         texts = []
         for q in text_query:
-            messages = [{"role": "user", "content": [{"type": "text", "text": q}]}]
+            messages = [
+                {"role": "user", "content": [{"type": "text", "text": q}]}
+            ]
             texts.append(
-                processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                processor.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
             )
 
         inputs = processor(
@@ -273,7 +292,9 @@ class Qwen3VLEmbeddingFeatureExtractor(FeatureExtractor):
 
         outputs = model(**inputs)
 
-        embedding = self._last_token_pool(outputs.last_hidden_state, inputs["attention_mask"])
+        embedding = self._last_token_pool(
+            outputs.last_hidden_state, inputs["attention_mask"]
+        )
         embedding = embedding.float()
         embedding = embedding / embedding.norm(dim=-1, keepdim=True)
         return embedding.cpu().numpy()

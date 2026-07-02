@@ -43,13 +43,15 @@ from wise.feature.feature_extractor import (
     get_torch_device,
 )
 
-
 logger = logging.getLogger(__name__)
+
 
 def flatten_patch_features(feature_map: torch.Tensor) -> torch.Tensor:
     assert feature_map.ndim == 4
     batch_sz, num_patches_h, num_patches_w, hidden_dim = feature_map.shape
-    return feature_map.reshape((batch_sz, num_patches_h * num_patches_w, hidden_dim))
+    return feature_map.reshape(
+        (batch_sz, num_patches_h * num_patches_w, hidden_dim)
+    )
 
 
 def sort_by_objectness(objectness_scores, embeds, pred_boxes):
@@ -76,8 +78,8 @@ def sort_by_objectness(objectness_scores, embeds, pred_boxes):
 
 
 def owlv2_bbox_to_xywh(
-        owlv2_bbox: np.ndarray, im_width: int, im_height: int
-    ) -> np.ndarray:
+    owlv2_bbox: np.ndarray, im_width: int, im_height: int
+) -> np.ndarray:
     """Convert bbox coordinates from OWLv2 format to XYWH.
 
     The original bounding box coordinates from OWLv2 are normalized
@@ -90,17 +92,17 @@ def owlv2_bbox_to_xywh(
     x_center, y_center, width, height = owlv2_bbox
 
     # Get coordinates of top left corner
-    x0 = x_center - width/2
-    y0 = y_center - height/2
+    x0 = x_center - width / 2
+    y0 = y_center - height / 2
 
     # Adjust bounding box coordinates to account for square padding applied
     # to the input image
     if im_width > im_height:
-        y0 *= im_width/im_height
-        height *= im_width/im_height
+        y0 *= im_width / im_height
+        height *= im_width / im_height
     else:
-        x0 *= im_height/im_width
-        width *= im_height/im_width
+        x0 *= im_height / im_width
+        width *= im_height / im_width
     return np.array([x0, y0, width, height])
 
 
@@ -118,7 +120,8 @@ def get_object_features(model: Owlv2ForObjectDetection, images: torch.Tensor):
     # Normalize image features
     # shape of batch_image_class_embeds: (B, 3600, 512)
     batch_image_class_embeds = batch_image_class_embeds / (
-        torch.linalg.norm(batch_image_class_embeds, dim=-1, keepdim=True) + 1e-6
+        torch.linalg.norm(batch_image_class_embeds, dim=-1, keepdim=True)
+        + 1e-6
     )
 
     # Apply a learnable shift and scale to logits
@@ -138,7 +141,9 @@ def get_object_features(model: Owlv2ForObjectDetection, images: torch.Tensor):
 
     # Predict objectness
     batch_objectness_logits = model.objectness_predictor(batch_image_feats)
-    batch_objectness_scores = torch.sigmoid(batch_objectness_logits)  # shape: (B, 3600)
+    batch_objectness_scores = torch.sigmoid(
+        batch_objectness_logits
+    )  # shape: (B, 3600)
 
     # Predict object boxes
     batch_pred_boxes = model.box_predictor(
@@ -180,7 +185,13 @@ class OWLv2FeatureMetadata(FeatureExtMetadata):
     objectness_score: float
 
     @classmethod
-    def from_owlv2(cls, owlv2_bbox: np.ndarray, objectness_score: np.floating, im_width: int, im_height: int):
+    def from_owlv2(
+        cls,
+        owlv2_bbox: np.ndarray,
+        objectness_score: np.floating,
+        im_width: int,
+        im_height: int,
+    ):
         """
         Creates a OWLv2FeatureMetadata instance with the bounding box and
         objectness score of a single object (patch) detected by OWLv2. The
@@ -232,7 +243,7 @@ class OWLv2FeatureMetadata(FeatureExtMetadata):
     def to_sql_values(self, vector_id: int):
         return {
             "vector_id": vector_id,
-            "objectness_score" : self.objectness_score,
+            "objectness_score": self.objectness_score,
             "bbox_x": self.bbox.x,
             "bbox_y": self.bbox.y,
             "bbox_w": self.bbox.w,
@@ -245,6 +256,7 @@ class TransformersOWLv2Model(MultiModalModel):
     A MultiModalModel wrapper for the OWLv2 model from HuggingFace Transformers.
     This class is used to load the OWLv2 model and perform inference on it.
     """
+
     @cached_property
     def model(self) -> Owlv2ForObjectDetection:
         """
@@ -304,7 +316,11 @@ class TransformersOWLv2Model(MultiModalModel):
     get_audio_features = None  # OWLv2 does not support audio features
 
     def export_to_onnx(
-        self, save_path: str, visual_inputs: tuple, text_inputs: tuple, **kwargs
+        self,
+        save_path: str,
+        visual_inputs: tuple,
+        text_inputs: tuple,
+        **kwargs,
     ):
         """
         Export the OWLv2 model to ONNX format.
@@ -400,8 +416,10 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
     see FeatureExtractor.py for documentation of API
     """
 
-    ID_PREFIX = 'transformers/owlv2/'
-    DESCRIPTION = 'See https://huggingface.co/docs/transformers/en/model_doc/owlv2'
+    ID_PREFIX = "transformers/owlv2/"
+    DESCRIPTION = (
+        "See https://huggingface.co/docs/transformers/en/model_doc/owlv2"
+    )
 
     ## OWLv2 does not support audio
     preprocess_audio = None
@@ -460,11 +478,15 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
             vectors that need to be stored and indexed
         """
         if not id.startswith(self.ID_PREFIX):
-            raise ValueError(f'feature id cannot start with {id} and must start with {self.ID_PREFIX}')
-        id_tokens = id.split('/')
+            raise ValueError(
+                f"feature id cannot start with {id} and must start with {self.ID_PREFIX}"
+            )
+        id_tokens = id.split("/")
 
         assert len(id_tokens) == 4
-        self.model_name = id[len(self.ID_PREFIX):] # remove ID_PREFIX from id string
+        self.model_name = id[
+            len(self.ID_PREFIX) :
+        ]  # remove ID_PREFIX from id string
 
         self.DEVICE = get_torch_device(device)
         self.objectness_threshold = config.objectness_threshold
@@ -495,7 +517,10 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
 
     @classmethod
     def add_to_vector_metadata_table(
-        cls, conn:sa.Connection, vid: list[int], metadata: list[OWLv2FeatureMetadata]
+        cls,
+        conn: sa.Connection,
+        vid: list[int],
+        metadata: list[OWLv2FeatureMetadata],
     ) -> None:
         ## This condition is needed because insert with an empty list
         ## does an insert with NULLs instead of "nothing".  See
@@ -511,9 +536,13 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
         # to be passed into wise_db.prepare_filter_stmt
         c = cls._vector_metadata_table.c
         return (
-            sa.select(c.objectness_score, c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h)
+            sa.select(
+                c.objectness_score, c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h
+            )
             .select_from(
-                cte.join(cls._vector_metadata_table, c.vector_id == cte.c.vector_id)
+                cte.join(
+                    cls._vector_metadata_table, c.vector_id == cte.c.vector_id
+                )
             )
             .order_by(cte.c.rank)
         )
@@ -538,16 +567,22 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
         assert len(vid) == len(res)
         return res
 
-    def preprocess_image(self, images: torch.Tensor | list[Image.Image]) -> torch.Tensor:
+    def preprocess_image(
+        self, images: torch.Tensor | list[Image.Image]
+    ) -> torch.Tensor:
         if isinstance(images, torch.Tensor):
             if images.ndim != 4 or images.shape[1] != 3:
-                raise ValueError("expect tensor images to be RGB in NCHW order")
+                raise ValueError(
+                    "expect tensor images to be RGB in NCHW order"
+                )
         elif isinstance(images, list):
             if not all([isinstance(x, Image.Image) for x in images]):
                 raise TypeError("expect list images to all be PIL Image")
             images = torch.stack([pil_to_tensor(img) for img in images])
         else:
-            raise TypeError("unexpected input images of type %s" % type(images))
+            raise TypeError(
+                "unexpected input images of type %s" % type(images)
+            )
         return images
 
     @torch.inference_mode()
@@ -596,10 +631,14 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
               patch in a given image.
         """
         if not isinstance(images, torch.Tensor):
-            raise ValueError('input to extract_features() must be an instance of torch.Tensor')
+            raise ValueError(
+                "input to extract_features() must be an instance of torch.Tensor"
+            )
 
         # Save original image sizes in a list before they get resized
-        orig_sizes = [(image.shape[2], image.shape[1]) for image in images] # list of (width, height) tuples
+        orig_sizes = [
+            (image.shape[2], image.shape[1]) for image in images
+        ]  # list of (width, height) tuples
         # Preprocess image (including resizing)
         images = self.processor(images=images, return_tensors="pt")[
             "pixel_values"
@@ -645,22 +684,39 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
             patchwise_objectness_scores,
             patchwise_pred_boxes,
             orig_size,
-        ) in zip(batch_image_class_embeds, batch_objectness_scores, batch_pred_boxes, orig_sizes):
+        ) in zip(
+            batch_image_class_embeds,
+            batch_objectness_scores,
+            batch_pred_boxes,
+            orig_sizes,
+        ):
             # Filter boxes by objectness score
-            remaining_mask = patchwise_objectness_scores >= self.objectness_threshold
-            patchwise_image_class_embeds = patchwise_image_class_embeds[remaining_mask]
-            patchwise_objectness_scores = patchwise_objectness_scores[remaining_mask]
+            remaining_mask = (
+                patchwise_objectness_scores >= self.objectness_threshold
+            )
+            patchwise_image_class_embeds = patchwise_image_class_embeds[
+                remaining_mask
+            ]
+            patchwise_objectness_scores = patchwise_objectness_scores[
+                remaining_mask
+            ]
             patchwise_pred_boxes = patchwise_pred_boxes[remaining_mask]
 
             feature_metadata = [
-                OWLv2FeatureMetadata.from_owlv2(pred_box, objectness_score, *orig_size)
-                for pred_box, objectness_score in zip(patchwise_pred_boxes, patchwise_objectness_scores)
+                OWLv2FeatureMetadata.from_owlv2(
+                    pred_box, objectness_score, *orig_size
+                )
+                for pred_box, objectness_score in zip(
+                    patchwise_pred_boxes, patchwise_objectness_scores
+                )
             ]
             features.append(
-                Features(vectors=patchwise_image_class_embeds, metadata=feature_metadata)
+                Features(
+                    vectors=patchwise_image_class_embeds,
+                    metadata=feature_metadata,
+                )
             )
         return features
-
 
     def preprocess_image_region(
         self, image: torch.Tensor | Image.Image, region: BBoxXYWH
@@ -671,7 +727,6 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
         self, image: torch.Tensor, region: BBoxXYWH
     ) -> Features:
         return self._extract_image_region_features_highest_iou(image, region)
-
 
     def preprocess_text(self, text_query: list[str]) -> dict:
         """
@@ -691,9 +746,7 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
 
     @torch.inference_mode()
     def extract_text_features(
-        self,
-        text_query: list[str],
-        return_augmented_features: bool = True
+        self, text_query: list[str], return_augmented_features: bool = True
     ) -> np.ndarray:
         """
         Extract text features/embeddings for a list of text queries
@@ -728,15 +781,21 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
         """
         inputs = self.preprocess_text(text_query)
         text_embeds = self.model.get_text_features(**inputs)
-        return text_embeds.cpu().numpy() # shape: (N, 513)
+        return text_embeds.cpu().numpy()  # shape: (N, 513)
 
-    def transform_internal_image_queries_hook(self, vec: np.ndarray) -> np.ndarray:
+    def transform_internal_image_queries_hook(
+        self, vec: np.ndarray
+    ) -> np.ndarray:
         ## Change the vector augmentation of the internal feature vector
 
         # Un-augment feature vector
         # Original shape of vec: (N, 769)
-        vec = vec[:, :-1]  # Remove extra logit_shift element (new shape: (N, 768))
-        vec /= np.linalg.norm(vec, axis=-1, keepdims=True)  # Normalize vector to undo logit_scale
+        vec = vec[
+            :, :-1
+        ]  # Remove extra logit_shift element (new shape: (N, 768))
+        vec /= np.linalg.norm(
+            vec, axis=-1, keepdims=True
+        )  # Normalize vector to undo logit_scale
 
         # Re-augment
         vec = np.concatenate(
@@ -746,7 +805,7 @@ class TransformersOWLv2FeatureExtractor(FeatureExtractor):
 
     def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
         # Apply sigmoid transformation to the logits (dot products) from Faiss.
-        return 1. / (1. + np.exp(-dist))
+        return 1.0 / (1.0 + np.exp(-dist))
 
     def warmup(self):
         random_image = torch.rand((1, 3, 512, 512))

@@ -27,10 +27,12 @@ from wise.api.services.embedding import EmbeddingService
 from wise.api.services.project import RemoteWiseProjectService
 from wise.data_models import MediaType
 
-
 logger = logging.getLogger(__name__)
 
-def merge_response(a: common.SearchResponse, b: common.SearchResponse) -> common.SearchResponse:
+
+def merge_response(
+    a: common.SearchResponse, b: common.SearchResponse
+) -> common.SearchResponse:
     if a.image_results and b.image_results:
         a.image_results.total += b.image_results.total
         a.image_results.vectors.extend(b.image_results.vectors)
@@ -40,7 +42,9 @@ def merge_response(a: common.SearchResponse, b: common.SearchResponse) -> common
 
     if a.video_results and b.video_results:
         a.video_results.total += b.video_results.total
-        a.video_results.unmerged_windows.extend(b.video_results.unmerged_windows)
+        a.video_results.unmerged_windows.extend(
+            b.video_results.unmerged_windows
+        )
         a.video_results.merged_windows.extend(b.video_results.merged_windows)
         a.video_results.videos.update(b.video_results.videos)
     elif b.video_results:
@@ -48,86 +52,127 @@ def merge_response(a: common.SearchResponse, b: common.SearchResponse) -> common
 
     if a.video_audio_results and b.video_audio_results:
         a.video_audio_results.total += b.video_audio_results.total
-        a.video_audio_results.unmerged_windows.extend(b.video_audio_results.unmerged_windows)
-        a.video_audio_results.merged_windows.extend(b.video_audio_results.merged_windows)
+        a.video_audio_results.unmerged_windows.extend(
+            b.video_audio_results.unmerged_windows
+        )
+        a.video_audio_results.merged_windows.extend(
+            b.video_audio_results.merged_windows
+        )
         a.video_audio_results.videos.update(b.video_audio_results.videos)
     elif b.video_audio_results:
         a.video_audio_results = b.video_audio_results
 
     return a
 
+
 def sort_response(response: common.SearchResponse) -> common.SearchResponse:
     if response.image_results:
-        response.image_results.vectors.sort(key=lambda x: x.distance, reverse=True)
+        response.image_results.vectors.sort(
+            key=lambda x: x.distance, reverse=True
+        )
     if response.video_results:
-        response.video_results.unmerged_windows.sort(key=lambda x: x.distance, reverse=True)
-        response.video_results.merged_windows.sort(key=lambda x: x.distance, reverse=True)
+        response.video_results.unmerged_windows.sort(
+            key=lambda x: x.distance, reverse=True
+        )
+        response.video_results.merged_windows.sort(
+            key=lambda x: x.distance, reverse=True
+        )
     if response.video_audio_results:
-        response.video_audio_results.unmerged_windows.sort(key=lambda x: x.distance, reverse=True)
-        response.video_audio_results.merged_windows.sort(key=lambda x: x.distance, reverse=True)
+        response.video_audio_results.unmerged_windows.sort(
+            key=lambda x: x.distance, reverse=True
+        )
+        response.video_audio_results.merged_windows.sort(
+            key=lambda x: x.distance, reverse=True
+        )
     return response
 
+
 class RemoteSearchService:
-    def __init__(self, remote_projects: dict[str, RemoteWiseProjectService], embedding_service: EmbeddingService):
+    def __init__(
+        self,
+        remote_projects: dict[str, RemoteWiseProjectService],
+        embedding_service: EmbeddingService,
+    ):
         self.project_services = remote_projects
         self.embedding_service = embedding_service
 
     async def featured(
-            self,
-            media_type: MediaType,
-            feature_extractor_id: str,
-            start: int,
-            end: int,
-            random_seed: int = 42,
-        ):
+        self,
+        media_type: MediaType,
+        feature_extractor_id: str,
+        start: int,
+        end: int,
+        random_seed: int = 42,
+    ):
 
-        all_responses = await asyncio.gather(*[
-            project_service.featured(
-                media_type, feature_extractor_id, start, end, random_seed
-            ) for project_service in self.project_services.values()
-        ])
+        all_responses = await asyncio.gather(
+            *[
+                project_service.featured(
+                    media_type, feature_extractor_id, start, end, random_seed
+                )
+                for project_service in self.project_services.values()
+            ]
+        )
         response = functools.reduce(merge_response, all_responses)
         response = sort_response(response)
         return response
 
     async def search(
-            self,
-            request: Request,
-            endpoint: Literal["/search", "/search2"] = "/search"
-        ) -> common.SearchResponse:
+        self,
+        request: Request,
+        endpoint: Literal["/search", "/search2"] = "/search",
+    ) -> common.SearchResponse:
 
-        all_responses = await asyncio.gather(*[
-            project_service.search(
-                request,
-                endpoint=endpoint,
-            ) for project_service in self.project_services.values()
-        ])
+        all_responses = await asyncio.gather(
+            *[
+                project_service.search(
+                    request,
+                    endpoint=endpoint,
+                )
+                for project_service in self.project_services.values()
+            ]
+        )
         response = functools.reduce(merge_response, all_responses)
         response = sort_response(response)
         return response
 
     async def search_with_feature(
-            self,
-            features: np.ndarray,
-            search_in: MediaType,
-            feature_extractor_id: str,
-            start: int,
-            end: int,
-            thumbnails_to_send: int = 0,
-            shot_scale: list[int] | None = None,
-            metadata_filter: list[str] = [],
-        ) -> common.SearchResponse:
+        self,
+        features: np.ndarray,
+        search_in: MediaType,
+        feature_extractor_id: str,
+        start: int,
+        end: int,
+        thumbnails_to_send: int = 0,
+        shot_scale: list[int] | None = None,
+        metadata_filter: list[str] = [],
+    ) -> common.SearchResponse:
 
-        all_responses = await asyncio.gather(*[
-            project_service.search_with_feature(
-                features, search_in, feature_extractor_id, start, end, thumbnails_to_send, shot_scale, metadata_filter
-            ) for project_service in self.project_services.values()
-        ])
+        all_responses = await asyncio.gather(
+            *[
+                project_service.search_with_feature(
+                    features,
+                    search_in,
+                    feature_extractor_id,
+                    start,
+                    end,
+                    thumbnails_to_send,
+                    shot_scale,
+                    metadata_filter,
+                )
+                for project_service in self.project_services.values()
+            ]
+        )
         response = functools.reduce(merge_response, all_responses)
         response = sort_response(response)
         return response
 
-    async def reconstruct_vectors(self, media_type: MediaType, feature_extractor_id: str, internal_ids: list[str]) -> list[np.ndarray]:
+    async def reconstruct_vectors(
+        self,
+        media_type: MediaType,
+        feature_extractor_id: str,
+        internal_ids: list[str],
+    ) -> list[np.ndarray]:
         async def handle_internal_id(internal_id: str) -> np.ndarray:
             # internal_id is of the form <project_name>_<vector_id>
             parts = internal_id.rsplit("/", 2)
@@ -144,8 +189,8 @@ class RemoteSearchService:
             )
             return vectors[0]
 
-        all_vectors = await asyncio.gather(*[
-            handle_internal_id(v) for v in internal_ids
-        ])
+        all_vectors = await asyncio.gather(
+            *[handle_internal_id(v) for v in internal_ids]
+        )
 
         return all_vectors

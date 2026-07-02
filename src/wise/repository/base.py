@@ -21,7 +21,6 @@ from typing import Any, Generic, Optional, Type, TypeVar
 import sqlalchemy as sa
 from pydantic import BaseModel
 
-
 Entity = TypeVar("Entity", bound=BaseModel)
 EntityCreate = TypeVar("EntityCreate", bound=BaseModel)
 EntityUpdate = TypeVar("EntityUpdate", bound=BaseModel)
@@ -63,18 +62,28 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         self.model = model
 
     def get(self, conn: sa.Connection, id: Any) -> Optional[Entity]:
-        result = conn.execute(sa.select(self._table).where(self._table.c.id == id))
+        result = conn.execute(
+            sa.select(self._table).where(self._table.c.id == id)
+        )
         for row in result.mappings():
             return self.model.model_validate(row)
         return None
 
     # see https://docs.sqlalchemy.org/en/20/_modules/examples/performance/large_resultsets.html
-    def list(self, conn: sa.Connection, batch_size: int | None = None, limit: int | None = None, offset: int | None = None):
+    def list(
+        self,
+        conn: sa.Connection,
+        batch_size: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ):
         _conn = conn
         if batch_size is not None:
             _conn = conn.execution_options(stream_results=True)
 
-        result = _conn.execute(sa.select(self._table).limit(limit).offset(offset))
+        result = _conn.execute(
+            sa.select(self._table).limit(limit).offset(offset)
+        )
         if batch_size is None:
             yield from map(self.model.model_validate, result.mappings())
 
@@ -85,29 +94,35 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
                     break
                 yield from map(self.model.model_validate, chunk)
 
-    def get_row_by_column_match(self, conn: sa.Connection, column_name_to_match, column_value):
+    def get_row_by_column_match(
+        self, conn: sa.Connection, column_name_to_match, column_value
+    ):
         """
         Performs query equivalent to:
         ```
         SELECT * FROM table WHERE {col_name} = {col_value}
         ```
         """
-        result = conn.execute(sa.select(self._table).where(self._table.c[column_name_to_match] == column_value))
+        result = conn.execute(
+            sa.select(self._table).where(
+                self._table.c[column_name_to_match] == column_value
+            )
+        )
         for row in result.mappings():
             return self.model.model_validate(row)
         return None
 
     def list_by_column_match(
-            self,
-            conn,
-            *,
-            column_to_match: str,
-            value_to_match: Any,
-            select_columns: Optional[tuple[str]] = None,
-            order_by_column: str,
-            desc: bool = False,
-            batch_size: int = 10000
-        ):
+        self,
+        conn,
+        *,
+        column_to_match: str,
+        value_to_match: Any,
+        select_columns: Optional[tuple[str]] = None,
+        order_by_column: str,
+        desc: bool = False,
+        batch_size: int = 10000,
+    ):
         """
         Performs a query equivalent to:
         ```
@@ -117,12 +132,18 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
 
         If select_columns is None, all columns in the table are selected (`SELECT * ...`)
         """
-        select_column_specs = self._table if select_columns is None else self._table.c[select_columns]
+        select_column_specs = (
+            self._table
+            if select_columns is None
+            else self._table.c[select_columns]
+        )
         result = conn.execution_options(stream_results=True).execute(
             sa.select(select_column_specs)
             .where(self._table.c[column_to_match] == value_to_match)
             .order_by(
-                self._table.c[order_by_column].desc() if desc else self._table.c[order_by_column].asc()
+                self._table.c[order_by_column].desc()
+                if desc
+                else self._table.c[order_by_column].asc()
             )
         )
         while True:
@@ -141,11 +162,14 @@ class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
         yield from result.mappings()
 
     def get_count(self, conn: sa.Connection) -> int:
-        return conn.execute(sa.select(sa.func.count(self._table.c.id))).scalar()
+        return conn.execute(
+            sa.select(sa.func.count(self._table.c.id))
+        ).scalar()
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
         result = conn.execute(
-            sa.insert(self._table).returning(self._table.c.id), [data.model_dump()]
+            sa.insert(self._table).returning(self._table.c.id),
+            [data.model_dump()],
         )
         obj = self.get(conn, next(result)[0])
         if not obj:

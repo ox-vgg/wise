@@ -30,7 +30,6 @@ from wise.feature.feature_extractor import (
     get_torch_device,
 )
 
-
 logger = logging.getLogger(__name__)
 
 # Copied from clap to make it pickleable
@@ -62,7 +61,9 @@ def default_collate(batch):
         if elem_type.__name__ == "ndarray" or elem_type.__name__ == "memmap":
             # array of string classes and object
             if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
-                raise TypeError(default_collate_err_msg_format.format(elem.dtype))
+                raise TypeError(
+                    default_collate_err_msg_format.format(elem.dtype)
+                )
 
             return default_collate([torch.as_tensor(b) for b in batch])
         elif elem.shape == ():  # scalars
@@ -76,13 +77,17 @@ def default_collate(batch):
     elif isinstance(elem, collections.abc.Mapping):
         return {key: default_collate([d[key] for d in batch]) for key in elem}
     elif isinstance(elem, tuple) and hasattr(elem, "_fields"):  # namedtuple
-        return elem_type(*(default_collate(samples) for samples in zip(*batch)))
+        return elem_type(
+            *(default_collate(samples) for samples in zip(*batch))
+        )
     elif isinstance(elem, collections.abc.Sequence):
         # check to make sure that the elements in batch have consistent size
         it = iter(batch)
         elem_size = len(next(it))
         if not all(len(elem) == elem_size for elem in it):
-            raise RuntimeError("each element in list of batch should be of equal size")
+            raise RuntimeError(
+                "each element in list of batch should be of equal size"
+            )
         transposed = zip(*batch)
         return [default_collate(samples) for samples in transposed]
 
@@ -93,7 +98,7 @@ class MicrosoftClapModel(MultiModalModel):
 
     @cached_property
     def _clap_wrapper(self):
-        use_cuda = self.DEVICE.type == 'cuda'
+        use_cuda = self.DEVICE.type == "cuda"
         logger.info(
             "Initialising microsoft/clap (version=%s, use_cuda=%s)",
             self.model_id,
@@ -145,7 +150,11 @@ class MicrosoftClapModel(MultiModalModel):
 
     @torch.inference_mode()
     def export_to_onnx(
-        self, save_path: Path, audio_inputs: tuple, text_inputs: tuple, **kwargs
+        self,
+        save_path: Path,
+        audio_inputs: tuple,
+        text_inputs: tuple,
+        **kwargs,
     ):
         """Export the model to ONNX format."""
         model = self.model
@@ -217,6 +226,7 @@ class MicrosoftClapModel(MultiModalModel):
         )
         logger.info("Successfully exported text model to %s", output_path)
 
+
 class MicrosoftClapFeatureExtractor(FeatureExtractor):
     """
     Audio feature extractors created by Microsoft's CLAP project
@@ -225,8 +235,8 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
     see FeatureExtractor.py for documentation of API
     """
 
-    ID_PREFIX = 'microsoft/clap/'
-    DESCRIPTION = 'See https://github.com/microsoft/CLAP'
+    ID_PREFIX = "microsoft/clap/"
+    DESCRIPTION = "See https://github.com/microsoft/CLAP"
 
     ## CLAP supports text and audio (no image)
     preprocess_image = None
@@ -246,7 +256,7 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
         **kwargs,
     ):
         super().__init__(id, device=device)
-        id_tokens = id.split('/')
+        id_tokens = id.split("/")
 
         assert len(id_tokens) == 4
         if id_tokens[2] not in CLAP.model_name or "clapcap" in id_tokens[2]:
@@ -280,9 +290,7 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
     @cached_property
     def model(self):
         return MicrosoftClapModel(
-            model_id=self.model_id,
-            device=self.DEVICE,
-            compile=self.compile
+            model_id=self.model_id, device=self.DEVICE, compile=self.compile
         )
 
     @staticmethod
@@ -299,12 +307,18 @@ class MicrosoftClapFeatureExtractor(FeatureExtractor):
         return self.processor.preprocess_text(text)
 
     @torch.inference_mode()
-    def extract_audio_features(self, preprocessed_audio: torch.Tensor) -> np.ndarray:
+    def extract_audio_features(
+        self, preprocessed_audio: torch.Tensor
+    ) -> np.ndarray:
         preprocessed_audio = preprocessed_audio.reshape(
             preprocessed_audio.shape[0], preprocessed_audio.shape[2]
         )
-        audio_embeddings = self.model.get_audio_features(audio=preprocessed_audio)
-        audio_embeddings = audio_embeddings/torch.norm(audio_embeddings, dim=-1, keepdim=True)
+        audio_embeddings = self.model.get_audio_features(
+            audio=preprocessed_audio
+        )
+        audio_embeddings = audio_embeddings / torch.norm(
+            audio_embeddings, dim=-1, keepdim=True
+        )
         return audio_embeddings.cpu().numpy()
 
     @torch.inference_mode()

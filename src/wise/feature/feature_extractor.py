@@ -83,6 +83,7 @@ class Features:
         :meth:`FeatureExtractor.add_to_vector_metadata_table`.
 
     """
+
     metadata: Any  # free for use by concrete FeatureExtractor
     vectors: np.ndarray  # shaped (n-features, embedding-length)
 
@@ -94,6 +95,7 @@ class BBoxXYWH(NamedTuple):
     of the image.
 
     """
+
     x: float
     y: float
     w: float
@@ -110,9 +112,9 @@ def _box_iou_xywh(boxes1_xywh: Tensor, boxes2_xywh: Tensor) -> Tensor:
 
     """
     boxes1_xyxy = boxes1_xywh.detach().clone()
-    boxes1_xyxy[:,2:] = boxes1_xyxy[:,:2] + boxes1_xyxy[:,2:]
+    boxes1_xyxy[:, 2:] = boxes1_xyxy[:, :2] + boxes1_xyxy[:, 2:]
     boxes2_xyxy = boxes2_xywh.detach().clone()
-    boxes2_xyxy[:,2:] = boxes2_xyxy[:,:2] + boxes2_xyxy[:,2:]
+    boxes2_xyxy[:, 2:] = boxes2_xyxy[:, :2] + boxes2_xyxy[:, 2:]
     return box_iou(boxes1_xyxy, boxes2_xyxy)
 
 
@@ -132,6 +134,7 @@ class FeatureExtMetadata:
     are not required to compute, store, or return any of them.
 
     """
+
     bbox: Optional[BBoxXYWH] = None
 
 
@@ -188,8 +191,10 @@ class FeatureExtractor:
     `None` (see :py:exc:`NotImplementedError`).
 
     """
+
     ID_PREFIX = None
     _vector_metadata_table: sa.Table | None = None
+
     class Config(FeatureExtractorConfig):
         """Configuration for the feature extractor."""
 
@@ -230,8 +235,7 @@ class FeatureExtractor:
 
     @classmethod
     def create_vector_metadata_table(cls, db_engine: sa.Engine) -> None:
-        """Create if needed a table for these features metadata.
-        """
+        """Create if needed a table for these features metadata."""
         pass  # default to no-op
 
     @classmethod
@@ -280,8 +284,10 @@ class FeatureExtractor:
         """
         return [FeatureExtMetadata() for _ in range(len(vid))]
 
-    def preprocess_image(self, images: torch.Tensor | list[Image.Image]) -> torch.Tensor:
-        """ Preprocess media to prepare it for feature extraction
+    def preprocess_image(
+        self, images: torch.Tensor | list[Image.Image]
+    ) -> torch.Tensor:
+        """Preprocess media to prepare it for feature extraction
 
         Parameters
         ----------
@@ -308,7 +314,6 @@ class FeatureExtractor:
 
         """
         raise NotImplementedError
-
 
     def preprocess_image_region(
         self, image: torch.Tensor | Image.Image, region: BBoxXYWH
@@ -356,7 +361,6 @@ class FeatureExtractor:
         """
         raise NotImplementedError
 
-
     def extract_video_segment_features(self, frames: torch.Tensor) -> Features:
         """Extract a single embedding for a multi-frame video segment.
 
@@ -376,7 +380,7 @@ class FeatureExtractor:
         raise NotImplementedError
 
     def extract_text_features(self, text_query: list[str]) -> np.ndarray:
-        """ Extracts features from text
+        """Extracts features from text
 
         Parameters
         ----------
@@ -392,10 +396,14 @@ class FeatureExtractor:
     def preprocess_audio(self, audio: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
-    def extract_audio_features(self, preprocessed_audio: torch.Tensor) -> np.ndarray:
+    def extract_audio_features(
+        self, preprocessed_audio: torch.Tensor
+    ) -> np.ndarray:
         raise NotImplementedError
 
-    def transform_internal_image_queries_hook(self, vec: np.ndarray) -> np.ndarray:
+    def transform_internal_image_queries_hook(
+        self, vec: np.ndarray
+    ) -> np.ndarray:
         """Hook method to transform internal image queries. This hook is useful for
         models like OWLv2 which requires feature vectors to be 'augmented'. See
         src/feature/transformers_owlv2.py::extract_image_features() for an example.
@@ -449,8 +457,7 @@ class FeatureExtractor:
     def _preprocess_image_region_crop(
         self, image: torch.Tensor | Image.Image, region: BBoxXYWH
     ) -> torch.Tensor:
-        """Implementation of :meth:`preprocess_image_region` that crops image.
-        """
+        """Implementation of :meth:`preprocess_image_region` that crops image."""
         if isinstance(image, torch.Tensor):
             if image.ndim != 3 or image.shape[0] != 3:
                 raise ValueError("expect Tensor image to be RGB in CHW order")
@@ -476,8 +483,7 @@ class FeatureExtractor:
     def _preprocess_image_region_nocrop(
         self, image: torch.Tensor | Image.Image, region: BBoxXYWH
     ) -> torch.Tensor:
-        """Implementation of :meth:`preprocess_image_region` that ignores region.
-        """
+        """Implementation of :meth:`preprocess_image_region` that ignores region."""
         if isinstance(image, torch.Tensor):
             if image.ndim != 3 or image.shape[0] != 3:
                 raise ValueError("expect Tensor image to be RGB in CHW order")
@@ -490,8 +496,7 @@ class FeatureExtractor:
     def _extract_image_region_features_highest_iou(
         self, image: torch.Tensor, region: BBoxXYWH
     ) -> Features:
-        """Implementation of :meth:`extract_image_region_features` that returns region with highest IoU.
-        """
+        """Implementation of :meth:`extract_image_region_features` that returns region with highest IoU."""
         features = self.extract_image_features(image)
         assert len(features) == 1
         ## FIXME: once we can depend on torchvision>0.24, we can
@@ -502,7 +507,7 @@ class FeatureExtractor:
         )
         iou_max_idx = iou.argmax()
         return Features(
-            vectors=features[0].vectors[[iou_max_idx],:],
+            vectors=features[0].vectors[[iou_max_idx], :],
             metadata=[features[0].metadata[iou_max_idx]],
         )
 
@@ -519,6 +524,6 @@ def get_torch_device(device: str | torch.device | None = None):
     if isinstance(device, torch.device):
         return device
 
-    _default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    _default_device = "cuda" if torch.cuda.is_available() else "cpu"
     _device = device or _default_device
     return torch.device(_device)

@@ -14,6 +14,7 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
+
 class SearchIndex:
     """
     Represents various types of search indices. For example,
@@ -21,6 +22,7 @@ class SearchIndex:
     in FeatureSearchIndex while the search index for text metadata
     is implemented in SqldbSearchIndex.
     """
+
     def __init__(self, modality_type, asset_id, assets):
         raise NotImplementedError
 
@@ -33,5 +35,5 @@ class SearchIndex:
     def load_index(self, index_type):
         raise NotImplementedError
 
-    def search(self, media_type, query, topk=5, query_type='text'):
+    def search(self, media_type, query, topk=5, query_type="text"):
         raise NotImplementedError

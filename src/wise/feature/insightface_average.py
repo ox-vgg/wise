@@ -23,7 +23,6 @@ from PIL import Image
 from wise.feature.feature_extractor import BBoxXYWH, FeatureExtractor, Features
 from wise.feature.insightface import InsightFaceFeatureExtractor
 
-
 _logger = logging.getLogger(__name__)
 
 

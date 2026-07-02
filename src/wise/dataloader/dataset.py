@@ -46,7 +46,6 @@ from wise.dataloader.utils import (
     md5,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -64,23 +63,35 @@ class MediaMetadata(object):
     extra: dict
     id: UUID = dataclasses.Field(default_factory=uuid4)
 
-def get_media_metadata(url: str, media_type_from_mimetype: MediaMimetype = None, mimetype: str = None):
+
+def get_media_metadata(
+    url: str,
+    media_type_from_mimetype: MediaMimetype = None,
+    mimetype: str = None,
+):
     # TODO: Update the code to handle remote path
     # Only md5sum will be a problem.
 
     # TODO: How to handle subtitle
 
     if not media_type_from_mimetype or not mimetype:
-        media_type_from_mimetype, mimetype, _ = get_mimetype_and_media_type_for_file(url)
-    format = mimetype.split('/')[1]
+        media_type_from_mimetype, mimetype, _ = (
+            get_mimetype_and_media_type_for_file(url)
+        )
+    format = mimetype.split("/")[1]
 
     # Get stream metadata
     video_stream_info, audio_stream_info = get_media_info(
-        url, guess_missing_video_info=(media_type_from_mimetype == MediaMimetype.video)
+        url,
+        guess_missing_video_info=(
+            media_type_from_mimetype == MediaMimetype.video
+        ),
     )
 
     # Get media type
-    media_type = get_media_type(video_stream_info, audio_stream_info, media_type_from_mimetype)
+    media_type = get_media_type(
+        video_stream_info, audio_stream_info, media_type_from_mimetype
+    )
 
     # Get md5sum for file.
     # TODO Update code to ignore for remote file
@@ -179,14 +190,19 @@ class MediaChunk:
     end_pts: float | None = None
 
 
-def validate_segment_lengths_from_options(stream_opts: list[StreamOutputOptions]):
+def validate_segment_lengths_from_options(
+    stream_opts: list[StreamOutputOptions],
+):
     # Each stream should be aligned, or we will just miss one or the other.
     segment_length = None
     for opts in stream_opts:
         frames = opts.frames_per_chunk
         rate = (
             opts.frame_rate
-            if isinstance(opts, (BasicVideoStreamOutputOptions, BasicImageStreamOutputOptions))
+            if isinstance(
+                opts,
+                (BasicVideoStreamOutputOptions, BasicImageStreamOutputOptions),
+            )
             else opts.sample_rate
         )
 
@@ -231,7 +247,12 @@ class MediaDataset(torch_data.IterableDataset):
         self,
         input_files: list[str] | dict[str, str],
         output_stream_opts=list[StreamOutputOptions],
-        transforms: Optional[list[Callable[[torch.Tensor], torch.Tensor] | dict[str, Callable[[torch.Tensor], torch.Tensor]]]] = None,
+        transforms: Optional[
+            list[
+                Callable[[torch.Tensor], torch.Tensor]
+                | dict[str, Callable[[torch.Tensor], torch.Tensor]]
+            ]
+        ] = None,
         offset: Optional[float] = None,
         thumbnails: bool = True,
     ):
@@ -248,7 +269,9 @@ class MediaDataset(torch_data.IterableDataset):
             else [IdentityTransform for _ in range(len(output_stream_opts))]
         )
 
-        self._segment_length = validate_segment_lengths_from_options(output_stream_opts)
+        self._segment_length = validate_segment_lengths_from_options(
+            output_stream_opts
+        )
         if self._segment_length is None:
             # No output stream configured, default to 4s for the sake of thumbnails
             self._segment_length = 4
@@ -258,7 +281,9 @@ class MediaDataset(torch_data.IterableDataset):
         assert self._segment_length % 0.5 == 0
         self._thumbnails = thumbnails
         self._thumbnail_opts = BasicThumbnailStreamOutputOptions(
-            frames_per_chunk=self._segment_length * 2 if self._segment_length else 1,
+            frames_per_chunk=(
+                self._segment_length * 2 if self._segment_length else 1
+            ),
             frame_rate=2 if self._segment_length else None,
             width=-2,
             height=192,
@@ -269,7 +294,17 @@ class MediaDataset(torch_data.IterableDataset):
         # verify if length of output_stream_opts and transform matches up
         assert len(self._transforms) == len(self._output_stream_opts)
 
-    def _get_media_iterator(self, id_list: list[str | int]) -> Generator[tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
+    def _get_media_iterator(self, id_list: list[str | int]) -> Generator[
+        tuple[
+            str | int,
+            dict[
+                MediaChunkType,
+                MediaChunk | None | dict[str, MediaChunk | None],
+            ],
+        ],
+        Any,
+        None,
+    ]:
         for _id in id_list:
             path = self._filelist[_id]
             try:
@@ -285,16 +320,21 @@ class MediaDataset(torch_data.IterableDataset):
                 if not isinstance(self, ImageDataset):
                     reader.seek(self._offset)
 
-                media_chunk_types = [get_media_chunk_type(opts) for opts in output_stream_opts]
+                media_chunk_types = [
+                    get_media_chunk_type(opts) for opts in output_stream_opts
+                ]
 
                 for c in reader.stream():
                     # Might contain 1 or many output streams. Apply the corresponding transform
                     media_chunks: dict[
-                        MediaChunkType, dict[str, MediaChunk | None] | MediaChunk | None
+                        MediaChunkType,
+                        dict[str, MediaChunk | None] | MediaChunk | None,
                     ] = {}
-                    for (stream_chunk, stream_transform, media_chunk_type) in zip(
-                            c, stream_transforms, media_chunk_types
-                        ):
+                    for (
+                        stream_chunk,
+                        stream_transform,
+                        media_chunk_type,
+                    ) in zip(c, stream_transforms, media_chunk_types):
                         media_chunks[media_chunk_type] = {}
                         if isinstance(stream_transform, dict):
                             # audiovisual features
@@ -302,7 +342,9 @@ class MediaDataset(torch_data.IterableDataset):
                                 _stream_transform = stream_transform[
                                     feature_extractor_id
                                 ]
-                                media_chunks[media_chunk_type][feature_extractor_id] = (
+                                media_chunks[media_chunk_type][
+                                    feature_extractor_id
+                                ] = (
                                     MediaChunk(
                                         tensor=_stream_transform(
                                             torch.Tensor(stream_chunk)
@@ -316,7 +358,9 @@ class MediaDataset(torch_data.IterableDataset):
                             # thumbnails / identity transform
                             media_chunks[media_chunk_type] = (
                                 MediaChunk(
-                                    tensor=stream_transform(torch.Tensor(stream_chunk)),
+                                    tensor=stream_transform(
+                                        torch.Tensor(stream_chunk)
+                                    ),
                                     pts=stream_chunk.pts,
                                 )
                                 if stream_chunk is not None
@@ -325,9 +369,23 @@ class MediaDataset(torch_data.IterableDataset):
 
                     yield _id, media_chunks
             except Exception:
-                logger.exception("Exception when processing '%s: %s'", _id, path)
+                logger.exception(
+                    "Exception when processing '%s: %s'", _id, path
+                )
 
-    def __iter__(self) -> Generator[tuple[str | int, dict[MediaChunkType,  MediaChunk | None | dict[str, MediaChunk | None]]], Any, None]:
+    def __iter__(
+        self,
+    ) -> Generator[
+        tuple[
+            str | int,
+            dict[
+                MediaChunkType,
+                MediaChunk | None | dict[str, MediaChunk | None],
+            ],
+        ],
+        Any,
+        None,
+    ]:
         """
         Creates the iterator used by the dataloader
 
@@ -349,7 +407,9 @@ class MediaDataset(torch_data.IterableDataset):
 
         # Split files by worker and yield the worker's shard
         # Each worker will process the video file with index in (w_id, w_id + n, w_id + 2n, ...)
-        file_list = itertools.islice(self._filelist.keys(), worker_id, None, n_workers)
+        file_list = itertools.islice(
+            self._filelist.keys(), worker_id, None, n_workers
+        )
 
         return self._get_media_iterator(list(file_list))
 
@@ -361,7 +421,9 @@ class AudioDataset(MediaDataset):
         input_files: list[str] | dict[str, str],
         samples_per_chunk: int,
         *,
-        preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        preprocessing_function: Optional[
+            Callable[[torch.Tensor], torch.Tensor]
+        ] = None,
         sample_rate: Optional[int] = None,
         offset: Optional[float] = None,
     ):
@@ -372,7 +434,9 @@ class AudioDataset(MediaDataset):
                 sample_rate=sample_rate,
             )
         ]
-        transforms = [preprocessing_function] if preprocessing_function else None
+        transforms = (
+            [preprocessing_function] if preprocessing_function else None
+        )
         super(AudioDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,
@@ -389,7 +453,9 @@ class VideoDataset(MediaDataset):
         input_files: list[str] | dict[str, str],
         frames_per_chunk: int,
         *,
-        preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        preprocessing_function: Optional[
+            Callable[[torch.Tensor], torch.Tensor]
+        ] = None,
         frame_rate: Optional[int] = None,
         offset: Optional[float] = None,
         thumbnails: bool = True,
@@ -400,7 +466,9 @@ class VideoDataset(MediaDataset):
                 frames_per_chunk=frames_per_chunk, frame_rate=frame_rate
             )
         ]
-        transforms = [preprocessing_function] if preprocessing_function else None
+        transforms = (
+            [preprocessing_function] if preprocessing_function else None
+        )
         super(VideoDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,
@@ -416,14 +484,16 @@ class ImageDataset(MediaDataset):
         self,
         input_files: list[str] | dict[str, str],
         *,
-        preprocessing_function: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        preprocessing_function: Optional[
+            Callable[[torch.Tensor], torch.Tensor]
+        ] = None,
         thumbnails: bool = True,
     ):
 
-        stream_opts = [
-            BasicImageStreamOutputOptions(frames_per_chunk=1)
-        ]
-        transforms = [preprocessing_function] if preprocessing_function else None
+        stream_opts = [BasicImageStreamOutputOptions(frames_per_chunk=1)]
+        transforms = (
+            [preprocessing_function] if preprocessing_function else None
+        )
         super(ImageDataset, self).__init__(
             input_files=input_files,
             output_stream_opts=stream_opts,
@@ -459,7 +529,7 @@ class AVDataset(MediaDataset):
                 BasicVideoStreamOutputOptions(
                     frames_per_chunk=video_frames_per_chunk,
                     frame_rate=video_frame_rate,
-                    decoder_option={"threads": "0"}, # let ffmpeg decide
+                    decoder_option={"threads": "0"},  # let ffmpeg decide
                 )
             )
             if video_preprocessing_function_map is None:
@@ -472,7 +542,7 @@ class AVDataset(MediaDataset):
                 BasicAudioStreamOutputOptions(
                     frames_per_chunk=audio_samples_per_chunk,
                     sample_rate=audio_sample_rate,
-                    decoder_option={"threads": "0"}, # let ffmpeg decide
+                    decoder_option={"threads": "0"},  # let ffmpeg decide
                 )
             )
             if audio_preprocessing_function_map is None:
@@ -499,15 +569,26 @@ def get_metadata_for_valid_files(paths: list[Path]):
     TODO: Accept URLs, filebuffers in the future
     """
     # get the mimetypes and media types for each file
-    logger.info('Getting mimetypes of files ...')
-    media_files = [get_mimetype_and_media_type_for_file(x) for x in tqdm(paths, total=len(paths))]
+    logger.info("Getting mimetypes of files ...")
+    media_files = [
+        get_mimetype_and_media_type_for_file(x)
+        for x in tqdm(paths, total=len(paths))
+    ]
 
     # separate the files with an unknown MIME type
-    unknown_files = [p for (_, media_type, p) in media_files if media_type == MediaMimetype.unknown]
-    known_files = [(mimetype, media_type, p) for (mimetype, media_type, p) in media_files if media_type != MediaMimetype.unknown]
+    unknown_files = [
+        p
+        for (_, media_type, p) in media_files
+        if media_type == MediaMimetype.unknown
+    ]
+    known_files = [
+        (mimetype, media_type, p)
+        for (mimetype, media_type, p) in media_files
+        if media_type != MediaMimetype.unknown
+    ]
 
     media_metadata: list[MediaMetadata] = []
-    logger.info('Extracting metadata from files ...')
+    logger.info("Extracting metadata from files ...")
     # for each file, try to open the file and get its metadata
     # skip the ones that fail
     for mimetype, media_type, p in tqdm(known_files, total=len(known_files)):
@@ -520,6 +601,7 @@ def get_metadata_for_valid_files(paths: list[Path]):
 
     return media_metadata, unknown_files
 
+
 @overload
 def _get_dataset(
     input_files: list[str] | dict[str, str],
@@ -529,12 +611,19 @@ def _get_dataset(
     audio_samples_per_chunk: int,
     video_frame_rate: int | None = None,
     audio_sampling_rate: int | None = None,
-    video_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    audio_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    image_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
+    video_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    audio_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    image_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
     offset: float | None,
     thumbnails: bool = True,
 ) -> MediaDataset: ...
+
 
 @overload
 def _get_dataset(
@@ -545,12 +634,19 @@ def _get_dataset(
     audio_samples_per_chunk: int = -1,
     video_frame_rate: int | None = None,
     audio_sampling_rate: int | None = None,
-    video_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    audio_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    image_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
+    video_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    audio_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    image_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
     offset: float | None,
     thumbnails: bool = True,
 ) -> MediaDataset: ...
+
 
 @overload
 def _get_dataset(
@@ -561,12 +657,19 @@ def _get_dataset(
     video_frames_per_chunk: int = -1,
     video_frame_rate: int | None = None,
     audio_sampling_rate: int | None = None,
-    video_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    audio_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    image_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
+    video_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    audio_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    image_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
     offset: float | None,
     thumbnails: bool = True,
 ) -> MediaDataset: ...
+
 
 @overload
 def _get_dataset(
@@ -577,25 +680,39 @@ def _get_dataset(
     video_frames_per_chunk: int = -1,
     video_frame_rate: int | None = None,
     audio_sampling_rate: int | None = None,
-    video_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    audio_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    image_preprocessing_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
+    video_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    audio_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
+    image_preprocessing_function: (
+        Callable[[torch.Tensor], torch.Tensor] | None
+    ) = None,
     offset: float | None,
     thumbnails: bool = True,
 ) -> MediaDataset: ...
 
+
 def _get_dataset(
-        input_files: list[str] | dict[str, str],
-        media_type: SourceMediaType,
-        video_frames_per_chunk: int,
-        audio_samples_per_chunk: int,
-        video_frame_rate: int | None = None,
-        audio_sampling_rate: int | None = None,
-        video_preprocessing_function_map: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
-        audio_preprocessing_function_map: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
-        image_preprocessing_function_map: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
-        offset: float | None = None,
-        thumbnails: bool = True ):
+    input_files: list[str] | dict[str, str],
+    media_type: SourceMediaType,
+    video_frames_per_chunk: int,
+    audio_samples_per_chunk: int,
+    video_frame_rate: int | None = None,
+    audio_sampling_rate: int | None = None,
+    video_preprocessing_function_map: (
+        list[Callable[[torch.Tensor], torch.Tensor]] | None
+    ) = None,
+    audio_preprocessing_function_map: (
+        list[Callable[[torch.Tensor], torch.Tensor]] | None
+    ) = None,
+    image_preprocessing_function_map: (
+        list[Callable[[torch.Tensor], torch.Tensor]] | None
+    ) = None,
+    offset: float | None = None,
+    thumbnails: bool = True,
+):
     if media_type == SourceMediaType.AV:
         if video_frames_per_chunk <= 0 and audio_samples_per_chunk <= 0:
             logger.warning(
@@ -615,7 +732,9 @@ def _get_dataset(
         )
     elif media_type == SourceMediaType.VIDEO:
         if video_frames_per_chunk <= 0:
-            logger.warning("video_frames_per_chunk is <= 0, skipping video-only files")
+            logger.warning(
+                "video_frames_per_chunk is <= 0, skipping video-only files"
+            )
             return None
         stream = VideoDataset(
             input_files,
@@ -623,11 +742,13 @@ def _get_dataset(
             preprocessing_function=video_preprocessing_function_map,
             frame_rate=video_frame_rate,
             offset=offset,
-            thumbnails=thumbnails
+            thumbnails=thumbnails,
         )
     elif media_type == SourceMediaType.AUDIO:
         if audio_samples_per_chunk <= 0:
-            logger.warning("audio_samples_per_chunk is <= 0, skipping audio-only files")
+            logger.warning(
+                "audio_samples_per_chunk is <= 0, skipping audio-only files"
+            )
             return None
         stream = AudioDataset(
             input_files,
@@ -640,11 +761,12 @@ def _get_dataset(
         stream = ImageDataset(
             input_files,
             preprocessing_function=image_preprocessing_function_map,
-            thumbnails=thumbnails
+            thumbnails=thumbnails,
         )
     else:
-        raise ValueError(f'Unknown media_type: {media_type}')
+        raise ValueError(f"Unknown media_type: {media_type}")
     return stream
+
 
 def get_dataset(media_metadata: list[DatasetPayload], params: dict[str, Any]):
     # sort and group (by media_type - image/video/audio/av)

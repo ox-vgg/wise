@@ -26,8 +26,8 @@ from torchaudio.io import StreamReader
 from wise.data_models import MediaChunkType, SourceMediaType
 from wise.dataloader.utils import MediaMimetype
 
-
 logger = logging.getLogger(__name__)
+
 
 @dataclasses.dataclass
 class BaseStreamOutputOptions(object):
@@ -52,10 +52,12 @@ class BasicVideoStreamOutputOptions(BaseStreamOutputOptions):
 
     hw_accel: Optional[str] = None
 
+
 @dataclasses.dataclass
 class BasicImageStreamOutputOptions(BasicVideoStreamOutputOptions):
     frames_per_chunk = 1
     frame_rate = None
+
 
 @dataclasses.dataclass
 class BasicThumbnailStreamOutputOptions(BasicVideoStreamOutputOptions):
@@ -64,7 +66,9 @@ class BasicThumbnailStreamOutputOptions(BasicVideoStreamOutputOptions):
 
 @dataclasses.dataclass
 class BasicAudioStreamOutputOptions(BaseStreamOutputOptions):
-    format: Optional[Literal["u8p", "s16p", "s32p", "s64p", "fltp", "dblp"]] = "fltp"
+    format: Optional[
+        Literal["u8p", "s16p", "s32p", "s64p", "fltp", "dblp"]
+    ] = "fltp"
     sample_rate: Optional[int] = None
 
     # TODO
@@ -72,7 +76,10 @@ class BasicAudioStreamOutputOptions(BaseStreamOutputOptions):
     # https://pytorch.org/audio/stable/generated/torio.io.StreamingMediaDecoder.html#add-basic-audio-stream
 
 
-StreamOutputOptions = TypeVar("StreamOutputOptions", bound=BaseStreamOutputOptions)
+StreamOutputOptions = TypeVar(
+    "StreamOutputOptions", bound=BaseStreamOutputOptions
+)
+
 
 def get_media_chunk_type(opts: StreamOutputOptions) -> MediaChunkType:
     if isinstance(opts, BasicThumbnailStreamOutputOptions):
@@ -108,11 +115,15 @@ def convert_duration_string_to_seconds(duration_str: Optional[str]):
     microsecond = f"{subsecond:<06}"[:6]
 
     if ":" in str(duration_str):
-        time_obj = datetime.strptime(f"{duration_second}.{microsecond}", "%H:%M:%S.%f")
+        time_obj = datetime.strptime(
+            f"{duration_second}.{microsecond}", "%H:%M:%S.%f"
+        )
     else:
         time_obj = (
             datetime.min
-            + timedelta(seconds=float(duration_second), microseconds=float(microsecond))
+            + timedelta(
+                seconds=float(duration_second), microseconds=float(microsecond)
+            )
         ).time()
 
     return (
@@ -203,10 +214,14 @@ def get_media_info(url: str, guess_missing_video_info: bool = False):
     audio_stream = streamer.default_audio_stream
 
     video_stream_info = (
-        streamer.get_src_stream_info(video_stream) if video_stream is not None else None
+        streamer.get_src_stream_info(video_stream)
+        if video_stream is not None
+        else None
     )
     audio_stream_info = (
-        streamer.get_src_stream_info(audio_stream) if audio_stream is not None else None
+        streamer.get_src_stream_info(audio_stream)
+        if audio_stream is not None
+        else None
     )
     if video_stream_info and guess_missing_video_info:
         video_stream_info = _update_video_info(streamer, video_stream_info)
@@ -214,7 +229,9 @@ def get_media_info(url: str, guess_missing_video_info: bool = False):
     return video_stream_info, audio_stream_info
 
 
-def get_stream_reader(url: str, output_stream_opts: list[BaseStreamOutputOptions] = []) -> StreamReader:
+def get_stream_reader(
+    url: str, output_stream_opts: list[BaseStreamOutputOptions] = []
+) -> StreamReader:
     streamer = StreamReader(url)
 
     logger.debug("StreamReader: (metadata) %s", streamer.get_metadata())
@@ -227,9 +244,12 @@ def get_stream_reader(url: str, output_stream_opts: list[BaseStreamOutputOptions
     for opts in output_stream_opts:
         # Add output video stream
         if not isinstance(
-            opts, (BasicVideoStreamOutputOptions, BasicAudioStreamOutputOptions)
+            opts,
+            (BasicVideoStreamOutputOptions, BasicAudioStreamOutputOptions),
         ):
-            raise TypeError(f"Unknown stream options type - {type(output_stream_opts)}")
+            raise TypeError(
+                f"Unknown stream options type - {type(output_stream_opts)}"
+            )
 
         _stream_opts = asdict(opts)
 
@@ -240,12 +260,18 @@ def get_stream_reader(url: str, output_stream_opts: list[BaseStreamOutputOptions
 
     logger.debug("StreamReader: %d output stream(s)", streamer.num_out_streams)
     for i in range(streamer.num_out_streams):
-        logger.debug("Output stream %d: %s", i, streamer.get_out_stream_info(i))
+        logger.debug(
+            "Output stream %d: %s", i, streamer.get_out_stream_info(i)
+        )
 
     return streamer
 
 
-def get_media_type(video_stream_info, audio_stream_info, media_type_from_mimetype: MediaMimetype) -> SourceMediaType:
+def get_media_type(
+    video_stream_info,
+    audio_stream_info,
+    media_type_from_mimetype: MediaMimetype,
+) -> SourceMediaType:
     """
     Based on the default video / audio stream info, infer whether the source file is either
         - IMAGE

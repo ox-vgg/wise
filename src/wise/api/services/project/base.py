@@ -27,19 +27,23 @@ class Filter(BaseModel):
     description: str
     options: list
 
+
 class ShotBasedFilters(BaseModel):
     shot_scale: Filter
     # extend with more shot filters like camera motion etc.
 
+
 class ProjectInfo(BaseModel):
     name: str = Field(alias="project_name")
-    num_vectors: int # total number of vectors in the project
+    num_vectors: int  # total number of vectors in the project
     max_search_results: int = 1000
-    num_media_files: int # total number of media files in the project
+    num_media_files: int  # total number of media files in the project
     num_thumbnails: int
     num_shots: int
-    media_file_counts: dict[MediaType, int] # e.g., {"image": 100, "video": 50, "audio": 20}
-    total_duration: float # in seconds
+    media_file_counts: dict[
+        MediaType, int
+    ]  # e.g., {"image": 100, "video": 50, "audio": 20}
+    total_duration: float  # in seconds
     models: dict[MediaType, list[str]]
     shot_based_filters: ShotBasedFilters | None = None
     search_targets: dict[MediaType, list[str]] = {}
@@ -64,7 +68,9 @@ class ProjectInfo(BaseModel):
     def reduce(cls, name, info: list["ProjectInfo"]) -> "ProjectInfo":
         def merge_(a: ProjectInfo, b: ProjectInfo) -> ProjectInfo:
             a.num_vectors += b.num_vectors
-            a.max_search_results = min(a.max_search_results, b.max_search_results)
+            a.max_search_results = min(
+                a.max_search_results, b.max_search_results
+            )
             a.num_media_files += b.num_media_files
             a.num_thumbnails += b.num_thumbnails
             a.total_duration += b.total_duration
@@ -76,13 +82,17 @@ class ProjectInfo(BaseModel):
                     a.media_file_counts[media_type] = count
             for media_type, model_list in b.models.items():
                 if media_type in a.models:
-                    a.models[media_type] = list(dict.fromkeys(a.models[media_type] + model_list))
+                    a.models[media_type] = list(
+                        dict.fromkeys(a.models[media_type] + model_list)
+                    )
                 else:
                     a.models[media_type] = model_list
 
             for media_type, targets in b.search_targets.items():
                 if media_type in a.search_targets:
-                    a.search_targets[media_type] = list(dict.fromkeys(a.search_targets[media_type] + targets))
+                    a.search_targets[media_type] = list(
+                        dict.fromkeys(a.search_targets[media_type] + targets)
+                    )
                 else:
                     a.search_targets[media_type] = targets
 
@@ -93,6 +103,7 @@ class ProjectInfo(BaseModel):
         merged = reduce(merge_, info)
         merged.name = name
         return merged
+
 
 class WiseProjectService(ABC):
     @abstractmethod

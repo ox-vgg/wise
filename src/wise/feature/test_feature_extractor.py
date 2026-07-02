@@ -17,7 +17,6 @@
 import os
 import unittest
 
-
 # isort: off
 ## InsightFace, which we will import below, imports albumentations
 ## which by default checks on PyPI if the user is running the last
@@ -49,34 +48,50 @@ class TestFeatureExtractor(unittest.TestCase):
         pass
 
     def test_image_feature(self):
-        featureExtractor = FeatureExtractorFactory('mlfoundations/open_clip/ViT-L-14/openai')
+        featureExtractor = FeatureExtractorFactory(
+            "mlfoundations/open_clip/ViT-L-14/openai"
+        )
         input_image_size = featureExtractor.input_image_size
-        self.assertEqual(input_image_size, (224,224))
+        self.assertEqual(input_image_size, (224, 224))
 
         TEST_DATA_COUNT = 8
         TEST_DATA = []
         for i in range(0, TEST_DATA_COUNT):
-            TEST_DATA.append( Image.new('RGB', input_image_size) )
+            TEST_DATA.append(Image.new("RGB", input_image_size))
 
-        self.assertEqual(len(TEST_DATA), TEST_DATA_COUNT, 'Malformed test data')
-        self.assertTrue( isinstance(TEST_DATA[0], Image.Image) )
-        self.assertEqual(TEST_DATA[0].size, input_image_size, 'Malformed image')
+        self.assertEqual(
+            len(TEST_DATA), TEST_DATA_COUNT, "Malformed test data"
+        )
+        self.assertTrue(isinstance(TEST_DATA[0], Image.Image))
+        self.assertEqual(
+            TEST_DATA[0].size, input_image_size, "Malformed image"
+        )
 
         # preprocess images
         preprocessed_data = featureExtractor.preprocess_image(TEST_DATA)
 
         # extract features
-        extracted_features = featureExtractor.extract_image_features(preprocessed_data)
+        extracted_features = featureExtractor.extract_image_features(
+            preprocessed_data
+        )
 
         self.assertEqual(preprocessed_data.shape[0], len(extracted_features))
-        self.assertTrue(all([x.vectors.shape == (1, 768) for x in extracted_features]))
+        self.assertTrue(
+            all([x.vectors.shape == (1, 768) for x in extracted_features])
+        )
         self.assertTrue(all([x.metadata is None for x in extracted_features]))
 
     def test_audio_feature(self):
-        featureExtractor = FeatureExtractorFactory('microsoft/clap/2023/Not-Applicable')
-        audio_time_series = torch.rand((1,408700)) # 2 sec. random audio
-        preprocessed_audio = featureExtractor.preprocess_audio(audio_time_series)
-        audio_embeddings = featureExtractor.extract_audio_features(preprocessed_audio)
+        featureExtractor = FeatureExtractorFactory(
+            "microsoft/clap/2023/Not-Applicable"
+        )
+        audio_time_series = torch.rand((1, 408700))  # 2 sec. random audio
+        preprocessed_audio = featureExtractor.preprocess_audio(
+            audio_time_series
+        )
+        audio_embeddings = featureExtractor.extract_audio_features(
+            preprocessed_audio
+        )
         self.assertEqual(audio_embeddings.shape[1], 1024)
 
     def tearDown(self):
@@ -85,7 +100,9 @@ class TestFeatureExtractor(unittest.TestCase):
 
 class TestInsightFaceFeatureExtractor(unittest.TestCase):
     def setUp(self):
-        self._extractor = FeatureExtractorFactory("deepinsight/insightface/buffalo_l/_")
+        self._extractor = FeatureExtractorFactory(
+            "deepinsight/insightface/buffalo_l/_"
+        )
 
     def _preprocess_and_extract_features(self, images):
         return self._extractor.extract_image_features(
@@ -96,12 +113,14 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
         return self._extractor.extract_image_region_features(
             self._extractor.preprocess_image_region(image, region), region
         )
+
     def _get_tom_hanks_grayscale_tensor(self) -> torch.Tensor:
         np_img = insightface.data.get_image("Tom_Hanks_54745", to_rgb=True)
-        assert (np.all(np_img[:,:,0] == np_img[:,:,1])
-                and np.all(np_img[:,:,0] == np_img[:,:,2]))
+        assert np.all(np_img[:, :, 0] == np_img[:, :, 1]) and np.all(
+            np_img[:, :, 0] == np_img[:, :, 2]
+        )
         np_img = np_img.transpose([2, 0, 1])  # H,W,C -> C,H,W
-        return torch.tensor(np_img[0:1,:,:].copy())
+        return torch.tensor(np_img[0:1, :, :].copy())
 
     def _get_t1_rgb_tensor(self) -> torch.Tensor:
         np_img = insightface.data.get_image("t1", to_rgb=True)
@@ -134,7 +153,7 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
         ## This region selects all of Ross face and part of Monica's
         ## face.  It purposely large to cover part of another face and
         ## test the selection of face with highest IoU.
-        ross_xt = BBoxXYWH(353/1280, 183/886, 311/1280, 292/886)
+        ross_xt = BBoxXYWH(353 / 1280, 183 / 886, 311 / 1280, 292 / 886)
         ross_bbox = [0.36, 0.30, 0.08, 0.17]  # ~ expected from InsightFace
         features = self._preprocess_and_extract_region_features(image, ross_xt)
         self.assertTrue(len(features.metadata), 1)
@@ -179,7 +198,7 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
 
     def test_grayscale_torch_image(self):
         images = torch.unsqueeze(self._get_tom_hanks_grayscale_tensor(), dim=0)
-        with self.assertRaisesRegex(Exception, 'RGB in NCHW order'):
+        with self.assertRaisesRegex(Exception, "RGB in NCHW order"):
             self._preprocess_and_extract_features(images)
 
     def test_with_empty_list(self):
@@ -195,7 +214,9 @@ class TestInsightFaceFeatureExtractor(unittest.TestCase):
 
 class TestInsightFaceWithAuraFace(TestInsightFaceFeatureExtractor):
     def setUp(self):
-        self._extractor = FeatureExtractorFactory("deepinsight/insightface/fal/AuraFace-v1")
+        self._extractor = FeatureExtractorFactory(
+            "deepinsight/insightface/fal/AuraFace-v1"
+        )
 
 
 class TestOWLv2BBoxConversion(unittest.TestCase):
@@ -358,10 +379,12 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
 
     def test_feature_extractor_factory_setup(self):
         # try setting up using the feature extractor factory (just to check no errors were raised)
-        FeatureExtractorFactory("transformers/owlv2/google/owlv2-base-patch16-ensemble")
+        FeatureExtractorFactory(
+            "transformers/owlv2/google/owlv2-base-patch16-ensemble"
+        )
 
     def test_text_encoder(self):
-        text_input = ['some random text']
+        text_input = ["some random text"]
         text_features = self._extractor.extract_text_features(text_input)
         self.assertTrue(text_features.shape == (1, 513))
 
@@ -371,13 +394,13 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
         )
 
     def _get_sample_image_tensor(self):
-        np_img = load_sample_image('flower.jpg')
+        np_img = load_sample_image("flower.jpg")
         np_img = np_img.transpose([2, 0, 1])  # H,W,C -> C,H,W
         return torch.tensor(np_img.copy())
 
     def _get_sample_image_pil(self):
-        np_img = load_sample_image('flower.jpg')
-        return Image.fromarray(np_img, 'RGB')
+        np_img = load_sample_image("flower.jpg")
+        return Image.fromarray(np_img, "RGB")
 
     def _test_images(self, images, n_images):
         assert n_images > 0
@@ -385,32 +408,68 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
         ## Check vectors
         self.assertIsInstance(features, list)
         self.assertEqual(len(features), n_images)
-        self.assertTrue(all([isinstance(x.vectors, np.ndarray) for x in features]))
-        self.assertTrue(all([x.vectors.shape == (3600, 513) for x in features]))
+        self.assertTrue(
+            all([isinstance(x.vectors, np.ndarray) for x in features])
+        )
+        self.assertTrue(
+            all([x.vectors.shape == (3600, 513) for x in features])
+        )
         ## Check metadata
         self.assertTrue(all([isinstance(x.metadata, list) for x in features]))
         for f in features:
             self.assertEqual(len(f.metadata), 3600)
-            self.assertTrue(all([
-                isinstance(m.objectness_score, float)
-                and isinstance(m.bbox.x, float)
-                and isinstance(m.bbox.y, float)
-                and isinstance(m.bbox.w, float)
-                and isinstance(m.bbox.h, float)
-                for m in f.metadata
-            ]))
+            self.assertTrue(
+                all(
+                    [
+                        isinstance(m.objectness_score, float)
+                        and isinstance(m.bbox.x, float)
+                        and isinstance(m.bbox.y, float)
+                        and isinstance(m.bbox.w, float)
+                        and isinstance(m.bbox.h, float)
+                        for m in f.metadata
+                    ]
+                )
+            )
 
             ## Check if top detected objects (in terms of objectness score) are the same as expected
             top_objects = [m for m in f.metadata if m.objectness_score > 0.2]
-            self.assertEqual(len(top_objects), 2) # there should only be 2 objects with an objectness score above 0.2
+            self.assertEqual(
+                len(top_objects), 2
+            )  # there should only be 2 objects with an objectness score above 0.2
 
             # object #1: check objectness score and bbox coordinates
-            np.testing.assert_allclose(top_objects[0].objectness_score, 0.475717157125473, rtol=1e-5)
-            np.testing.assert_allclose(np.array(top_objects[0].bbox), np.array([0.26258963346481323, 0.20182788232450463, 0.4356532692909241, 0.6405366723375522]), rtol=1e-5)
+            np.testing.assert_allclose(
+                top_objects[0].objectness_score, 0.475717157125473, rtol=1e-5
+            )
+            np.testing.assert_allclose(
+                np.array(top_objects[0].bbox),
+                np.array(
+                    [
+                        0.26258963346481323,
+                        0.20182788232450463,
+                        0.4356532692909241,
+                        0.6405366723375522,
+                    ]
+                ),
+                rtol=1e-5,
+            )
 
             # object #2: check objectness score and bbox coordinates
-            np.testing.assert_allclose(top_objects[1].objectness_score, 0.2692972719669342, rtol=1e-5)
-            np.testing.assert_allclose(np.array(top_objects[1].bbox), np.array([0.4490808695554733, 0.8730822033848641, 0.2807672321796417, 0.12563285559625204]), rtol=1e-5)
+            np.testing.assert_allclose(
+                top_objects[1].objectness_score, 0.2692972719669342, rtol=1e-5
+            )
+            np.testing.assert_allclose(
+                np.array(top_objects[1].bbox),
+                np.array(
+                    [
+                        0.4490808695554733,
+                        0.8730822033848641,
+                        0.2807672321796417,
+                        0.12563285559625204,
+                    ]
+                ),
+                rtol=1e-5,
+            )
 
     def test_with_one_element_list(self):
         images = [self._get_sample_image_pil()]
@@ -424,11 +483,11 @@ class TestOWLv2FeatureExtractor(unittest.TestCase):
         self._test_images(images, 4)
 
     def test_with_n_images_tensor(self):
-        image_batch = torch.stack([
-            self._get_sample_image_tensor() for _ in range(4)
-        ])
+        image_batch = torch.stack(
+            [self._get_sample_image_tensor() for _ in range(4)]
+        )
         self._test_images(image_batch, 4)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

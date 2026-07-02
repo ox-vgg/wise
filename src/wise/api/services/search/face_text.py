@@ -17,7 +17,6 @@ from typing import Hashable, Iterable, TypeVar
 from wise.api.common import MediaQueryTerm, Query, TextQueryTerm
 from wise.data_models import MediaType
 
-
 T = TypeVar("T")
 
 
@@ -32,7 +31,10 @@ def get_face_text_embedder_id(
 
     if preferred_id and preferred_id not in excluded_ids:
         extractor = embedding_service.feature_extractors.get(preferred_id)
-        if extractor is not None and extractor.extract_text_features is not None:
+        if (
+            extractor is not None
+            and extractor.extract_text_features is not None
+        ):
             return preferred_id
 
     for candidate_id in search_targets.get(media_type, []):
@@ -163,7 +165,10 @@ def fuse_face_text_frame_results(
 
     fused_payloads = fused_payloads[start:end]
     total = len(fused_payloads)
-    return [(payload, total - idx) for idx, payload in enumerate(fused_payloads)]
+    return [
+        (payload, total - idx) for idx, payload in enumerate(fused_payloads)
+    ]
+
 
 async def run_face_text_search(
     q: Query | None = None,
@@ -192,12 +197,15 @@ async def run_face_text_search(
 ) -> tuple[object, object | None, list[tuple[T, int]]]:
     if q is not None:
         face_q = [
-            item for item in q
+            item
+            for item in q
             if isinstance(item, MediaQueryTerm) and item.qtype == "visual"
         ]
         text_q = [item for item in q if isinstance(item, TextQueryTerm)]
     if face_q is None or text_q is None:
-        raise ValueError("Either q or both face_q and text_q must be provided.")
+        raise ValueError(
+            "Either q or both face_q and text_q must be provided."
+        )
     # Decide the face-search k (adaptive if configured, otherwise use the request end).
     # Adaptively set the `k` value in K-Nearest Neighbors search based on threshold
     # which is known to roughly delineate more accurate vs less accurate matches.
@@ -206,7 +214,9 @@ async def run_face_text_search(
     face_k = end
     if face_text_options:
         face_k_default = int(face_text_options.get("k_default", end))
-        face_k_expanded = int(face_text_options.get("k_expanded", face_k_default))
+        face_k_expanded = int(
+            face_text_options.get("k_expanded", face_k_default)
+        )
         face_score_threshold = face_text_options.get("score_threshold", None)
         face_k = min(face_k_default, num_vectors)
     else:
@@ -226,10 +236,16 @@ async def run_face_text_search(
         and len(face_distances) >= face_k_default
     ):
         score_at_k = face_distances[face_k_default - 1]
-        if score_at_k > face_score_threshold and face_k_expanded and face_k_expanded > face_k:
+        if (
+            score_at_k > face_score_threshold
+            and face_k_expanded
+            and face_k_expanded > face_k
+        ):
             face_k = min(face_k_expanded, num_vectors)
             # If the kth face score is strong, expand k and re-run face search.
-            face_output = await search_face_fn(face_features, 0, face_k, filter_specs)
+            face_output = await search_face_fn(
+                face_features, 0, face_k, filter_specs
+            )
             face_distances = get_face_distances_fn(face_output)
 
     if not face_distances:
@@ -246,7 +262,9 @@ async def run_face_text_search(
 
     # Perform text search but constrain it such that the results are limited
     # to the vector IDs obtained from the face search.
-    text_features = embed_fn(text_feature_extractor_id, embedding_config, text_q)
+    text_features = embed_fn(
+        text_feature_extractor_id, embedding_config, text_q
+    )
     text_k = text_k_target
     if vector_id_constraint is not None:
         text_k = min(text_k_target, len(vector_id_constraint))

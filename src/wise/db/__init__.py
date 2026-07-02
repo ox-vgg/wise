@@ -63,19 +63,23 @@ from wise.db.tables import (
 )
 from wise.db.utils import prepare_filter_stmt
 
-
 logger = logging.getLogger(__name__)
 
-_WISE_FTS_TABLE = 'metadata_fts'
-_WISE_ASR_TABLE = 'metadata-asr'
+_WISE_FTS_TABLE = "metadata_fts"
+_WISE_ASR_TABLE = "metadata-asr"
 __wise_tables = [_WISE_FTS_TABLE, _WISE_ASR_TABLE]
 
-def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+
+def before_cursor_execute(
+    conn, cursor, statement, parameters, context, executemany
+):
     conn.info.setdefault("query_start_time", []).append(time.time())
     logger.info("Start Query: %s", statement)
 
 
-def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+def after_cursor_execute(
+    conn, cursor, statement, parameters, context, executemany
+):
     total = time.time() - conn.info["query_start_time"].pop(-1)
     logger.info("Query Complete!")
     logger.info("Total Time: %f", total)
@@ -125,7 +129,14 @@ def init_project(dburi: str, **kwargs) -> Engine:
 def init_thumbs(dburi: str, **kwargs) -> Engine:
     return _init(dburi, thumbs_metadata_obj, **kwargs)
 
-def reflect_external_metadata(db_engine):
-    project_metadata_obj.reflect(bind=db_engine, only=lambda x, _: x != _WISE_FTS_TABLE)
 
-    return [ v for k, v in project_metadata_obj.tables.items() if k.startswith('metadata-') and k not in __wise_tables]
+def reflect_external_metadata(db_engine):
+    project_metadata_obj.reflect(
+        bind=db_engine, only=lambda x, _: x != _WISE_FTS_TABLE
+    )
+
+    return [
+        v
+        for k, v in project_metadata_obj.tables.items()
+        if k.startswith("metadata-") and k not in __wise_tables
+    ]

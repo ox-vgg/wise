@@ -40,7 +40,6 @@ from wise.api.services.embedding.exceptions import (
 )
 from wise.feature import BBoxXYWH, FeatureExtractor, FeatureExtractorFactory
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -87,9 +86,7 @@ def load_image(qterm: MediaQueryTerm) -> Image.Image:
             download_url_to_file(qterm.src, tmpfile.name)
             return Image.open(tmpfile.name).load()
     else:
-        raise HTTPException(
-            400, {"message": "Unhandled query term"}
-        )
+        raise HTTPException(400, {"message": "Unhandled query term"})
 
 
 def load_audio(x: list[io.BytesIO]) -> torch.Tensor:
@@ -99,16 +96,20 @@ def load_audio(x: list[io.BytesIO]) -> torch.Tensor:
     elif len(x) > 1:
         raise NotImplementedError("Please specify 1 audio file only")
 
-    target_sample_rate = 48_000 # TODO set this based on model?
+    target_sample_rate = 48_000  # TODO set this based on model?
     audio_file = x[0]
     waveform, original_sample_rate = torchaudio.load(audio_file)
-    waveform = torchaudio.functional.resample(waveform, orig_freq=original_sample_rate, new_freq=target_sample_rate)
+    waveform = torchaudio.functional.resample(
+        waveform, orig_freq=original_sample_rate, new_freq=target_sample_rate
+    )
     return waveform
+
 
 class EmbeddingConfig(BaseModel):
     query_prefix: str
     text_queries_weight: float = 2.0
     negative_queries_weight: float = 0.2
+
 
 class EmbeddingService:
     def __init__(self, feature_extractors: dict[str, FeatureExtractor]):
@@ -123,19 +124,31 @@ class EmbeddingService:
         )
         return cls(feature_extractors)
 
-    def transform_distances(self, feature_extractor_id: str, distances: list) -> list:
+    def transform_distances(
+        self, feature_extractor_id: str, distances: list
+    ) -> list:
         feature_extractor = self.feature_extractors.get(feature_extractor_id)
         if feature_extractor is None:
-            raise FeatureExtractorNotFoundError(f"Feature extractor {feature_extractor_id} not initialized!")
-        ret = feature_extractor.transform_faiss_distances_hook(np.array(distances))
+            raise FeatureExtractorNotFoundError(
+                f"Feature extractor {feature_extractor_id} not initialized!"
+            )
+        ret = feature_extractor.transform_faiss_distances_hook(
+            np.array(distances)
+        )
         return ret.tolist()
 
-    def transform_internal_image_queries(self, feature_extractor_id: str, image_query: np.ndarray) -> np.ndarray:
+    def transform_internal_image_queries(
+        self, feature_extractor_id: str, image_query: np.ndarray
+    ) -> np.ndarray:
         feature_extractor = self.feature_extractors.get(feature_extractor_id)
         if feature_extractor is None:
-            raise FeatureExtractorNotFoundError(f"Feature extractor {feature_extractor_id} not initialized!")
+            raise FeatureExtractorNotFoundError(
+                f"Feature extractor {feature_extractor_id} not initialized!"
+            )
 
-        return feature_extractor.transform_internal_image_queries_hook(image_query)
+        return feature_extractor.transform_internal_image_queries_hook(
+            image_query
+        )
 
     def embed(
         self,
@@ -149,7 +162,9 @@ class EmbeddingService:
 
         feature_extractor = self.feature_extractors.get(feature_extractor_id)
         if feature_extractor is None:
-            raise FeatureExtractorNotFoundError(f"Feature extractor {feature_extractor_id} not initialized!")
+            raise FeatureExtractorNotFoundError(
+                f"Feature extractor {feature_extractor_id} not initialized!"
+            )
 
         def extract_text_features(text: str) -> np.ndarray:
             if feature_extractor.extract_text_features is None:
@@ -165,23 +180,31 @@ class EmbeddingService:
             if not len(features.vectors):
                 raise NoFeaturesFoundError("no features found on image")
             if len(features.vectors) > 1:
-                logger.debug("multiple features found, will return vector for the top feature only")
+                logger.debug(
+                    "multiple features found, will return vector for the top feature only"
+                )
             return features.vectors[0:1]
 
-        def extract_image_region_features(image: Image.Image, bbox) -> np.ndarray:
+        def extract_image_region_features(
+            image: Image.Image, bbox
+        ) -> np.ndarray:
             if feature_extractor.extract_image_region_features is None:
-                raise ModalityNotSupportedError("image region modality not supported")
+                raise ModalityNotSupportedError(
+                    "image region modality not supported"
+                )
             ## bbox here is api.common.BBoxXYWH (pydantic model) but
             ## we need BBoxXYWH from FeatureExtractor (NamedTuple).
             ft_bbox = BBoxXYWH(bbox.x, bbox.y, bbox.w, bbox.h)
             features = feature_extractor.extract_image_region_features(
                 feature_extractor.preprocess_image_region(image, ft_bbox),
-                ft_bbox
+                ft_bbox,
             )
             if not len(features.vectors):
                 raise NoFeaturesFoundError("no features found on image")
             if len(features.vectors) > 1:
-                logger.debug("multiple features found, will return vector for the top feature only")
+                logger.debug(
+                    "multiple features found, will return vector for the top feature only"
+                )
             return features.vectors[0:1]
 
         def extract_audio_features(audio: torch.Tensor) -> np.ndarray:
@@ -209,12 +232,14 @@ class EmbeddingService:
                 elif qterm.qtype == "audio":
                     if isinstance(qterm.src, bytes):
                         au = io.BytesIO(qterm.src)
-                        feature_vector = extract_audio_features(load_audio([au]))
+                        feature_vector = extract_audio_features(
+                            load_audio([au])
+                        )
                     elif _is_HttpUrl(qterm.src):
                         logger.info("Downloading '%s' to file", qterm.src)
                         with NamedTemporaryFile() as tmpfile:
                             download_url_to_file(qterm.src, tmpfile.name)
-                            with open(tmpfile.name, mode='rb') as f:
+                            with open(tmpfile.name, mode="rb") as f:
                                 file_bytes_io = io.BytesIO(f.read())
                                 feature_vector = extract_audio_features(
                                     load_audio([file_bytes_io])
@@ -230,7 +255,9 @@ class EmbeddingService:
 
             elif isinstance(qterm, TextQueryTerm):
                 if config.query_prefix:
-                    prefixed_queries = f"{config.query_prefix} {qterm.txt.strip()}".strip()
+                    prefixed_queries = (
+                        f"{config.query_prefix} {qterm.txt.strip()}".strip()
+                    )
                 else:
                     prefixed_queries = qterm.txt.strip()
 
@@ -243,7 +270,6 @@ class EmbeddingService:
                 feature_vector = -feature_vector
             feature_vectors.append(feature_vector)
 
-
             if qterm.is_negative:
                 weights.append(config.negative_queries_weight)
             else:
@@ -254,5 +280,7 @@ class EmbeddingService:
 
         weights = np.array(weights, dtype=np.float32)
         average_features = np.average(feature_vectors, axis=0, weights=weights)
-        average_features /= np.linalg.norm(average_features, axis=-1, keepdims=True)
+        average_features /= np.linalg.norm(
+            average_features, axis=-1, keepdims=True
+        )
         return average_features

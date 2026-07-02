@@ -32,9 +32,9 @@ def SearchIndexFactory(modality_type: str, asset_id, asset):
          see src/wise_project.py::discover_assets()
 
     """
-    if modality_type in ['audio', 'video', 'image']:
+    if modality_type in ["audio", "video", "image"]:
         return FeatureSearchIndex(modality_type, asset_id, asset)
-    elif modality_type == 'metadata':
+    elif modality_type == "metadata":
         return SqliteSearchIndex(modality_type, asset_id, asset)
     else:
-        raise ValueError(f'Unknown modality_type {modality_type}')
+        raise ValueError(f"Unknown modality_type {modality_type}")

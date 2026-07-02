@@ -17,7 +17,6 @@
 import logging
 import os
 
-
 logger = logging.getLogger(__name__)
 
 try:
@@ -31,6 +30,7 @@ except:
 
 # TODO move this to pydantic settings and inject it
 default_triton_url = os.environ.get("WISE_TRITON_URL", "localhost:8001")
+
 
 def _get_triton_url_and_model_id(_id: str) -> tuple[str | None, str]:
     """
@@ -155,15 +155,16 @@ def FeatureExtractorFactory(id, config: dict[str, dict] = {}):
     is_triton = url is not None
 
     if len(model_id.split("/")) != 4:
-        raise ValueError('''Feature extractor name must be formatted as
+        raise ValueError("""Feature extractor name must be formatted as
               USER_OR_ORGANIZATION / REPOSITORY_NAME / MODEL_NAME / TRAINING_DATASET
             For example, use "mlfoundations/open_clip/ViT-B-16-SigLIP-256/webli" for extracting features using ViT
             model trained on the Web Language Image (WebLI) dataset.
-            ''')
+            """)
 
     cls = get_feature_extractor_class(model_id)
     if is_triton:
         from wise.feature.triton_runner import make_triton_feature_extractor
+
         url = url or default_triton_url
         cls = make_triton_feature_extractor(cls)
         model_config["url"] = url

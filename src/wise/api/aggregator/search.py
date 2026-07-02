@@ -39,7 +39,6 @@ from wise.api.dependencies import (
 from wise.api.services.embedding import EmbeddingConfig
 from wise.data_models import MediaType
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -47,12 +46,13 @@ def get_prefix(config):
     return {
         MediaType.IMAGE: config.query_prefix.strip(),
         MediaType.VIDEO: config.query_prefix.strip(),
-        MediaType.AV: "This is the sound of", # TODO add this to config
+        MediaType.AV: "This is the sound of",  # TODO add this to config
         MediaType.AUDIO: "This is the sound of",
     }
 
 
 router = APIRouter(route_class=common.CachedBodyRoute)
+
 
 @router.get("/featured", response_model=common.SearchResponse)
 @common.add_response_time
@@ -72,7 +72,9 @@ async def handle_get_featured(
     # This seed is used to randomly select the set of images used for the featured images
     random_seed: int = fastapi.Query(123),
 ):
-    start, end = common.clamp_search_window(start, end, config.max_search_results)
+    start, end = common.clamp_search_window(
+        start, end, config.max_search_results
+    )
     # modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in)
     response = await cast(RemoteSearchService, search_service).featured(
         featured_in, feature_extractor_id, start, end, random_seed
@@ -103,7 +105,9 @@ async def replace_vector_ids_with_search_embeddings(
     )
     ## Apply hook to transform internal image query vectors
     search_embeddings = [
-        embedding_service.transform_internal_image_queries(feature_extractor_id, x)
+        embedding_service.transform_internal_image_queries(
+            feature_extractor_id, x
+        )
         for x in embeddings
     ]
 
@@ -115,6 +119,7 @@ async def replace_vector_ids_with_search_embeddings(
             vector=embedding,
         )
     return new_q
+
 
 async def _search(
     config: APIConfig,
@@ -135,26 +140,38 @@ async def _search(
     shot_scale: list[int],
     metadata_filter: list[str],
     add_prefix: bool,
-    search_endpoint: Literal["/search", "/search2"] = "/search"
+    search_endpoint: Literal["/search", "/search2"] = "/search",
 ):
     if search_in == MediaType.IMAGE:
-        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
-            raise HTTPException(400, {
-                "message": "Cannot search on images using an audio query"
-            })
+        if any(
+            [isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]
+        ):
+            raise HTTPException(
+                400,
+                {"message": "Cannot search on images using an audio query"},
+            )
     elif search_in == MediaType.VIDEO:
-        if any([isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]):
-            raise HTTPException(400, {
-                "message": "Cannot search on visual stream of video files using an audio query"
-            })
+        if any(
+            [isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]
+        ):
+            raise HTTPException(
+                400,
+                {
+                    "message": "Cannot search on visual stream of video files using an audio query"
+                },
+            )
     elif search_in == MediaType.AUDIO or search_in == MediaType.AV:
-        if any([isinstance(x, MediaQueryTerm) and x.qtype == "visual" for x in q]):
-            raise HTTPException(400, {
-                "message": "Cannot search on audio using a visual query"
-            })
+        if any(
+            [isinstance(x, MediaQueryTerm) and x.qtype == "visual" for x in q]
+        ):
+            raise HTTPException(
+                400, {"message": "Cannot search on audio using a visual query"}
+            )
 
-    if feature_extractor_id == 'wise/metadata':
-        response = await search_service.search(request, endpoint=search_endpoint)
+    if feature_extractor_id == "wise/metadata":
+        response = await search_service.search(
+            request, endpoint=search_endpoint
+        )
         return response
 
     media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
@@ -169,7 +186,9 @@ async def _search(
         text_queries_weight=config.text_queries_weight,
         negative_queries_weight=config.negative_queries_weight,
     )
-    features = embedding_service.embed(feature_extractor_id, embedding_config, q)
+    features = embedding_service.embed(
+        feature_extractor_id, embedding_config, q
+    )
     search_response = await search_service.search_with_feature(
         features,
         search_in=search_in,
@@ -182,6 +201,7 @@ async def _search(
     )
 
     return search_response
+
 
 @router.post("/search", response_model=common.SearchResponse)
 @common.add_response_time
@@ -201,15 +221,23 @@ async def handle_post_search(
     audio_file_queries: list[bytes] = File([]),  # user-uploaded audio files
     image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
     audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
-    internal_image_queries: list[str] = fastapi.Query(default=[]),  # ids to internal images
+    internal_image_queries: list[str] = fastapi.Query(
+        default=[]
+    ),  # ids to internal images
     # Negative queries
     negative_text_queries: list[str] = fastapi.Query(default=[]),
-    negative_image_file_queries: list[bytes] = File([]),  # user-uploaded images
+    negative_image_file_queries: list[bytes] = File(
+        []
+    ),  # user-uploaded images
     negative_audio_file_queries: list[bytes] = File(
         []
     ),  # user-uploaded audio files
-    negative_image_url_queries: list[HttpUrl] = Form([]),  # URLs to online images
-    negative_audio_url_queries: list[HttpUrl] = Form([]),  # URLs to online audio files
+    negative_image_url_queries: list[HttpUrl] = Form(
+        []
+    ),  # URLs to online images
+    negative_audio_url_queries: list[HttpUrl] = Form(
+        []
+    ),  # URLs to online audio files
     negative_internal_image_queries: list[str] = fastapi.Query(
         default=[]
     ),  # ids to internal images
@@ -219,7 +247,7 @@ async def handle_post_search(
     thumbnails_to_send: int = fastapi.Query(0),
     shot_scale: list[int] = fastapi.Query(default=[]),
     metadata_filter: list[str] = fastapi.Query(default=[]),
-    add_prefix: bool = fastapi.Query(True)
+    add_prefix: bool = fastapi.Query(True),
 ):
     """
     Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
@@ -259,9 +287,10 @@ async def handle_post_search(
         thumbnails_to_send,
         shot_scale,
         metadata_filter,
-        add_prefix
+        add_prefix,
     )
     return response
+
 
 @router.post("/search2", response_model=common.SearchResponse)
 @common.add_response_time
@@ -284,7 +313,7 @@ async def handle_post_search2(
     thumbnails_to_send: int = fastapi.Query(0),
     shot_scale: list[int] = fastapi.Query(default=[]),
     metadata_filter: list[str] = fastapi.Query(default=[]),
-    add_prefix: bool = fastapi.Query(True)
+    add_prefix: bool = fastapi.Query(True),
 ):
     """
     Handles queries sent by POST request. This endpoint can handle file queries, URL queries (i.e. URL to an image), and/or text queries.
@@ -312,6 +341,6 @@ async def handle_post_search2(
         shot_scale,
         metadata_filter,
         add_prefix,
-        search_endpoint="/search2"
+        search_endpoint="/search2",
     )
     return response

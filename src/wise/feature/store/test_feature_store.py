@@ -24,7 +24,7 @@ from wise.feature.store.faiss_store import FaissStore
 
 class TestFeatureExtractorFactory(unittest.TestCase):
     def setUp(self):
-        self.store_name = 'test-store'
+        self.store_name = "test-store"
         self.feature_dim = 512
 
     def test_faiss_store(self):
@@ -73,7 +73,9 @@ class TestFeatureExtractorFactory(unittest.TestCase):
                     )
                 else:
                     self.assertTrue(
-                        np.all(np.equal(feature_vector, feature3[feature_id - 3]))
+                        np.all(
+                            np.equal(feature_vector, feature3[feature_id - 3])
+                        )
                     )
 
             self.assertEqual(read_feature_id, [0, 1, 2, 3, 4, 5])
@@ -114,5 +116,5 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             del store
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

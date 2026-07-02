@@ -24,6 +24,7 @@ from wise.feature.store.faiss_store import FaissStore
 class FeatureStoreType(enum.Enum):
     FAISS = "faiss"
 
+
 class FeatureStoreFactory:
     @classmethod
     def create_store(
@@ -36,24 +37,34 @@ class FeatureStoreFactory:
         if feature_store_type is FeatureStoreType.FAISS:
             return FaissStore(store_name_prefix, features_dir)
         else:
-            raise ValueError(f'unknown feature_store_type {feature_store_type}')
+            raise ValueError(
+                f"unknown feature_store_type {feature_store_type}"
+            )
 
     @classmethod
     def load_store(cls, modality_type: ModalityType, features_dir):
-        features_dir = Path(features_dir) # convert type in case features_dir is a string
+        features_dir = Path(
+            features_dir
+        )  # convert type in case features_dir is a string
         store_name_prefix = modality_type.value
 
         # infer the store type
-        shard_suffixes = set([p.suffix for p in features_dir.glob(store_name_prefix + '-*')])
+        shard_suffixes = set(
+            [p.suffix for p in features_dir.glob(store_name_prefix + "-*")]
+        )
         if len(shard_suffixes) == 0:
             raise ValueError(
                 f"found no feature store files '{features_dir}/{store_name_prefix}-*'"
             )
         elif len(shard_suffixes) > 1:
-            raise ValueError(f"failed to infer type of '{features_dir}/{store_name_prefix}-*' feature store files because there are multiple file types present ({shard_suffixes})")
+            raise ValueError(
+                f"failed to infer type of '{features_dir}/{store_name_prefix}-*' feature store files because there are multiple file types present ({shard_suffixes})"
+            )
 
         shard_suffix = shard_suffixes.pop()
         if shard_suffix == ".faiss":
             return FaissStore(store_name_prefix, features_dir)
         else:
-            raise ValueError(f'unknown store containing shard filenames with extension {shard_suffix}')
+            raise ValueError(
+                f"unknown store containing shard filenames with extension {shard_suffix}"
+            )

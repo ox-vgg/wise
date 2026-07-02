@@ -21,22 +21,26 @@ from fastapi import APIRouter, HTTPException, Request
 from wise.api import common
 from wise.api.dependencies import ProjectInfoDep, ProjectServiceDep
 
-
 logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
+
 
 @router.get(
     "/related-vectors/{_vector_id}",
     response_model=list[common.VectorInfo],
     responses={200: {"content": "application/json"}},
 )
-async def get_related_vectors(_vector_id: int, media_id: str, projects: ProjectServiceDep):
-    shard_id, _ = media_id.rsplit('/', 2)
+async def get_related_vectors(
+    _vector_id: int, media_id: str, projects: ProjectServiceDep
+):
+    shard_id, _ = media_id.rsplit("/", 2)
     project = projects.get(shard_id)
     if project is None:
-        raise HTTPException(status_code=404, detail=f"Project shard {shard_id} not found!")
+        raise HTTPException(
+            status_code=404, detail=f"Project shard {shard_id} not found!"
+        )
 
     response = await project.related_vectors(_vector_id)
     return response
@@ -46,18 +50,30 @@ async def get_related_vectors(_vector_id: int, media_id: str, projects: ProjectS
     "/shard/{shard_id}/{full_path:path}",
     methods=["GET", "HEAD"],
 )
-async def forward(shard_id: str, full_path: str, request: Request,  projects: ProjectServiceDep):
+async def forward(
+    shard_id: str,
+    full_path: str,
+    request: Request,
+    projects: ProjectServiceDep,
+):
     """
     Forward the request to a remote project based on the project_id
     """
-    logger.info('Forwarding request to remote shard %s for path %s', shard_id, full_path)
+    logger.info(
+        "Forwarding request to remote shard %s for path %s",
+        shard_id,
+        full_path,
+    )
 
     project = projects.get(shard_id)
     if project is None:
-        raise HTTPException(status_code=404, detail=f"Project shard {shard_id} not found!")
+        raise HTTPException(
+            status_code=404, detail=f"Project shard {shard_id} not found!"
+        )
 
     response = await project.forward(full_path, request)
     return response
+
 
 @router.get("/info")
 async def get_info(info: ProjectInfoDep):

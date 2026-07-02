@@ -30,10 +30,11 @@ from wise.api.services.project import (
 from wise.api.services.search import LocalSearchService, RemoteSearchService
 from wise.config import APIConfig
 
-
 logger = logging.getLogger(__name__)
 
-ProjectServiceType = LocalWiseProjectService | dict[str, RemoteWiseProjectService]
+ProjectServiceType = (
+    LocalWiseProjectService | dict[str, RemoteWiseProjectService]
+)
 SearchServiceType = LocalSearchService | RemoteSearchService
 
 # module globals
@@ -43,12 +44,17 @@ project_info: ProjectInfo = None
 embedding_service: EmbeddingService = None
 search_service: SearchServiceType = None
 
+
 def get_config():
     if config is None:
-        raise ValueError("Config not initialized - call init method before using other methods in the module")
+        raise ValueError(
+            "Config not initialized - call init method before using other methods in the module"
+        )
     return config
 
+
 ConfigDep = Annotated[APIConfig, Depends(get_config)]
+
 
 def get_project_service(config: ConfigDep):
     global project_service
@@ -59,9 +65,12 @@ def get_project_service(config: ConfigDep):
         def init_project_service(config: APIConfig):
             if config.remote_projects:
                 remote_project_services = [
-                    RemoteWiseProjectService(p, config) for p in config.remote_projects
+                    RemoteWiseProjectService(p, config)
+                    for p in config.remote_projects
                 ]
-                remote_project_services = {p.name: p for p in remote_project_services}
+                remote_project_services = {
+                    p.name: p for p in remote_project_services
+                }
                 _project_service = remote_project_services
             else:
 
@@ -71,6 +80,7 @@ def get_project_service(config: ConfigDep):
                         f"Local path does not exist or is not a directory: {project_path}"
                     )
                 from wise.wise_project import WiseProject
+
                 project = WiseProject(project_path, read_only=True)
                 project.load_search_indices(config.index_type, config.nprobe)
                 _project_service = LocalWiseProjectService(project, config)
@@ -81,11 +91,14 @@ def get_project_service(config: ConfigDep):
 
     return project_service
 
+
 ProjectServiceDep = Annotated[ProjectServiceType, Depends(get_project_service)]
+
 
 def get_project_info(config: ConfigDep, project_service: ProjectServiceDep):
     global project_info
     if project_info is None:
+
         def init_project_info(project_service: ProjectServiceType):
             if isinstance(project_service, LocalWiseProjectService):
                 info = project_service.info()
@@ -101,12 +114,14 @@ def get_project_info(config: ConfigDep, project_service: ProjectServiceDep):
         project_info = init_project_info(project_service)
     return project_info
 
+
 ProjectInfoDep = Annotated[ProjectInfo, Depends(get_project_info)]
 
 
 def get_embedding_service(config: ConfigDep, project_info: ProjectInfoDep):
     global embedding_service
     if embedding_service is None:
+
         def init_embedding_service(project_info: ProjectInfo):
             active_search_targets = project_info.search_targets
             logger.info(
@@ -127,11 +142,14 @@ def get_embedding_service(config: ConfigDep, project_info: ProjectInfoDep):
             return EmbeddingService.from_ids(
                 feature_extractor_ids, config.feature_extractor_config
             )
+
         embedding_service = init_embedding_service(project_info)
     return embedding_service
 
 
-EmbeddingServiceDep = Annotated[EmbeddingService, Depends(get_embedding_service)]
+EmbeddingServiceDep = Annotated[
+    EmbeddingService, Depends(get_embedding_service)
+]
 
 
 def get_search_service(
@@ -139,16 +157,24 @@ def get_search_service(
 ):
     global search_service
     if search_service is None:
-        def init_search_service(project_service: ProjectServiceType, embedding_service: EmbeddingService):
+
+        def init_search_service(
+            project_service: ProjectServiceType,
+            embedding_service: EmbeddingService,
+        ):
             if isinstance(project_service, LocalWiseProjectService):
                 return LocalSearchService(project_service, embedding_service)
             # remote projects
             return RemoteSearchService(project_service, embedding_service)
-        search_service = init_search_service(project_service, embedding_service)
+
+        search_service = init_search_service(
+            project_service, embedding_service
+        )
     return search_service
 
 
 SearchServiceDep = Annotated[SearchServiceType, Depends(get_search_service)]
+
 
 def init(_config: APIConfig):
     global config

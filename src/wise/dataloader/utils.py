@@ -22,13 +22,14 @@ from pathlib import Path
 import filetype
 import magic
 
-
 logger = logging.getLogger(__name__)
 
 MATCHERS = {
     x.MIME: x
     for x in (
-        filetype.image_matchers + filetype.video_matchers + filetype.audio_matchers
+        filetype.image_matchers
+        + filetype.video_matchers
+        + filetype.audio_matchers
     )
 }
 

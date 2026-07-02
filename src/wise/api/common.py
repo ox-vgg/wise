@@ -36,17 +36,24 @@ from pydantic import (
 
 from wise.config import APIConfig
 
-
 PRECISION = 5
+
+
 def round_float_(v: float) -> float:
     return round(v, PRECISION)
 
-round_float = Annotated[float, PlainSerializer(round_float_, when_used='json-unless-none')]
+
+round_float = Annotated[
+    float, PlainSerializer(round_float_, when_used="json-unless-none")
+]
+
 
 def clamp_search_window(start: int, end: int, max_end: int) -> tuple[int, int]:
     end = min(end, max_end)
     if start > end:
-        raise HTTPException(400, {"message": "'start' cannot be greater than 'end'"})
+        raise HTTPException(
+            400, {"message": "'start' cannot be greater than 'end'"}
+        )
     return start, end
 
 
@@ -58,8 +65,8 @@ class BBoxXYWH(BaseModel):
 
 
 class NPArray(BaseModel):
-    """Utility to convert between numpy arrays and json for HTTP requests.
-    """
+    """Utility to convert between numpy arrays and json for HTTP requests."""
+
     content: str
     shape: list[int]
     # assume we only exchange float32 arrays for now
@@ -68,13 +75,10 @@ class NPArray(BaseModel):
     def from_array(cls, x: np.ndarray) -> "NPArray":
         np_bytes = x.tobytes()
         base64_encoded = base64.b64encode(np_bytes)
-        return cls(
-            content=base64_encoded.decode('ascii'),
-            shape=list(x.shape)
-        )
+        return cls(content=base64_encoded.decode("ascii"), shape=list(x.shape))
 
     def to_array(self) -> np.ndarray:
-        bytes_from_b64 = base64.b64decode(self.content.encode('ascii'))
+        bytes_from_b64 = base64.b64decode(self.content.encode("ascii"))
         arr = np.frombuffer(bytes_from_b64, dtype=np.float32)
         arr = arr.reshape(self.shape)
         return arr
@@ -92,6 +96,7 @@ class BaseQueryTerm(BaseModel):
     concrete "implementations".
 
     """
+
     term_id: str
     is_negative: bool
 
@@ -116,14 +121,17 @@ class MediaQueryTerm(BaseQueryTerm):
             a video segment.
 
     """
+
     src: HttpUrl | bytes | int
     qtype: Literal["audio", "visual"]
     bbox: Optional[BBoxXYWH] = None
     ts: Optional[float] = None
     te: Optional[float] = None
 
+
 class VectorIdQueryTerm(BaseQueryTerm):
     vector_id: str  # str because format is {shard_id}/{media_id}/{vector_id}
+
 
 class VectorQueryTerm(BaseQueryTerm):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -137,7 +145,7 @@ class VectorQueryTerm(BaseQueryTerm):
         else:
             return v
 
-    @field_serializer('vector', mode='plain')
+    @field_serializer("vector", mode="plain")
     def serialize_vector(self, value: np.ndarray) -> NPArray:
         return NPArray.from_array(self.vector)
 
@@ -146,7 +154,9 @@ class TextQueryTerm(BaseQueryTerm):
     txt: str
 
 
-Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm]
+Query = list[
+    MediaQueryTerm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm
+]
 
 
 ## Query's are an HTTP multipart/form-data request where the files
@@ -161,6 +171,7 @@ Query = list[MediaQueryTerm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTer
 ## multipart approach instead of gzip+base64+json because we decided
 ## it would be simpler to maintain with lower CPU usage in the client.
 
+
 class MediaQueryTermInForm(MediaQueryTerm):
     src: HttpUrl | int | None  # None means bytes in another form part
 
@@ -172,9 +183,14 @@ class MediaQueryTermInForm(MediaQueryTerm):
             return cls(**q.model_dump())
 
 
-QueryTermInForm = MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm
+QueryTermInForm = (
+    MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm
+)
 QueryTermInFormAdapter = TypeAdapter(QueryTermInForm)
-QueryInForm = list[MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm]
+QueryInForm = list[
+    MediaQueryTermInForm | TextQueryTerm | VectorQueryTerm | VectorIdQueryTerm
+]
+
 
 def merge_multipart_query_form(
     query_form: list[str], query_form_files: list[UploadFile]
@@ -194,7 +210,10 @@ def merge_multipart_query_form(
         )
     if any([x not in term_ids for x in filename_to_file.keys()]):
         raise HTTPException(
-            400, {"message": "query files must have query term with matching term_id"}
+            400,
+            {
+                "message": "query files must have query term with matching term_id"
+            },
         )
 
     query = []
@@ -252,31 +271,52 @@ def parse_old_api_query(
     negative_audio_url_queries: list[HttpUrl],  # URLs to online audio files
     negative_internal_image_queries: list[str],  # ids to internal images
 ) -> Query:
-    """Convert from the *_queries values from API into the "internal" form.
-    """
+    """Convert from the *_queries values from API into the "internal" form."""
     q = []
     q += [
         TextQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, txt=val)
         for val in text_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=val, qtype="visual")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()),
+            is_negative=False,
+            src=val,
+            qtype="visual",
+        )
         for val in image_file_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=HttpUrl(val), qtype="visual")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()),
+            is_negative=False,
+            src=HttpUrl(val),
+            qtype="visual",
+        )
         for val in image_url_queries
     ]
     q += [
-        VectorQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, vector_id=val)
+        VectorQueryTerm(
+            term_id=str(uuid.uuid4()), is_negative=False, vector_id=val
+        )
         for val in internal_image_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=val, qtype="audio")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()),
+            is_negative=False,
+            src=val,
+            qtype="audio",
+        )
         for val in audio_file_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=False, src=HttpUrl(val), qtype="audio")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()),
+            is_negative=False,
+            src=HttpUrl(val),
+            qtype="audio",
+        )
         for val in audio_url_queries
     ]
     q += [
@@ -284,23 +324,42 @@ def parse_old_api_query(
         for val in negative_text_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=val, qtype="visual")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()),
+            is_negative=True,
+            src=val,
+            qtype="visual",
+        )
         for val in negative_image_file_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=HttpUrl(val), qtype="visual")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()),
+            is_negative=True,
+            src=HttpUrl(val),
+            qtype="visual",
+        )
         for val in negative_image_url_queries
     ]
     q += [
-        VectorQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, vector_id=val)
+        VectorQueryTerm(
+            term_id=str(uuid.uuid4()), is_negative=True, vector_id=val
+        )
         for val in negative_internal_image_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=val, qtype="audio")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()), is_negative=True, src=val, qtype="audio"
+        )
         for val in negative_audio_file_queries
     ]
     q += [
-        MediaQueryTerm(term_id=str(uuid.uuid4()), is_negative=True, src=HttpUrl(val), qtype="audio")
+        MediaQueryTerm(
+            term_id=str(uuid.uuid4()),
+            is_negative=True,
+            src=HttpUrl(val),
+            qtype="audio",
+        )
         for val in negative_audio_url_queries
     ]
     return q
@@ -316,13 +375,17 @@ class VectorInfo(BaseModel):
     @field_validator("bbox", mode="before")
     @classmethod
     def cast_bbox(cls, v):
-        if isinstance(v, tuple):  # v is the NamedTuple in feature_extractor module
-            return BBoxXYWH(**{k: v for (k, v) in zip('xywh', v)})
+        if isinstance(
+            v, tuple
+        ):  # v is the NamedTuple in feature_extractor module
+            return BBoxXYWH(**{k: v for (k, v) in zip("xywh", v)})
         else:
             return v
 
+
 class VectorResult(VectorInfo):
     distance: round_float
+
 
 # Metadata for a video/audio/image file, to be sent to the frontend
 class MediaInfo(BaseModel):
@@ -336,45 +399,63 @@ class MediaInfo(BaseModel):
     title: str = ""
     external_metadata: dict = {}
 
+
 # A subclass of MediaInfo for images
 class ImageInfo(MediaInfo):
     pass
+
 
 # A subclass of MediaInfo for videos
 class VideoInfo(MediaInfo):
     timeline_hover_thumbnails: str
 
+
 class ImageVector(VectorResult):
     pass
+
 
 class VideoSegment(VectorResult):
     ts: round_float
     te: round_float
     thumbnail_ts: round_float
 
+
 class VideoAudioResults(BaseModel):
-    total: int # maximum number of unmerged_windows that can be returned
-    unmerged_windows: list[VideoSegment] # e.g. 7-second windows
-    merged_windows: list[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
+    total: int  # maximum number of unmerged_windows that can be returned
+    unmerged_windows: list[VideoSegment]  # e.g. 7-second windows
+    merged_windows: list[
+        VideoSegment
+    ]  # shots (for edited videos) or merged segments (for unedited videos)
     videos: dict[str, VideoInfo]
+
 
 class VideoResults(BaseModel):
-    total: int # maximum number of unmerged_windows that can be returned
-    unmerged_windows: list[VideoSegment] # frames (CLIP) or unmerged 4-second segments (InternVideo/LanguageBind)
-    merged_windows: list[VideoSegment] # shots (for edited videos) or merged segments (for unedited videos)
+    total: int  # maximum number of unmerged_windows that can be returned
+    unmerged_windows: list[
+        VideoSegment
+    ]  # frames (CLIP) or unmerged 4-second segments (InternVideo/LanguageBind)
+    merged_windows: list[
+        VideoSegment
+    ]  # shots (for edited videos) or merged segments (for unedited videos)
     videos: dict[str, VideoInfo]
 
+
 class ImageResults(BaseModel):
-    total: int # maximum number of images that can be returned e.g. min(1000, num_images_in_project)
+    total: int  # maximum number of images that can be returned e.g. min(1000, num_images_in_project)
     vectors: list[ImageVector]
     images: dict[str, ImageInfo]
 
+
 class SearchResponse(BaseModel):
-    time: float # backend search time in seconds
+    time: float  # backend search time in seconds
     query: Query | QueryInForm
-    video_audio_results: Optional[VideoAudioResults] # search results from audio stream of video files
-    video_results: Optional[VideoResults] # search results from video stream of video files
-    image_results: Optional[ImageResults] # search results from image files
+    video_audio_results: Optional[
+        VideoAudioResults
+    ]  # search results from audio stream of video files
+    video_results: Optional[
+        VideoResults
+    ]  # search results from video stream of video files
+    image_results: Optional[ImageResults]  # search results from image files
 
 
 def patch_precision(config: APIConfig):
@@ -384,6 +465,7 @@ def patch_precision(config: APIConfig):
     # or handle it frontend
     global PRECISION
     PRECISION = config.precision
+
 
 def add_response_time(func: Callable[..., Awaitable[SearchResponse]]):
     @functools.wraps(func)
@@ -411,13 +493,15 @@ class CachedBodyRequest(Request):
     forwards the request after parsing the form arguments.
 
     """
+
     async def form(self, *args, **kwargs):
         await super().body()
         return await super().form(*args, **kwargs)
 
+
 class CachedBodyRoute(APIRoute):
-    """Route that ensures that Request cache body, see CachedBodyRequest
-    """
+    """Route that ensures that Request cache body, see CachedBodyRequest"""
+
     def get_route_handler(self) -> Callable:
         original_route_handler = super().get_route_handler()
 

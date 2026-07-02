@@ -17,7 +17,9 @@ import itertools
 from wise.api import common
 
 
-def merge_close_segments(_keyframes: list[common.VideoSegment], threshold: float = 4):
+def merge_close_segments(
+    _keyframes: list[common.VideoSegment], threshold: float = 4
+):
     """
     Takes a list of segments of a media file and merges them if they are close - within 4 seconds of each other
     The merged segment is represented by the best matching segment based on distance
@@ -75,9 +77,8 @@ def merge_close_segments(_keyframes: list[common.VideoSegment], threshold: float
 
 
 def get_shots_from_segments(
-        segments: list[common.VideoSegment],
-        merge_function=merge_close_segments
-    ):
+    segments: list[common.VideoSegment], merge_function=merge_close_segments
+):
     """
     Functions that takes a list of segments and returns a list of merged segments
     based on the merge function passed in

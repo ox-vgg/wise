@@ -1,3 +1,4 @@
+black>=26.1.0,<27  # v26.1.0 introduced 2026 stable style
 pre-commit
 pyinstrument
 pytest

@@ -23,7 +23,6 @@ import wise._main.extract_features
 import wise._main.media_metadata
 import wise._main.serve
 
-
 _logger = logging.getLogger(__name__)
 
 

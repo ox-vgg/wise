@@ -70,7 +70,6 @@ from wise.repository import (
 )
 from wise.wise_project import WiseProject
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -78,6 +77,7 @@ class ExtractFeatureMode(BaseStrEnum):
     create = "create"
     add_feature_extractor = "add_feature_extractor"
     add_media = "add_media"
+
 
 def initialise_feature_extractors(
     project: WiseProject,
@@ -96,18 +96,26 @@ def initialise_feature_extractors(
     feature_extractors = {}
     feature_stores = {}
 
-    for modality_type, feature_extractor_id_map in feature_extractor_ids.items():
+    for (
+        modality_type,
+        feature_extractor_id_map,
+    ) in feature_extractor_ids.items():
         feature_extractors[modality_type] = {}
         feature_stores[modality_type] = {}
         for feature_extractor_id in feature_extractor_id_map:
             ## 3.1 Initialise feature extractor
-            logger.info("Initialising %s for %s", feature_extractor_id, modality_type)
+            logger.info(
+                "Initialising %s for %s", feature_extractor_id, modality_type
+            )
 
             # Check if we already have an instance of this feature extractor (could be local / triton)
-            canonical_feature_extractor_id = get_canonical_feature_extractor_id(
-                feature_extractor_id
+            canonical_feature_extractor_id = (
+                get_canonical_feature_extractor_id(feature_extractor_id)
             )
-            if canonical_feature_extractor_id in feature_extractors[modality_type]:
+            if (
+                canonical_feature_extractor_id
+                in feature_extractors[modality_type]
+            ):
                 logger.warning(
                     "Feature extractor '%s' for %s already exists, re-using previous instance.",
                     feature_extractor_id,
@@ -144,21 +152,33 @@ def initialise_feature_extractors(
 
     return feature_extractors, feature_stores
 
-def _is_segment_level_video_run(feature_extractors: dict[ModalityType, dict[str, FeatureExtractor]]) -> bool:
+
+def _is_segment_level_video_run(
+    feature_extractors: dict[ModalityType, dict[str, FeatureExtractor]],
+) -> bool:
     """Return True if all video extractors are segment-level (Qwen3-VL style)."""
     video_ids = list(feature_extractors.get(ModalityType.VIDEO, {}).keys())
-    return bool(video_ids) and all(is_segment_level_extractor(fid) for fid in video_ids)
+    return bool(video_ids) and all(
+        is_segment_level_extractor(fid) for fid in video_ids
+    )
 
 
-def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureExtractor]], thumbnails: bool) -> dict:
+def get_dataset_params(
+    feature_extractors: dict[ModalityType, dict[str, FeatureExtractor]],
+    thumbnails: bool,
+) -> dict:
     ## dataset
     ## TODO move parameters to args / config
     audio_sampling_rate = 48_000  # (48 kHz)
     video_frame_rate = 2  # fps
     video_frames_per_chunk = 8  # frames
-    segment_length = video_frames_per_chunk / video_frame_rate  # frames / fps = seconds
+    segment_length = (
+        video_frames_per_chunk / video_frame_rate
+    )  # frames / fps = seconds
     audio_segment_length = segment_length  # seconds
-    audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
+    audio_frames_per_chunk = int(
+        round(audio_sampling_rate * audio_segment_length)
+    )
 
     # Segment-level video (e.g. Qwen3-VL) uses VideoSegmentDataset directly;
     # pass zeros so the standard AVDataset/VideoDataset skips video streams.
@@ -166,25 +186,30 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
 
     params = {
         "video_frames_per_chunk": (
-            0 if segment_level else
-            (video_frames_per_chunk if ModalityType.VIDEO in feature_extractors else 0)
+            0
+            if segment_level
+            else (
+                video_frames_per_chunk
+                if ModalityType.VIDEO in feature_extractors
+                else 0
+            )
         ),
         "video_frame_rate": video_frame_rate,
         "video_preprocessing_function_map": (
             (
                 {
-                    feature_extractor_id: feature_extractors[ModalityType.VIDEO][
-                        feature_extractor_id
-                    ].preprocess_video_segment
+                    feature_extractor_id: feature_extractors[
+                        ModalityType.VIDEO
+                    ][feature_extractor_id].preprocess_video_segment
                     for feature_extractor_id in feature_extractors.get(
                         ModalityType.VIDEO, {}
                     )
                 }
                 if segment_level
                 else {
-                    feature_extractor_id: feature_extractors[ModalityType.VIDEO][
-                        feature_extractor_id
-                    ].preprocess_image
+                    feature_extractor_id: feature_extractors[
+                        ModalityType.VIDEO
+                    ][feature_extractor_id].preprocess_image
                     for feature_extractor_id in feature_extractors.get(
                         ModalityType.VIDEO, {}
                     )
@@ -194,7 +219,9 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
             else None
         ),
         "audio_samples_per_chunk": (
-            audio_frames_per_chunk if ModalityType.AUDIO in feature_extractors else 0
+            audio_frames_per_chunk
+            if ModalityType.AUDIO in feature_extractors
+            else 0
         ),
         "audio_sampling_rate": audio_sampling_rate,
         "audio_preprocessing_function_map": (
@@ -225,7 +252,9 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
         "thumbnails": thumbnails,
         # Segment-level params (used by get_dataset_stream)
         "_segment_level": segment_level,
-        "_segment_video_ids": list(feature_extractors.get(ModalityType.VIDEO, {}).keys()),
+        "_segment_video_ids": list(
+            feature_extractors.get(ModalityType.VIDEO, {}).keys()
+        ),
         "_segment_video_files": None,  # filled in by caller
     }
 
@@ -234,7 +263,8 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
         seg_p = get_segment_params(seg_ids[0]) if seg_ids else {}
         _log_params = {
             **params,
-            "video_frame_rate": seg_p.get("segment_num_frames", 0) / seg_p.get("segment_duration", 1),
+            "video_frame_rate": seg_p.get("segment_num_frames", 0)
+            / seg_p.get("segment_duration", 1),
             "video_frames_per_chunk": seg_p.get("segment_num_frames", 0),
             "segment_duration": seg_p.get("segment_duration"),
             "segment_overlap": seg_p.get("segment_overlap"),
@@ -243,6 +273,7 @@ def get_dataset_params(feature_extractors: dict[ModalityType, dict[str, FeatureE
         _log_params = params
     logger.info("Dataset parameters: %s", pprint.pformat(_log_params))
     return params, segment_length, segment_level
+
 
 def get_dataset_stream(
     project: WiseProject,
@@ -285,7 +316,9 @@ def get_dataset_stream(
 
     uniform_stream = torch_data.ChainDataset(datasets)
     if use_shots:
-        logger.info("Extracting features from center frame of each shot in videos")
+        logger.info(
+            "Extracting features from center frame of each shot in videos"
+        )
         shots = project.get_shots()
         if shots is None or len(shots) == 0:
             logger.error(
@@ -305,6 +338,7 @@ def get_dataset_stream(
         stream = uniform_stream
 
     return stream
+
 
 def get_dataloader(stream: torch.utils.data.Dataset, num_workers: int):
     logger.info("Initialising data loader with %d workers ...", num_workers)
@@ -333,7 +367,7 @@ def process_media_files(media_dir: Path, db_engine, media_files: list[Path]):
         logger.warning(
             "Skipping %d invalid media files in directory '%s'",
             len(unknown_files),
-            media_dir
+            media_dir,
         )
         logger.debug("Unknown files:\n%s", "\n".join(map(str, unknown_files)))
 
@@ -342,7 +376,9 @@ def process_media_files(media_dir: Path, db_engine, media_files: list[Path]):
     logger.info("Writing metadata to database...")
     with tqdm(total=len(metadata)) as pbar, db_engine.begin() as conn:
         # Add each folder to source collection table
-        data = SourceCollection(location=str(media_dir), type=SourceCollectionType.DIR)
+        data = SourceCollection(
+            location=str(media_dir), type=SourceCollectionType.DIR
+        )
         media_source_collection = SourceCollectionRepo.create(conn, data=data)
 
         for media_metadata in metadata:
@@ -353,7 +389,9 @@ def process_media_files(media_dir: Path, db_engine, media_files: list[Path]):
                 conn,
                 data=MediaMetadata(
                     source_collection_id=media_source_collection.id,
-                    path=os.path.relpath(media_path, media_source_collection.location),
+                    path=os.path.relpath(
+                        media_path, media_source_collection.location
+                    ),
                     media_type=media_metadata.media_type,
                     checksum=media_metadata.md5sum,
                     size_in_bytes=os.path.getsize(media_path),
@@ -378,7 +416,6 @@ def process_media_files(media_dir: Path, db_engine, media_files: list[Path]):
             )
             pbar.update(1)
 
-
     # return metadata and datasets to be chained
     return dataset_payload
 
@@ -400,27 +437,34 @@ def validate_args(args):
 
     # sanity check: remove duplicate entries in command line args
     if not args.media_include_list:
-        setattr(args, 'media_include_list', ['*'])
+        setattr(args, "media_include_list", ["*"])
     else:
         unique_media_include_list = list(set(args.media_include_list))
-        setattr(args, 'media_include_list', unique_media_include_list)
+        setattr(args, "media_include_list", unique_media_include_list)
 
     if len(args.media_dir_list) > 1:
         unique_media_dir_list = list(set(args.media_dir_list))
         if len(unique_media_dir_list) != len(args.media_dir_list):
-            logger.warning(
-                "Ignoring duplicated MEDIA_DIR"
-            )
-        setattr(args, 'media_dir_list', unique_media_dir_list)
+            logger.warning("Ignoring duplicated MEDIA_DIR")
+        setattr(args, "media_dir_list", unique_media_dir_list)
 
-    assert all(Path(x).is_dir() for x in args.media_dir_list), \
-        "All values for media_dir_list must be directories"
+    assert all(
+        Path(x).is_dir() for x in args.media_dir_list
+    ), "All values for media_dir_list must be directories"
 
     # Feature Extractor IDs
     # Set default for {image,audio,video}_feature_id_map only if the argument was not provided
-    if args.video_feature_id_map is None and args.image_feature_id_map is None and args.audio_feature_id_map is None:
-        args.video_feature_id_map = ["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"]
-        args.image_feature_id_map = ["mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"]
+    if (
+        args.video_feature_id_map is None
+        and args.image_feature_id_map is None
+        and args.audio_feature_id_map is None
+    ):
+        args.video_feature_id_map = [
+            "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
+        ]
+        args.image_feature_id_map = [
+            "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli"
+        ]
         args.audio_feature_id_map = ["microsoft/clap/2023/four-datasets"]
     else:
         # If any feature extractor ids are provided, do not use the default values for the missing ones
@@ -435,11 +479,12 @@ def validate_args(args):
     unique_video_feature_ids = list(set(args.video_feature_id_map or []))
     unique_image_feature_ids = list(set(args.image_feature_id_map or []))
     unique_audio_feature_ids = list(set(args.audio_feature_id_map or []))
-    setattr(args, 'video_feature_id_map', unique_video_feature_ids)
-    setattr(args, 'image_feature_id_map', unique_image_feature_ids)
-    setattr(args, 'audio_feature_id_map', unique_audio_feature_ids)
+    setattr(args, "video_feature_id_map", unique_video_feature_ids)
+    setattr(args, "image_feature_id_map", unique_image_feature_ids)
+    setattr(args, "audio_feature_id_map", unique_audio_feature_ids)
 
     return args
+
 
 def get_mode(args):
     mode = None
@@ -454,6 +499,7 @@ def get_mode(args):
     logger.debug("Operating in %s mode", mode)
     return mode
 
+
 def get_feature_extractor_ids_from_args(args):
     feature_extractor_ids: dict[ModalityType, list] = {}
     if args.video_feature_id_map:
@@ -464,6 +510,7 @@ def get_feature_extractor_ids_from_args(args):
         feature_extractor_ids[ModalityType.AUDIO] = args.audio_feature_id_map
     return feature_extractor_ids
 
+
 def get_feature_extractor_ids_from_project(project: WiseProject):
     project_assets = project.discover_assets()
     feature_extractor_ids: dict[ModalityType, list] = {}
@@ -471,24 +518,38 @@ def get_feature_extractor_ids_from_project(project: WiseProject):
         ## project_assets uses string for keys, convert to
         ## ModalityType (see also merge request !127).
         modality_type = ModalityType(modality_type)
-        if modality_type not in [ModalityType.IMAGE, ModalityType.VIDEO, ModalityType.AUDIO]:
+        if modality_type not in [
+            ModalityType.IMAGE,
+            ModalityType.VIDEO,
+            ModalityType.AUDIO,
+        ]:
             continue
-        feature_extractor_ids[modality_type] = list(feature_extractor_id_list.keys())
+        feature_extractor_ids[modality_type] = list(
+            feature_extractor_id_list.keys()
+        )
     return feature_extractor_ids
 
-def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, args):
+
+def get_feature_extractor_ids(
+    mode: ExtractFeatureMode, project: WiseProject, args
+):
 
     feature_extractor_ids = get_feature_extractor_ids_from_args(args)
 
     if mode == ExtractFeatureMode.create:
         return feature_extractor_ids
 
-    project_feature_extractor_ids = get_feature_extractor_ids_from_project(project)
+    project_feature_extractor_ids = get_feature_extractor_ids_from_project(
+        project
+    )
 
     # Add feature extractor mode
     # Remove feature extractor ids that already exist in the project
     feature_extractor_ids_copy = feature_extractor_ids.copy()
-    for (modality_type, feature_extractor_id_list) in feature_extractor_ids_copy.items():
+    for (
+        modality_type,
+        feature_extractor_id_list,
+    ) in feature_extractor_ids_copy.items():
         if modality_type not in project_feature_extractor_ids:
             # project does not have any feature extractors for this modality type
             continue
@@ -498,13 +559,18 @@ def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, ar
                 feature_extractor_id
             )
 
-            if _feature_extractor_id in project_feature_extractor_ids[modality_type]:
+            if (
+                _feature_extractor_id
+                in project_feature_extractor_ids[modality_type]
+            ):
                 logger.warning(
                     "Feature extractor '%s' for %s already exists in the project. Skipping.",
                     _feature_extractor_id,
                     modality_type,
                 )
-                feature_extractor_ids[modality_type].remove(feature_extractor_id)
+                feature_extractor_ids[modality_type].remove(
+                    feature_extractor_id
+                )
         if len(feature_extractor_ids[modality_type]) == 0:
             del feature_extractor_ids[modality_type]
 
@@ -519,6 +585,7 @@ def get_feature_extractor_ids(mode: ExtractFeatureMode, project: WiseProject, ar
         return project_feature_extractor_ids
 
     return feature_extractor_ids
+
 
 def get_media_files_for_dataset(
     mode: ExtractFeatureMode,
@@ -540,11 +607,13 @@ def get_media_files_for_dataset(
 
             logger.info(
                 "Reading filepaths to be included from '%s'",
-                args.media_files_from
+                args.media_files_from,
             )
             with open(args.media_files_from, "rt") as fh:
                 ## Remove *only* the \n at the end of each line
-                media_files = [media_dir / line[:-1] for line in fh if len(line) > 1]
+                media_files = [
+                    media_dir / line[:-1] for line in fh if len(line) > 1
+                ]
             metadata = process_media_files(media_dir, db_engine, media_files)
             all_metadata.extend(metadata)
         else:
@@ -555,7 +624,9 @@ def get_media_files_for_dataset(
                         media_dir, args.media_include_list
                     )
                 )
-                metadata = process_media_files(media_dir, db_engine, media_files)
+                metadata = process_media_files(
+                    media_dir, db_engine, media_files
+                )
                 all_metadata.extend(metadata)
 
     return all_metadata
@@ -569,7 +640,7 @@ def main(argv: list[str]):
     )
     parser.add_argument(
         "media_dir_list",
-        nargs='*',
+        nargs="*",
         help="process images and video from this folder (an existing WISE project will be updated if this is not provided)",
         default=[],
     )
@@ -663,9 +734,10 @@ def main(argv: list[str]):
     )
 
     parser.add_argument(
-        "-y", "--yes",
+        "-y",
+        "--yes",
         action="store_true",
-        help="Automatically answer yes to all prompts"
+        help="Automatically answer yes to all prompts",
     )
 
     parser.add_argument(
@@ -685,7 +757,9 @@ def main(argv: list[str]):
     )
 
     args = parser.parse_args(argv[1:])
-    config = APIConfig(project_dir=Path(args.project_dir), command='extract_features')
+    config = APIConfig(
+        project_dir=Path(args.project_dir), command="extract_features"
+    )
 
     feature_extractor_config = config.feature_extractor_config
     args = validate_args(args)
@@ -712,24 +786,29 @@ def main(argv: list[str]):
     mode = get_mode(args)
     if mode != ExtractFeatureMode.create:
         if not args.yes:
-            answer = input(f'Do you want to update it? [y/N]: ')
-            if answer.lower() != 'y':
-                logger.info('Aborting...')
+            answer = input(f"Do you want to update it? [y/N]: ")
+            if answer.lower() != "y":
+                logger.info("Aborting...")
                 exit(1)
         if mode == ExtractFeatureMode.add_media:
             logger.info(
                 "Updating existing project '%s' with new media files ...",
-                args.project_dir
+                args.project_dir,
             )
         else:
             logger.info(
                 "Updating existing project '%s' with new feature extractor(s) ...",
-                args.project_dir
+                args.project_dir,
             )
     else:
         logger.info("Creating new project '%s' ...", args.project_dir)
 
-    project = WiseProject(args.project_dir, create_project=True, db_kwargs={'echo': False}, thumbsdb_kwargs={'echo': False})
+    project = WiseProject(
+        args.project_dir,
+        create_project=True,
+        db_kwargs={"echo": False},
+        thumbsdb_kwargs={"echo": False},
+    )
     db_engine = project.db_engine
     thumbs_engine = project.thumbsdb_engine
 
@@ -755,23 +834,29 @@ def main(argv: list[str]):
         exit(0)
 
     # Get the set of media types present in the input media files
-    media_types_present: set[SourceMediaType] = set(x.media_type for x in all_metadata)
+    media_types_present: set[SourceMediaType] = set(
+        x.media_type for x in all_metadata
+    )
 
     # Remove feature extractor ids for modalities that are not present in the input media files
-    if SourceMediaType.VIDEO not in media_types_present and SourceMediaType.AV not in media_types_present:
+    if (
+        SourceMediaType.VIDEO not in media_types_present
+        and SourceMediaType.AV not in media_types_present
+    ):
         feature_extractor_ids.pop(ModalityType.VIDEO, None)
 
     if SourceMediaType.IMAGE not in media_types_present:
         feature_extractor_ids.pop(ModalityType.IMAGE, None)
 
-    if SourceMediaType.AUDIO not in media_types_present and SourceMediaType.AV not in media_types_present:
+    if (
+        SourceMediaType.AUDIO not in media_types_present
+        and SourceMediaType.AV not in media_types_present
+    ):
         feature_extractor_ids.pop(ModalityType.AUDIO, None)
 
     if len(feature_extractor_ids) == 0:
         if mode == ExtractFeatureMode.add_feature_extractor:
-            logger.info(
-                "No new feature extractors specified. Nothing to do."
-            )
+            logger.info("No new feature extractors specified. Nothing to do.")
         else:
             logger.info(
                 "No feature extractors matching the relevant modality of the media files specified. Nothing to do."
@@ -791,14 +876,19 @@ def main(argv: list[str]):
         exit(1)
 
     if has_segment:
-        segment_ids = [fid for fid in video_ids if is_segment_level_extractor(fid)]
+        segment_ids = [
+            fid for fid in video_ids if is_segment_level_extractor(fid)
+        ]
         logger.warning(
             "EXPERIMENTAL: Video segment-based feature extraction is not yet stable "
-            "(extractor(s): %s)", ", ".join(segment_ids)
+            "(extractor(s): %s)",
+            ", ".join(segment_ids),
         )
 
     if has_segment and args.use_shots:
-        segment_ids = [fid for fid in video_ids if is_segment_level_extractor(fid)]
+        segment_ids = [
+            fid for fid in video_ids if is_segment_level_extractor(fid)
+        ]
         logger.error(
             "--use-shots is not yet supported for video segment-based feature extractors: "
             + ", ".join(segment_ids)
@@ -814,29 +904,38 @@ def main(argv: list[str]):
         db_engine,
     )
 
-    params, segment_length, _segment_level_run = get_dataset_params(feature_extractors, args.thumbnails)
+    params, segment_length, _segment_level_run = get_dataset_params(
+        feature_extractors, args.thumbnails
+    )
     stream = get_dataset_stream(project, all_metadata, params, args.use_shots)
     av_data_loader = get_dataloader(stream, args.num_workers)
 
-    audio_sampling_rate = params['audio_sampling_rate']
-    video_frame_rate = params['video_frame_rate']
+    audio_sampling_rate = params["audio_sampling_rate"]
+    video_frame_rate = params["video_frame_rate"]
     audio_segment_length = segment_length
-    audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
+    audio_frames_per_chunk = int(
+        round(audio_sampling_rate * audio_segment_length)
+    )
 
     MAX_BULK_INSERT = 1024
     with (
         db_engine.connect() as conn,
         thumbs_engine.connect() as thumbs_conn,
         tqdm(desc="Feature extraction") as pbar,
-        torch.autocast("cuda" if torch.cuda.is_available() else "cpu", enabled=args.enable_autocast)
+        torch.autocast(
+            "cuda" if torch.cuda.is_available() else "cpu",
+            enabled=args.enable_autocast,
+        ),
     ):
-        mid: str | int # type annotation
+        mid: str | int  # type annotation
         chunks: dict[
             MediaChunkType, dict[str, MediaChunk | None] | MediaChunk | None
         ]  # type annotation
 
         def handle_chunk(
-            chunk: MediaChunk, media_type: MediaChunkType, feature_extractor_id: str
+            chunk: MediaChunk,
+            media_type: MediaChunkType,
+            feature_extractor_id: str,
         ):
             segment_tensor = chunk.tensor
             segment_pts = chunk.pts
@@ -851,17 +950,23 @@ def main(argv: list[str]):
                 )
                 return
 
-            feature_extractor = feature_extractors[media_type][feature_extractor_id]
+            feature_extractor = feature_extractors[media_type][
+                feature_extractor_id
+            ]
             feature_store = feature_stores[media_type][feature_extractor_id]
 
             if media_type == MediaType.VIDEO and _segment_level_run:
                 # Segment-level video extractor (e.g. Qwen3-VL): one vector per segment
-                segment_feature = feature_extractor.extract_video_segment_features(
-                    segment_tensor
+                segment_feature = (
+                    feature_extractor.extract_video_segment_features(
+                        segment_tensor
+                    )
                 )
                 pbar.update(1)
 
-            elif media_type == MediaType.IMAGE or media_type == MediaType.VIDEO:
+            elif (
+                media_type == MediaType.IMAGE or media_type == MediaType.VIDEO
+            ):
                 segment_feature = feature_extractor.extract_image_features(
                     segment_tensor
                 )
@@ -892,7 +997,9 @@ def main(argv: list[str]):
                     ),
                 )
                 feature_store.add(feature_metadata.id, segment_feature.vectors)
-            elif media_type == MediaType.IMAGE or media_type == MediaType.VIDEO:
+            elif (
+                media_type == MediaType.IMAGE or media_type == MediaType.VIDEO
+            ):
                 # Frame-level: one vector per frame (image or frame-level video)
                 for frame_idx, frame_features in enumerate(segment_feature):
                     vector_ids: list[int] = []
@@ -939,7 +1046,10 @@ def main(argv: list[str]):
 
         for idx, (mid, chunks) in enumerate(av_data_loader):
             for media_type in chunks:
-                if media_type not in feature_extractors or chunks[media_type] is None:
+                if (
+                    media_type not in feature_extractors
+                    or chunks[media_type] is None
+                ):
                     # This is a single chunk, not a dictionary of chunks
                     logger.debug(
                         "Skipping empty / irrelevant chunk for media_id=%d,"
@@ -955,7 +1065,8 @@ def main(argv: list[str]):
                     _chunk = chunks[media_type][feature_extractor_id]
                     if (
                         _chunk is None
-                        or feature_extractor_id not in feature_extractors[media_type]
+                        or feature_extractor_id
+                        not in feature_extractors[media_type]
                     ):
                         logger.debug(
                             "Skipping empty / irrelevant chunk for media_id=%d,"
@@ -967,10 +1078,10 @@ def main(argv: list[str]):
                         continue
                     handle_chunk(_chunk, media_type, feature_extractor_id)
 
-            if 'thumbnails' in chunks and chunks['thumbnails'] is not None:
+            if "thumbnails" in chunks and chunks["thumbnails"] is not None:
                 # Handle thumbnails
-                _thumb_jpegs = chunks['thumbnails'].tensor
-                _thumb_pts = chunks['thumbnails'].pts
+                _thumb_jpegs = chunks["thumbnails"].tensor
+                _thumb_pts = chunks["thumbnails"].pts
 
                 # Store in thumbnail store
                 # (thumbnail will be N x 3 x 192 x W)
@@ -978,14 +1089,18 @@ def main(argv: list[str]):
                     if type(_thumb_pts) is list and args.use_shots:
                         thumb_timestamp = _thumb_pts[thumb_index]
                     else:
-                        thumb_timestamp = _thumb_pts + thumb_index * (1 / video_frame_rate)
+                        thumb_timestamp = _thumb_pts + thumb_index * (
+                            1 / video_frame_rate
+                        )
                     # convert thumb tensor to jpeg
                     thumbnail_metadata = ThumbnailRepo.create(
                         thumbs_conn,
                         data=ThumbnailMetadata(
                             media_id=mid,
                             timestamp=thumb_timestamp,
-                            content=bytes(_thumb_jpegs[thumb_index].numpy().data),
+                            content=bytes(
+                                _thumb_jpegs[thumb_index].numpy().data
+                            ),
                         ),
                     )
             if idx % MAX_BULK_INSERT == 0:
@@ -1006,5 +1121,5 @@ def main(argv: list[str]):
     logger.info(
         "Feature extraction completed in %.0f sec (%.2f min)",
         elapsed_time,
-        elapsed_time/60,
+        elapsed_time / 60,
     )

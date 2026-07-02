@@ -54,7 +54,6 @@ from wise.repository import (
 from wise.search.fts import FTSSearch
 from wise.utils import batched
 
-
 logger = logging.getLogger(__name__)
 DB_SCHEME = "sqlite+pysqlite://"
 
@@ -97,7 +96,10 @@ def batch_select(
 
 # utility to insert a batch of rows into a table, and optionally return the inserted ids
 def batch_insert(
-    conn: sa.Connection, table: sa.Table, batch: list[dict], return_ids: bool = True
+    conn: sa.Connection,
+    table: sa.Table,
+    batch: list[dict],
+    return_ids: bool = True,
 ):
     stmt = table.insert()
     if return_ids:
@@ -123,7 +125,9 @@ def batch_query_by_column(
         value=table.c.id,
     )
 
-    stmt = sa.select(table).where(table.c[column].in_(vals)).order_by(id_ordering)
+    stmt = (
+        sa.select(table).where(table.c[column].in_(vals)).order_by(id_ordering)
+    )
     return conn.execute(stmt).mappings().all()
 
 
@@ -133,7 +137,15 @@ class WiseProject:
 
 
     """
-    def __init__(self, project_dir: Path, *, create_project=False, read_only=False, **kwargs):
+
+    def __init__(
+        self,
+        project_dir: Path,
+        *,
+        create_project=False,
+        read_only=False,
+        **kwargs,
+    ):
         self.project_dir = Path(project_dir)
         self._store_dir = self.project_dir / "store"
         self._media_dir = self.project_dir / "media"
@@ -142,7 +154,9 @@ class WiseProject:
         self.read_only = read_only
 
         if create_project and read_only:
-            raise ValueError("options create_project and read_only are mutually exclusive")
+            raise ValueError(
+                "options create_project and read_only are mutually exclusive"
+            )
 
         if not self.project_dir.exists():
             if create_project:
@@ -151,10 +165,12 @@ class WiseProject:
                 self.media_dir.mkdir(parents=True, exist_ok=True)
                 self.metadata_dir.mkdir(parents=True, exist_ok=True)
             else:
-                raise ValueError(f"project folder {self.project_dir} does not exist")
+                raise ValueError(
+                    f"project folder {self.project_dir} does not exist"
+                )
 
-        self._db_kwargs = kwargs.get('db_kwargs', {})
-        self._thumbsdb_kwargs = kwargs.get('thumbsdb_kwargs', {})
+        self._db_kwargs = kwargs.get("db_kwargs", {})
+        self._thumbsdb_kwargs = kwargs.get("thumbsdb_kwargs", {})
 
         self._search_indices = None
 
@@ -209,11 +225,15 @@ class WiseProject:
 
     @property
     def fts_config_file(self) -> Path:
-        return self.metadata_dir / 'fts_config.json'
+        return self.metadata_dir / "fts_config.json"
 
-    def metadata_db_table(self, metadata_id: str, extension='.sqlite') -> tuple[Path, str]:
-        metadata_id_tok = metadata_id.split('/')
-        assert len(metadata_id_tok) == 3, 'metadata_id must be in "FOLDER_NAME/DB_NAME/TABLE_NAME" format'
+    def metadata_db_table(
+        self, metadata_id: str, extension=".sqlite"
+    ) -> tuple[Path, str]:
+        metadata_id_tok = metadata_id.split("/")
+        assert (
+            len(metadata_id_tok) == 3
+        ), 'metadata_id must be in "FOLDER_NAME/DB_NAME/TABLE_NAME" format'
         metadata_db_dir = self.metadata_dir / metadata_id_tok[0]
         metadata_db_dir.mkdir(parents=True, exist_ok=True)
         metadata_db = metadata_db_dir / (metadata_id_tok[1] + extension)
@@ -235,7 +255,7 @@ class WiseProject:
         return self.store_dir / feature_extractor_id
 
     def features_dir(self, feature_extractor_id: str) -> Path:
-        return self.features_root(feature_extractor_id) / 'features'
+        return self.features_root(feature_extractor_id) / "features"
 
     def create_features_dir(self, feature_extractor_id: str) -> Path:
         features_store = self.features_dir(feature_extractor_id)
@@ -244,21 +264,23 @@ class WiseProject:
         return features_store
 
     def index_dir(self, feature_extractor_id: str) -> Path:
-        return self.features_root(feature_extractor_id) / 'index'
+        return self.features_root(feature_extractor_id) / "index"
 
     def create_index_dir(self, feature_extractor_id: str) -> Path:
-        index_store = self.features_root(feature_extractor_id) / 'index'
+        index_store = self.features_root(feature_extractor_id) / "index"
         if not index_store.exists():
             index_store.mkdir(parents=True, exist_ok=True)
         return index_store
 
     @property
-    def supported_modality_types_and_features(self) -> dict[ModalityType, set[str]]:
+    def supported_modality_types_and_features(
+        self,
+    ) -> dict[ModalityType, set[str]]:
         with self.db_engine.connect() as conn:
             results = conn.execute(
                 sa.select(
                     wise_db.vectors_table.c.modality,
-                    wise_db.vectors_table.c.feature_extractor_id
+                    wise_db.vectors_table.c.feature_extractor_id,
                 ).distinct()
             ).all()
         ## Do sorting in Python because it is very very slow in SQL
@@ -273,7 +295,7 @@ class WiseProject:
 
         _assets = None
         _supported = defaultdict(set)
-        for g, vals in itertools.groupby(results, key = lambda x: x[0]):
+        for g, vals in itertools.groupby(results, key=lambda x: x[0]):
             feature_extractor_ids = set([v[1] for v in vals])
             if "" in feature_extractor_ids:
                 # Fallback - find it by globbing
@@ -329,11 +351,13 @@ class WiseProject:
         """
         self.assets = {}
         # 1. find all feature-extractor-id
-        for feature_dir in self.store_dir.glob('*/*/*/*/features/'):
-            feature_extractor_id = str(feature_dir.relative_to(self.store_dir).parent)
+        for feature_dir in self.store_dir.glob("*/*/*/*/features/"):
+            feature_extractor_id = str(
+                feature_dir.relative_to(self.store_dir).parent
+            )
             available_media_types = []
-            for feature_data in feature_dir.glob('*.*'):
-                media_type = str(feature_data.stem).split('-')[0]
+            for feature_data in feature_dir.glob("*.*"):
+                media_type = str(feature_data.stem).split("-")[0]
                 if media_type not in available_media_types:
                     available_media_types.append(media_type)
             for media_type in available_media_types:
@@ -345,58 +369,84 @@ class WiseProject:
         for media_type in self.assets:
             for feature_extractor_id in self.assets[media_type]:
                 features_root = self.store_dir / feature_extractor_id
-                features_dir = features_root / 'features'
-                self.assets[media_type][feature_extractor_id]['features_root'] = str(features_root)
-                self.assets[media_type][feature_extractor_id]['features_dir'] = str(features_dir)
-                self.assets[media_type][feature_extractor_id]['features_files'] = []
-                for feature_data in features_dir.glob(media_type + '-*.*'):
-                    self.assets[media_type][feature_extractor_id]['features_files'].append(feature_data.name)
-                self.assets[media_type][feature_extractor_id]['features_files'].sort()
+                features_dir = features_root / "features"
+                self.assets[media_type][feature_extractor_id][
+                    "features_root"
+                ] = str(features_root)
+                self.assets[media_type][feature_extractor_id][
+                    "features_dir"
+                ] = str(features_dir)
+                self.assets[media_type][feature_extractor_id][
+                    "features_files"
+                ] = []
+                for feature_data in features_dir.glob(media_type + "-*.*"):
+                    self.assets[media_type][feature_extractor_id][
+                        "features_files"
+                    ].append(feature_data.name)
+                self.assets[media_type][feature_extractor_id][
+                    "features_files"
+                ].sort()
 
-                index_dir = features_root / 'index'
-                self.assets[media_type][feature_extractor_id]['index_dir'] = str(index_dir)
-                self.assets[media_type][feature_extractor_id]['index_files'] = []
+                index_dir = features_root / "index"
+                self.assets[media_type][feature_extractor_id]["index_dir"] = (
+                    str(index_dir)
+                )
+                self.assets[media_type][feature_extractor_id][
+                    "index_files"
+                ] = []
                 if not index_dir.exists():
                     continue
-                for index_data in index_dir.glob(media_type + '-*.faiss'):
-                    self.assets[media_type][feature_extractor_id]['index_files'].append(index_data.name)
-                self.assets[media_type][feature_extractor_id]['index_files'].sort()
+                for index_data in index_dir.glob(media_type + "-*.faiss"):
+                    self.assets[media_type][feature_extractor_id][
+                        "index_files"
+                    ].append(index_data.name)
+                self.assets[media_type][feature_extractor_id][
+                    "index_files"
+                ].sort()
 
         # 3. locate all assets related to metadata
         metadata_assets = {}
-        for metadata_db in self.metadata_dir.glob('*/*.sqlite'):
+        for metadata_db in self.metadata_dir.glob("*/*.sqlite"):
             metadata_db_rel_path = metadata_db.relative_to(self.metadata_dir)
-            assert len(metadata_db_rel_path.parts) == 2, f"unexpected {metadata_db_rel_path}, should be of form FOLDER_NAME/DB_NAME"
-            metadata_id_prefix = str(metadata_db_rel_path.parent / metadata_db_rel_path.stem)
-            with sqlite3.connect( str(metadata_db) ) as sqlite_connection:
+            assert (
+                len(metadata_db_rel_path.parts) == 2
+            ), f"unexpected {metadata_db_rel_path}, should be of form FOLDER_NAME/DB_NAME"
+            metadata_id_prefix = str(
+                metadata_db_rel_path.parent / metadata_db_rel_path.stem
+            )
+            with sqlite3.connect(str(metadata_db)) as sqlite_connection:
                 cursor = sqlite_connection.cursor()
-                for row in cursor.execute(f'SELECT name FROM sqlite_master WHERE type="table"'):
+                for row in cursor.execute(
+                    f'SELECT name FROM sqlite_master WHERE type="table"'
+                ):
                     table_name = row[0]
-                    if '_fts' not in table_name:
-                        metadata_id = metadata_id_prefix + '/' + table_name
+                    if "_fts" not in table_name:
+                        metadata_id = metadata_id_prefix + "/" + table_name
                         metadata_assets[metadata_id] = {
-                            'metadata_db': str(metadata_db),
-                            'metadata_db_type': 'sqlite',
-                            'metadata_table': table_name
+                            "metadata_db": str(metadata_db),
+                            "metadata_db_type": "sqlite",
+                            "metadata_table": table_name,
                         }
         if metadata_assets:
-            self.assets['metadata'] = metadata_assets
+            self.assets["metadata"] = metadata_assets
         return self.assets
 
     def get_media_files(self) -> list[DatasetPayload]:
         media_files = []
         with self.db_engine.connect() as conn:
-            stmt = (
-                sa.select(
-                    wise_db.media_table.c.id,
-                    (wise_db.source_collections_table.c.location + '/' + wise_db.media_table.c.path).label('media_path'),
-                    wise_db.media_table.c.media_type
-                )
-                .select_from(
-                    wise_db.media_table.join(
-                        wise_db.source_collections_table,
-                        wise_db.media_table.c.source_collection_id == wise_db.source_collections_table.c.id
-                    )
+            stmt = sa.select(
+                wise_db.media_table.c.id,
+                (
+                    wise_db.source_collections_table.c.location
+                    + "/"
+                    + wise_db.media_table.c.path
+                ).label("media_path"),
+                wise_db.media_table.c.media_type,
+            ).select_from(
+                wise_db.media_table.join(
+                    wise_db.source_collections_table,
+                    wise_db.media_table.c.source_collection_id
+                    == wise_db.source_collections_table.c.id,
                 )
             )
             rows = conn.execute(stmt)
@@ -415,20 +465,21 @@ class WiseProject:
                 wise_db.shots_table.c.media_id,
                 wise_db.shots_table.c.ts,
                 wise_db.shots_table.c.te,
-                wise_db.shots_table.c.id.label('shot_id')
+                wise_db.shots_table.c.id.label("shot_id"),
             ).order_by(
-                wise_db.shots_table.c.media_id,
-                wise_db.shots_table.c.ts
+                wise_db.shots_table.c.media_id, wise_db.shots_table.c.ts
             )
             rows = conn.execute(stmt)
             for row in rows:
                 if row.media_id not in shots:
                     shots[row.media_id] = []
-                shots[row.media_id].append({
-                    'start_time': row.ts,
-                    'end_time': row.te,
-                    'shot_id': row.shot_id
-                })
+                shots[row.media_id].append(
+                    {
+                        "start_time": row.ts,
+                        "end_time": row.te,
+                        "shot_id": row.shot_id,
+                    }
+                )
         return shots
 
     @property
@@ -493,7 +544,8 @@ class WiseProject:
             media_counts = {media_type: count for media_type, count in results}
             if MediaType.AV in media_counts:
                 media_counts[MediaType.VIDEO] = (
-                    media_counts.get(MediaType.VIDEO, 0) + media_counts[MediaType.AV]
+                    media_counts.get(MediaType.VIDEO, 0)
+                    + media_counts[MediaType.AV]
                 )
                 del media_counts[MediaType.AV]
             return media_counts
@@ -511,7 +563,9 @@ class WiseProject:
         return wise_db.reflect_external_metadata(self.db_engine)
 
     def enable_fts(self):
-        _table = wise_db.project_metadata_obj.tables.get(wise_db._WISE_FTS_TABLE)
+        _table = wise_db.project_metadata_obj.tables.get(
+            wise_db._WISE_FTS_TABLE
+        )
         if _table is not None:
             logger.debug("%s table already loaded", wise_db._WISE_FTS_TABLE)
             return True
@@ -525,13 +579,17 @@ class WiseProject:
         return False
 
     def enable_shot_scale(self):
-        _table = wise_db.project_metadata_obj.tables.get("vectors_to_shots_map")
+        _table = wise_db.project_metadata_obj.tables.get(
+            "vectors_to_shots_map"
+        )
         if _table is not None:
             logger.debug("vectors_to_shots_map table already loaded")
             return True
 
         if not self.db_inspector.has_table(wise_db.shots_table.name):
-            logger.warning("No Shots table found. Cannot enable shot_scale filtering.")
+            logger.warning(
+                "No Shots table found. Cannot enable shot_scale filtering."
+            )
             return False
 
         colnames = [
@@ -619,7 +677,9 @@ class WiseProject:
             num_thumbs_per_partition if partition_id is not None else None
         )
         offset = (
-            partition_id * num_images_per_partition if partition_id is not None else 0
+            partition_id * num_images_per_partition
+            if partition_id is not None
+            else 0
         )
         cols = [
             _thumbs_table.c.id,
@@ -634,7 +694,8 @@ class WiseProject:
             .where(
                 sa.and_(
                     _thumbs_table.c.media_id == _video_media_id,
-                    (10 * _thumbs_table.c.timestamp) % (10 * num_seconds_per_image)
+                    (10 * _thumbs_table.c.timestamp)
+                    % (10 * num_seconds_per_image)
                     == 0,
                 )
             )
@@ -646,13 +707,16 @@ class WiseProject:
             return thumbs_conn.execute(stmt).all()
 
     def metadata(self, media_id: str):
-        stmt = sa.select(wise_db.media_table, wise_db.source_collections_table).select_from(
-            wise_db.media_table.join(
-                wise_db.source_collections_table,
-                wise_db.media_table.c.source_collection_id == wise_db.source_collections_table.c.id,
+        stmt = (
+            sa.select(wise_db.media_table, wise_db.source_collections_table)
+            .select_from(
+                wise_db.media_table.join(
+                    wise_db.source_collections_table,
+                    wise_db.media_table.c.source_collection_id
+                    == wise_db.source_collections_table.c.id,
+                )
             )
-        ).where(
-            wise_db.media_table.c.id == media_id
+            .where(wise_db.media_table.c.id == media_id)
         )
         with self.db_engine.connect() as conn:
             row = conn.execute(stmt).first()
@@ -707,11 +771,15 @@ class WiseProject:
                 logger.warning(
                     "highres thumbnail retrieval is not compatible with get_id_only=True, ignoring highres flag"
                 )
-            start_timestamp_expr = _thumbs_table.c.timestamp >= timestamp - 0.25
+            start_timestamp_expr = (
+                _thumbs_table.c.timestamp >= timestamp - 0.25
+            )
             end_timestamp_expr = _thumbs_table.c.timestamp <= timestamp + 2
             stmt = (
                 sa.select(
-                    _thumbs_table.c.content if not get_id_only else _thumbs_table.c.id
+                    _thumbs_table.c.content
+                    if not get_id_only
+                    else _thumbs_table.c.id
                 )
                 .where(_thumbs_table.c.media_id == media_id)
                 .where((start_timestamp_expr & end_timestamp_expr))
@@ -736,7 +804,9 @@ class WiseProject:
             video_frames_per_chunk / video_frame_rate
         )  # frames / fps = seconds
         audio_segment_length = segment_length  # seconds
-        audio_frames_per_chunk = int(round(audio_sampling_rate * audio_segment_length))
+        audio_frames_per_chunk = int(
+            round(audio_sampling_rate * audio_segment_length)
+        )
         offset = 4 * ((timestamp) // 4)
 
         stream = AVDataset(
@@ -775,7 +845,10 @@ class WiseProject:
         end_timestamp_expr = timestamp < shots_table.c.te
         dataset_expr = shots_table.c.media_id == media_id
         stmt = sa.select(
-            shots_table.c.id, shots_table.c.media_id, shots_table.c.ts, shots_table.c.te
+            shots_table.c.id,
+            shots_table.c.media_id,
+            shots_table.c.ts,
+            shots_table.c.te,
         ).where((dataset_expr & start_timestamp_expr & end_timestamp_expr))
         with self.db_engine.connect() as conn:
             result = conn.execute(stmt)
@@ -794,7 +867,10 @@ class WiseProject:
                     (_vtable.c.media_id == subq.c.media_id)
                     & (_vtable.c.timestamp == subq.c.timestamp)
                     & (_vtable.c.modality == subq.c.modality)
-                    & (_vtable.c.feature_extractor_id == subq.c.feature_extractor_id)
+                    & (
+                        _vtable.c.feature_extractor_id
+                        == subq.c.feature_extractor_id
+                    )
                 ),
             )
             .where(_vtable.c.id != vector_id)
@@ -842,7 +918,8 @@ class WiseProject:
         with self.db_engine.connect() as conn:
             res1 = conn.execute(stmt1)
             res1 = [
-                VectorAndMediaMetadata.model_validate(row) for row in res1.mappings()
+                VectorAndMediaMetadata.model_validate(row)
+                for row in res1.mappings()
             ]
 
         if len(external_metadata_tables) == 0:
@@ -902,7 +979,9 @@ class WiseProject:
 
         if timestamps is not None:
             if len(timestamps) != len(media_ids):
-                raise ValueError("media_ids and timestamps must have the same length")
+                raise ValueError(
+                    "media_ids and timestamps must have the same length"
+                )
 
             cte = (
                 sa.values(
@@ -910,38 +989,58 @@ class WiseProject:
                     sa.column("media_id", sa.Integer),
                     sa.column("timestamp", sa.Float),
                 )
-                .data([(i, mid, ts) for i, (mid, ts) in enumerate(zip(media_ids, timestamps))])
+                .data(
+                    [
+                        (i, mid, ts)
+                        for i, (mid, ts) in enumerate(
+                            zip(media_ids, timestamps)
+                        )
+                    ]
+                )
                 .cte("cte")
             )
-            stmt = sa.select(_vtable.c.id).select_from(
-                cte.join(
-                    _vtable,
-                    sa.and_(
-                        _vtable.c.media_id == cte.c.media_id,
-                        _vtable.c.timestamp == cte.c.timestamp,
-                        _vtable.c.modality == modality,
-                        _vtable.c.feature_extractor_id == feature_extractor_id,
-                    ),
+            stmt = (
+                sa.select(_vtable.c.id)
+                .select_from(
+                    cte.join(
+                        _vtable,
+                        sa.and_(
+                            _vtable.c.media_id == cte.c.media_id,
+                            _vtable.c.timestamp == cte.c.timestamp,
+                            _vtable.c.modality == modality,
+                            _vtable.c.feature_extractor_id
+                            == feature_extractor_id,
+                        ),
+                    )
                 )
-            ).order_by(cte.c.rank)
+                .order_by(cte.c.rank)
+            )
         else:
             media_cte = get_cte_from_ids(media_ids, label="media_id")
-            stmt = sa.select(_vtable.c.id).select_from(
-                media_cte.join(
-                    _vtable,
-                    sa.and_(
-                        _vtable.c.media_id == media_cte.c.media_id,
-                        _vtable.c.modality == modality,
-                        _vtable.c.feature_extractor_id == feature_extractor_id,
-                    ),
+            stmt = (
+                sa.select(_vtable.c.id)
+                .select_from(
+                    media_cte.join(
+                        _vtable,
+                        sa.and_(
+                            _vtable.c.media_id == media_cte.c.media_id,
+                            _vtable.c.modality == modality,
+                            _vtable.c.feature_extractor_id
+                            == feature_extractor_id,
+                        ),
+                    )
                 )
-            ).order_by(media_cte.c.rank)
+                .order_by(media_cte.c.rank)
+            )
 
         with self.db_engine.connect() as conn:
             return conn.execute(stmt).scalars().all()
 
     def get_vector_ids_for_shot_scale(
-        self, shot_scales: list[int], modality: MediaType, feature_extractor_id: str
+        self,
+        shot_scales: list[int],
+        modality: MediaType,
+        feature_extractor_id: str,
     ):
         """Get vector ids for the given shot scale constraints."""
 
@@ -963,7 +1062,8 @@ class WiseProject:
                     vectors_to_shots_map,
                     sa.and_(
                         shots_table.c.id == vectors_to_shots_map.c.shot_id,
-                        shots_table.c.media_id == vectors_to_shots_map.c.media_id,
+                        shots_table.c.media_id
+                        == vectors_to_shots_map.c.media_id,
                     ),
                 ).join(
                     vtable,
@@ -1001,13 +1101,17 @@ class WiseProject:
         """
         cls = get_feature_extractor_class(feature_extractor_id)
         if cls is None:
-            raise ValueError(f"unknown feature extractor id {feature_extractor_id}")
+            raise ValueError(
+                f"unknown feature extractor id {feature_extractor_id}"
+            )
 
         with self.db_engine.connect() as conn:
             return cls.get_vector_metadata(conn, ids)
 
     def load_search_indices(
-        self, preferred_index_type: str = "IndexFlatIP", default_nprobe: int = 32
+        self,
+        preferred_index_type: str = "IndexFlatIP",
+        default_nprobe: int = 32,
     ):
         """
         Load all available search indices by default
@@ -1025,23 +1129,29 @@ class WiseProject:
             fts_search_index = FTSSearch(self, wise_db.project_metadata_obj)
 
         for media_type in project_assets:
-            if media_type not in {MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO}:
+            if media_type not in {
+                MediaType.IMAGE,
+                MediaType.VIDEO,
+                MediaType.AUDIO,
+            }:
                 # Added to ensure projects created with older versions
                 # remain compatible (TODO: remove this in the future)
                 logger.warning(
                     "Media type %s is not supported. Please use IMAGE, VIDEO,"
                     " or AUDIO media types.",
-                    media_type
+                    media_type,
                 )
                 continue
             for feature_extractor_id in project_assets[media_type]:
                 if media_type not in search_indices:
                     search_indices[media_type] = {}
 
-                search_indices[media_type][feature_extractor_id] = SearchIndexFactory(
-                    media_type,
-                    feature_extractor_id,
-                    project_assets[media_type][feature_extractor_id],
+                search_indices[media_type][feature_extractor_id] = (
+                    SearchIndexFactory(
+                        media_type,
+                        feature_extractor_id,
+                        project_assets[media_type][feature_extractor_id],
+                    )
                 )
                 asset = project_assets[media_type][feature_extractor_id]
                 index_type_to_load = preferred_index_type
@@ -1066,29 +1176,31 @@ class WiseProject:
                     ]
                     if available_indices:
                         # extract index type from filename, e.g. "video-IndexFlatIP.faiss" -> "IndexFlatIP"
-                        index_type_to_load = Path(available_indices[0]).stem.split("-")[
-                            1
-                        ]
+                        index_type_to_load = Path(
+                            available_indices[0]
+                        ).stem.split("-")[1]
                         logger.info(
                             "Loading available index of type %s",
-                            index_type_to_load
+                            index_type_to_load,
                         )
                     else:
                         logger.error(
                             "No index files found for %s and %s",
                             media_type,
-                            feature_extractor_id
+                            feature_extractor_id,
                         )
                         del search_indices[media_type][feature_extractor_id]
                         continue
 
                 logger.info(
                     "Loading faiss index from %s",
-                    search_indices[media_type][feature_extractor_id].get_index_filename(index_type_to_load)
+                    search_indices[media_type][
+                        feature_extractor_id
+                    ].get_index_filename(index_type_to_load),
                 )
-                if not search_indices[media_type][feature_extractor_id].load_index(
-                    index_type_to_load
-                ):
+                if not search_indices[media_type][
+                    feature_extractor_id
+                ].load_index(index_type_to_load):
                     logger.error(
                         "Failed to load %s index: %s",
                         media_type,
@@ -1097,7 +1209,8 @@ class WiseProject:
                     del search_indices[media_type][feature_extractor_id]
                     continue
                 if hasattr(
-                    search_indices[media_type][feature_extractor_id].index, "nprobe"
+                    search_indices[media_type][feature_extractor_id].index,
+                    "nprobe",
                 ):
                     # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
                     search_indices[media_type][
@@ -1118,7 +1231,9 @@ class WiseProject:
                             " --index-type %s --overwrite`",
                             self.project_dir,
                             media_type,
-                            search_indices[media_type][feature_extractor_id].index_type,
+                            search_indices[media_type][
+                                feature_extractor_id
+                            ].index_type,
                         )
             # TODO: Fix this to handle audio when support gets added
             if fts_search_index is not None and media_type in {
@@ -1150,7 +1265,7 @@ class WiseProject:
 
         """
         # sanity checks - TODO
-        NO_ID = {'id': None}
+        NO_ID = {"id": None}
         supported_assets = other.supported_modality_types_and_features
 
         # Create the required tables for feature extractor metadata
@@ -1159,7 +1274,9 @@ class WiseProject:
                 feature_extractor_cls = get_feature_extractor_class(
                     feature_extractor_id
                 )
-                feature_extractor_cls.create_vector_metadata_table(self.db_engine)
+                feature_extractor_cls.create_vector_metadata_table(
+                    self.db_engine
+                )
 
         # Merge source collections by location and type
         def handle_source_collection(
@@ -1179,7 +1296,7 @@ class WiseProject:
             if existing_source_collection_id is None:
                 logger.debug(
                     "could not find source collection %s - copying over",
-                    other_source_collection
+                    other_source_collection,
                 )
                 # none match, create new
                 existing_source_collection = SourceCollectionRepo.create(
@@ -1190,7 +1307,7 @@ class WiseProject:
             else:
                 logger.debug(
                     "found existing source collection at id - %s",
-                    existing_source_collection_id
+                    existing_source_collection_id,
                 )
 
             return other_source_collection.id, existing_source_collection_id
@@ -1235,7 +1352,9 @@ class WiseProject:
 
             # left join to find matching media
             def get_matching_media_stmt(cte: sa.CTE):
-                return sa.select(cte.c.id, wise_db.media_table.c.id).select_from(
+                return sa.select(
+                    cte.c.id, wise_db.media_table.c.id
+                ).select_from(
                     cte.join(
                         wise_db.media_table,
                         onclause=sa.and_(
@@ -1243,7 +1362,8 @@ class WiseProject:
                             wise_db.media_table.c.path == cte.c.path,
                             wise_db.media_table.c.source_collection_id
                             == cte.c.source_collection_id,
-                            wise_db.media_table.c.size_in_bytes == cte.c.size_in_bytes,
+                            wise_db.media_table.c.size_in_bytes
+                            == cte.c.size_in_bytes,
                         ),
                         isouter=True,
                     )
@@ -1307,7 +1427,8 @@ class WiseProject:
                     .select_from(
                         cte.join(
                             wise_db.shots_table,
-                            onclause=wise_db.shots_table.c.media_id == cte.c.media_id,
+                            onclause=wise_db.shots_table.c.media_id
+                            == cte.c.media_id,
                         )
                     )
                     .order_by(cte.c.rank)
@@ -1326,7 +1447,9 @@ class WiseProject:
                 other_media_ids: list[int],
             ):
                 other_media = (
-                    run(other_conn, [(x,) for x in other_media_ids]).mappings().all()
+                    run(other_conn, [(x,) for x in other_media_ids])
+                    .mappings()
+                    .all()
                 )
                 other_media = [
                     dict(x)
@@ -1340,10 +1463,14 @@ class WiseProject:
                 ]
 
                 # new media
-                new_media_ids = batch_insert(conn, wise_db.media_table, other_media)
+                new_media_ids = batch_insert(
+                    conn, wise_db.media_table, other_media
+                )
 
                 # query all shots and map to new media ids
-                media_id_map: dict[int, int] = dict(zip(other_media_ids, new_media_ids))
+                media_id_map: dict[int, int] = dict(
+                    zip(other_media_ids, new_media_ids)
+                )
 
                 shots = (
                     run_shots(other_conn, [(x,) for x in other_media_ids])
@@ -1353,9 +1480,12 @@ class WiseProject:
 
                 if shots:
                     shots = [
-                        x | {"media_id": media_id_map[x["media_id"]]} for x in shots
+                        x | {"media_id": media_id_map[x["media_id"]]}
+                        for x in shots
                     ]
-                    batch_insert(conn, wise_db.shots_table, shots, return_ids=False)
+                    batch_insert(
+                        conn, wise_db.shots_table, shots, return_ids=False
+                    )
 
                 return media_id_map
 
@@ -1413,6 +1543,7 @@ class WiseProject:
             thumbs_row_query = sa.select(
                 *[wise_db.thumbnails_table.c[x] for x in thumbnail_columns]
             )
+
             def get_thumbnail_ids_to_copy_stmt(cte: sa.CTE):
                 return (
                     sa.select(cte.c.id)
@@ -1420,8 +1551,10 @@ class WiseProject:
                         cte.join(
                             wise_db.thumbnails_table,
                             onclause=sa.and_(
-                                wise_db.thumbnails_table.c.media_id == cte.c.media_id,
-                                wise_db.thumbnails_table.c.timestamp == cte.c.timestamp,
+                                wise_db.thumbnails_table.c.media_id
+                                == cte.c.media_id,
+                                wise_db.thumbnails_table.c.timestamp
+                                == cte.c.timestamp,
                             ),
                             isouter=True,
                         )
@@ -1435,11 +1568,15 @@ class WiseProject:
                 get_thumbnail_ids_to_copy_stmt,
             )
 
-            def get_thumbnail_ids_to_copy(conn: sa.Connection, batch_thumbnails: list):
+            def get_thumbnail_ids_to_copy(
+                conn: sa.Connection, batch_thumbnails: list
+            ):
                 mapped_batch_thumbnails = [
                     (x[0], media_id_map[x[1]], x[2]) for x in batch_thumbnails
                 ]
-                _needs_copy = run(conn, mapped_batch_thumbnails).scalars().all()
+                _needs_copy = (
+                    run(conn, mapped_batch_thumbnails).scalars().all()
+                )
                 return _needs_copy
 
             return thumbs_row_query, get_thumbnail_ids_to_copy
@@ -1523,7 +1660,9 @@ class WiseProject:
         ):
             handle_new_thumbnail = get_handle_new_thumbnail_fn()
             for batch_thumbs in batched(_needs_copy, batch_size):
-                handle_new_thumbnail(thumbs_conn, other_thumbs_conn, batch_thumbs)
+                handle_new_thumbnail(
+                    thumbs_conn, other_thumbs_conn, batch_thumbs
+                )
                 if not dry_run:
                     thumbs_conn.commit()
                 pbar.update(len(batch_thumbs))
@@ -1547,10 +1686,15 @@ class WiseProject:
                 )
                 .order_by(wise_db.vectors_table.c.media_id.asc())
             )
-            for media_id, modality, feature_extractor_id, timestamp in result.all():
-                vector_timestamp_limits[(media_id, modality, feature_extractor_id)] = (
-                    timestamp
-                )
+            for (
+                media_id,
+                modality,
+                feature_extractor_id,
+                timestamp,
+            ) in result.all():
+                vector_timestamp_limits[
+                    (media_id, modality, feature_extractor_id)
+                ] = timestamp
 
             return vector_timestamp_limits
 
@@ -1566,7 +1710,9 @@ class WiseProject:
             other_store: FeatureStore,
         ):
             logger.info(
-                "copying for feature_extractor - %s (%s)", feature_extractor_id, media_type
+                "copying for feature_extractor - %s (%s)",
+                feature_extractor_id,
+                media_type,
             )
             feature_count = other_store.feature_count
             self.create_features_dir(feature_extractor_id)
@@ -1582,7 +1728,9 @@ class WiseProject:
                 )
             store.enable_write()
 
-            feature_extractor_cls = get_feature_extractor_class(feature_extractor_id)
+            feature_extractor_cls = get_feature_extractor_class(
+                feature_extractor_id
+            )
 
             if store.__class__.__name__ == "FaissFeatureStore":
 
@@ -1605,7 +1753,8 @@ class WiseProject:
                         .select_from(
                             cte.join(
                                 wise_db.vectors_table,
-                                onclause=wise_db.vectors_table.c.id == cte.c.id,
+                                onclause=wise_db.vectors_table.c.id
+                                == cte.c.id,
                             )
                         )
                         .order_by(cte.c.rank)
@@ -1673,8 +1822,10 @@ class WiseProject:
                         # copy to store
                         add_to_store(new_vector_ids, other_features[_copy_idx])
 
-                        ext_vector_metadata = feature_extractor_cls.get_vector_metadata(
-                            other_conn, _needs_copy
+                        ext_vector_metadata = (
+                            feature_extractor_cls.get_vector_metadata(
+                                other_conn, _needs_copy
+                            )
                         )
                         feature_extractor_cls.add_to_vector_metadata_table(
                             conn, new_vector_ids, ext_vector_metadata
@@ -1686,9 +1837,13 @@ class WiseProject:
             handle_new_vectors = get_handle_new_vectors_fn()
             try:
                 with (
-                    tqdm(total=feature_count, desc="Processing vectors") as pbar,
+                    tqdm(
+                        total=feature_count, desc="Processing vectors"
+                    ) as pbar,
                 ):
-                    for feature_ids, features in other_store.iter_batch(batch_size):
+                    for feature_ids, features in other_store.iter_batch(
+                        batch_size
+                    ):
 
                         total_copied += handle_new_vectors(
                             conn, other_conn, feature_ids, features
@@ -1716,43 +1871,71 @@ class WiseProject:
                         media_type, other.features_dir(feature_extractor_id)
                     )
                     copy_vectors(
-                        conn, other_conn, media_type, feature_extractor_id, other_store
+                        conn,
+                        other_conn,
+                        media_type,
+                        feature_extractor_id,
+                        other_store,
                     )
                     if not dry_run:
                         conn.commit()
 
         # merge tables in database
+
     def merge(self, other: "WiseProject", dry_run: bool = True):
 
         # Source collection
-        with self.db_engine.connect() as conn, self.thumbsdb_engine.connect() as thumbs_conn:
-            last_collection_id = conn.execute(sa.select(sa.func.max(wise_db.source_collections_table.c.id))).scalar_one_or_none()
-            last_media_id = conn.execute(sa.select(sa.func.max(wise_db.media_table.c.id))).scalar_one_or_none()
-            last_vector_id = conn.execute(sa.select(sa.func.max(wise_db.vectors_table.c.id))).scalar_one_or_none()
-            last_thumbnail_id = thumbs_conn.execute(sa.select(sa.func.max(wise_db.thumbnails_table.c.id))).scalar_one_or_none()
+        with (
+            self.db_engine.connect() as conn,
+            self.thumbsdb_engine.connect() as thumbs_conn,
+        ):
+            last_collection_id = conn.execute(
+                sa.select(sa.func.max(wise_db.source_collections_table.c.id))
+            ).scalar_one_or_none()
+            last_media_id = conn.execute(
+                sa.select(sa.func.max(wise_db.media_table.c.id))
+            ).scalar_one_or_none()
+            last_vector_id = conn.execute(
+                sa.select(sa.func.max(wise_db.vectors_table.c.id))
+            ).scalar_one_or_none()
+            last_thumbnail_id = thumbs_conn.execute(
+                sa.select(sa.func.max(wise_db.thumbnails_table.c.id))
+            ).scalar_one_or_none()
 
         supported_assets = self.discover_assets()
-        supported_assets.pop('metadata', None)
+        supported_assets.pop("metadata", None)
 
         def cleanup_features():
             other_assets = other.discover_assets()
             for media_type in other_assets:
                 for feature_extractor_id in other_assets[media_type]:
                     if media_type not in supported_assets:
-                        for p in self.features_dir(feature_extractor_id).rglob(f'{media_type}-*'):
+                        for p in self.features_dir(feature_extractor_id).rglob(
+                            f"{media_type}-*"
+                        ):
                             logger.info("Deleting '%s'", p)
                             p.unlink(missing_ok=True)
 
-                    elif feature_extractor_id not in supported_assets[media_type]:
+                    elif (
+                        feature_extractor_id
+                        not in supported_assets[media_type]
+                    ):
                         logger.info(
                             "Deleting directory of %s from project",
-                            feature_extractor_id
+                            feature_extractor_id,
                         )
                         shutil.rmtree(self.features_root(feature_extractor_id))
 
                     else:
-                        for p in self.features_dir(feature_extractor_id).rglob(f'{media_type}-*'):
-                            if p.name not in supported_assets[media_type][feature_extractor_id]['features_files']:
+                        for p in self.features_dir(feature_extractor_id).rglob(
+                            f"{media_type}-*"
+                        ):
+                            if (
+                                p.name
+                                not in supported_assets[media_type][
+                                    feature_extractor_id
+                                ]["features_files"]
+                            ):
                                 logger.info("Deleting '%s'", p)
                                 p.unlink(missing_ok=True)
 
@@ -1762,18 +1945,18 @@ class WiseProject:
                 if _id is None:
                     return
 
-                logger.info("deleting rows from %s with id > %s", table.name, _id)
+                logger.info(
+                    "deleting rows from %s with id > %s", table.name, _id
+                )
                 with self.db_engine.connect() as conn:
                     res = conn.execute(
-                        sa.delete(
-                            table
-                        ).where(
-                            table.c.id > _id
-                        )
+                        sa.delete(table).where(table.c.id > _id)
                     )
                     if dry_run and res.rowcount > 0:
                         extra_rows = []
-                        for r in conn.execute(sa.select(table.c.id).where(table.c.id > _id)).scalar_one():
+                        for r in conn.execute(
+                            sa.select(table.c.id).where(table.c.id > _id)
+                        ).scalar_one():
                             extra_rows.append(r)
                         logger.error(
                             "Dry run inserted rows in %s - %s",
@@ -1783,7 +1966,9 @@ class WiseProject:
                     else:
                         conn.commit()
 
-            delete_rows_from_id(wise_db.source_collections_table, last_collection_id)
+            delete_rows_from_id(
+                wise_db.source_collections_table, last_collection_id
+            )
             delete_rows_from_id(wise_db.media_table, last_media_id)
             delete_rows_from_id(wise_db.vectors_table, last_vector_id)
             delete_rows_from_id(wise_db.thumbnails_table, last_thumbnail_id)
@@ -1793,7 +1978,7 @@ class WiseProject:
             if dry_run:
                 cleanup_features()
         except (Exception, KeyboardInterrupt):
-            logger.exception('Error in merge, rolling back - dont interrupt')
+            logger.exception("Error in merge, rolling back - dont interrupt")
             cleanup_features()
             cleanup_tables()
 
@@ -1827,7 +2012,9 @@ if __name__ == "__main__":
             ..., help="the source project directory to merge from"
         ),
         into: Path = typer.Option(..., help="the target project directory"),
-        dry_run: bool = typer.Option(False, help="if set, will not make any changes"),
+        dry_run: bool = typer.Option(
+            False, help="if set, will not make any changes"
+        ),
     ):
         """
         Merges another wise project into this one

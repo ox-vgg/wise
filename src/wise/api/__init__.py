@@ -27,16 +27,16 @@ from fastapi.staticfiles import StaticFiles
 from wise.api import common, dependencies
 from wise.config import APIConfig
 
-
 logger = logging.getLogger(__name__)
+
 
 def log_custom_format(message: str):
     """Log a message with a custom format (green text, bold)"""
     RESET_SEQ = "\033[0m"
-    COLOR_SEQ = "\033[92m" # green color
+    COLOR_SEQ = "\033[92m"  # green color
     BOLD_SEQ = "\033[1m"
     logger.info(
-        f'{COLOR_SEQ}{BOLD_SEQ}{message}{RESET_SEQ}',
+        f"{COLOR_SEQ}{BOLD_SEQ}{message}{RESET_SEQ}",
     )
 
 
@@ -97,8 +97,9 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
     # Enable CORS for development mode
     # If you are running a dev server for the frontend React app,
     # this allows the frontend dev server on a different port to access the backend
-    if config.mode == 'development':
+    if config.mode == "development":
         from fastapi.middleware.cors import CORSMiddleware
+
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -114,7 +115,9 @@ def create_app(config: APIConfig, theme_asset_dir: Path):
             @app.middleware("http")
             async def profile_request(request: Request, call_next):
                 if request.query_params.get("profile", False):
-                    with Profiler(interval=0.001, async_mode="enabled") as profiler:
+                    with Profiler(
+                        interval=0.001, async_mode="enabled"
+                    ) as profiler:
                         response = await call_next(request)
                     with open(f"profile.html", "w") as out:
                         out.write(profiler.output(renderer=HTMLRenderer()))

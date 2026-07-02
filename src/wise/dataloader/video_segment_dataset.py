@@ -27,7 +27,6 @@ from torchaudio.io import StreamReader
 from wise.data_models import MediaChunkType
 from wise.dataloader.dataset import MediaChunk
 
-
 logger = logging.getLogger(__name__)
 
 THUMBNAIL_FPS = 2
@@ -35,7 +34,10 @@ THUMBNAIL_FPS = 2
 
 def _encode_jpeg_frames(frames: torch.Tensor) -> list[torch.Tensor]:
     """Encode (N, C, H, W) uint8 RGB tensor to a list of JPEG byte tensors."""
-    return [tv.io.encode_jpeg(frames[i], quality=80) for i in range(frames.shape[0])]
+    return [
+        tv.io.encode_jpeg(frames[i], quality=80)
+        for i in range(frames.shape[0])
+    ]
 
 
 class VideoSegmentDataset(torch_data.IterableDataset):
@@ -139,7 +141,9 @@ class VideoSegmentDataset(torch_data.IterableDataset):
         for (chunk,) in reader.stream():
             if chunk is None:
                 continue
-            t = torch.as_tensor(chunk)  # (T, C, H, W) — torchaudio outputs NCHW for rgb24
+            t = torch.as_tensor(
+                chunk
+            )  # (T, C, H, W) — torchaudio outputs NCHW for rgb24
             elapsed += t.shape[0] / THUMBNAIL_FPS
             encoded = _encode_jpeg_frames(t)
             jpegs.extend(encoded)
@@ -171,12 +175,18 @@ class VideoSegmentDataset(torch_data.IterableDataset):
             # Skip trailing remnants too short to embed meaningfully. The overlap
             # guarantee ensures this content was already covered by the previous segment.
             # Always process the first segment so short videos are not dropped entirely.
-            if not first_segment and (segment_end - pts_list[0]) < self._segment_overlap:
+            if (
+                not first_segment
+                and (segment_end - pts_list[0]) < self._segment_overlap
+            ):
                 break
 
             # Apply per-extractor preprocessing
             video_chunks: dict[str, MediaChunk] = {}
-            for extractor_id, preprocess_fn in self._preprocessing_function_map.items():
+            for (
+                extractor_id,
+                preprocess_fn,
+            ) in self._preprocessing_function_map.items():
                 if preprocess_fn is not None:
                     preprocessed = preprocess_fn(frames)
                 else:
@@ -199,7 +209,9 @@ class VideoSegmentDataset(torch_data.IterableDataset):
                     thumb_end = segment_end
 
                 if thumb_end > thumb_start:
-                    thumb_jpegs = self._make_thumbnail_frames(path, thumb_start, thumb_end)
+                    thumb_jpegs = self._make_thumbnail_frames(
+                        path, thumb_start, thumb_end
+                    )
                     if thumb_jpegs:
                         chunks[MediaChunkType.THUMBNAILS] = MediaChunk(
                             tensor=thumb_jpegs,
@@ -223,7 +235,9 @@ class VideoSegmentDataset(torch_data.IterableDataset):
             try:
                 yield from self._iter_file(media_id, path)
             except Exception:
-                logger.exception('Exception when processing "%s: %s"', media_id, path)
+                logger.exception(
+                    'Exception when processing "%s: %s"', media_id, path
+                )
 
     def __iter__(self) -> Generator[tuple[str, dict], Any, None]:
         worker_info = torch.utils.data.get_worker_info()

@@ -26,7 +26,6 @@ from tritonclient.utils import triton_to_np_dtype
 
 from wise.feature.feature_extractor import FeatureExtractor, MultiModalModel
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +41,7 @@ def get_config_and_metadata(client, model_name: str):
     # Get the input / output schema
     logger.debug(
         "model metadata: %s",
-        client.get_model_metadata(model_name, as_json=True)
+        client.get_model_metadata(model_name, as_json=True),
     )
     model_metadata = client.get_model_metadata(model_name)
 
@@ -112,9 +111,9 @@ class TritonModel(MultiModalModel):
             "(%s) Getting %s features with params: %s",
             self._model,
             _type,
-            input_params
+            input_params,
         )
-        model_name =  f"{self._model}--{_type}"
+        model_name = f"{self._model}--{_type}"
         if _type not in self._triton_configs:
             self._triton_configs[_type] = get_config_and_metadata(
                 self._client, model_name
@@ -145,7 +144,7 @@ class TritonModel(MultiModalModel):
                 logger.debug(
                     "Converting input dtype from %s to %s",
                     value.dtype,
-                    np_dtype
+                    np_dtype,
                 )
                 value = value.astype(np_dtype)
 
@@ -190,17 +189,24 @@ class TritonModel(MultiModalModel):
             return chunks
 
         inputs_data = list(
-            zip(*itertools.starmap(_prepare_chunked_input, input_params.items()))
+            zip(
+                *itertools.starmap(
+                    _prepare_chunked_input, input_params.items()
+                )
+            )
         )
 
         outputs_data = []
         for chunk in inputs_data:
             logger.debug("Sending chunk with (%d) inputs", len(chunk))
             _outputs = [
-                grpcclient.InferRequestedOutput(name) for name in outputs.keys()
+                grpcclient.InferRequestedOutput(name)
+                for name in outputs.keys()
             ]
 
-            response = self._client.infer(model_name, inputs=chunk, outputs=_outputs)
+            response = self._client.infer(
+                model_name, inputs=chunk, outputs=_outputs
+            )
             if not response:
                 raise RuntimeError("Failed to get response from Triton server")
 
@@ -273,6 +279,7 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
 
     class TritonFeatureExtractor(cls):
         """A Triton-enabled feature extractor class."""
+
         class Config(cls.Config):
             """Configuration for the Triton feature extractor."""
 
@@ -309,7 +316,9 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
 
             if "_TritonFeatureExtractor__model_name" in state:
                 # Ensure the model name is a string
-                state["model_id"] = state.pop("_TritonFeatureExtractor__model_name")
+                state["model_id"] = state.pop(
+                    "_TritonFeatureExtractor__model_name"
+                )
             return state
 
         def __setstate__(self, state):
@@ -317,7 +326,9 @@ def make_triton_feature_extractor(cls: Type[FeatureExtractor]):
             # Restore instance attributes
             self.__dict__.update(state)
             # Re-initialize the model property
-            if "config" in state and not isinstance(state["config"], self.Config):
+            if "config" in state and not isinstance(
+                state["config"], self.Config
+            ):
                 self.config = self.Config(**state["config"])
             if (
                 "_TritonFeatureExtractor__model_name" not in state

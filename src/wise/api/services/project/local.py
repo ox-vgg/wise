@@ -34,7 +34,6 @@ from wise.repository import get_featured_images
 from wise.utils import convert_uint8array_to_base64
 from wise.wise_project import WiseProject
 
-
 logger = logging.getLogger(__name__)
 
 # TODO config
@@ -58,6 +57,7 @@ def timedelta_to_vtt_timestamp(dt: datetime.timedelta):
 
     return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
 
+
 class LocalWiseProjectService(WiseProjectService):
     def __init__(self, wise_project: WiseProject, config: APIConfig):
         # Initialize other necessary attributes here
@@ -72,11 +72,15 @@ class LocalWiseProjectService(WiseProjectService):
         shot_based_filters = None
         if config.use_shots:
             if self.wise_project.num_shots == 0:
-                logger.warning('use_shots is set to True, but shots table is empty! Please make sure to populate the shots table before using this feature.')
+                logger.warning(
+                    "use_shots is set to True, but shots table is empty! Please make sure to populate the shots table before using this feature."
+                )
 
             shot_scales = self.wise_project.shot_scales()
             if shot_scales:
-                logger.info("shot_scale filter enabled with values =%s", shot_scales)
+                logger.info(
+                    "shot_scale filter enabled with values =%s", shot_scales
+                )
                 shot_based_filters = {}
                 shot_based_filters["shot_scale"] = {
                     "name": "Shot Scale",
@@ -96,8 +100,12 @@ class LocalWiseProjectService(WiseProjectService):
         # Implement logic to retrieve project info from local files
         models = {
             media_type: [
-                feature_extractor_id for feature_extractor_id in self.project_assets[media_type]
-            ] for media_type in self.project_assets if media_type in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO]
+                feature_extractor_id
+                for feature_extractor_id in self.project_assets[media_type]
+            ]
+            for media_type in self.project_assets
+            if media_type
+            in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO]
         }
         search_target_order = getattr(self.config, "search_target_order", None)
         return ProjectInfo(
@@ -123,23 +131,38 @@ class LocalWiseProjectService(WiseProjectService):
 
         return metadata
 
-    def thumbnail(self, media_id: str, timestamp: float, get_id_only:bool = False, highres: bool = False) -> bytes | int:
+    def thumbnail(
+        self,
+        media_id: str,
+        timestamp: float,
+        get_id_only: bool = False,
+        highres: bool = False,
+    ) -> bytes | int:
         # Implement logic to retrieve thumbnail for a given media_id and timestamp from local files
-        thumbnail = self.wise_project.thumbnail(media_id, timestamp, get_id_only=get_id_only, highres=highres)
+        thumbnail = self.wise_project.thumbnail(
+            media_id, timestamp, get_id_only=get_id_only, highres=highres
+        )
         if thumbnail is None:
-            raise ThumbnailNotFoundException(f"Thumbnail for media ID {media_id} at timestamp {timestamp} not found")
+            raise ThumbnailNotFoundException(
+                f"Thumbnail for media ID {media_id} at timestamp {timestamp} not found"
+            )
         return thumbnail
 
     def get_thumbnail_reader(self, thumbnails_to_send: int = 0):
         project = self.wise_project
+
         def _thumbnail_url(_m: VectorAndMediaMetadata):
             return f"thumbnail?media_id={_m.media_id}&timestamp={_m.timestamp}"
 
         def _thumbnail(_m: VectorAndMediaMetadata):
-            thumbnail = project.thumbnail(media_id=_m.id, timestamp=_m.timestamp)
+            thumbnail = project.thumbnail(
+                media_id=_m.id, timestamp=_m.timestamp
+            )
             return convert_uint8array_to_base64(thumbnail)
 
-        def inner(vector_and_media_metadata_list: list[VectorAndMediaMetadata]):
+        def inner(
+            vector_and_media_metadata_list: list[VectorAndMediaMetadata],
+        ):
             thumbs = [
                 (
                     _thumbnail(vector_and_media_metadata)
@@ -160,13 +183,13 @@ class LocalWiseProjectService(WiseProjectService):
     def featured_vectors_for_targets(self) -> dict[str, dict[str, list[int]]]:
         project_engine = self.wise_project.db_engine
         # Generate a list of random featured images for each modality and feature extractor
-        ids: dict[str: dict[str: list[int]]] = {}
+        ids: dict[str : dict[str : list[int]]] = {}
         search_targets = self.search_indices
         with project_engine.connect() as conn:
             for modality in search_targets:
                 ids[modality] = {}
                 for feature_extractor_id in search_targets[modality]:
-                    if feature_extractor_id == 'wise/metadata':
+                    if feature_extractor_id == "wise/metadata":
                         continue
 
                     this_ids = get_featured_images(
@@ -186,7 +209,10 @@ class LocalWiseProjectService(WiseProjectService):
     ):
         all_thumbs = list(
             self.wise_project.get_thumbnails(
-                media_id, num_seconds_per_image, partition_id, NUM_THUMBNAILS_PER_PARTITION
+                media_id,
+                num_seconds_per_image,
+                partition_id,
+                NUM_THUMBNAILS_PER_PARTITION,
             )
         )
         num_thumbs = len(all_thumbs)
@@ -218,7 +244,9 @@ class LocalWiseProjectService(WiseProjectService):
         )
         num_thumbs = len(all_thumbs)
         if num_thumbs == 0:
-            raise ThumbnailNotFoundException(f"No thumbnails found for media {media_id}!")
+            raise ThumbnailNotFoundException(
+                f"No thumbnails found for media {media_id}!"
+            )
 
         w, h = self.wise_project.thumbnail_size_for_media_id(media_id)
 
@@ -247,15 +275,23 @@ class LocalWiseProjectService(WiseProjectService):
         return vtt.content
 
     def get_active_search_targets(
-       self, search_target_order: list[str] | None = None
+        self, search_target_order: list[str] | None = None
     ):
 
         active_search_targets: dict[str, list[str]] = {
             k: list(self.search_indices[k].keys()) for k in self.search_indices
         }
 
-        default_search_target_order = ["open_clip", "insightface", "owlv2", "clap", "wise/metadata"]
-        _search_target_order = search_target_order or default_search_target_order
+        default_search_target_order = [
+            "open_clip",
+            "insightface",
+            "owlv2",
+            "clap",
+            "wise/metadata",
+        ]
+        _search_target_order = (
+            search_target_order or default_search_target_order
+        )
 
         # sort active search targets based on user defined order in config.search_target_order
         for media_type in active_search_targets:
@@ -272,7 +308,8 @@ class LocalWiseProjectService(WiseProjectService):
         active_search_targets = {
             x: active_search_targets[x]
             for x in sorted(
-                active_search_targets.keys(), key=lambda x: preferred_order.index(x)
+                active_search_targets.keys(),
+                key=lambda x: preferred_order.index(x),
             )
         }
 
@@ -283,7 +320,9 @@ class LocalWiseProjectService(WiseProjectService):
     ) -> list[VectorAndMediaMetadata]:
         _external_metadata_tables = external_metadata_tables
         if _external_metadata_tables is None:
-            _external_metadata_tables = self.wise_project.external_metadata_tables()
+            _external_metadata_tables = (
+                self.wise_project.external_metadata_tables()
+            )
         return self.wise_project.get_vector_media_metadata_for_ids(
             ids, _external_metadata_tables
         )
@@ -291,4 +330,6 @@ class LocalWiseProjectService(WiseProjectService):
     def get_vector_ext_metadata_for_ids(
         self, feature_extractor_id: str, ids: list[int]
     ) -> list[Any]:
-        return self.wise_project.get_vector_ext_metadata_for_ids(feature_extractor_id, ids)
+        return self.wise_project.get_vector_ext_metadata_for_ids(
+            feature_extractor_id, ids
+        )

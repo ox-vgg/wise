@@ -23,7 +23,6 @@ from wise.db.base import (
     thumbs_metadata_obj,
 )
 
-
 source_collections_table = sa.Table(
     "source_collections",
     project_metadata_obj,
@@ -50,8 +49,12 @@ media_table = sa.Table(
     sa.Column("format", sa.String(5), nullable=False),
     sa.Column("width", sa.Integer, nullable=False),
     sa.Column("height", sa.Integer, nullable=False),
-    sa.Column("num_frames", sa.Integer, nullable=True),  # only applies to video files
-    sa.Column("duration", sa.Float, nullable=True),  # only applies to video files
+    sa.Column(
+        "num_frames", sa.Integer, nullable=True
+    ),  # only applies to video files
+    sa.Column(
+        "duration", sa.Float, nullable=True
+    ),  # only applies to video files
 )
 
 vectors_table = sa.Table(
@@ -59,13 +62,15 @@ vectors_table = sa.Table(
     project_metadata_obj,
     sa.Column("id", sa.Integer, autoincrement=True, primary_key=True),
     sa.Column("modality", sa.Enum(ModalityType), index=True, nullable=False),
-    sa.Column("feature_extractor_id", sa.Unicode(255), index=True, nullable=False),
+    sa.Column(
+        "feature_extractor_id", sa.Unicode(255), index=True, nullable=False
+    ),
     sa.Column(
         "media_id",
         sa.Integer,
         sa.ForeignKey("media.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     ),
     sa.Column("timestamp", sa.Float(), index=True, nullable=True),
     sa.Column("end_timestamp", sa.Float(), index=True, nullable=True),
@@ -96,7 +101,9 @@ thumbnails_table = sa.Table(
     ),
     sa.Column("timestamp", sa.Float(), index=True, nullable=True),
     sa.Column("content", sa.LargeBinary(), nullable=False),
-    sa.schema.Index("ix_thumbnails_media_id_and_timestamp", "media_id", "timestamp"),
+    sa.schema.Index(
+        "ix_thumbnails_media_id_and_timestamp", "media_id", "timestamp"
+    ),
 )
 
 shots_table = sa.Table(

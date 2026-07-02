@@ -28,16 +28,15 @@ from wise.data_models import (
 )
 from wise.repository.base import SQLAlchemyRepository
 
-
 SourceCollectionRepo = SQLAlchemyRepository[
     SourceCollection, SourceCollection, SourceCollection
 ](db.source_collections_table, SourceCollection)
 MediaRepo = SQLAlchemyRepository[MediaMetadata, MediaMetadata, MediaMetadata](
     db.media_table, MediaMetadata
 )
-VectorRepo = SQLAlchemyRepository[VectorMetadata, VectorMetadata, VectorMetadata](
-    db.vectors_table, VectorMetadata
-)
+VectorRepo = SQLAlchemyRepository[
+    VectorMetadata, VectorMetadata, VectorMetadata
+](db.vectors_table, VectorMetadata)
 MediaMetadataRepo = SQLAlchemyRepository[
     ExtraMediaMetadata, ExtraMediaMetadata, ExtraMediaMetadata
 ](db.imported_metadata_table, ExtraMediaMetadata)
@@ -46,7 +45,9 @@ ThumbnailRepo = SQLAlchemyRepository[
     ThumbnailMetadata, ThumbnailMetadata, ThumbnailMetadata
 ](db.thumbnails_table, ThumbnailMetadata)
 
-VideoShotsRepo = SQLAlchemyRepository[VideoShot, VideoShot, VideoShot](db.shots_table, VideoShot)
+VideoShotsRepo = SQLAlchemyRepository[VideoShot, VideoShot, VideoShot](
+    db.shots_table, VideoShot
+)
 
 
 _vtable = db.vectors_table
@@ -82,7 +83,7 @@ def get_featured_images(
     # and is from the 4th second of the video
     where_clause = sa.and_(
         _vtable.c.modality == modality,
-        _vtable.c.feature_extractor_id == feature_extractor_id
+        _vtable.c.feature_extractor_id == feature_extractor_id,
     )
 
     # select a random list of media ids from the media table

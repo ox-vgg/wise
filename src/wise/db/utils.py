@@ -20,6 +20,7 @@ def prepare_filter_stmt(
         query_fn: A function that takes a CTE expression and returns a Select statement
         include_ordering: Whether to include an ordering column in the CTE for stable results
     """
+
     def get_filter_cte(num_filters: int = 10):
         """
         Create a pre-compiled CTE statement with placeholders for bind parameters.
@@ -39,7 +40,8 @@ def prepare_filter_stmt(
         for i in range(num_filters):
             # Create named parameters for each column in each row
             params = tuple(
-                sa.bindparam(f"{c}_{i}", type_=table.c[c].type) for c in columns
+                sa.bindparam(f"{c}_{i}", type_=table.c[c].type)
+                for c in columns
             )
             names = {c: x.key for c, x in zip(columns, params)}
             param_names.append(names)
@@ -53,7 +55,9 @@ def prepare_filter_stmt(
         # Create the values expression
         values_columns = [sa.column(c, type_=table.c[c].type) for c in columns]
         if include_ordering:
-            values_columns = [sa.column("rank", type_=sa.Integer)] + values_columns
+            values_columns = [
+                sa.column("rank", type_=sa.Integer)
+            ] + values_columns
         values_expr = sa.values(*values_columns).data(values_data).cte("cte")
 
         return values_expr, param_names

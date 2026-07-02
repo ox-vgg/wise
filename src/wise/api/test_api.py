@@ -42,7 +42,9 @@ class TestWithEmptyProject(unittest.TestCase):
         ## will create another instance of WiseProject in readonly
         ## mode.  So we "get" the db engines here to trigger the db
         ## creation.  See https://gitlab.com/vgg/wise/wise/-/work_items/231
-        project = WiseProject(self.project_dir, create_project=True, read_only=False)
+        project = WiseProject(
+            self.project_dir, create_project=True, read_only=False
+        )
         _ = project.db_engine
         _ = project.thumbsdb_engine
 
@@ -142,17 +144,18 @@ class TestHandlingMultipartForm(unittest.TestCase):
             ),
             wise.api.common.VectorIdQueryTerm(
                 term_id="bar", is_negative=False, vector_id="0/0/0"
-            )
+            ),
         ]
         self.assertEqual(
             wise.api.common.merge_multipart_query_form(query_form, []),
-            expected_q
+            expected_q,
         )
 
     def test_parsing_url(self):
         url = "http://www.example.com/960px-Flagstone_3_(20767991).jpg"
         query_form = [
-            '{"term_id": "gnu", "is_negative": false, "src": "%s", "qtype": "visual"}' % url,
+            '{"term_id": "gnu", "is_negative": false, "src": "%s", "qtype": "visual"}'
+            % url,
         ]
         expected_q = [
             wise.api.common.MediaQueryTerm(
@@ -164,5 +167,5 @@ class TestHandlingMultipartForm(unittest.TestCase):
         ]
         self.assertEqual(
             wise.api.common.merge_multipart_query_form(query_form, []),
-            expected_q
+            expected_q,
         )

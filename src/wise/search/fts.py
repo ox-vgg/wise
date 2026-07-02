@@ -35,13 +35,14 @@ from wise.data_models import (
     VectorAndMediaMetadata,
 )
 
-
 logger = logging.getLogger(__name__)
 
 COMMON_COLUMNS = ["media_id", "timestamp", "end_timestamp", "vector_id"]
 
 
-def update_segment_text_with_highlights(highlighted_text: str, segments: list[dict]):
+def update_segment_text_with_highlights(
+    highlighted_text: str, segments: list[dict]
+):
     """
     Replace text in segments with the highlighted text, while taking care of the length mismatch
     due to the highlighting, and closing the dangling highlights
@@ -57,7 +58,9 @@ def update_segment_text_with_highlights(highlighted_text: str, segments: list[di
     TOKEN_LENGTH = 7  # sum(map(len, TOKENS))
 
     segment_lengths = list(map(lambda x: len(x["text"]), segments))
-    cummulative_lengths = list(itertools.accumulate(segment_lengths, initial=0))
+    cummulative_lengths = list(
+        itertools.accumulate(segment_lengths, initial=0)
+    )
     # account for 1 space between segments
     cummulative_lengths = list(map(sum, enumerate(cummulative_lengths)))
 
@@ -94,7 +97,9 @@ def update_segment_text_with_highlights(highlighted_text: str, segments: list[di
             # If the diff is not divisible by 7 (length of token pair), then there are dangling tags
             # Close tag in current segment and update next segment with an open tag, and update length
             updated_text += "</b>"
-            updated_segment_texts[idx + 1] = "<b>" + updated_segment_texts[idx + 1]
+            updated_segment_texts[idx + 1] = (
+                "<b>" + updated_segment_texts[idx + 1]
+            )
         s["text"] = updated_text
     return segments
 
@@ -136,7 +141,8 @@ def get_cte_from_ids(ids: list[tuple]):
             sa.literal(v).label("vector_id"),
         )
         for i, m, t, e, v in [
-            (idx, *(vals + (None,) * (4 - len(vals)))) for idx, vals in enumerate(ids)
+            (idx, *(vals + (None,) * (4 - len(vals))))
+            for idx, vals in enumerate(ids)
         ]
     ]
     cte = sa.union_all(*sub_queries).cte("cte")
@@ -157,18 +163,22 @@ def get_cte_from_ids(ids: list[tuple]):
 #     cte = sa.union_all(*sub_queries).cte("cte")
 #     return cte
 
+
 def get_cte_from_media_ids(media_ids: list[int]):
     """
     Create a CTE from a list of media_ids using the values expression in SQLAlchemy
     """
-    cte = sa.values(
-        sa.column("rank", sa.Integer),
-        sa.column("media_id", sa.Integer),
-    ).data(
-        [(i, m) for i, m in enumerate(media_ids)]
-    ).cte('cte')
+    cte = (
+        sa.values(
+            sa.column("rank", sa.Integer),
+            sa.column("media_id", sa.Integer),
+        )
+        .data([(i, m) for i, m in enumerate(media_ids)])
+        .cte("cte")
+    )
 
     return cte
+
 
 def get_join_onclause(
     left: sa.FromClause,
@@ -199,13 +209,14 @@ def get_join_onclause(
         ],
     )
 
+
 def parse_fts_config(fts_config: dict):
     # generates a mapping from old name to new name and vice-versa
     column2fts = defaultdict(dict)
     fts2column = defaultdict(dict)
     for table, fts_cols in fts_config.items():
         for c in fts_cols:
-            if ':' in c:
+            if ":" in c:
                 old_name, new_name = c.split(":", 1)
             else:
                 old_name, new_name = c, c
@@ -214,6 +225,7 @@ def parse_fts_config(fts_config: dict):
             fts2column[table][new_name] = old_name
 
     return column2fts, fts2column
+
 
 def get_metadata_selectable_from_fts5_config(
     extra_metadata_tables: dict[str, sa.Table], fts_config: dict
@@ -233,7 +245,10 @@ def get_metadata_selectable_from_fts5_config(
         from_clause = from_clause.join(
             m, m.c["media_id"] == media_table.c.id, isouter=True
         )
-        mcols = [ m.c[old_name].label(new_name) for old_name, new_name in col2fts_map.items() ]
+        mcols = [
+            m.c[old_name].label(new_name)
+            for old_name, new_name in col2fts_map.items()
+        ]
         columns.extend(mcols)
 
     if len(columns) == 0:
@@ -349,19 +364,20 @@ class WISEFTSQuery(RootModel[OperatorQuery]):
 
 class FTSSearch:
     is_internal_search_supported = False
-    table_name =  db._WISE_FTS_TABLE
+    table_name = db._WISE_FTS_TABLE
+
     def __init__(self, project: "WiseProject", metadata):
         self.project = project
         self.db_metadata = metadata
 
-        self.tables = { t.name: t for t in project.external_metadata_tables() }
+        self.tables = {t.name: t for t in project.external_metadata_tables()}
         self.fts_table = metadata.tables.get(self.table_name)
 
         try:
             with self.project.fts_config_file.open() as f:
                 self.fts_config = json.load(f)
         except Exception:
-            raise ValueError('fts_config could not be found!')
+            raise ValueError("fts_config could not be found!")
 
     def build_index(self, conn: sa.Connection):
         fts_selectable = get_metadata_selectable_from_fts5_config(
@@ -371,9 +387,9 @@ class FTSSearch:
         self.fts_table = create_fts_table_from_selectable(
             self.table_name, self.db_metadata, fts_selectable
         )
-        logger.info('Dropping existing fts5 table')
+        logger.info("Dropping existing fts5 table")
         self.fts_table.drop(conn, checkfirst=True)
-        logger.info('Building fts5 index')
+        logger.info("Building fts5 index")
         self.fts_table.create(conn)
         stmt = sa.text(
             f"INSERT INTO [{self.fts_table.name}] ([{self.fts_table.name}]) VALUES ('rebuild')"
@@ -394,13 +410,16 @@ class FTSSearch:
         TODO, make it fine-grained and return the segment to allow further filtering
         """
         if self.fts_table is None:
-            raise ValueError("Cannot use match operator without the fts table - build it with create_index.py and make sure the table is reflected from the db before calling this function")
+            raise ValueError(
+                "Cannot use match operator without the fts table - build it with create_index.py and make sure the table is reflected from the db before calling this function"
+            )
 
         col2fts, _ = parse_fts_config(self.fts_config)
         where_clause = q.convert_query_to_sql(self.fts_table)
         from_clause = db.media_table.join(
             self.fts_table,
-            db.media_table.c.id == sa.literal_column(f"[{self.fts_table.name}].rowid"),
+            db.media_table.c.id
+            == sa.literal_column(f"[{self.fts_table.name}].rowid"),
         )
         if end is None:
             limit = None
@@ -431,7 +450,8 @@ class FTSSearch:
             cte.c.media_id == db.media_table.c.id,
         ).join(
             self.fts_table,
-            db.media_table.c.id == sa.literal_column(f"[{self.fts_table.name}].rowid"),
+            db.media_table.c.id
+            == sa.literal_column(f"[{self.fts_table.name}].rowid"),
         )
 
         # use the media_ids to select the matching rows and highlight the fts columns
@@ -483,7 +503,9 @@ class FTSSearch:
         for r in res.all():
             row = r[:]
             media_cols, row = get_columns(db.media_table.c, row)
-            media_metadata = MediaMetadata.model_validate(dict(zip(db.media_table.c.keys(), media_cols)))
+            media_metadata = MediaMetadata.model_validate(
+                dict(zip(db.media_table.c.keys(), media_cols))
+            )
             extra_metadata = {}
             for m in self.tables.values():
                 cols, row = get_columns(
@@ -501,7 +523,9 @@ class FTSSearch:
                 vals.pop("segments", []),
             )
 
-            updated_segments = update_segment_text_with_highlights(text, segments)
+            updated_segments = update_segment_text_with_highlights(
+                text, segments
+            )
             # Merge nearby segments
             # merged_segments = merge_close_segments(updated_segments)
             # Note: dont merge segments as they can become very long. Best to display them next to each other on the table
@@ -514,12 +538,17 @@ class FTSSearch:
                     "id": None,
                     "timestamp": None,
                     "end_timestamp": None,
-                    "feature_extractor_id": "wise/metadata"
+                    "feature_extractor_id": "wise/metadata",
                 }
                 | {
                     "external_metadata": {
                         "asr_segments": merged_segments,
-                        **{k: v for m in extra_metadata.values() for k, v in m.items() if v},
+                        **{
+                            k: v
+                            for m in extra_metadata.values()
+                            for k, v in m.items()
+                            if v
+                        },
                     }
                 }
             )
@@ -530,27 +559,39 @@ class FTSSearch:
                 for s in filtered_segments:
                     m = vector_media_metadata.model_copy(
                         update={
-                            "modality": media_metadata.media_type if media_metadata.media_type != MediaType.AV else MediaType.VIDEO,
+                            "modality": (
+                                media_metadata.media_type
+                                if media_metadata.media_type != MediaType.AV
+                                else MediaType.VIDEO
+                            ),
                             "timestamp": s["start"],
                             "end_timestamp": s["end"],
                         }
                     )
                     responses.append(m)
                     if media_metadata.media_type == MediaType.AV:
-                        m_audio = m.model_copy(update={"modality": ModalityType.AUDIO})
+                        m_audio = m.model_copy(
+                            update={"modality": ModalityType.AUDIO}
+                        )
                         responses.append(m_audio)
             else:
                 # if no segments, add the media metadata
                 m = vector_media_metadata.model_copy(
                     update={
-                        "modality": media_metadata.media_type if media_metadata.media_type != MediaType.AV else MediaType.VIDEO,
+                        "modality": (
+                            media_metadata.media_type
+                            if media_metadata.media_type != MediaType.AV
+                            else MediaType.VIDEO
+                        ),
                         "timestamp": 0,
                         "end_timestamp": None,
                     }
                 )
                 responses.append(m)
                 if media_metadata.media_type == MediaType.AV:
-                    m_audio = m.model_copy(update={"modality": ModalityType.AUDIO})
+                    m_audio = m.model_copy(
+                        update={"modality": ModalityType.AUDIO}
+                    )
                     responses.append(m_audio)
         logger.info("Num responses: %d", len(responses))
         return responses

@@ -28,7 +28,6 @@ from wise.feature.feature_extractor import (
     get_torch_device,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -38,8 +37,9 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
     This class is a placeholder for future implementations that will
     support Hugging Face models for feature extraction.
     """
-    ID_PREFIX = 'hf/'
-    DESCRIPTION = 'Hugging Face feature extractor'
+
+    ID_PREFIX = "hf/"
+    DESCRIPTION = "Hugging Face feature extractor"
 
     class Config(FeatureExtractor.Config):
         preprocessor_kwargs: dict[str, Any] = {}
@@ -55,12 +55,14 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         **kwargs,
     ):
         if not id.startswith(self.ID_PREFIX):
-            raise ValueError(f'Feature ID must start with {self.ID_PREFIX}, got {id}')
+            raise ValueError(
+                f"Feature ID must start with {self.ID_PREFIX}, got {id}"
+            )
 
-        id_tokens = id.split('/')
-        assert len(id_tokens) == 4, f'Invalid feature ID format: {id}'
+        id_tokens = id.split("/")
+        assert len(id_tokens) == 4, f"Invalid feature ID format: {id}"
 
-        model_name, _dataset = id[len(self.ID_PREFIX):].rsplit('/', 1)
+        model_name, _dataset = id[len(self.ID_PREFIX) :].rsplit("/", 1)
         self.DEVICE = get_torch_device(device)
 
         self._config = config
@@ -73,13 +75,13 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         self.logit_scale = getattr(model, "logit_scale", torch.tensor(0.0))
         self.logit_bias = getattr(model, "logit_bias", torch.tensor(0.0))
 
-        if not hasattr(model, 'get_image_features'):
+        if not hasattr(model, "get_image_features"):
             self.extract_image_features = None
 
-        if not hasattr(model, 'get_text_features'):
+        if not hasattr(model, "get_text_features"):
             self.extract_text_features = None
 
-        if not hasattr(model, 'get_audio_features'):
+        if not hasattr(model, "get_audio_features"):
             self.extract_audio_features = None
 
         if warmup:
@@ -99,7 +101,12 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
             self.__model_name,
             self.DEVICE,
         )
-        model = AutoModel.from_pretrained(self.__model_name, config=self.model_config, device_map=f'{self.DEVICE}', **self.model_kwargs)
+        model = AutoModel.from_pretrained(
+            self.__model_name,
+            config=self.model_config,
+            device_map=f"{self.DEVICE}",
+            **self.model_kwargs,
+        )
         model.eval()
         if self._config.compile:
             available_backends = torch._dynamo.list_backends()
@@ -107,7 +114,9 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
             if "tensorrt" in available_backends:
                 backend = "tensorrt"
             logger.info("Compiling model with backend %s", backend)
-            model = torch.compile(model, mode="reduce-overhead", backend=backend)
+            model = torch.compile(
+                model, mode="reduce-overhead", backend=backend
+            )
         return model
 
     def preprocess_image(self, images):
@@ -121,7 +130,6 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
 
     @torch.inference_mode()
     def extract_image_features(self, images: torch.Tensor) -> list[Features]:
-
         """Extracts features from pre-processed images.
 
         Parameters
@@ -134,9 +142,13 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         list[Features]
             One :class:`Feature` object per input image.
         """
-        inputs = self.processor(images=images, return_tensors='pt', **self.preprocessor_kwargs).to(self.DEVICE)
+        inputs = self.processor(
+            images=images, return_tensors="pt", **self.preprocessor_kwargs
+        ).to(self.DEVICE)
         outputs = self.model.get_image_features(**inputs)
-        outputs = outputs / torch.linalg.norm(outputs, dim=-1, keepdim=True)  # Normalize features
+        outputs = outputs / torch.linalg.norm(
+            outputs, dim=-1, keepdim=True
+        )  # Normalize features
         outputs = outputs.cpu().numpy()
         feature_vectors = list(np.expand_dims(outputs, axis=1))
         return [Features(vectors=x, metadata=None) for x in feature_vectors]
@@ -156,9 +168,13 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
             A 2D numpy array of shape (n, d) where n is the number of text queries
             and d is the feature dimension.
         """
-        inputs = self.processor(text=text_query, return_tensors='pt', **self.preprocessor_kwargs).to(self.DEVICE)
+        inputs = self.processor(
+            text=text_query, return_tensors="pt", **self.preprocessor_kwargs
+        ).to(self.DEVICE)
         outputs = self.model.get_text_features(**inputs)
-        outputs = outputs / torch.linalg.norm(outputs, dim=-1, keepdim=True)  # Normalize features
+        outputs = outputs / torch.linalg.norm(
+            outputs, dim=-1, keepdim=True
+        )  # Normalize features
         outputs = outputs.cpu().numpy()
 
         return outputs
@@ -177,31 +193,41 @@ class HFMultiModalFeatureExtractor(FeatureExtractor):
         list of Features
             A list of `Features` objects, one for each audio sample in the input tensor.
         """
-        inputs = self.processor(audio=audio, return_tensors='pt', **self.preprocessor_kwargs).to(self.DEVICE)
+        inputs = self.processor(
+            audio=audio, return_tensors="pt", **self.preprocessor_kwargs
+        ).to(self.DEVICE)
         outputs = self.model.get_audio_features(**inputs)
-        outputs = outputs / torch.linalg.norm(outputs, dim=-1, keepdim=True)  # Normalize features
+        outputs = outputs / torch.linalg.norm(
+            outputs, dim=-1, keepdim=True
+        )  # Normalize features
         outputs = outputs.cpu().numpy()
         feature_vectors = list(np.expand_dims(outputs, axis=1))
         return [Features(vectors=x, metadata=None) for x in feature_vectors]
 
     def warmup(self):
         """Warm up the model by running a dummy forward pass."""
-        logger.info('Warming up model')
+        logger.info("Warming up model")
 
         self.extract_image_features(torch.rand((1, 3, 224, 224)))
-        self.extract_text_features(['dummy text'])
+        self.extract_text_features(["dummy text"])
 
     def transform_faiss_distances_hook(self, dist: np.ndarray) -> np.ndarray:
         with torch.no_grad():
             dist_tensor = torch.from_numpy(dist)
-            dist_tensor = dist_tensor * self.logit_scale.exp() + self.logit_bias
+            dist_tensor = (
+                dist_tensor * self.logit_scale.exp() + self.logit_bias
+            )
             return dist_tensor.detach().numpy()
 
 
 if __name__ == "__main__":
     # Example usage
     logging.basicConfig(level=logging.INFO)
-    extractor = HFMultiModalFeatureExtractor('hf/openai/clip-vit-base-patch32', warmup=True)
-    image_features = extractor.extract_image_features(torch.rand((1, 3, 224, 224)))
-    text_features = extractor.extract_text_features(['Hello, world!'])
+    extractor = HFMultiModalFeatureExtractor(
+        "hf/openai/clip-vit-base-patch32", warmup=True
+    )
+    image_features = extractor.extract_image_features(
+        torch.rand((1, 3, 224, 224))
+    )
+    text_features = extractor.extract_text_features(["Hello, world!"])
     print(image_features, text_features)

@@ -26,14 +26,15 @@ import numpy as np
 from wise.feature.store.feature_store import FeatureStore
 from wise.utils import batched
 
-
 logger = logging.getLogger(__name__)
 
 MAX_CACHE_SIZE = 32
 
 
 def load_faiss_index(filename: str) -> faiss.Index:
-    return faiss.read_index(filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+    return faiss.read_index(
+        filename, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY
+    )
 
 
 class FaissStore(FeatureStore):
@@ -45,6 +46,7 @@ class FaissStore(FeatureStore):
     A new shard is created when the current shard contains shard_maxcount entries or
     when the close method is called or when object goes out of scope (__del__)
     """
+
     EXTENSION = "faiss"
 
     def __init__(self, store_name: str, store_data_dir: str):
@@ -54,7 +56,7 @@ class FaissStore(FeatureStore):
         self.store_data_dir = store_data_dir
 
         self._prefix = str(Path(self.store_data_dir) / f"{self.store_name}-")
-        self._pattern = self._prefix + '%06d.' + self.EXTENSION
+        self._pattern = self._prefix + "%06d." + self.EXTENSION
 
         logger.debug(
             "FaissStore: store_name=%s, store_data_dir=%s, pattern=%s",
@@ -86,9 +88,11 @@ class FaissStore(FeatureStore):
             if self._dim is None:
                 self._dim = index.d
             elif self._dim != index.d:
-                raise ValueError(f'Stored features have different feature dimensions in shard - {filename} '
-                                 f'(Expected: {self._dim}, Got: {index.d}) '
-                                 '- this project is likely to be corrupt')
+                raise ValueError(
+                    f"Stored features have different feature dimensions in shard - {filename} "
+                    f"(Expected: {self._dim}, Got: {index.d}) "
+                    "- this project is likely to be corrupt"
+                )
 
             feature_ids = faiss.vector_to_array(index.id_map)
             for feature_id in feature_ids:
@@ -97,9 +101,13 @@ class FaissStore(FeatureStore):
         self._vector_id_to_shard_location = _vector_id_to_shard_location
 
         if self._dim is not None:
-            self._current_shard = faiss.IndexIDMap2(faiss.IndexFlatIP(self._dim))
+            self._current_shard = faiss.IndexIDMap2(
+                faiss.IndexFlatIP(self._dim)
+            )
 
-        logger.debug("FaissStore reset: count=%d, dim=%s", self._count, self._dim)
+        logger.debug(
+            "FaissStore reset: count=%d, dim=%s", self._count, self._dim
+        )
 
     def _get_current_filenames(self):
         pattern = f"{self._prefix}*.{self.EXTENSION}"
@@ -136,7 +144,9 @@ class FaissStore(FeatureStore):
 
         self.shard_maxcount = int(shard_maxcount)
 
-    def enable_read(self, shard_shuffle=False, shuffle_values=False, shuffle_bufsize=10000):
+    def enable_read(
+        self, shard_shuffle=False, shuffle_values=False, shuffle_bufsize=10000
+    ):
         # TODO - handle shuffle parameters
         self.shard_shuffle = shard_shuffle
         self.shuffle_values = shuffle_values
@@ -183,14 +193,18 @@ class FaissStore(FeatureStore):
         if isinstance(_ids, int):
             return self.add([_ids], features)
 
-        if not (isinstance(_ids, list) and all(isinstance(i, int) for i in _ids)):
+        if not (
+            isinstance(_ids, list) and all(isinstance(i, int) for i in _ids)
+        ):
             raise ValueError("ID must be an integer or a list of integers")
 
         if len(_ids) == 0:
             raise ValueError("ID list cannot be empty")
 
         if len(features.shape) != 2:
-            raise ValueError(f"Features must be a 2D array (Got: {features.shape})")
+            raise ValueError(
+                f"Features must be a 2D array (Got: {features.shape})"
+            )
 
         if features.shape[0] != len(_ids):
             raise ValueError(
@@ -200,14 +214,19 @@ class FaissStore(FeatureStore):
         # Add features to the Faiss index
         if self.feature_dim is None:
             self._dim = features.shape[1]
-            self._current_shard = faiss.IndexIDMap2(faiss.IndexFlatIP(self._dim))
+            self._current_shard = faiss.IndexIDMap2(
+                faiss.IndexFlatIP(self._dim)
+            )
 
         if features.shape[1] != self.feature_dim:
             raise ValueError(
                 f"Feature dimension mismatch (Expected: {self.feature_dim}, Got: {features.shape[1]})"
             )
 
-        if self._current_shard.ntotal + features.shape[0] <= self.shard_maxcount:
+        if (
+            self._current_shard.ntotal + features.shape[0]
+            <= self.shard_maxcount
+        ):
             ids_array = np.array(_ids, dtype=np.int64)
             self._current_shard.add_with_ids(features, ids_array)
             # Update vector ID to shard location mapping
@@ -228,7 +247,7 @@ class FaissStore(FeatureStore):
         for feature_ids, features in self.iter_batch():
             yield from zip(feature_ids, np.vsplit(features, features.shape[0]))
 
-    def iter_batch(self, batch_size = 512):
+    def iter_batch(self, batch_size=512):
         # Iterate over the Faiss index in batches
         _filelist = self.filenames.copy()
 
@@ -268,7 +287,7 @@ class FaissStore(FeatureStore):
                 feature_vector = self._current_shard.reconstruct(id)
                 return feature_vector
             except:
-                raise KeyError(f'Feature ID {id} not found in the store')
+                raise KeyError(f"Feature ID {id} not found in the store")
 
         filename = self._vector_id_to_shard_location[id]
 

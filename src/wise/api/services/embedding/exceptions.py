@@ -14,11 +14,14 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
+
 class ModalityNotSupportedError(Exception):
     pass
 
+
 class FeatureExtractorNotFoundError(Exception):
     pass
+
 
 class NoFeaturesFoundError(Exception):
     pass

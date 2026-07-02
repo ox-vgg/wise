@@ -21,8 +21,8 @@ import os
 from fastapi import APIRouter, File, Form
 from fastapi.responses import PlainTextResponse
 
-
 router = APIRouter()
+
 
 @router.post("/report")
 def report_image(
@@ -66,4 +66,6 @@ def report_image(
             }
         )
 
-    return PlainTextResponse(status_code=200, content="Image has been reported")
+    return PlainTextResponse(
+        status_code=200, content="Image has been reported"
+    )

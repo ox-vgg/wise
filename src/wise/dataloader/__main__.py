@@ -33,7 +33,6 @@ from wise.dataloader._extra import (
 from wise.dataloader.dataset import get_dataset, get_metadata_for_valid_files
 from wise.dataloader.utils import get_files_from_directory_with_extensions
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -70,10 +69,12 @@ if __name__ == "__main__":
             help="Path to input folder of media files",
         ),
         media_include: list[str] = typer.Option(
-            default=["*"], help="regular expression to include certain media files"
+            default=["*"],
+            help="regular expression to include certain media files",
         ),
         model: Optional[CLIPModel] = typer.Option(
-            "ViT-B-32:openai", help="Pass in a open_clip model string (or) internvideo"
+            "ViT-B-32:openai",
+            help="Pass in a open_clip model string (or) internvideo",
         ),
         thumbnails: bool = typer.Option(
             True, help="Flag to control thumbnail extraction"
@@ -137,7 +138,9 @@ if __name__ == "__main__":
         # Get metadata to write into the media table
         input_files = list(
             itertools.chain.from_iterable(
-                get_files_from_directory_with_extensions(media_dir, media_include)
+                get_files_from_directory_with_extensions(
+                    media_dir, media_include
+                )
                 for media_dir in media_dir_list
             )
         )
@@ -170,7 +173,10 @@ if __name__ == "__main__":
                                         (
                                             f"List length: {len(chunk[model].tensor)} | Shapes: {[t.shape for t in chunk[feature_extractor_id].tensor]}"
                                             if isinstance(
-                                                chunk[feature_extractor_id].tensor, list
+                                                chunk[
+                                                    feature_extractor_id
+                                                ].tensor,
+                                                list,
                                             )
                                             else chunk[
                                                 feature_extractor_id

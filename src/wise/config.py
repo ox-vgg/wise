@@ -50,12 +50,14 @@ class APIConfig(BaseSettings):
         yaml_file="wise_config.yaml", env_file_encoding="utf-8"
     )
     project_dir: Path
-    command: Literal['serve', 'create_index', 'extract_features', 'search']
+    command: Literal["serve", "create_index", "extract_features", "search"]
 
-    mode: Literal['production', 'development'] = 'production'
+    mode: Literal["production", "development"] = "production"
     listen_address: str = "0.0.0.0"
     port: int = 9670
-    max_search_results: int = 1000  # Higher values increase latency, memory use, and payload size.
+    max_search_results: int = (
+        1000  # Higher values increase latency, memory use, and payload size.
+    )
     precision: int = 3
     query_prefix: str = "This is a photo of a"
     text_queries_weight: float = 2.0
@@ -100,7 +102,13 @@ class APIConfig(BaseSettings):
 
     # define the order in which search targets (or feature_extractor_id) are listed
     # this order is used by the frontend to display the search targets in the UI
-    search_target_order: list[str] = ["open_clip", "insightface", "owlv2", "clap", "wise/metadata"]
+    search_target_order: list[str] = [
+        "open_clip",
+        "insightface",
+        "owlv2",
+        "clap",
+        "wise/metadata",
+    ]
 
     # enable profiling for development mode
     enable_profiling: bool = False
@@ -152,23 +160,25 @@ class APIConfig(BaseSettings):
     # Set to None to disable, higher values may improve recall at the cost of latency.
     face_text_search_nprobe_target: Optional[int] = 4096
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_feature_extractor_config(self) -> Self:
-        if 'default' not in self.feature_extractor_config:
-            self.feature_extractor_config['default'] = {}
+        if "default" not in self.feature_extractor_config:
+            self.feature_extractor_config["default"] = {}
 
-        if 'warmup' not in self.feature_extractor_config['default']:
-            if self.command == 'serve':
+        if "warmup" not in self.feature_extractor_config["default"]:
+            if self.command == "serve":
                 # warmup in serve when not in development mode
-                self.feature_extractor_config['default']['warmup'] = self.mode != 'development'
+                self.feature_extractor_config["default"]["warmup"] = (
+                    self.mode != "development"
+                )
 
-            elif self.command == 'extract_features':
+            elif self.command == "extract_features":
                 # warmup in extract_features always
-                self.feature_extractor_config['default']['warmup'] = True
+                self.feature_extractor_config["default"]["warmup"] = True
 
             else:
                 # default to False if not set
-                self.feature_extractor_config['default']['warmup'] = False
+                self.feature_extractor_config["default"]["warmup"] = False
 
         return self
 

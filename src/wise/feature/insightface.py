@@ -27,7 +27,6 @@ import PIL.Image
 import sqlalchemy as sa
 import torch
 
-
 ## Importing InsightFace requires some care:
 ##
 ##   1. The Python package has an undeclared dependency on onnxruntime
@@ -58,6 +57,7 @@ os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"  # disable check for version
 import cv2  # import before onnxruntime
 import onnxruntime  # import before insightface for cleaner error
 import insightface.app
+
 # isort: on
 
 from wise.db import prepare_filter_stmt, project_metadata_obj
@@ -68,7 +68,6 @@ from wise.feature.feature_extractor import (
     Features,
     MultiModalModel,
 )
-
 
 _logger = logging.getLogger(__name__)
 
@@ -97,8 +96,10 @@ def pil_img_list_to_nhwc_tensor(images: list[PIL.Image.Image]) -> torch.Tensor:
     if len(images) == 0:
         return torch.empty([0, 1024, 768, 3])
 
-    assert len({x.size for x in images}) in [0, 1], \
-        "multiple PIL images of different sizes"
+    assert len({x.size for x in images}) in [
+        0,
+        1,
+    ], "multiple PIL images of different sizes"
     return torch.stack([rgb_pil_to_bgr_hwc_tensor(x) for x in images])
 
 
@@ -127,7 +128,7 @@ class FaceInferenceResponse:
                 det_score=score.item(),
                 bbox=box,
                 age=age.item(),
-                gender=int(is_male)
+                gender=int(is_male),
             )
             metadata.append(_face)
         return metadata
@@ -143,7 +144,11 @@ class FaceInferenceResponse:
         age = outputs["age"].cpu().numpy()
         is_male = outputs["is_male"].cpu().numpy()
         return cls(
-            embeddings=embeddings, scores=scores, boxes=boxes, age=age, is_male=is_male
+            embeddings=embeddings,
+            scores=scores,
+            boxes=boxes,
+            age=age,
+            is_male=is_male,
         )
 
 
@@ -187,7 +192,7 @@ class FaceFeatureMetadata(FeatureExtMetadata):
     def to_sql_values(self, vector_id: int):
         return {
             "vector_id": vector_id,
-            "detection_score" : self.detection_score,
+            "detection_score": self.detection_score,
             "bbox_x": self.bbox.x,
             "bbox_y": self.bbox.y,
             "bbox_w": self.bbox.w,
@@ -255,7 +260,7 @@ class InsightFaceModel(MultiModalModel):
             with contextlib.redirect_stdout(devnull):
                 _logger.info(
                     "Trying first with a model named '%s'",
-                    insightface_model_id
+                    insightface_model_id,
                 )
                 try:
                     _app = get_app(insightface_model_id)
@@ -263,13 +268,13 @@ class InsightFaceModel(MultiModalModel):
                     _logger.info(
                         "model '%s' failed; trying '%s' from huggingface_hub",
                         insightface_model_id,
-                        huggingface_hub_model_id
+                        huggingface_hub_model_id,
                     )
                     huggingface_hub.snapshot_download(
                         huggingface_hub_model_id,
                         local_dir=os.path.join(
                             _default_insightface_models_dir(),
-                            huggingface_hub_model_id
+                            huggingface_hub_model_id,
                         ),
                     )
                     _app = get_app(huggingface_hub_model_id)
@@ -300,8 +305,13 @@ class InsightFaceModel(MultiModalModel):
         """
         Returns the size of the embedding vector for the recognition model.
         """
-        recognition_outputs = self.model.models["recognition"].session.get_outputs()[0]
-        assert len(recognition_outputs.shape) == 2 and recognition_outputs.shape[0] == 1
+        recognition_outputs = self.model.models[
+            "recognition"
+        ].session.get_outputs()[0]
+        assert (
+            len(recognition_outputs.shape) == 2
+            and recognition_outputs.shape[0] == 1
+        )
         assert recognition_outputs.type == "tensor(float)"
         return recognition_outputs.shape[-1]
 
@@ -309,7 +319,9 @@ class InsightFaceModel(MultiModalModel):
     def get_image_features(self, **kwargs):
         image = kwargs.get("image", None)
         if not isinstance(image, torch.Tensor):
-            raise ValueError("Image input is required for image feature extraction.")
+            raise ValueError(
+                "Image input is required for image feature extraction."
+            )
         faces = self.model.get(image.numpy())
         n_faces = len(faces)
 
@@ -324,7 +336,9 @@ class InsightFaceModel(MultiModalModel):
                 "is_male": torch.empty((n_faces,), dtype=torch.bool),
             }
 
-        embeddings = np.stack([face.normed_embedding for face in faces], axis=0)
+        embeddings = np.stack(
+            [face.normed_embedding for face in faces], axis=0
+        )
         scores = np.array([face.det_score for face in faces], dtype=np.float32)
         boxes = np.array([face.bbox for face in faces], dtype=np.float32)
         age = np.array([face.age for face in faces], dtype=np.int32)
@@ -430,7 +444,10 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
     @classmethod
     def add_to_vector_metadata_table(
-        cls, conn:sa.Connection, vid: list[int], metadata: list[FaceFeatureMetadata]
+        cls,
+        conn: sa.Connection,
+        vid: list[int],
+        metadata: list[FaceFeatureMetadata],
     ) -> None:
         ## This condition is needed because insert with an empty list
         ## does an insert with NULLs instead of "nothing".  See
@@ -456,7 +473,9 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
                 c.is_male,
             )
             .select_from(
-                cte.join(cls._vector_metadata_table, c.vector_id == cte.c.vector_id)
+                cte.join(
+                    cls._vector_metadata_table, c.vector_id == cte.c.vector_id
+                )
             )
             .order_by(cte.c.rank)
         )
@@ -496,7 +515,9 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
                 raise Exception("expect list of PIL images to be in RGB mode")
             return pil_img_list_to_nhwc_tensor(images)
         else:
-            raise Exception("unexpected input images of type %s" % type(images))
+            raise Exception(
+                "unexpected input images of type %s" % type(images)
+            )
 
     @cached_property
     def model(self) -> InsightFaceModel:
@@ -540,7 +561,6 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
 
         return features
 
-
     def preprocess_image_region(
         self, image: torch.Tensor | PIL.Image.Image, region: BBoxXYWH
     ) -> torch.Tensor:
@@ -551,9 +571,10 @@ class InsightFaceFeatureExtractor(FeatureExtractor):
     ) -> Features:
         return self._extract_image_region_features_highest_iou(image, region)
 
-
     def warmup(self):
         random_image = torch.rand((1, 3, 768, 1024))
-        features = self.extract_image_features(self.preprocess_image(random_image))
+        features = self.extract_image_features(
+            self.preprocess_image(random_image)
+        )
         assert features[0].vectors.shape[1] == 512
         return

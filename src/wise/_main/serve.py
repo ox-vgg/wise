@@ -57,7 +57,7 @@ def main(argv: list[str]):
         type=str,
         default=None,
         choices=IndexType.__members__.keys(),
-        help="The faiss index to use for serving"
+        help="The faiss index to use for serving",
     )
     parser.add_argument(
         "--proxy-root-path",
@@ -74,7 +74,7 @@ def main(argv: list[str]):
     args = parser.parse_args(argv[1:])
 
     # ensure that the frontend assets are built
-    if not (args.theme_asset_dir / 'index.html').exists():
+    if not (args.theme_asset_dir / "index.html").exists():
         raise FileNotFoundError(
             f"Frontend assets not found at {args.theme_asset_dir}. "
             "Please build the frontend assets using `npm install && npm run build`."
