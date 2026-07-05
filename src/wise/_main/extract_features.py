@@ -19,6 +19,7 @@ import logging
 import os
 import pprint
 import time
+from enum import Enum
 from pathlib import Path
 
 import numpy as np
@@ -47,7 +48,6 @@ from wise.dataloader import (
 from wise.dataloader.dataset import MediaChunk
 from wise.dataloader.shot import ShotStream
 from wise.dataloader.utils import get_files_from_directory_with_extensions
-from wise.enums import BaseStrEnum
 from wise.feature.feature_extractor import FeatureExtractor
 from wise.feature.feature_extractor_factory import (
     FeatureExtractorFactory,
@@ -73,7 +73,7 @@ from wise.wise_project import WiseProject
 logger = logging.getLogger(__name__)
 
 
-class ExtractFeatureMode(BaseStrEnum):
+class ExtractFeatureMode(Enum):
     create = "create"
     add_feature_extractor = "add_feature_extractor"
     add_media = "add_media"
@@ -536,7 +536,7 @@ def get_feature_extractor_ids(
 
     feature_extractor_ids = get_feature_extractor_ids_from_args(args)
 
-    if mode == ExtractFeatureMode.create:
+    if mode is ExtractFeatureMode.create:
         return feature_extractor_ids
 
     project_feature_extractor_ids = get_feature_extractor_ids_from_project(
@@ -574,7 +574,7 @@ def get_feature_extractor_ids(
         if len(feature_extractor_ids[modality_type]) == 0:
             del feature_extractor_ids[modality_type]
 
-    if mode == ExtractFeatureMode.add_media:
+    if mode is ExtractFeatureMode.add_media:
         if len(feature_extractor_ids) > 0:
             logger.warning(
                 "A project can only be updated with new media files using the existing feature extractors in the project. Ignoring the following feature extractor ids.\n"
@@ -596,7 +596,7 @@ def get_media_files_for_dataset(
     """Initialise internal metadata database with valid files."""
     logger.info("Initialising internal metadata database")
     all_metadata: list[DatasetPayload] = []
-    if mode == ExtractFeatureMode.add_feature_extractor:
+    if mode is ExtractFeatureMode.add_feature_extractor:
         metadata = project.get_media_files()
         all_metadata.extend(metadata)
     else:
@@ -784,13 +784,13 @@ def main(argv: list[str]):
 
     # Check if an update of an existing project is requested
     mode = get_mode(args)
-    if mode != ExtractFeatureMode.create:
+    if mode is not ExtractFeatureMode.create:
         if not args.yes:
             answer = input(f"Do you want to update it? [y/N]: ")
             if answer.lower() != "y":
                 logger.info("Aborting...")
                 exit(1)
-        if mode == ExtractFeatureMode.add_media:
+        if mode is ExtractFeatureMode.add_media:
             logger.info(
                 "Updating existing project '%s' with new media files ...",
                 args.project_dir,
@@ -820,7 +820,7 @@ def main(argv: list[str]):
     # Feature extractor ids can be empty in add_feautre_extractor case if the user provided feature extractor ids that already exist in the project
     if (
         len(feature_extractor_ids) == 0
-        and mode == ExtractFeatureMode.add_feature_extractor
+        and mode is ExtractFeatureMode.add_feature_extractor
     ):
         logger.info("No new feature extractors specified. Nothing to do.")
         exit(0)
@@ -855,7 +855,7 @@ def main(argv: list[str]):
         feature_extractor_ids.pop(ModalityType.AUDIO, None)
 
     if len(feature_extractor_ids) == 0:
-        if mode == ExtractFeatureMode.add_feature_extractor:
+        if mode is ExtractFeatureMode.add_feature_extractor:
             logger.info("No new feature extractors specified. Nothing to do.")
         else:
             logger.info(
