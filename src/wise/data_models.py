@@ -22,7 +22,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, dataclasses
 
 
-class SourceCollectionType(str, Enum):
+class SourceCollectionType(Enum):
     DIR = "dir"
     WEBDATASET = "webdataset"
 
@@ -45,7 +45,7 @@ class SourceCollection(BaseModel):
     id: Optional[int] = None
     location: str
     type: SourceCollectionType
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MediaMetadata(BaseModel):

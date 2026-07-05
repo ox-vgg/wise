@@ -182,7 +182,7 @@ def get_media_file(
 
             # Look up the source_collections table and find the location and type
             # Handle case where we read the media file from disk, but it may not be there
-            if metadata.source_collection.type == SourceCollectionType.DIR:
+            if metadata.source_collection.type is SourceCollectionType.DIR:
                 # metadata.source_uri will be None, so we have to search for it on disk
                 if file_path.is_file():
                     return FileResponse(
