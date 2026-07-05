@@ -14,7 +14,8 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from typing import Any, Generic, Optional, Type, TypeVar
+import builtins
+from typing import Any, Generic, Iterable, Optional, Type, TypeVar
 
 import sqlalchemy as sa
 from pydantic import BaseModel
@@ -141,11 +142,20 @@ class SQLAlchemyRepository(Generic[Entity, EntityCreate, EntityUpdate]):
         ).scalar()
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
-        result = conn.execute(
+        return self.create_many(conn, data=[data])[0]
+
+    def create_many(
+        self, conn: sa.Connection, *, data: Iterable[EntityCreate]
+    ) -> builtins.list[Entity]:  # builtins avoids clash with list method
+        rows = conn.execute(
             sa.insert(self._table).returning(self._table.columns),
-            [data.model_dump()],
+            [x.model_dump() for x in data],
         )
-        return self.model.model_validate(next(result), from_attributes=True)
+        objs = [
+            self.model.model_validate(x, from_attributes=True) for x in rows
+        ]
+        assert len(data) == len(objs)
+        return objs
 
     # TODO: Need to be careful with update since we can also re-assign the id key
     # 1. Could remove the id key and check, but how do we find the name of the id column?
