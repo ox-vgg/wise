@@ -18,7 +18,7 @@ import itertools
 import logging
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Any, Literal, Optional, overload
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 import torch
@@ -602,101 +602,10 @@ def get_metadata_for_valid_files(paths: list[Path]):
     return media_metadata, unknown_files
 
 
-@overload
-def _get_dataset(
-    input_files: list[str] | dict[str, str],
-    media_type: Literal[MediaType.AV],
-    *,
-    video_frames_per_chunk: int,
-    audio_samples_per_chunk: int,
-    video_frame_rate: int | None = None,
-    audio_sampling_rate: int | None = None,
-    video_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    audio_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    image_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    offset: float | None,
-    thumbnails: bool = True,
-) -> MediaDataset: ...
-
-
-@overload
-def _get_dataset(
-    input_files: list[str] | dict[str, str],
-    media_type: Literal[MediaType.VIDEO],
-    *,
-    video_frames_per_chunk: int,
-    audio_samples_per_chunk: int = -1,
-    video_frame_rate: int | None = None,
-    audio_sampling_rate: int | None = None,
-    video_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    audio_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    image_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    offset: float | None,
-    thumbnails: bool = True,
-) -> MediaDataset: ...
-
-
-@overload
-def _get_dataset(
-    input_files: list[str] | dict[str, str],
-    media_type: Literal[MediaType.AUDIO],
-    *,
-    audio_samples_per_chunk: int,
-    video_frames_per_chunk: int = -1,
-    video_frame_rate: int | None = None,
-    audio_sampling_rate: int | None = None,
-    video_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    audio_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    image_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    offset: float | None,
-    thumbnails: bool = True,
-) -> MediaDataset: ...
-
-
-@overload
-def _get_dataset(
-    input_files: list[str] | dict[str, str],
-    media_type: Literal[MediaType.IMAGE],
-    *,
-    audio_samples_per_chunk: int = -1,
-    video_frames_per_chunk: int = -1,
-    video_frame_rate: int | None = None,
-    audio_sampling_rate: int | None = None,
-    video_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    audio_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    image_preprocessing_function: (
-        Callable[[torch.Tensor], torch.Tensor] | None
-    ) = None,
-    offset: float | None,
-    thumbnails: bool = True,
-) -> MediaDataset: ...
-
-
 def _get_dataset(
     input_files: list[str] | dict[str, str],
     media_type: MediaType,
+    *,
     video_frames_per_chunk: int,
     audio_samples_per_chunk: int,
     video_frame_rate: int | None = None,
@@ -712,7 +621,7 @@ def _get_dataset(
     ) = None,
     offset: float | None = None,
     thumbnails: bool = True,
-):
+) -> MediaDataset:
     if media_type == MediaType.AV:
         if video_frames_per_chunk <= 0 and audio_samples_per_chunk <= 0:
             logger.warning(
