@@ -15,26 +15,26 @@
 ## limitations under the License.
 
 import datetime
-import enum
+from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, dataclasses
 
 
-class SourceCollectionType(str, enum.Enum):
+class SourceCollectionType(str, Enum):
     DIR = "dir"
     WEBDATASET = "webdataset"
 
 
-class MediaType(str, enum.Enum):
+class MediaType(str, Enum):
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
     AV = "av"
 
 
-class ModalityType(str, enum.Enum):
+class ModalityType(str, Enum):
     TEXT = "text"
     IMAGE = "image"
     VIDEO = "video"
@@ -144,7 +144,7 @@ class VideoShot(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MediaChunkType(str, enum.Enum):
+class MediaChunkType(str, Enum):
     AUDIO = "audio"
     VIDEO = "video"
     THUMBNAILS = "thumbnails"
