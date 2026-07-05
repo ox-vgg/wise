@@ -27,7 +27,7 @@ import torchvision as tv
 from pydantic import ConfigDict, dataclasses
 from tqdm import tqdm
 
-from wise.data_models import DatasetPayload, MediaChunkType, SourceMediaType
+from wise.data_models import DatasetPayload, MediaChunkType, MediaType
 from wise.dataloader.streamreader import (
     BasicAudioStreamOutputOptions,
     BasicImageStreamOutputOptions,
@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 class MediaMetadata(object):
     path: str
     md5sum: str
-    media_type: SourceMediaType
+    media_type: MediaType
     format: str
     width: int
     height: int
@@ -103,7 +103,7 @@ def get_media_metadata(
     # fps, duration, width, height, channels, sample_rate, extra
 
     # Must be one of image, audio-only, video-only or av
-    if media_type == SourceMediaType.IMAGE:
+    if media_type == MediaType.IMAGE:
         # image
         # TODO check for iptc, exif and other metadata
         return MediaMetadata(
@@ -118,7 +118,7 @@ def get_media_metadata(
             fps=None,
             extra={},
         )
-    elif media_type == SourceMediaType.VIDEO:
+    elif media_type == MediaType.VIDEO:
         # video
         duration = get_stream_duration(video_stream_info)
 
@@ -134,7 +134,7 @@ def get_media_metadata(
             fps=video_stream_info.frame_rate,
             extra={},
         )
-    elif media_type == SourceMediaType.AUDIO:
+    elif media_type == MediaType.AUDIO:
         # Audio-only
         duration = get_stream_duration(audio_stream_info)
         return MediaMetadata(
@@ -152,7 +152,7 @@ def get_media_metadata(
                 "sample_rate": audio_stream_info.sample_rate,
             },
         )
-    elif media_type == SourceMediaType.AV:
+    elif media_type == MediaType.AV:
         # Both are present, classify it as video
         duration = get_stream_duration(video_stream_info)
         return MediaMetadata(
@@ -605,7 +605,7 @@ def get_metadata_for_valid_files(paths: list[Path]):
 @overload
 def _get_dataset(
     input_files: list[str] | dict[str, str],
-    media_type: Literal[SourceMediaType.AV],
+    media_type: Literal[MediaType.AV],
     *,
     video_frames_per_chunk: int,
     audio_samples_per_chunk: int,
@@ -628,7 +628,7 @@ def _get_dataset(
 @overload
 def _get_dataset(
     input_files: list[str] | dict[str, str],
-    media_type: Literal[SourceMediaType.VIDEO],
+    media_type: Literal[MediaType.VIDEO],
     *,
     video_frames_per_chunk: int,
     audio_samples_per_chunk: int = -1,
@@ -651,7 +651,7 @@ def _get_dataset(
 @overload
 def _get_dataset(
     input_files: list[str] | dict[str, str],
-    media_type: Literal[SourceMediaType.AUDIO],
+    media_type: Literal[MediaType.AUDIO],
     *,
     audio_samples_per_chunk: int,
     video_frames_per_chunk: int = -1,
@@ -674,7 +674,7 @@ def _get_dataset(
 @overload
 def _get_dataset(
     input_files: list[str] | dict[str, str],
-    media_type: Literal[SourceMediaType.IMAGE],
+    media_type: Literal[MediaType.IMAGE],
     *,
     audio_samples_per_chunk: int = -1,
     video_frames_per_chunk: int = -1,
@@ -696,7 +696,7 @@ def _get_dataset(
 
 def _get_dataset(
     input_files: list[str] | dict[str, str],
-    media_type: SourceMediaType,
+    media_type: MediaType,
     video_frames_per_chunk: int,
     audio_samples_per_chunk: int,
     video_frame_rate: int | None = None,
@@ -713,7 +713,7 @@ def _get_dataset(
     offset: float | None = None,
     thumbnails: bool = True,
 ):
-    if media_type == SourceMediaType.AV:
+    if media_type == MediaType.AV:
         if video_frames_per_chunk <= 0 and audio_samples_per_chunk <= 0:
             logger.warning(
                 "Both video_frames_per_chunk and audio_samples_per_chunk are <= 0, skipping video files"
@@ -730,7 +730,7 @@ def _get_dataset(
             offset=offset,
             thumbnails=thumbnails,
         )
-    elif media_type == SourceMediaType.VIDEO:
+    elif media_type == MediaType.VIDEO:
         if video_frames_per_chunk <= 0:
             logger.warning(
                 "video_frames_per_chunk is <= 0, skipping video-only files"
@@ -744,7 +744,7 @@ def _get_dataset(
             offset=offset,
             thumbnails=thumbnails,
         )
-    elif media_type == SourceMediaType.AUDIO:
+    elif media_type == MediaType.AUDIO:
         if audio_samples_per_chunk <= 0:
             logger.warning(
                 "audio_samples_per_chunk is <= 0, skipping audio-only files"
@@ -757,7 +757,7 @@ def _get_dataset(
             preprocessing_function=audio_preprocessing_function_map,
             offset=offset,
         )
-    elif media_type == SourceMediaType.IMAGE:
+    elif media_type == MediaType.IMAGE:
         stream = ImageDataset(
             input_files,
             preprocessing_function=image_preprocessing_function_map,

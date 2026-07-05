@@ -23,7 +23,7 @@ from typing import Literal, Optional, TypeVar
 from pydantic import dataclasses
 from torchaudio.io import StreamReader
 
-from wise.data_models import MediaChunkType, SourceMediaType
+from wise.data_models import MediaChunkType, MediaType
 from wise.dataloader.utils import MediaMimetype
 
 logger = logging.getLogger(__name__)
@@ -271,7 +271,7 @@ def get_media_type(
     video_stream_info,
     audio_stream_info,
     media_type_from_mimetype: MediaMimetype,
-) -> SourceMediaType:
+) -> MediaType:
     """
     Based on the default video / audio stream info, infer whether the source file is either
         - IMAGE
@@ -289,10 +289,10 @@ def get_media_type(
         if media_type_from_mimetype == MediaMimetype.image:
             # image
             # TODO check for iptc, exif and other metadata
-            return SourceMediaType.IMAGE
+            return MediaType.IMAGE
         else:
-            return SourceMediaType.VIDEO
+            return MediaType.VIDEO
     elif video_stream_info is None:
-        return SourceMediaType.AUDIO
+        return MediaType.AUDIO
     else:
-        return SourceMediaType.AV
+        return MediaType.AV

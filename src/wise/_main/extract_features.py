@@ -36,7 +36,6 @@ from wise.data_models import (
     ModalityType,
     SourceCollection,
     SourceCollectionType,
-    SourceMediaType,
     ThumbnailMetadata,
     VectorMetadata,
 )
@@ -295,7 +294,7 @@ def get_dataset_stream(
         video_files: dict[str, str] = {
             x.id: x.path
             for x in all_metadata
-            if x.media_type in (SourceMediaType.VIDEO, SourceMediaType.AV)
+            if x.media_type in (MediaType.VIDEO, MediaType.AV)
         }
 
         # Derive segment params from the first segment-level video extractor id
@@ -834,23 +833,23 @@ def main(argv: list[str]):
         exit(0)
 
     # Get the set of media types present in the input media files
-    media_types_present: set[SourceMediaType] = set(
+    media_types_present: set[MediaType] = set(
         x.media_type for x in all_metadata
     )
 
     # Remove feature extractor ids for modalities that are not present in the input media files
     if (
-        SourceMediaType.VIDEO not in media_types_present
-        and SourceMediaType.AV not in media_types_present
+        MediaType.VIDEO not in media_types_present
+        and MediaType.AV not in media_types_present
     ):
         feature_extractor_ids.pop(ModalityType.VIDEO, None)
 
-    if SourceMediaType.IMAGE not in media_types_present:
+    if MediaType.IMAGE not in media_types_present:
         feature_extractor_ids.pop(ModalityType.IMAGE, None)
 
     if (
-        SourceMediaType.AUDIO not in media_types_present
-        and SourceMediaType.AV not in media_types_present
+        MediaType.AUDIO not in media_types_present
+        and MediaType.AV not in media_types_present
     ):
         feature_extractor_ids.pop(ModalityType.AUDIO, None)
 

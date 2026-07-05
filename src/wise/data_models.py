@@ -144,13 +144,6 @@ class VideoShot(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class SourceMediaType(str, enum.Enum):
-    AUDIO = "audio"
-    VIDEO = "video"
-    IMAGE = "image"
-    AV = "av"
-
-
 class MediaChunkType(str, enum.Enum):
     AUDIO = "audio"
     VIDEO = "video"
@@ -162,4 +155,4 @@ class MediaChunkType(str, enum.Enum):
 class DatasetPayload(object):
     id: Any
     path: str
-    media_type: SourceMediaType
+    media_type: MediaType
