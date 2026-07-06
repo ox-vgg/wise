@@ -188,18 +188,20 @@ class WiseProject:
         Return the SQLAlchemy URI for the thumbnails database.
 
         """
+        dbpath = (self.project_dir / "thumbs.db").absolute()
         if self.read_only:
-            return f"{DB_SCHEME}/file:{self.project_dir.absolute()}/thumbs.db?mode=ro&uri=true"
-        return f"{DB_SCHEME}/{self.project_dir.absolute()}/thumbs.db"
+            return f"{DB_SCHEME}/{dbpath.as_uri()}?mode=ro&uri=true"
+        return f"{DB_SCHEME}/{dbpath.as_uri()}"
 
     @property
     def dburi(self) -> str:
         """
         Return the SQLAlchemy URI for the main project database.
         """
+        dbpath = (self.metadata_dir / "internal.db").absolute()
         if self.read_only:
-            return f"{DB_SCHEME}/file:{self.metadata_dir.absolute()}/internal.db?mode=ro&uri=true"
-        return f"{DB_SCHEME}/{self.metadata_dir.absolute()}/internal.db"
+            return f"{DB_SCHEME}/{dbpath.as_uri()}?mode=ro&uri=true"
+        return f"{DB_SCHEME}/{dbpath.as_uri()}"
 
     @cached_property
     def db_engine(self):
