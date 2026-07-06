@@ -66,8 +66,8 @@ class MediaMetadata(object):
 
 def get_media_metadata(
     url: str,
-    media_type_from_mimetype: MediaMimetype = None,
-    mimetype: str = None,
+    media_type_from_mimetype: Optional[MediaMimetype] = None,
+    mimetype: Optional[str] = None,
 ):
     # TODO: Update the code to handle remote path
     # Only md5sum will be a problem.
@@ -617,7 +617,7 @@ def _get_dataset(
     ) = None,
     offset: float | None = None,
     thumbnails: bool = True,
-) -> MediaDataset:
+) -> Optional[MediaDataset]:
     if media_type == MediaType.AV:
         if video_frames_per_chunk <= 0 and audio_samples_per_chunk <= 0:
             logger.warning(
