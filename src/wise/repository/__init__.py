@@ -37,7 +37,7 @@ MediaRepo = SQLAlchemyRepository[MediaMetadata, MediaMetadata, MediaMetadata](
 VectorRepo = SQLAlchemyRepository[
     VectorMetadata, VectorMetadata, VectorMetadata
 ](db.vectors_table, VectorMetadata)
-MediaMetadataRepo = SQLAlchemyRepository[
+ExtraMediaMetadataRepo = SQLAlchemyRepository[
     ExtraMediaMetadata, ExtraMediaMetadata, ExtraMediaMetadata
 ](db.imported_metadata_table, ExtraMediaMetadata)
 
