@@ -151,6 +151,9 @@ class WiseProject:
         self._media_dir = self._project_dir / "media"
         self._metadata_dir = self._project_dir / "metadata"
         self._read_only = read_only
+        self._db_kwargs = kwargs.get("db_kwargs", {})
+        self._thumbsdb_kwargs = kwargs.get("thumbsdb_kwargs", {})
+        self._search_indices = None
 
         if create_project and read_only:
             raise ValueError(
@@ -163,15 +166,13 @@ class WiseProject:
                 self.store_dir.mkdir(parents=True, exist_ok=True)
                 self.media_dir.mkdir(parents=True, exist_ok=True)
                 self._metadata_dir.mkdir(parents=True, exist_ok=True)
+                # and databases (access implicitly creates them)
+                _ = self.db_engine
+                _ = self.thumbsdb_engine
             else:
                 raise ValueError(
                     f"project folder {self._project_dir} does not exist"
                 )
-
-        self._db_kwargs = kwargs.get("db_kwargs", {})
-        self._thumbsdb_kwargs = kwargs.get("thumbsdb_kwargs", {})
-
-        self._search_indices = None
 
     @property
     def name(self) -> str:

@@ -38,16 +38,9 @@ class TestWithEmptyProject(unittest.TestCase):
         ## subdirectories will not be created).
         self.project_dir = os.path.join(self.tmp_dir.name, "wise-test-project")
 
-        ## The database files must exist later during serve() which
-        ## will create another instance of WiseProject in readonly
-        ## mode.  So we "get" the db engines here to trigger the db
-        ## creation.  See https://gitlab.com/vgg/wise/wise/-/work_items/231
         project = WiseProject(
             self.project_dir, create_project=True, read_only=False
         )
-        _ = project.db_engine
-        _ = project.thumbsdb_engine
-
         self.api_config = APIConfig(
             project_dir=self.project_dir,
             command="serve",
