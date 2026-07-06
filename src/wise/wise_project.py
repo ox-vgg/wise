@@ -186,7 +186,8 @@ class WiseProject:
         ## XXX: We have been using "rwc" (implicitly) but maybe we
         ## should use "rw" and only "rwc" when create_project is true.
         mode = "ro" if self.read_only else "rwc"
-        return f"{DB_SCHEME}/{dbpath.absolute.as_uri()}?mode={mode}&uri=true"
+        return f"{DB_SCHEME}/{dbpath.absolute().as_uri()}?mode={mode}&uri=true"
+
 
     @property
     def thumbs_uri(self) -> str:
