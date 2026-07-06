@@ -163,8 +163,8 @@ class WiseProject:
         if not self._project_dir.exists():
             if create_project:
                 # create the root folders
-                self.store_dir.mkdir(parents=True, exist_ok=True)
-                self.media_dir.mkdir(parents=True, exist_ok=True)
+                self._store_dir.mkdir(parents=True, exist_ok=True)
+                self._media_dir.mkdir(parents=True, exist_ok=True)
                 self._metadata_dir.mkdir(parents=True, exist_ok=True)
                 # and databases (access implicitly creates them)
                 _ = self.db_engine
@@ -222,26 +222,14 @@ class WiseProject:
         return sa.inspect(self.db_engine)
 
     @property
-    def search_indices(self):
-        return self._search_indices
-
-    @property
     def fts_config_file(self) -> Path:
         return self._metadata_dir / "fts_config.json"
 
     def metadata_tablename(self, metadata_id: str) -> str:
         return "metadata-" + metadata_id
 
-    @property
-    def store_dir(self) -> Path:
-        return self._store_dir
-
-    @property
-    def media_dir(self) -> Path:
-        return self._media_dir
-
     def features_root(self, feature_extractor_id: str) -> Path:
-        return self.store_dir / feature_extractor_id
+        return self._store_dir / feature_extractor_id
 
     def features_dir(self, feature_extractor_id: str) -> Path:
         return self.features_root(feature_extractor_id) / "features"
@@ -334,9 +322,9 @@ class WiseProject:
         """
         self.assets = {}
         # 1. find all feature-extractor-id
-        for feature_dir in self.store_dir.glob("*/*/*/*/features/"):
+        for feature_dir in self._store_dir.glob("*/*/*/*/features/"):
             feature_extractor_id = str(
-                feature_dir.relative_to(self.store_dir).parent
+                feature_dir.relative_to(self._store_dir).parent
             )
             available_media_types = []
             for feature_data in feature_dir.glob("*.*"):
@@ -351,7 +339,7 @@ class WiseProject:
         # 2. locate all assets related to each feature-extractor-id
         for media_type in self.assets:
             for feature_extractor_id in self.assets[media_type]:
-                features_root = self.store_dir / feature_extractor_id
+                features_root = self._store_dir / feature_extractor_id
                 features_dir = features_root / "features"
                 self.assets[media_type][feature_extractor_id][
                     "features_root"
@@ -1087,8 +1075,8 @@ class WiseProject:
         `search_indices` is a dictionary of SearchIndex objects, where the key is the
         feature_extractor_id and value is a SearchIndex object
         """
-        if self.search_indices is not None:
-            return self.search_indices
+        if self._search_indices is not None:
+            return self._search_indices
 
         search_indices: dict[str, dict[str, SearchIndex]] = {}
         project_assets = self.discover_assets()
