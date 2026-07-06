@@ -64,7 +64,6 @@ class APIConfig(BaseSettings):
     negative_queries_weight: float = 0.2
     index_type: str = "IndexFlatIP"
     nprobe: int = 1024
-    project_dir: Path
     remote_projects: set[str] = set()
 
     # If you want to serve the media files from a different static file server,
