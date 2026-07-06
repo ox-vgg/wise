@@ -146,26 +146,26 @@ class WiseProject:
         read_only=False,
         **kwargs,
     ):
-        self.project_dir = Path(project_dir)
-        self._store_dir = self.project_dir / "store"
-        self._media_dir = self.project_dir / "media"
-        self.metadata_dir = self.project_dir / "metadata"
-        self.read_only = read_only
+        self._project_dir = Path(project_dir)
+        self._store_dir = self._project_dir / "store"
+        self._media_dir = self._project_dir / "media"
+        self._metadata_dir = self._project_dir / "metadata"
+        self._read_only = read_only
 
         if create_project and read_only:
             raise ValueError(
                 "options create_project and read_only are mutually exclusive"
             )
 
-        if not self.project_dir.exists():
+        if not self._project_dir.exists():
             if create_project:
                 # create the root folders
                 self.store_dir.mkdir(parents=True, exist_ok=True)
                 self.media_dir.mkdir(parents=True, exist_ok=True)
-                self.metadata_dir.mkdir(parents=True, exist_ok=True)
+                self._metadata_dir.mkdir(parents=True, exist_ok=True)
             else:
                 raise ValueError(
-                    f"project folder {self.project_dir} does not exist"
+                    f"project folder {self._project_dir} does not exist"
                 )
 
         self._db_kwargs = kwargs.get("db_kwargs", {})
@@ -179,14 +179,13 @@ class WiseProject:
         Return the project directory name.
 
         """
-        return self.project_dir.name
+        return self._project_dir.name
 
     def _dbpath_to_uri(self, dbpath: Path) -> str:
         ## XXX: We have been using "rwc" (implicitly) but maybe we
         ## should use "rw" and only "rwc" when create_project is true.
-        mode = "ro" if self.read_only else "rwc"
+        mode = "ro" if self._read_only else "rwc"
         return f"{DB_SCHEME}/{dbpath.absolute().as_uri()}?mode={mode}&uri=true"
-
 
     @property
     def thumbs_uri(self) -> str:
@@ -194,14 +193,14 @@ class WiseProject:
         Return the SQLAlchemy URI for the thumbnails database.
 
         """
-        return self._dbpath_to_uri(self.project_dir / "thumbs.db")
+        return self._dbpath_to_uri(self._project_dir / "thumbs.db")
 
     @property
     def dburi(self) -> str:
         """
         Return the SQLAlchemy URI for the main project database.
         """
-        return self._dbpath_to_uri(self.metadata_dir / "internal.db")
+        return self._dbpath_to_uri(self._metadata_dir / "internal.db")
 
     @cached_property
     def db_engine(self):
@@ -227,7 +226,7 @@ class WiseProject:
 
     @property
     def fts_config_file(self) -> Path:
-        return self.metadata_dir / "fts_config.json"
+        return self._metadata_dir / "fts_config.json"
 
     def metadata_tablename(self, metadata_id: str) -> str:
         return "metadata-" + metadata_id
@@ -389,8 +388,8 @@ class WiseProject:
 
         # 3. locate all assets related to metadata
         metadata_assets = {}
-        for metadata_db in self.metadata_dir.glob("*/*.sqlite"):
-            metadata_db_rel_path = metadata_db.relative_to(self.metadata_dir)
+        for metadata_db in self._metadata_dir.glob("*/*.sqlite"):
+            metadata_db_rel_path = metadata_db.relative_to(self._metadata_dir)
             assert (
                 len(metadata_db_rel_path.parts) == 2
             ), f"unexpected {metadata_db_rel_path}, should be of form FOLDER_NAME/DB_NAME"
@@ -1198,7 +1197,7 @@ class WiseProject:
                             " index by running `python -m wise create-index"
                             " --project-dir '%s' --media-type %s "
                             " --index-type %s --overwrite`",
-                            self.project_dir,
+                            self._project_dir,
                             media_type,
                             search_indices[media_type][
                                 feature_extractor_id
