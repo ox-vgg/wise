@@ -150,7 +150,6 @@ class WiseProject:
         self._store_dir = self.project_dir / "store"
         self._media_dir = self.project_dir / "media"
         self.metadata_dir = self.project_dir / "metadata"
-        self.media_type_list = ["image", "video", "audio"]
         self.read_only = read_only
 
         if create_project and read_only:
@@ -230,19 +229,6 @@ class WiseProject:
     def fts_config_file(self) -> Path:
         return self.metadata_dir / "fts_config.json"
 
-    def metadata_db_table(
-        self, metadata_id: str, extension=".sqlite"
-    ) -> tuple[Path, str]:
-        metadata_id_tok = metadata_id.split("/")
-        assert (
-            len(metadata_id_tok) == 3
-        ), 'metadata_id must be in "FOLDER_NAME/DB_NAME/TABLE_NAME" format'
-        metadata_db_dir = self.metadata_dir / metadata_id_tok[0]
-        metadata_db_dir.mkdir(parents=True, exist_ok=True)
-        metadata_db = metadata_db_dir / (metadata_id_tok[1] + extension)
-        metadata_table = metadata_id_tok[2]
-        return metadata_db, metadata_table
-
     def metadata_tablename(self, metadata_id: str) -> str:
         return "metadata-" + metadata_id
 
@@ -268,12 +254,6 @@ class WiseProject:
 
     def index_dir(self, feature_extractor_id: str) -> Path:
         return self.features_root(feature_extractor_id) / "index"
-
-    def create_index_dir(self, feature_extractor_id: str) -> Path:
-        index_store = self.features_root(feature_extractor_id) / "index"
-        if not index_store.exists():
-            index_store.mkdir(parents=True, exist_ok=True)
-        return index_store
 
     @property
     def supported_modality_types_and_features(
@@ -636,20 +616,6 @@ class WiseProject:
             )
             shot_scales = list(filter(None, shot_scales))
             return shot_scales
-
-    def num_thumbnails_for_media_id(self, media_id: int):
-        _thumbs_table = wise_db.thumbnails_table
-        with self.thumbsdb_engine.connect() as thumbs_conn:
-            num_thumbs = thumbs_conn.execute(
-                sa.select(sa.func.count(_thumbs_table.c.id)).where(
-                    _thumbs_table.c.media_id == media_id
-                )
-            ).scalar_one()
-
-            if num_thumbs == 0:
-                raise ValueError(f"no thumbnails for media id {media_id}")
-
-            return num_thumbs
 
     def thumbnail_size_for_media_id(self, media_id: int):
         # Assumes all thumbnails have the same size

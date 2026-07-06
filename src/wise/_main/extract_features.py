@@ -1092,7 +1092,7 @@ def main(argv: list[str]):
                             1 / video_frame_rate
                         )
                     # convert thumb tensor to jpeg
-                    thumbnail_metadata = ThumbnailRepo.create(
+                    _ = ThumbnailRepo.create(
                         thumbs_conn,
                         data=ThumbnailMetadata(
                             media_id=mid,

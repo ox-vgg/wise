@@ -93,45 +93,10 @@ class ThumbnailMetadata(BaseModel):
     content: bytes
 
 
-class Project(BaseModel):
-    id: str
-    version: Optional[int] = None
-    model_config = ConfigDict(from_attributes=True)
-
-
 class ExtraMediaMetadata(BaseModel):
     media_id: int
     external_id: Optional[str] = None
     metadata: dict[str, Any]  # TODO: narrow the type
-
-
-class ExploreFacet(BaseModel):
-    id: Optional[int] = None
-    name: str
-    feature_extractor_id: str
-    model_config = ConfigDict(from_attributes=True)
-
-
-class FacetMetadata(BaseModel):
-    id: Optional[int] = None
-    vector_id: int
-    facet_id: int
-    cluster_id: int
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ClusterMetadata(BaseModel):
-    id: Optional[int] = None
-    cluster_id: int
-    facet_id: int
-    facet_name: str
-    cluster_label: str
-    metadata_json: dict = {}
-    model_config = ConfigDict(from_attributes=True)
-
-
-class URL(str):
-    pass
 
 
 class VideoShot(BaseModel):

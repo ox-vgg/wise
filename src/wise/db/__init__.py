@@ -73,6 +73,7 @@ __wise_tables = [_WISE_FTS_TABLE, _WISE_ASR_TABLE]
 def before_cursor_execute(
     conn, cursor, statement, parameters, context, executemany
 ):
+    del cursor, parameters, context, executemany
     conn.info.setdefault("query_start_time", []).append(time.time())
     logger.info("Start Query: %s", statement)
 
@@ -80,6 +81,7 @@ def before_cursor_execute(
 def after_cursor_execute(
     conn, cursor, statement, parameters, context, executemany
 ):
+    del cursor, statement, parameters, context, executemany
     total = time.time() - conn.info["query_start_time"].pop(-1)
     logger.info("Query Complete!")
     logger.info("Total Time: %f", total)
@@ -87,6 +89,7 @@ def after_cursor_execute(
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
+    del connection_record
     if isinstance(dbapi_connection, SQLite3Connection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
