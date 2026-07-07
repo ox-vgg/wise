@@ -9,7 +9,7 @@ dependencies:
   - pip>=24
   - conda-forge::ffmpeg>=6,<7
   - libmagic
-  - sqlite
+  - sqlite>=3.35
   - blas
   - pip:
     - -r requirements.txt

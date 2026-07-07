@@ -69,6 +69,11 @@ _WISE_FTS_TABLE = "metadata_fts"
 _WISE_ASR_TABLE = "metadata-asr"
 __wise_tables = [_WISE_FTS_TABLE, _WISE_ASR_TABLE]
 
+## We require sqlite version 3.35.0 (released on 2021-03-12) because
+## that's when sqlite added support for the RETURNING clause on INSERT
+## (used in SQLAlchemyRepository.create).
+_SQLITE_VERSION_REQUIREMENT = (3, 35, 0)
+
 
 def before_cursor_execute(
     conn, cursor, statement, parameters, context, executemany
@@ -85,6 +90,24 @@ def after_cursor_execute(
     total = time.time() - conn.info["query_start_time"].pop(-1)
     logger.info("Query Complete!")
     logger.info("Total Time: %f", total)
+
+
+def check_sqlite_requirements(dbapi_connection, connection_record):
+    ## This is equivalent to `engine.dialect.server_version_info` but
+    ## we don't have the engine object here.
+    cursor = dbapi_connection.cursor()
+    res = cursor.execute("SELECT sqlite_version() AS version;")
+    driver_version = res.fetchone()[0]
+    logger.debug("Found sqlite driver version %s", driver_version)
+    driver_version_parts = [int(x) for x in driver_version.split(".")]
+    assert len(driver_version_parts) == 3
+    for req, ver in zip(_SQLITE_VERSION_REQUIREMENT, driver_version_parts):
+        if ver > req:
+            break
+        elif ver < req:
+            msg = "WISE requires sqlite %d.%d.%d or later"
+            logger.critical(msg, *_SQLITE_VERSION_REQUIREMENT)
+            raise Exception(msg % _SQLITE_VERSION_REQUIREMENT)
 
 
 @event.listens_for(Engine, "connect")
@@ -116,6 +139,7 @@ def _init(dburi: str, metadata_obj: MetaData, **kwargs) -> Engine:
     profile = kwargs.pop("profile", False)
 
     engine = create_engine(dburi, **kwargs)
+    event.listen(engine, "first_connect", check_sqlite_requirements)
     if profile:
         event.listen(engine, "before_cursor_execute", before_cursor_execute)
         event.listen(engine, "after_cursor_execute", after_cursor_execute)
