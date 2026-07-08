@@ -14,8 +14,6 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-from abc import ABC, abstractmethod
-from collections.abc import Iterable
 from typing import Any, Generic, Optional, Type, TypeVar
 
 import sqlalchemy as sa
@@ -30,35 +28,9 @@ class EntityNotFoundException(Exception):
     pass
 
 
-class Repository(ABC, Generic[Entity, EntityCreate, EntityUpdate]):
-    @abstractmethod
-    def get(self, conn: sa.Connection, id: Any) -> Optional[Entity]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def list(self, conn: sa.Connection) -> Iterable[Entity]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def create(self, conn: sa.Connection, *, data: EntityCreate):
-        raise NotImplementedError
-
-    @abstractmethod
-    def update(
-        self, conn: sa.Connection, id: Any, *, data: EntityUpdate
-    ) -> Entity:
-        raise NotImplementedError
-
-    @abstractmethod
-    def delete(self, conn: sa.Connection, id: Any) -> Entity:
-        raise NotImplementedError
-
-    @abstractmethod
-    def delete_all(self, conn: sa.Connection):
-        raise NotImplementedError
-
-
-class SQLAlchemyRepository(Repository[Entity, EntityCreate, EntityUpdate]):
+## XXX: Type parameter lists are only supported in Python 3.12.  When
+## we depend on python 3.12+, we can drop Generic.
+class SQLAlchemyRepository(Generic[Entity, EntityCreate, EntityUpdate]):
     def __init__(self, table: sa.Table, model: Type[Entity]):
         self._table = table
         self.model = model
