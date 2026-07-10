@@ -142,13 +142,10 @@ class SQLAlchemyRepository(Generic[Entity, EntityCreate, EntityUpdate]):
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
         result = conn.execute(
-            sa.insert(self._table).returning(self._table.c.id),
+            sa.insert(self._table).returning(self._table.columns),
             [data.model_dump()],
         )
-        obj = self.get(conn, next(result)[0])
-        if not obj:
-            raise RuntimeError()
-        return obj
+        return self.model.model_validate(next(result), from_attributes=True)
 
     # TODO: Need to be careful with update since we can also re-assign the id key
     # 1. Could remove the id key and check, but how do we find the name of the id column?
