@@ -364,26 +364,3 @@ export const isResult = (
 ): vector is ProcessedImageVector => {
     return Boolean("distance" in vector);
 }
-
-export type ConfigType = {
-    MAX_SEARCH_RESULTS: number;
-    PAGE_SIZE: number;
-    NUM_PAGES_PER_REQUEST: number;
-    FETCH_THUMBS: number;
-    FETCH_TIMEOUT: number;
-    WISE_OVERVIEW_CARD: {
-        OVERVIEW?: string;
-        ABOUT: string;
-        DISCLAIMER: string;
-    };
-    EXAMPLE_QUERIES: string[];
-    MULTIMODAL_EXAMPLE_QUERIES: {
-        url: string;
-        text: string;
-    }[];
-    ENABLE_REPORT_MEDIA: boolean;
-    SHOT_SCALE_FILTER_LABEL: Record<number, string>;
-    METADATA_TABLE_COLUMNS?: string[];
-    METADATA_FILTER_PLACEHOLDER?: string;
-    METADATA_FILTER_HELP?: string;
-};
