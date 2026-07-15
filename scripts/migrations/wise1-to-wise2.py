@@ -26,6 +26,11 @@ database with the specifics of each project.  For example, WISE 2 has
 no support for webdataset.  Alternatively, this script can be
 modified.
 
+The original wikimedia demo, which originally ran a modified version
+of WISE 1.2, was migrated to the development version "2.1.0+dev" by
+replacing `migrate_database_to_wise2` with
+`migrate_wikimedia_demo_database_to_wise2` script.
+
 This script requires Python 3.12 or later.
 
 """
@@ -35,6 +40,7 @@ import datetime
 import logging
 import sqlite3
 import sys
+import urllib.parse
 from itertools import batched  # requires python 3.12+
 from pathlib import Path
 
@@ -226,6 +232,97 @@ class Wise1Project:
                             format=row[4].lower(),
                             width=row[5],
                             height=row[6],
+                            num_frames=1,  # wise 1 only supported images
+                            duration=0.0,  # wise 1 only supported images
+                        )
+                    )
+                    ## Wise 1 had no separate vector and media tables
+                    ## so we use the same id on both tables.
+                    vector_data.append(
+                        VectorMetadata(
+                            id=row[0],
+                            modality=ModalityType.IMAGE,  # wise 1 only supported images
+                            feature_extractor_id=self._feature_extractor_id,
+                            media_id=row[0],
+                            timestamp=0.0,  # wise 1 only supported images
+                        )
+                    )
+                MediaRepo.create_many(wise2_conn, data=media_data)
+                VectorRepo.create_many(wise2_conn, data=vector_data)
+                wise2_conn.commit()
+
+    def migrate_wikimedia_demo_database_to_wise2(
+        self, wise2_project: WiseProject, max_insert: int
+    ):
+        epoch_time = datetime.datetime.fromtimestamp(0)
+        with (
+            sqlite3.connect(self._project_db) as wise1_conn,
+            wise2_project.db_engine.connect() as wise2_conn,
+        ):
+            source_collection = SourceCollectionRepo.create(
+                wise2_conn,
+                data=SourceCollection(
+                    location="https://commons.wikimedia.org/",
+                    type=SourceCollectionType.DIR,
+                ),
+            )
+            wise2_conn.commit()
+            source_collection_id = source_collection.id
+
+            ## We have one image where source_uri is NULL (no clue
+            ## why), hence the coalesce.  Could also skip it but then
+            ## when we iterate over the vectors we'd have to
+            ## constantly be checking.  This is just nicer and in a
+            ## weird matches, it matches the wise 1 demo.
+            ##
+            ## The two substr() are to remove the "&width=x" query
+            ## suffix and the Special:Redirect/file prefix.  We are
+            ## betting that '&width=' does not appear in any of the
+            ## filenames.
+            commons_redirect_uri = "https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/"
+            wise1_select = f"""
+                SELECT
+                    id,
+                    size_in_bytes,
+                    format,
+                    width,
+                    height,
+                    Coalesce(
+                        Substr(
+                            Substr(source_uri, Instr(source_uri, '&width='), -999),
+                            {len(commons_redirect_uri) + 1}
+                        ),
+                        ''
+                    )
+                FROM
+                    metadata
+            """
+            n_rows = next(wise1_conn.execute("SELECT Count(*) FROM metadata"))[
+                0
+            ]
+            for rows_batch in batched(
+                tqdm.tqdm(
+                    wise1_conn.execute(wise1_select),
+                    desc="Migrating metadata table",
+                    total=n_rows,
+                ),
+                n=max_insert,
+            ):
+                media_data = []
+                vector_data = []
+                for row in rows_batch:
+                    media_data.append(
+                        MediaMetadata(
+                            id=row[0],
+                            source_collection_id=source_collection_id,
+                            path=urllib.parse.unquote(row[5]),
+                            checksum=b"",  # there was no checksums in wise 1
+                            size_in_bytes=row[1],
+                            date_modified=epoch_time,  # there was no date in Wise 1
+                            media_type=MediaType.IMAGE,  # wise 1 only supported images
+                            format=row[2].lower(),
+                            width=row[3],
+                            height=row[4],
                             num_frames=1,  # wise 1 only supported images
                             duration=0.0,  # wise 1 only supported images
                         )
