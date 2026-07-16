@@ -142,20 +142,48 @@ class SQLAlchemyRepository(Generic[Entity, EntityCreate, EntityUpdate]):
         ).scalar()
 
     def create(self, conn: sa.Connection, *, data: EntityCreate):
-        return self.create_many(conn, data=[data])[0]
+        return self.create_many(conn, data=[data], return_objs=True)[0]
 
     def create_many(
-        self, conn: sa.Connection, *, data: Iterable[EntityCreate]
-    ) -> builtins.list[Entity]:  # builtins avoids clash with list method
-        rows = conn.execute(
-            sa.insert(self._table).returning(self._table.columns),
-            [x.model_dump() for x in data],
-        )
-        objs = [
-            self.model.model_validate(x, from_attributes=True) for x in rows
-        ]
-        assert len(data) == len(objs)
-        return objs
+        self,
+        conn: sa.Connection,
+        *,
+        data: Iterable[EntityCreate],
+        return_objs=False,
+        return_ids=False,
+        ## builtins.list on type annotations avoids clash with list method
+    ) -> Optional[builtins.list[int] | builtins.list[Entity]]:
+        """Create multiple entities on the repository.
+
+        This method can optionally return the ids, or the whole "data
+        model", of the entity created.  It is "cheaper" to return
+        nothing.  The number of rows inserted will be checked even if
+        nothing is returned.
+
+        """
+        if return_objs and return_ids:
+            raise ValueError(
+                "`return_objs` and `return_ids` options are mutually exclusive"
+            )
+        stmt = sa.insert(self._table)
+        if return_ids:
+            stmt = stmt.returning(self._table.id)
+        elif return_objs:
+            stmt = stmt.returning(self._table.columns)
+
+        cur = conn.execute(stmt, [x.model_dump() for x in data])
+        if return_ids:
+            ids = [int(x) for x in cur]
+            assert len(data) == len(ids)
+            return ids
+        elif return_objs:
+            objs = [
+                self.model.model_validate(x, from_attributes=True) for x in cur
+            ]
+            assert len(data) == len(objs)
+            return objs
+        else:
+            assert len(data) == cur.rowcount
 
     # TODO: Need to be careful with update since we can also re-assign the id key
     # 1. Could remove the id key and check, but how do we find the name of the id column?
