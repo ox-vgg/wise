@@ -148,7 +148,9 @@ class Wise1Project:
         )
         wise2_index_dir.mkdir(parents=True, exist_ok=False)
         for wise1_index_file in self._index_dir.glob("*.faiss"):
-            wise2_index_file = wise2_index_dir / wise1_index_file.name
+            wise2_index_file = wise2_index_dir / (
+                "image-" + wise1_index_file.name
+            )
             if wise2_index_file.exists():
                 raise RuntimeError(
                     f"index file '{wise2_index_file}' already exists"
