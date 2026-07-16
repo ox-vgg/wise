@@ -315,10 +315,9 @@ const ImageDetailsModal = ({
         </div> || <></>
       }
 
-
-
-      {imageDetails.mediaInfo.external_metadata && <ExternalMetadata all_metadata={imageDetails.mediaInfo.external_metadata} />}
-
+      <ExternalMetadata
+        all_metadata={imageDetails.mediaInfo.external_metadata}
+      />
     </Modal>
   );
 };
