@@ -96,7 +96,7 @@ class Wise1Project:
             model = h5fh["/features/image"].attrs["model"]
             logger.debug("Project model is '%s'", model)
             self._feature_extractor_id = (
-                "mlfoundations/openclip/" + model.replace(":", "/")
+                "mlfoundations/open_clip/" + model.replace(":", "/")
             )
 
         with sqlite3.connect(self._project_db) as conn:
