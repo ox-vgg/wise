@@ -3,7 +3,7 @@ import math
 from pathlib import Path
 
 import numpy as np
-
+from tqdm import tqdm
 import faiss
 import faiss.contrib.ivf_tools
 import faiss.contrib.inspect_tools
@@ -124,7 +124,7 @@ def compute_running_minmax(index: faiss.IndexIVFFlat, residual: bool = True) -> 
         # without this, the ±inf accumulators would masquerade as NaN input
         raise ConversionError("source index has no stored vectors (ntotal == 0)")
 
-    for list_no in nonempty:
+    for list_no in tqdm(nonempty, unit="lists", desc="Computing min/max"):
         _, vecs = get_assigned_vectors(index.invlists, int(list_no), d)
         if centroids is not None:
             # get_invlist hands back a private copy, so subtract in place
@@ -221,14 +221,17 @@ def convert_ivf_index(
 
     batch: list[int] = []
     batched = 0
-    for list_no in np.flatnonzero(sizes):
-        batch.append(int(list_no))
-        batched += int(sizes[list_no])
-        if batched >= _COPY_BATCH:
+    with tqdm(total=src.ntotal, unit="vectors", desc="Copying vectors") as pbar:
+        for list_no in np.flatnonzero(sizes):
+            batch.append(int(list_no))
+            batched += int(sizes[list_no])
+            if batched >= _COPY_BATCH:
+                copy_invlists_and_vectors(src, dst, batch)
+                pbar.update(batched)
+                batch, batched = [], 0
+        if batch:
             copy_invlists_and_vectors(src, dst, batch)
-            batch, batched = [], 0
-    if batch:
-        copy_invlists_and_vectors(src, dst, batch)
+            pbar.update(batched)
 
     if src.direct_map.type != faiss.DirectMap.NoMap:
         dst.set_direct_map_type(src.direct_map.type)
@@ -473,7 +476,6 @@ def main():
 
             _write_index(index, index_path)
 
-            logger.info("Converting IVF index to SQ8 with residual=%s", True)
             convert_index(index_path, output_path, queries=queries_path, seed=seed)
 
             index = load_ivf_index(index_path)
