@@ -48,7 +48,7 @@ def load_queries(path: Path, d: int) -> np.ndarray:
 def load_ivf_index(path: Path) -> faiss.IndexIVFFlat:
     """Open memory-mapped read-only; only a top-level, non-empty, L2/IP
     IndexIVFFlat is accepted."""
-    
+
     # load the index in read only, memory mapped mode
     try:
         index = faiss.read_index(
@@ -56,28 +56,28 @@ def load_ivf_index(path: Path) -> faiss.IndexIVFFlat:
         )
     except RuntimeError as e:
         raise ConversionError(f"cannot read source index {path}: {e}") from e
-    
+
     # support only IVF Index for now
     if type(index) is not faiss.IndexIVFFlat:
         raise ConversionError(
             f"source must be a top-level IndexIVFFlat, got {type(index).__name__}"
         )
-    
+
     if index.metric_type not in SUPPORTED_METRICS:
         raise ConversionError(
             f"source metric_type={index.metric_type} is not supported: "
             f"only {SUPPORTED_METRICS} are supported"
         )
-    
+
     # cannot convert empty index
     if index.ntotal == 0:
         raise ConversionError(f"source index is empty (ntotal == 0): {path}")
-    
+
     # nprobe must at least be 1 for an IVF index
     if index.nprobe < 1:
         # inherited by the twin, where it would make every search raise
         raise ConversionError(f"source has invalid nprobe={index.nprobe}: {path}")
-    
+
     return index
 
 def get_assigned_vectors(invlists, list_no: int, d: int) -> tuple[np.ndarray, np.ndarray]:
@@ -98,10 +98,10 @@ def sample_vectors(src, n: int, rng: np.random.Generator) -> np.ndarray:
         positions = np.arange(ntotal)
     else:
         positions = np.sort(rng.choice(ntotal, size=n, replace=False))
-    
+
     list_nos = np.searchsorted(offsets, positions, side="right") - 1
     local_offsets = positions - offsets[list_nos]
-    
+
     out = np.empty((len(positions), src.d), dtype=np.float32)
     for row, list_no, offset in zip(out, list_nos, local_offsets):
         src.reconstruct_from_offset(int(list_no), int(offset), faiss.swig_ptr(row))
@@ -118,12 +118,12 @@ def compute_running_minmax(index: faiss.IndexIVFFlat, residual: bool = True) -> 
 
     centroids = index.quantizer.reconstruct_n(0, index.nlist) if residual else None
     sizes = faiss.contrib.ivf_tools.get_invlist_sizes(index.invlists)
-    
+
     nonempty = np.flatnonzero(sizes)
     if nonempty.size == 0:
         # without this, the ±inf accumulators would masquerade as NaN input
         raise ConversionError("source index has no stored vectors (ntotal == 0)")
-    
+
     for list_no in nonempty:
         _, vecs = get_assigned_vectors(index.invlists, int(list_no), d)
         if centroids is not None:
@@ -131,7 +131,7 @@ def compute_running_minmax(index: faiss.IndexIVFFlat, residual: bool = True) -> 
             np.subtract(vecs, centroids[list_no], out=vecs)
         np.minimum(vmin, vecs.min(axis=0), out=vmin)
         np.maximum(vmax, vecs.max(axis=0), out=vmax)
-    
+
     # NaN/Inf anywhere in the source propagates into the accumulator, so one
     # O(d) check detects a poisoned source (garbage ranges) in full.
     bad = np.flatnonzero(~(np.isfinite(vmin) & np.isfinite(vmax)))
@@ -141,7 +141,7 @@ def compute_running_minmax(index: faiss.IndexIVFFlat, residual: bool = True) -> 
             f"meaningless in dimension(s) {bad[:16].tolist()}"
             + (f" + {bad.size - 16} more" if bad.size > 16 else "")
         )
-    
+
     return np.stack([vmin, vmax])
 
 def copy_invlists_and_vectors(src: faiss.IndexIVFFlat, dst: faiss.IndexIVF, list_nos: list[int]) -> None:
@@ -216,9 +216,9 @@ def convert_ivf_index(
                 len(train_vectors),
             )
         dst.train(train_vectors)  # ty: ignore[missing-argument]
-    
+
     sizes = faiss.contrib.ivf_tools.get_invlist_sizes(src.invlists)
-    
+
     batch: list[int] = []
     batched = 0
     for list_no in np.flatnonzero(sizes):
@@ -229,17 +229,17 @@ def convert_ivf_index(
             batch, batched = [], 0
     if batch:
         copy_invlists_and_vectors(src, dst, batch)
-    
+
     if src.direct_map.type != faiss.DirectMap.NoMap:
         dst.set_direct_map_type(src.direct_map.type)
     dst.nprobe = src.nprobe
-    
+
     return dst
 
 def agreement_at_k(
     candidate, reference, queries: np.ndarray, k: int = AGREEMENT_K
 ) -> tuple[float, int]:
-    """Agreement@K: mean per-query |top-K(candidate) ∩ top-K(reference)| / K — 
+    """Agreement@K: mean per-query |top-K(candidate) ∩ top-K(reference)| / K —
     consistency is measured against the reference, not accuracy.
 
     Ids are compared as sets (faiss permits duplicate ids; they collapse).
@@ -247,8 +247,8 @@ def agreement_at_k(
     sparse probed lists) the row is scored against the larger returned set,
     so a bit-perfect twin scores 1.0 while extra junk against a short
     reference is still penalized. Rows where both sides return nothing carry
-    no signal and are excluded. 
-    
+    no signal and are excluded.
+
     Returns (agreement, rows scored)."""
 
     _, cand = candidate.search(queries, k)
@@ -269,7 +269,7 @@ def human_readable_bytes(n: int) -> str:
     """Convert a byte count to a human-readable string with binary prefixes."""
     if n < 0:
         raise ValueError(f"byte count must be non-negative, got {n}")
-    
+
     out_n = n
     for unit in ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]:
         if out_n < 1024:
@@ -296,16 +296,16 @@ def convert_index(
     src_path, dst_path = Path(src_path), Path(dst_path)
     if dst_path.exists():
         raise ConversionError(f"output path already exists, refusing: {dst_path}")
-    
+
     if not dst_path.parent.is_dir():
         raise ConversionError(f"output directory does not exist: {dst_path.parent}")
-    
+
     if train_sample is not None and train_sample <= 0:
         raise ConversionError(f"train_sample must be positive, got {train_sample}")
-    
+
     if seed < 0:
         raise ConversionError(f"seed must be non-negative, got {seed}")
-    
+
     if queries is not None and skip_check:
         raise ConversionError(
             "queries were provided but skip_check is set — refusing to silently "
@@ -542,6 +542,6 @@ def main():
         convert_index(src_path, dst_path, train_sample, residual, queries, skip_check, seed)
 
     app()
-    
+
 if __name__ == '__main__':
     main()
