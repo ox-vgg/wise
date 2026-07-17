@@ -54,6 +54,7 @@ from sqlalchemy import Engine, MetaData, create_engine, event
 
 from wise.db.base import project_metadata_obj, thumbs_metadata_obj
 from wise.db.tables import (
+    featured_table,
     imported_metadata_table,
     media_table,
     shots_table,
