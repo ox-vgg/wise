@@ -42,7 +42,7 @@ from wise.data_models import (
 from wise.dataloader import AVDataset
 from wise.feature.feature_extractor_factory import get_feature_extractor_class
 from wise.feature.store import (
-    FeatureStore,
+    FaissStore,
     FeatureStoreFactory,
     FeatureStoreType,
 )
@@ -1664,7 +1664,7 @@ class WiseProject:
             other_conn: sa.Connection,
             media_type: ModalityType,
             feature_extractor_id: str,
-            other_store: FeatureStore,
+            other_store: FaissStore,
         ):
             logger.info(
                 "copying for feature_extractor - %s (%s)",

@@ -23,7 +23,6 @@ from pathlib import Path
 import faiss
 import numpy as np
 
-from wise.feature.store.feature_store import FeatureStore
 from wise.utils import batched
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ def load_faiss_index(filename: str) -> faiss.Index:
     )
 
 
-class FaissStore(FeatureStore):
+class FaissStore:
     """
     Feature store that uses Faiss for storing and retrieving feature vectors.
 

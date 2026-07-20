@@ -57,7 +57,7 @@ from wise.feature.hf_models import (
     is_segment_level_extractor,
 )
 from wise.feature.store import (
-    FeatureStore,
+    FaissStore,
     FeatureStoreFactory,
     FeatureStoreType,
 )
@@ -87,7 +87,7 @@ def initialise_feature_extractors(
     db_engine: sa.Engine,
 ) -> tuple[
     dict[ModalityType, dict[str, FeatureExtractor]],
-    dict[ModalityType, dict[str, FeatureStore]],
+    dict[ModalityType, dict[str, FaissStore]],
 ]:
     ## 3. Prepare for feature extraction and storage
     logger.info("Initialising feature extractor")

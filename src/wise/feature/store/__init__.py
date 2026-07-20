@@ -21,7 +21,7 @@ and audio.
 
 """
 
-from wise.feature.store.feature_store import FeatureStore as FeatureStore
+from wise.feature.store.faiss_store import FaissStore
 from wise.feature.store.feature_store_factory import (
     FeatureStoreFactory,
     FeatureStoreType,
