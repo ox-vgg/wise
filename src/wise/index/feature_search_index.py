@@ -160,7 +160,7 @@ class FeatureSearchIndex(SearchIndex):
         return True
 
     @property
-    def is_internal_search_supported(self):
+    def is_internal_search_supported(self) -> bool:
         """
         Checks if the faiss index supports internal search (i.e. reconstructing
         vectors from their ids). This should be enabled by default for new
@@ -172,7 +172,7 @@ class FeatureSearchIndex(SearchIndex):
             # which doesn't support internal search. Therefore we need to check
             # if faiss.IndexIDMap2 (rather than faiss.IndexIDMap) is being used
             return isinstance(self.index, faiss.IndexIDMap2)
-        elif self.index_type == "IndexIVFFlat":
+        else:
             # Check if the direct map was enabled
             return (
                 hasattr(self.index, "direct_map")
