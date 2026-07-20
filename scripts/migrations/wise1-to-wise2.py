@@ -56,10 +56,7 @@ from wise.data_models import (
     SourceCollectionType,
     VectorMetadata,
 )
-from wise.feature.store import (
-    FeatureStoreFactory,
-    FeatureStoreType,
-)
+from wise.feature.store import FaissStore
 from wise.repository import MediaRepo, SourceCollectionRepo, VectorRepo
 from wise.wise_project import WiseProject
 
@@ -120,8 +117,7 @@ class Wise1Project:
         self, wise2_project: WiseProject, shard_maxcount: int
     ):
         wise2_project.create_features_dir(self._feature_extractor_id)
-        wise2_store = FeatureStoreFactory.create_store(
-            FeatureStoreType.FAISS,
+        wise2_store = FaissStore(
             ModalityType.IMAGE,
             wise2_project.features_dir(self._feature_extractor_id),
         )

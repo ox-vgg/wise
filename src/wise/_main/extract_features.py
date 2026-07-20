@@ -56,11 +56,7 @@ from wise.feature.hf_models import (
     get_segment_params,
     is_segment_level_extractor,
 )
-from wise.feature.store import (
-    FeatureStore,
-    FeatureStoreFactory,
-    FeatureStoreType,
-)
+from wise.feature.store import FaissStore
 from wise.repository import (
     MediaRepo,
     SourceCollectionRepo,
@@ -82,12 +78,11 @@ def initialise_feature_extractors(
     project: WiseProject,
     feature_extractor_ids: dict[ModalityType, list],
     feature_extractor_config: dict[str, dict],
-    feature_store_type: FeatureStoreType,
     shard_max_count: int,
     db_engine: sa.Engine,
 ) -> tuple[
     dict[ModalityType, dict[str, FeatureExtractor]],
-    dict[ModalityType, dict[str, FeatureStore]],
+    dict[ModalityType, dict[str, FaissStore]],
 ]:
     ## 3. Prepare for feature extraction and storage
     logger.info("Initialising feature extractor")
@@ -136,16 +131,9 @@ def initialise_feature_extractors(
             project.create_features_dir(feature_extractor_id)
 
             ## 3.3 Initialise feature store to store features
-            try:
-                store = FeatureStoreFactory.load_store(
-                    modality_type, project.features_dir(feature_extractor_id)
-                )
-            except ValueError:
-                store = FeatureStoreFactory.create_store(
-                    feature_store_type,
-                    modality_type,
-                    project.features_dir(feature_extractor_id),
-                )
+            store = FaissStore(
+                modality_type, project.features_dir(feature_extractor_id)
+            )
             store.enable_write(shard_maxcount=shard_max_count)
             feature_stores[modality_type][feature_extractor_id] = store
 
@@ -434,6 +422,19 @@ def validate_args(args):
             " one MEDIA_DIR"
         )
 
+    if args.feature_store_type == "faiss":
+        logger.warning(
+            "the `--feature-store faiss` option no longer does anything because"
+            " faiss is now the only valid option.  This option will be removed"
+            " in the future."
+        )
+    elif args.feature_store_type is not None:
+        raise ValueError(
+            "The `--feature-store` option was `%s` but faiss is now the only"
+            " valid option value and the `--feature-store` option will be"
+            " removed.  Either remove this option or set it to `faiss`."
+        )
+
     # sanity check: remove duplicate entries in command line args
     if not args.media_include_list:
         setattr(args, "media_include_list", ["*"])
@@ -683,10 +684,8 @@ def main(argv: list[str]):
         "--feature-store",
         required=False,
         type=str,
-        default="faiss",
         dest="feature_store_type",
-        choices=sorted([x.value for x in FeatureStoreType]),
-        help="extracted features are stored using this data structure",
+        help="this option does nothing and is kept for backwards compatibility",
     )
 
     parser.add_argument(
@@ -898,7 +897,6 @@ def main(argv: list[str]):
         project,
         feature_extractor_ids,
         feature_extractor_config,
-        FeatureStoreType(args.feature_store_type),
         args.shard_maxcount,
         db_engine,
     )

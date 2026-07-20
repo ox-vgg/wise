@@ -10,13 +10,13 @@ Here is an example of how the features stores in these stores can be accessed.
 ```python
 # source: src/wise/search_index.py
 from pathlib import Path
-from wise.feature.store.feature_store_factory import FeatureStoreFactory
+from wise.feature.store.faiss_store import FaissStore
 from wise.data_models import ModalityType
 
 ...
 modality_type = ModalityType.VIDEO  # or AUDIO, IMAGE, or TEXT
 feature_dir = Path('/data/projects/Kinetics-7/store/mlfoundations/open_clip/xlm-roberta-large-ViT-H-14/frozen_laion5b_s13b_b90k/features/')
-feature_store = FeatureStoreFactory.load_store(modality_type, feature_dir)
+feature_store = FaissStore(modality_type, feature_dir)
 feature_store.enable_read(shard_shuffle = False)
 
 for feature_id, feature_vector in feature_store:
