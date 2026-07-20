@@ -41,11 +41,7 @@ from wise.data_models import (
 )
 from wise.dataloader import AVDataset
 from wise.feature.feature_extractor_factory import get_feature_extractor_class
-from wise.feature.store import (
-    FaissStore,
-    FeatureStoreFactory,
-    FeatureStoreType,
-)
+from wise.feature.store import FaissStore
 from wise.index.search_index import SearchIndex
 from wise.index.search_index_factory import SearchIndexFactory
 from wise.repository import (
@@ -1673,23 +1669,17 @@ class WiseProject:
             )
             feature_count = other_store.feature_count
             self.create_features_dir(feature_extractor_id)
-            try:
-                store = FeatureStoreFactory.load_store(
-                    media_type, self.features_dir(feature_extractor_id)
-                )
-            except ValueError:
-                store = FeatureStoreFactory.create_store(
-                    FeatureStoreType.FAISS,
-                    media_type,
-                    self.features_dir(feature_extractor_id),
-                )
+            store = FaissStore(
+                ModalityType(media_type),
+                self.features_dir(feature_extractor_id),
+            )
             store.enable_write()
 
             feature_extractor_cls = get_feature_extractor_class(
                 feature_extractor_id
             )
 
-            if store.__class__.__name__ == "FaissFeatureStore":
+            if store.__class__.__name__ == "FaissStore":
 
                 def add_to_store(feature_ids, features):
                     store.add(feature_ids, features)
@@ -1824,8 +1814,9 @@ class WiseProject:
         ):
             for media_type in supported_assets:
                 for feature_extractor_id in supported_assets[media_type]:
-                    other_store = FeatureStoreFactory.load_store(
-                        media_type, other.features_dir(feature_extractor_id)
+                    other_store = FaissStore(
+                        ModalityType(media_type),
+                        other.features_dir(feature_extractor_id),
                     )
                     copy_vectors(
                         conn,

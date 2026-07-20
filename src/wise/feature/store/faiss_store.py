@@ -23,6 +23,7 @@ from pathlib import Path
 import faiss
 import numpy as np
 
+from wise.data_models import ModalityType
 from wise.utils import batched
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,10 @@ class FaissStore:
 
     EXTENSION = "faiss"
 
-    def __init__(self, store_name: str, store_data_dir: str):
+    def __init__(self, modality_type: ModalityType, store_data_dir: str):
         # Initialize Faiss-specific components here
         # e.g., self.index = faiss.IndexFlatL2(dimension)
-        self.store_name = store_name
+        self.store_name = modality_type.value
         self.store_data_dir = store_data_dir
 
         self._prefix = str(Path(self.store_data_dir) / f"{self.store_name}-")

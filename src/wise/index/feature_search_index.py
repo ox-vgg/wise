@@ -24,7 +24,7 @@ import numpy as np
 from tqdm import tqdm
 
 from wise.data_models import ModalityType
-from wise.feature.store.feature_store_factory import FeatureStoreFactory
+from wise.feature.store import FaissStore
 from wise.index.search_index import SearchIndex
 
 logger = logging.getLogger(__name__)
@@ -70,9 +70,7 @@ class FeatureSearchIndex(SearchIndex):
             return
         self.index_type = index_type
 
-        feature_store = FeatureStoreFactory.load_store(
-            self.modality_type, self.features_dir
-        )
+        feature_store = FaissStore(self.modality_type, self.features_dir)
         feature_store.enable_read(shard_shuffle=False)
 
         feature_count = feature_store.feature_count
@@ -104,7 +102,7 @@ class FeatureSearchIndex(SearchIndex):
                 train_count,
                 feature_count,
             )
-            shuffled_features = FeatureStoreFactory.load_store(
+            shuffled_features = FaissStore(
                 self.modality_type, self.features_dir
             )
             shuffled_features.enable_read(

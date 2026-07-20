@@ -19,17 +19,18 @@ import unittest
 
 import numpy as np
 
+from wise.data_models import ModalityType
 from wise.feature.store.faiss_store import FaissStore
 
 
 class TestFeatureExtractorFactory(unittest.TestCase):
     def setUp(self):
-        self.store_name = "test-store"
+        self.modality = ModalityType.AUDIO
         self.feature_dim = 512
 
     def test_faiss_store(self):
         with tempfile.TemporaryDirectory() as temp_store_dir:
-            store = FaissStore(self.store_name, temp_store_dir)
+            store = FaissStore(self.modality, temp_store_dir)
             featureA = np.array([[1, 2, 3, 4]])
             featureB = np.array([[5, 6, 7, 8]])
             featureC = np.array([[9, 10, 11, 12]])
@@ -47,7 +48,7 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             self.assertEqual(
                 store.filenames,
                 [
-                    f"{temp_store_dir}/{self.store_name}-000000.faiss",
+                    f"{temp_store_dir}/{self.modality.value}-000000.faiss",
                 ],
             )
             store.enable_write()
@@ -59,8 +60,8 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             self.assertEqual(
                 store.filenames,
                 [
-                    f"{temp_store_dir}/{self.store_name}-000000.faiss",
-                    f"{temp_store_dir}/{self.store_name}-000001.faiss",
+                    f"{temp_store_dir}/{self.modality.value}-000000.faiss",
+                    f"{temp_store_dir}/{self.modality.value}-000001.faiss",
                 ],
             )
 
@@ -108,9 +109,9 @@ class TestFeatureExtractorFactory(unittest.TestCase):
             self.assertEqual(
                 store.filenames,
                 [
-                    f"{temp_store_dir}/{self.store_name}-000000.faiss",
-                    f"{temp_store_dir}/{self.store_name}-000001.faiss",
-                    f"{temp_store_dir}/{self.store_name}-000002.faiss",
+                    f"{temp_store_dir}/{self.modality.value}-000000.faiss",
+                    f"{temp_store_dir}/{self.modality.value}-000001.faiss",
+                    f"{temp_store_dir}/{self.modality.value}-000002.faiss",
                 ],
             )
             del store
