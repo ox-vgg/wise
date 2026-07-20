@@ -10,8 +10,8 @@ Here is an example of how the features stores in these stores can be accessed.
 ```python
 # source: src/wise/search_index.py
 from pathlib import Path
-from .feature.store.feature_store_factory import FeatureStoreFactory
-from ...data_models import ModalityType
+from wise.feature.store.feature_store_factory import FeatureStoreFactory
+from wise.data_models import ModalityType
 
 ...
 modality_type = ModalityType.VIDEO  # or AUDIO, IMAGE, or TEXT

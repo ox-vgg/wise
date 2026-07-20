@@ -27,7 +27,7 @@ from PIL import Image
 import torchvision.transforms.functional as F
 from collections.abc import Iterable
 
-from .feature_extractor import FeatureExtractor
+from wise.feature.feature_extractor import FeatureExtractor
 
 class RandomFeatures(FeatureExtractor):
     """
@@ -89,7 +89,7 @@ Next, we register this newly created feature extractor in WISE by updating
 ```python
 # File: src/wise/feature/feature_extractor_factory.py
 ...
-from .random_features import RandomFeatures
+from wise.feature.random_features import RandomFeatures
 
 def FeatureExtractorFactory(id):
     ...
