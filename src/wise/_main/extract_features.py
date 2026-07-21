@@ -668,8 +668,15 @@ def main(argv: list[str]):
         "--shard-maxcount",
         required=False,
         type=int,
-        default=2048,
-        help="max number of entries in each feature store shard (for faiss store, using shard-maxcount=1e6 results in 4GB files with 1024-dim features)",
+        default=2**19,
+        help=(
+            "Max number of entries in each feature store shard.  For a"
+            " feature extractor of1024 dimensions, a shard max count of"
+            " 2^19 (524288) will lead to files/shards of approximately"
+            " 2GB.  Higher numbers means more memory is required when"
+            " writing the feature store, while lower numbers will lead"
+            " to an excessive number of files."
+        ),
     )
 
     parser.add_argument(
