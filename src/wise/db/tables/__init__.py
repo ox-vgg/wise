@@ -76,6 +76,17 @@ vectors_table = sa.Table(
     sa.Column("end_timestamp", sa.Float(), index=True, nullable=True),
 )
 
+featured_table = sa.Table(
+    "featured",
+    project_metadata_obj,
+    sa.Column(
+        "vector_id",
+        sa.Integer,
+        sa.ForeignKey("vectors.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+)
+
 imported_metadata_table = sa.Table(
     "imported_metadata",
     project_metadata_obj,
