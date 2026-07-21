@@ -44,7 +44,6 @@ class ProjectInfo(BaseModel):
         MediaType, int
     ]  # e.g., {"image": 100, "video": 50, "audio": 20}
     total_duration: float  # in seconds
-    models: dict[MediaType, list[str]]
     shot_based_filters: ShotBasedFilters | None = None
     search_targets: dict[MediaType, list[str]] = {}
     enable_facets: bool = False
@@ -52,10 +51,6 @@ class ProjectInfo(BaseModel):
     def normalized(self) -> "ProjectInfo":
         """Return a copy with deterministic ordering for list fields."""
         info = self.model_copy(deep=True)
-        info.models = {
-            media_type: sorted(model_list)
-            for media_type, model_list in info.models.items()
-        }
         # Do not sort search_targets here, as their order is explicitly
         # defined by config.search_target_order and sorted in the LocalProjectService.
         info.search_targets = {
@@ -80,14 +75,6 @@ class ProjectInfo(BaseModel):
                     a.media_file_counts[media_type] += count
                 else:
                     a.media_file_counts[media_type] = count
-            for media_type, model_list in b.models.items():
-                if media_type in a.models:
-                    a.models[media_type] = list(
-                        dict.fromkeys(a.models[media_type] + model_list)
-                    )
-                else:
-                    a.models[media_type] = model_list
-
             for media_type, targets in b.search_targets.items():
                 if media_type in a.search_targets:
                     a.search_targets[media_type] = list(

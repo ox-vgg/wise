@@ -198,11 +198,6 @@ export interface DataServiceOutput {
 
 export interface ProjectInfo {
   project_name?: string;
-  models?: {
-    image?: string[],
-    video?: string[],
-    audio?: string[],
-  };
   search_targets?: {
     image?: string[],
     video?: string[],

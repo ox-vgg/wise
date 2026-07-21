@@ -62,7 +62,6 @@ class TestWithEmptyProject(unittest.TestCase):
                 "media_file_counts": {},
                 "max_search_results": 1000,
                 "total_duration": 0.0,
-                "models": {},
                 "shot_based_filters": None,
                 "search_targets": {},
                 "enable_facets": False,

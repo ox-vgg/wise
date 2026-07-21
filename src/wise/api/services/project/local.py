@@ -98,15 +98,6 @@ class LocalWiseProjectService(WiseProjectService):
 
     def info(self) -> ProjectInfo:
         # Implement logic to retrieve project info from local files
-        models = {
-            media_type: [
-                feature_extractor_id
-                for feature_extractor_id in self.project_assets[media_type]
-            ]
-            for media_type in self.project_assets
-            if media_type
-            in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO]
-        }
         search_target_order = getattr(self.config, "search_target_order", None)
         return ProjectInfo(
             project_name=self.name,
@@ -117,7 +108,6 @@ class LocalWiseProjectService(WiseProjectService):
             num_shots=self.wise_project.num_shots,
             media_file_counts=self.wise_project.media_file_counts,
             total_duration=self.wise_project.total_duration,
-            models=models,
             search_targets=self.get_active_search_targets(search_target_order),
             shot_based_filters=self.shot_based_filters,
             enable_facets=self.config.enable_facets,
