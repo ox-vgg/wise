@@ -19,8 +19,6 @@ import logging
 import sys
 from pathlib import Path
 
-from wise.enums import IndexType
-
 
 def _arg_type_dir(path_str: str) -> Path:
     path = Path(path_str)
@@ -56,8 +54,11 @@ def main(argv: list[str]):
         "--index-type",
         type=str,
         default=None,
-        choices=IndexType.__members__.keys(),
-        help="The faiss index to use for serving",
+        help=(
+            "The faiss index to use on the server, e.g., `IndexFlatIP` or"
+            " `IndexIVFFlat`.  This is effectively the filename of the index"
+            " file without the `.faiss` file extension."
+        ),
     )
     parser.add_argument(
         "--proxy-root-path",
