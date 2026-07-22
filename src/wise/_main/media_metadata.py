@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(argv: list[str]):
+    logging.basicConfig()
     parser = argparse.ArgumentParser(
         prog="media-metadata",
         description="Manage metadata associated with media files contained in a WISE project",
@@ -62,6 +63,15 @@ def main(argv: list[str]):
         "command",
         choices=["import", "import-shots", "import-shot-scale"],
         help="various modes of operation supported by the metadata script",
+    )
+
+    parser.add_argument(
+        "--logging-level",
+        action="store",
+        type=str,
+        default="info",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Set logging level",
     )
 
     parser.add_argument(
@@ -93,6 +103,8 @@ def main(argv: list[str]):
     )
 
     args = parser.parse_args(argv[1:])
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, args.logging_level.upper()))
 
     if args.command == "import":
         import_media_metadata(args)

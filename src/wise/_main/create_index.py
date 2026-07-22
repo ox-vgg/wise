@@ -66,14 +66,24 @@ def create_fts_index(project, args):
 
 def main(argv: list[str]):
     logging.basicConfig(
-        level=logging.INFO,
         format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
     )
+
     parser = argparse.ArgumentParser(
         prog="create-index",
         description="Create a nearest neighbour search index for features extracted from images and videos.",
         epilog="For more details about WISE, visit https://www.robots.ox.ac.uk/~vgg/software/wise/",
     )
+
+    parser.add_argument(
+        "--logging-level",
+        action="store",
+        type=str,
+        default="info",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Set logging level",
+    )
+
     parser.add_argument(
         "--media-type",
         required=False,
@@ -118,6 +128,8 @@ def main(argv: list[str]):
         help="json file representing the config for building the FTS5 index",
     )
     args = parser.parse_args(argv[1:])
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, args.logging_level.upper()))
 
     config = APIConfig(project_dir=args.project_dir, command="create_index")
 

@@ -31,8 +31,7 @@ def _arg_type_dir(path_str: str) -> Path:
 
 
 def main(argv: list[str]):
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    logging.basicConfig()
 
     parser = argparse.ArgumentParser(
         description="Serve the REST API and frontend UI for WISE.",
@@ -40,6 +39,14 @@ def main(argv: list[str]):
             "For more details about WISE, visit"
             " https://www.robots.ox.ac.uk/~vgg/software/wise/"
         ),
+    )
+    parser.add_argument(
+        "--logging-level",
+        action="store",
+        type=str,
+        default="info",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Set logging level",
     )
     parser.add_argument(
         "--theme-asset-dir",
@@ -73,6 +80,8 @@ def main(argv: list[str]):
         help="Project directory path",
     )
     args = parser.parse_args(argv[1:])
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, args.logging_level.upper()))
 
     # ensure that the frontend assets are built
     if not (args.theme_asset_dir / "index.html").exists():

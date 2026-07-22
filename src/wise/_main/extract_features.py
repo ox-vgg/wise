@@ -633,16 +633,30 @@ def get_media_files_for_dataset(
 
 
 def main(argv: list[str]):
+    logging.basicConfig(
+        format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
+    )
+
     parser = argparse.ArgumentParser(
         prog="extract-features",
         description="Initialise a WISE project by extractng features from images, audio and videos.",
         epilog="For more details about WISE, visit https://www.robots.ox.ac.uk/~vgg/software/wise/",
     )
+
     parser.add_argument(
         "media_dir_list",
         nargs="*",
         help="process images and video from this folder (an existing WISE project will be updated if this is not provided)",
         default=[],
+    )
+
+    parser.add_argument(
+        "--logging-level",
+        action="store",
+        type=str,
+        default="info",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Set logging level",
     )
 
     parser.add_argument(
@@ -762,17 +776,15 @@ def main(argv: list[str]):
     )
 
     args = parser.parse_args(argv[1:])
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, args.logging_level.upper()))
+
     config = APIConfig(
         project_dir=Path(args.project_dir), command="extract_features"
     )
 
     feature_extractor_config = config.feature_extractor_config
     args = validate_args(args)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s (%(threadName)s): %(name)s - %(levelname)s - %(message)s",
-    )
 
     if args.num_workers > 0:
         torch.multiprocessing.set_start_method("spawn")
