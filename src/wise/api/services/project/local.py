@@ -65,7 +65,6 @@ class LocalWiseProjectService(WiseProjectService):
         self.config = config
 
         # cache the current project assets
-        self.project_assets = self.wise_project.discover_assets()
         self.search_indices = self.wise_project.load_search_indices()
 
         # Shot property (e.g. shot_scale, camera_motion, etc.) based filters
