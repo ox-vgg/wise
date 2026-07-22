@@ -140,10 +140,8 @@ def main(argv: list[str]):
     if args.media_type is not None:
         media_type_list = list(args.media_type)
 
-    if "metadata" in media_type_list or args.fts_config:
+    if args.fts_config:
         create_fts_index(project, args)
-        if "metadata" in media_type_list:
-            media_type_list.remove("metadata")
 
     logger.info("Creating indices for media types: %s", media_type_list)
     for media_type in media_type_list:

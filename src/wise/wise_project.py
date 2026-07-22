@@ -371,31 +371,12 @@ class WiseProject:
                     "index_files"
                 ].sort()
 
-        # 3. locate all assets related to metadata
-        metadata_assets = {}
         for metadata_db in self._metadata_dir.glob("*/*.sqlite"):
-            metadata_db_rel_path = metadata_db.relative_to(self._metadata_dir)
-            assert (
-                len(metadata_db_rel_path.parts) == 2
-            ), f"unexpected {metadata_db_rel_path}, should be of form FOLDER_NAME/DB_NAME"
-            metadata_id_prefix = str(
-                metadata_db_rel_path.parent / metadata_db_rel_path.stem
+            raise Exception(
+                "Found metadata database at '%s' from older versions of wise;"
+                " please migrate your project" % str(metadata_db)
             )
-            with sqlite3.connect(str(metadata_db)) as sqlite_connection:
-                cursor = sqlite_connection.cursor()
-                for row in cursor.execute(
-                    f'SELECT name FROM sqlite_master WHERE type="table"'
-                ):
-                    table_name = row[0]
-                    if "_fts" not in table_name:
-                        metadata_id = metadata_id_prefix + "/" + table_name
-                        metadata_assets[metadata_id] = {
-                            "metadata_db": str(metadata_db),
-                            "metadata_db_type": "sqlite",
-                            "metadata_table": table_name,
-                        }
-        if metadata_assets:
-            self.assets["metadata"] = metadata_assets
+
         return self.assets
 
     def get_media_files(self) -> list[DatasetPayload]:
