@@ -572,16 +572,13 @@ def get_metadata_for_valid_files(paths: list[Path]):
     ]
 
     # separate the files with an unknown MIME type
-    unknown_files = [
-        p
-        for (_, media_type, p) in media_files
-        if media_type == MediaMimetype.unknown
-    ]
-    known_files = [
-        (mimetype, media_type, p)
-        for (mimetype, media_type, p) in media_files
-        if media_type != MediaMimetype.unknown
-    ]
+    known_files = []
+    unknown_files = []
+    for mimetype, media_type, path in media_files:
+        if media_type == MediaMimetype.unknown:
+            unknown_files.append(path)
+        else:
+            known_files.append((mimetype, media_type, path))
 
     media_metadata: list[MediaMetadata] = []
     logger.info("Extracting metadata from files ...")
