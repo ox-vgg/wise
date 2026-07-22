@@ -316,60 +316,38 @@ class WiseProject:
           }
         }
         """
-        self.assets = {}
+        assets = defaultdict(dict)
         # 1. find all feature-extractor-id
         for feature_dir in self._store_dir.glob("*/*/*/*/features/"):
             feature_extractor_id = str(
                 feature_dir.relative_to(self._store_dir).parent
             )
-            available_media_types = []
+            available_media_types = set()
             for feature_data in feature_dir.glob("*.*"):
-                media_type = str(feature_data.stem).split("-")[0]
-                if media_type not in available_media_types:
-                    available_media_types.append(media_type)
+                media_type = feature_data.stem.split("-", maxsplit=1)[0]
+                available_media_types.add(media_type)
             for media_type in available_media_types:
-                if media_type not in self.assets:
-                    self.assets[media_type] = {}
-                if feature_extractor_id not in self.assets[media_type]:
-                    self.assets[media_type][feature_extractor_id] = {}
+                assets[media_type][feature_extractor_id] = {}
+        assets = dict(assets)  # defaultdict -> dict
+
         # 2. locate all assets related to each feature-extractor-id
-        for media_type in self.assets:
-            for feature_extractor_id in self.assets[media_type]:
+        for media_type in assets:
+            for feature_extractor_id in assets[media_type]:
+                these_assets = {}
                 features_root = self._store_dir / feature_extractor_id
                 features_dir = features_root / "features"
-                self.assets[media_type][feature_extractor_id][
-                    "features_root"
-                ] = str(features_root)
-                self.assets[media_type][feature_extractor_id][
-                    "features_dir"
-                ] = str(features_dir)
-                self.assets[media_type][feature_extractor_id][
-                    "features_files"
-                ] = []
-                for feature_data in features_dir.glob(media_type + "-*.*"):
-                    self.assets[media_type][feature_extractor_id][
-                        "features_files"
-                    ].append(feature_data.name)
-                self.assets[media_type][feature_extractor_id][
-                    "features_files"
-                ].sort()
+                these_assets["features_root"] = str(features_root)
+                these_assets["features_dir"] = str(features_dir)
+                these_assets["features_files"] = sorted(
+                    [x.name for x in features_dir.glob(media_type + "-*.*")]
+                )
 
                 index_dir = features_root / "index"
-                self.assets[media_type][feature_extractor_id]["index_dir"] = (
-                    str(index_dir)
+                these_assets["index_dir"] = str(index_dir)
+                these_assets["index_files"] = sorted(
+                    [x.name for x in index_dir.glob(media_type + "-*.faiss")]
                 )
-                self.assets[media_type][feature_extractor_id][
-                    "index_files"
-                ] = []
-                if not index_dir.exists():
-                    continue
-                for index_data in index_dir.glob(media_type + "-*.faiss"):
-                    self.assets[media_type][feature_extractor_id][
-                        "index_files"
-                    ].append(index_data.name)
-                self.assets[media_type][feature_extractor_id][
-                    "index_files"
-                ].sort()
+                assets[media_type][feature_extractor_id] = these_assets
 
         for metadata_db in self._metadata_dir.glob("*/*.sqlite"):
             raise Exception(
@@ -377,7 +355,7 @@ class WiseProject:
                 " please migrate your project" % str(metadata_db)
             )
 
-        return self.assets
+        return assets
 
     def get_media_files(self) -> list[DatasetPayload]:
         media_files = []
