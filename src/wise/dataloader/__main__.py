@@ -14,13 +14,12 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import enum
 import functools
 import itertools
 import logging
 from collections.abc import Callable
+from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import open_clip
@@ -58,8 +57,13 @@ def permute_(x):
     return x.permute(1, 0, 2, 3)
 
 
-def get_input_transform_for_model(clip_model):
-    if clip_model == "internvideo":
+CLIPModel = Enum(
+    "CLIPModel", {x: x for x in AVAILABLE_MODELS} | {"None": None}
+)
+
+
+def get_input_transform_for_model(clip_model: CLIPModel):
+    if clip_model is CLIPModel.internvideo:
         # Internvideo preprocessing
         return transforms_v2.Compose(
             [
@@ -95,15 +99,6 @@ def get_input_transform_for_model(clip_model):
             unsqueeze_,
         ]
     )
-
-
-class _CLIPModel(str, enum.Enum):
-    pass
-
-
-CLIPModel = _CLIPModel(
-    "CLIPModel", {x: x for x in AVAILABLE_MODELS} | {"None": None}
-)
 
 
 def _preprocess(
@@ -148,7 +143,7 @@ if __name__ == "__main__":
             default=["*"],
             help="regular expression to include certain media files",
         ),
-        model: Optional[CLIPModel] = typer.Option(
+        model: CLIPModel = typer.Option(
             "ViT-B-32:openai",
             help="Pass in a open_clip model string (or) internvideo",
         ),
@@ -176,6 +171,11 @@ if __name__ == "__main__":
         # Define output stream options based on model.
         # Every 0.5 seconds, we read 8 frames chunk for internvideo, and 1 for clip
 
+        ## If `--model None`, then typer assigns model the None value
+        ## instead of the None enum, so do it here.
+        if model is None:
+            model = CLIPModel(model)
+
         audio_sampling_rate = 48_000  # (48 kHz)
 
         video_frame_rate = 2  # fps
@@ -193,9 +193,9 @@ if __name__ == "__main__":
         logger.debug("Getting preprocessing function")
 
         frame_preprocess = None
-        if model != "None":
+        if model is not CLIPModel(None):
             preprocess = get_input_transform_for_model(model)
-            if model != "internvideo":
+            if model is not CLIPModel.internvideo:
                 preprocess = functools.partial(_preprocess, preprocess)
             frame_preprocess = {model: preprocess}
 
