@@ -14,9 +14,9 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import enum
 import hashlib
 import logging
+from enum import Enum
 from pathlib import Path
 
 import filetype
@@ -36,7 +36,7 @@ MATCHERS = {
 SEEN_EXTENSIONS = {x.EXTENSION: x.MIME for x in MATCHERS.values()}
 
 
-class MediaMimetype(str, enum.Enum):
+class MediaMimetype(Enum):
     image = "image"
     video = "video"
     audio = "audio"

@@ -84,7 +84,7 @@ def get_media_metadata(
     video_stream_info, audio_stream_info = get_media_info(
         url,
         guess_missing_video_info=(
-            media_type_from_mimetype == MediaMimetype.video
+            media_type_from_mimetype is MediaMimetype.video
         ),
     )
 
@@ -575,7 +575,7 @@ def get_metadata_for_valid_files(paths: list[Path]):
     known_files = []
     unknown_files = []
     for mimetype, media_type, path in media_files:
-        if media_type == MediaMimetype.unknown:
+        if media_type is MediaMimetype.unknown:
             unknown_files.append(path)
         else:
             known_files.append((mimetype, media_type, path))

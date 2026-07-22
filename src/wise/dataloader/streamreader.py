@@ -286,7 +286,7 @@ def get_media_type(
     # Must be one of image, audio-only, video-only or av
     elif audio_stream_info is None:
         # Either video-only or image
-        if media_type_from_mimetype == MediaMimetype.image:
+        if media_type_from_mimetype is MediaMimetype.image:
             # image
             # TODO check for iptc, exif and other metadata
             return MediaType.IMAGE
