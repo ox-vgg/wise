@@ -88,13 +88,13 @@ if __name__ == "__main__":
 
         Example:
         # Loading one video based on clip preprocessing
-        python3 -m src run data/Shazam.mkv --model "ViT-L-14:openai"
+        python3 -m wise.dataloder run data/Shazam.mkv --model "ViT-L-14:openai"
 
         # With a directory of videos
-        python3 -m src run data/ --model "ViT-L-14:openai"
+        python3 -m wise.dataloder run data/ --model "ViT-L-14:openai"
 
         # With internvideo
-        python3 -m src run data/ --model "internvideo"
+        python3 -m wise.dataloder run data/ --model "internvideo"
         """
 
         # Define output stream options based on model.
