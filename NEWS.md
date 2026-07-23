@@ -41,6 +41,16 @@ Next version (unreleased)
   option uses the whole filepath, relative to `MEDIA_DIR`, making it
   useful when media files are in a structure of nested directories.
 
+* All entrypoints now have a `--logging-level` option to control the
+  logging level.  All entrypoints default it to info level.
+
+* The default `--shard-maxcount` value in extract-features has been
+  increased from 2048 to 2**19 (524288).  This increases the memory
+  requirements during extract-features by about 2GB.
+
+* There is now a `featured` table in the internal database which can
+  be used to select which vectors/files to shown on the landing page.
+
 
 2.1.0 (2025-02-04)
 ------------------
