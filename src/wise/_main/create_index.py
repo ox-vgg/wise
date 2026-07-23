@@ -21,7 +21,7 @@ from pathlib import Path
 
 from wise import db
 from wise.config import APIConfig
-from wise.index.search_index_factory import SearchIndexFactory
+from wise.index.feature_search_index import FeatureSearchIndex
 from wise.search.fts import FTSSearch
 from wise.wise_project import WiseProject
 
@@ -155,7 +155,7 @@ def main(argv: list[str]):
 
         for feature_extractor_id in feature_extractor_id_list:
             asset = project_assets[media_type][feature_extractor_id]
-            search_index = SearchIndexFactory(
+            search_index = FeatureSearchIndex(
                 media_type, feature_extractor_id, asset
             )
             search_index.create_index(args.index_type, args.overwrite)

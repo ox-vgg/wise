@@ -42,8 +42,8 @@ from wise.data_models import (
 from wise.dataloader import AVDataset
 from wise.feature.feature_extractor_factory import get_feature_extractor_class
 from wise.feature.store import FaissStore
+from wise.index.feature_search_index import FeatureSearchIndex
 from wise.index.search_index import SearchIndex
-from wise.index.search_index_factory import SearchIndexFactory
 from wise.repository import (
     SourceCollectionRepo,
 )
@@ -1059,7 +1059,7 @@ class WiseProject:
                     search_indices[media_type] = {}
 
                 search_indices[media_type][feature_extractor_id] = (
-                    SearchIndexFactory(
+                    FeatureSearchIndex(
                         media_type,
                         feature_extractor_id,
                         project_assets[media_type][feature_extractor_id],
