@@ -15,7 +15,6 @@
 ## limitations under the License.
 
 from wise.index.feature_search_index import FeatureSearchIndex
-from wise.index.sqlite_search_index import SqliteSearchIndex
 
 
 ## FIXME: modality_type is a str because it may have the value
@@ -27,14 +26,12 @@ def SearchIndexFactory(modality_type: str, asset_id, asset):
     Parameters
     ----------
     modality_type : str
-         can be ['audio', 'video', 'image', 'metadata']
+         can be ['audio', 'video', 'image']
     media_assets : dict
          see src/wise_project.py::discover_assets()
 
     """
     if modality_type in ["audio", "video", "image"]:
         return FeatureSearchIndex(modality_type, asset_id, asset)
-    elif modality_type == "metadata":
-        return SqliteSearchIndex(modality_type, asset_id, asset)
     else:
         raise ValueError(f"Unknown modality_type {modality_type}")
