@@ -88,7 +88,7 @@ def main(argv: list[str]):
         "--media-type",
         required=False,
         action="append",
-        choices=["audio", "video", "metadata", "image"],
+        choices=["audio", "video", "image"],
         help="create search index only for these media types; applies to all by default ",
     )
 
