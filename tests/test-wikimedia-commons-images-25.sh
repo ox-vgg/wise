@@ -192,7 +192,7 @@ if [ ! -f "${IMAGE_INDEX_FILENAME1}" ] || [ ! -f "${IMAGE_INDEX_FILENAME2}" ] ||
     FTS_CONFIG_FILE="${WISE_PROJECT_DIR}metadata-fts-config.json"
     echo "{ \"${METADATA_TABLE_NAME}\": [ \"description\", \"date\", \"source_url\", \"author\" ] }" > "${FTS_CONFIG_FILE}"
     python -m wise create-index \
-        --media-type "image" \
+        --modality-type "image" \
         --fts-config "${FTS_CONFIG_FILE}" \
         --index-type "${FAISS_INDEX_TYPE}" \
         --project-dir "$WISE_PROJECT_DIR"

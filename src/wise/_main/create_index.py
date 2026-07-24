@@ -21,6 +21,7 @@ from pathlib import Path
 
 from wise import db
 from wise.config import APIConfig
+from wise.data_models import ModalityType
 from wise.index.feature_search_index import FeatureSearchIndex
 from wise.search.fts import FTSSearch
 from wise.wise_project import WiseProject
@@ -86,6 +87,16 @@ def main(argv: list[str]):
 
     parser.add_argument(
         "--media-type",
+        default=[],
+        required=False,
+        action="append",
+        choices=["audio", "video", "image"],
+        help="alias to --modality-type; kept for backwards compatibility",
+    )
+
+    parser.add_argument(
+        "--modality-type",
+        default=[],
         required=False,
         action="append",
         choices=["audio", "video", "image"],
@@ -135,27 +146,38 @@ def main(argv: list[str]):
 
     project = WiseProject(args.project_dir)
     project_assets = project.discover_assets()
-    media_type_list = list(project_assets.keys())
-    logger.debug("Discovered media types: %s", media_type_list)
-    if args.media_type is not None:
-        media_type_list = list(args.media_type)
+    logger.debug(
+        "Discovered assets for modality types: %s", list(project_assets.keys())
+    )
+
+    modality_types_wanted = set()
+    modality_types_wanted.update([ModalityType(x) for x in args.media_type])
+    modality_types_wanted.update([ModalityType(x) for x in args.modality_type])
+    if not modality_types_wanted:
+        modality_types_wanted.update(list(project_assets.keys()))
+        logger.debug(
+            "No modality types specified on command line; defaulting to all available '%s'",
+            modality_types_wanted,
+        )
 
     if args.fts_config:
         create_fts_index(project, args)
 
-    logger.info("Creating indices for media types: %s", media_type_list)
-    for media_type in media_type_list:
-        feature_extractor_id_list = list(project_assets[media_type].keys())
+    if not modality_types_wanted:
+        logger.info("No index requested for any modality type")
+    for modality_type in modality_types_wanted:
+        logger.info("Creating index for modality types: %s", modality_type)
+        feature_extractor_id_list = list(project_assets[modality_type].keys())
         if args.feature_id:
             if args.feature_id not in feature_extractor_id_list:
                 raise ValueError(
-                    f"feature id {args.feature_id} not found for media type {media_type}"
+                    f"feature id {args.feature_id} not found for modality type {modality_type}"
                 )
             feature_extractor_id_list = [args.feature_id]
 
         for feature_extractor_id in feature_extractor_id_list:
-            asset = project_assets[media_type][feature_extractor_id]
+            asset = project_assets[modality_type][feature_extractor_id]
             search_index = FeatureSearchIndex(
-                media_type, feature_extractor_id, asset
+                modality_type, feature_extractor_id, asset
             )
             search_index.create_index(args.index_type, args.overwrite)

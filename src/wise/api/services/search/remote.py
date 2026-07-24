@@ -108,7 +108,11 @@ class RemoteSearchService:
         all_responses = await asyncio.gather(
             *[
                 project_service.featured(
-                    media_type, feature_extractor_id, start, end, random_seed
+                    media_type,
+                    feature_extractor_id,
+                    start,
+                    end,
+                    random_seed,
                 )
                 for project_service in self.project_services.values()
             ]

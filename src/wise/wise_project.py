@@ -23,6 +23,7 @@ import sqlite3
 from collections import defaultdict
 from functools import cached_property, partial
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import sqlalchemy as sa
@@ -257,7 +258,7 @@ class WiseProject:
         ## Maybe once https://gitlab.com/vgg/wise/wise/-/issues/138,
         ## then doing the whole thing in SQL will be just as fast.
         results = sorted(
-            sorted(results, key=lambda x: x[1]), key=lambda x: x[0]
+            sorted(results, key=lambda x: x[1]), key=lambda x: x[0].name
         )
 
         _assets = None
@@ -273,7 +274,9 @@ class WiseProject:
             _supported[g].update(feature_extractor_ids)
         return _supported
 
-    def discover_assets(self):
+    def discover_assets(
+        self,
+    ) -> dict[ModalityType, dict[str, Any]]:
         """
         Find the location of all assets based on known structure of WISE project folder tree
 
@@ -322,32 +325,44 @@ class WiseProject:
             feature_extractor_id = str(
                 feature_dir.relative_to(self._store_dir).parent
             )
-            available_media_types = set()
+            available_modality_types = set()
             for feature_data in feature_dir.glob("*.*"):
-                media_type = feature_data.stem.split("-", maxsplit=1)[0]
-                available_media_types.add(media_type)
-            for media_type in available_media_types:
-                assets[media_type][feature_extractor_id] = {}
+                modality_type = ModalityType(
+                    feature_data.stem.split("-", maxsplit=1)[0]
+                )
+                available_modality_types.add(modality_type)
+            for modality_type in available_modality_types:
+                assets[modality_type][feature_extractor_id] = {}
         assets = dict(assets)  # defaultdict -> dict
 
         # 2. locate all assets related to each feature-extractor-id
-        for media_type in assets:
-            for feature_extractor_id in assets[media_type]:
+        for modality_type in assets:
+            for feature_extractor_id in assets[modality_type]:
                 these_assets = {}
                 features_root = self._store_dir / feature_extractor_id
                 features_dir = features_root / "features"
                 these_assets["features_root"] = str(features_root)
                 these_assets["features_dir"] = str(features_dir)
                 these_assets["features_files"] = sorted(
-                    [x.name for x in features_dir.glob(media_type + "-*.*")]
+                    [
+                        x.name
+                        for x in features_dir.glob(
+                            modality_type.value + "-*.*"
+                        )
+                    ]
                 )
 
                 index_dir = features_root / "index"
                 these_assets["index_dir"] = str(index_dir)
                 these_assets["index_files"] = sorted(
-                    [x.name for x in index_dir.glob(media_type + "-*.faiss")]
+                    [
+                        x.name
+                        for x in index_dir.glob(
+                            modality_type.value + "-*.faiss"
+                        )
+                    ]
                 )
-                assets[media_type][feature_extractor_id] = these_assets
+                assets[modality_type][feature_extractor_id] = these_assets
 
         for metadata_db in self._metadata_dir.glob("*/*.sqlite"):
             raise Exception(
@@ -1033,44 +1048,31 @@ class WiseProject:
         if self._search_indices is not None:
             return self._search_indices
 
-        search_indices: dict[str, dict[str, SearchIndex]] = {}
+        search_indices: dict[ModalityType, dict[str, SearchIndex]] = {}
         project_assets = self.discover_assets()
 
         fts_search_index = None
         if self.enable_fts():
             fts_search_index = FTSSearch(self, wise_db.project_metadata_obj)
 
-        for media_type in project_assets:
-            if media_type not in {
-                MediaType.IMAGE,
-                MediaType.VIDEO,
-                MediaType.AUDIO,
-            }:
-                # Added to ensure projects created with older versions
-                # remain compatible (TODO: remove this in the future)
-                logger.warning(
-                    "Media type %s is not supported. Please use IMAGE, VIDEO,"
-                    " or AUDIO media types.",
-                    media_type,
-                )
-                continue
-            for feature_extractor_id in project_assets[media_type]:
-                if media_type not in search_indices:
-                    search_indices[media_type] = {}
+        for modality_type in project_assets:
+            for feature_extractor_id in project_assets[modality_type]:
+                if modality_type not in search_indices:
+                    search_indices[modality_type] = {}
 
-                search_indices[media_type][feature_extractor_id] = (
+                search_indices[modality_type][feature_extractor_id] = (
                     FeatureSearchIndex(
-                        media_type,
+                        modality_type,
                         feature_extractor_id,
-                        project_assets[media_type][feature_extractor_id],
+                        project_assets[modality_type][feature_extractor_id],
                     )
                 )
-                asset = project_assets[media_type][feature_extractor_id]
+                asset = project_assets[modality_type][feature_extractor_id]
                 index_type_to_load = preferred_index_type
 
                 if index_type_to_load:
                     # check if the preferred index type is available
-                    preferred_index_filename = search_indices[media_type][
+                    preferred_index_filename = search_indices[modality_type][
                         feature_extractor_id
                     ].get_index_filename(index_type_to_load)
                     if not os.path.exists(preferred_index_filename):
@@ -1098,69 +1100,73 @@ class WiseProject:
                     else:
                         logger.error(
                             "No index files found for %s and %s",
-                            media_type,
+                            modality_type.value,
                             feature_extractor_id,
                         )
-                        del search_indices[media_type][feature_extractor_id]
+                        del search_indices[modality_type][feature_extractor_id]
                         continue
 
                 logger.info(
                     "Loading faiss index from %s",
-                    search_indices[media_type][
+                    search_indices[modality_type][
                         feature_extractor_id
                     ].get_index_filename(index_type_to_load),
                 )
-                if not search_indices[media_type][
+                if not search_indices[modality_type][
                     feature_extractor_id
                 ].load_index(index_type_to_load):
                     logger.error(
                         "Failed to load %s index: %s",
-                        media_type,
+                        modality_type.value,
                         feature_extractor_id,
                     )
-                    del search_indices[media_type][feature_extractor_id]
+                    del search_indices[modality_type][feature_extractor_id]
                     continue
                 if hasattr(
-                    search_indices[media_type][feature_extractor_id].index,
+                    search_indices[modality_type][feature_extractor_id].index,
                     "nprobe",
                 ):
                     # See https://github.com/facebookresearch/faiss/blob/43d86e30736ede853c384b24667fc3ab897d6ba9/faiss/IndexIVF.h#L184C8-L184C42
-                    search_indices[media_type][
+                    search_indices[modality_type][
                         feature_extractor_id
                     ].index.parallel_mode = 1
-                    search_indices[media_type][
+                    search_indices[modality_type][
                         feature_extractor_id
                     ].index.nprobe = default_nprobe
 
-                    if not search_indices[media_type][
+                    if not search_indices[modality_type][
                         feature_extractor_id
                     ].is_internal_search_supported:
                         logger.info(
                             "This faiss index does not support internal search."
                             " To enable internal search, please re-create the"
                             " index by running `python -m wise create-index"
-                            " --project-dir '%s' --media-type %s "
+                            " --project-dir '%s' --modality-type %s "
                             " --index-type %s --overwrite`",
                             self._project_dir,
-                            media_type,
-                            search_indices[media_type][
+                            modality_type.value,
+                            search_indices[modality_type][
                                 feature_extractor_id
                             ].index_type,
                         )
             # TODO: Fix this to handle audio when support gets added
-            if fts_search_index is not None and media_type in {
-                MediaType.IMAGE,
-                MediaType.VIDEO,
+            if fts_search_index is not None and modality_type in {
+                ModalityType.IMAGE,
+                ModalityType.VIDEO,
             }:
-                search_indices[media_type]["wise/metadata"] = fts_search_index
+                search_indices[modality_type][
+                    "wise/metadata"
+                ] = fts_search_index
 
         is_audio_only_project = (
-            MediaType.VIDEO not in search_indices
-            and MediaType.AUDIO in search_indices
+            ModalityType.VIDEO not in search_indices
+            and ModalityType.AUDIO in search_indices
             and len(search_indices[MediaType.AUDIO]) > 0
         )
         if fts_search_index is not None and is_audio_only_project:
-            search_indices[MediaType.AUDIO]["wise/metadata"] = fts_search_index
+            search_indices[ModalityType.AUDIO][
+                "wise/metadata"
+            ] = fts_search_index
 
         self._search_indices = search_indices
         return search_indices
@@ -1617,20 +1623,19 @@ class WiseProject:
         def copy_vectors(
             conn: sa.Connection,
             other_conn: sa.Connection,
-            media_type: ModalityType,
+            modality_type: ModalityType,
             feature_extractor_id: str,
             other_store: FaissStore,
         ):
             logger.info(
                 "copying for feature_extractor - %s (%s)",
                 feature_extractor_id,
-                media_type,
+                modality_type.value,
             )
             feature_count = other_store.feature_count
             self.create_features_dir(feature_extractor_id)
             store = FaissStore(
-                ModalityType(media_type),
-                self.features_dir(feature_extractor_id),
+                modality_type, self.features_dir(feature_extractor_id)
             )
             store.enable_write()
 
@@ -1706,9 +1711,13 @@ class WiseProject:
                         vector = other_vectors[feature_id]
                         new_media_id = vector["media_id"]
                         min_ts = min_time_stamp_per_media_id.get(
-                            (new_media_id, media_type, feature_extractor_id),
+                            (
+                                new_media_id,
+                                modality_type,
+                                feature_extractor_id,
+                            ),
                             min_time_stamp_per_media_id.get(
-                                (new_media_id, media_type, ""), -1
+                                (new_media_id, modality_type, ""), -1
                             ),
                         )
                         if vector["timestamp"] <= min_ts:
@@ -1764,23 +1773,22 @@ class WiseProject:
                 "copied %d vectors over for feature extractor - %s (%s)",
                 total_copied,
                 feature_extractor_id,
-                media_type,
+                modality_type.value,
             )
 
         with (
             self.db_engine.connect() as conn,
             other.db_engine.connect() as other_conn,
         ):
-            for media_type in supported_assets:
-                for feature_extractor_id in supported_assets[media_type]:
+            for modality_type in supported_assets:
+                for feature_extractor_id in supported_assets[modality_type]:
                     other_store = FaissStore(
-                        ModalityType(media_type),
-                        other.features_dir(feature_extractor_id),
+                        modality_type, other.features_dir(feature_extractor_id)
                     )
                     copy_vectors(
                         conn,
                         other_conn,
-                        media_type,
+                        modality_type,
                         feature_extractor_id,
                         other_store,
                     )
@@ -1814,18 +1822,18 @@ class WiseProject:
 
         def cleanup_features():
             other_assets = other.discover_assets()
-            for media_type in other_assets:
-                for feature_extractor_id in other_assets[media_type]:
-                    if media_type not in supported_assets:
+            for modality_type in other_assets:
+                for feature_extractor_id in other_assets[modality_type]:
+                    if modality_type not in supported_assets:
                         for p in self.features_dir(feature_extractor_id).rglob(
-                            f"{media_type}-*"
+                            f"{modality_type.value}-*"
                         ):
                             logger.info("Deleting '%s'", p)
                             p.unlink(missing_ok=True)
 
                     elif (
                         feature_extractor_id
-                        not in supported_assets[media_type]
+                        not in supported_assets[modality_type]
                     ):
                         logger.info(
                             "Deleting directory of %s from project",
@@ -1835,11 +1843,11 @@ class WiseProject:
 
                     else:
                         for p in self.features_dir(feature_extractor_id).rglob(
-                            f"{media_type}-*"
+                            f"{modality_type.value}-*"
                         ):
                             if (
                                 p.name
-                                not in supported_assets[media_type][
+                                not in supported_assets[modality_type][
                                     feature_extractor_id
                                 ]["features_files"]
                             ):

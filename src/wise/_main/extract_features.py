@@ -950,7 +950,7 @@ def main(argv: list[str]):
 
         def handle_chunk(
             chunk: MediaChunk,
-            media_type: MediaChunkType,
+            modality_type: ModalityType,
             feature_extractor_id: str,
         ):
             segment_tensor = chunk.tensor
@@ -958,20 +958,20 @@ def main(argv: list[str]):
 
             if segment_tensor is None or segment_tensor.shape[0] == 0:
                 logger.warning(
-                    "Skipping empty segment for media_id=%d, media_type=%s,"
+                    "Skipping empty segment for media_id=%d, modality_type=%s,"
                     " feature_extractor_id=%s",
                     mid,
-                    media_type,
+                    modality_type,
                     feature_extractor_id,
                 )
                 return
 
-            feature_extractor = feature_extractors[media_type][
+            feature_extractor = feature_extractors[modality_type][
                 feature_extractor_id
             ]
-            feature_store = feature_stores[media_type][feature_extractor_id]
+            feature_store = feature_stores[modality_type][feature_extractor_id]
 
-            if media_type == MediaType.VIDEO and _segment_level_run:
+            if modality_type is ModalityType.VIDEO and _segment_level_run:
                 # Segment-level video extractor (e.g. Qwen3-VL): one vector per segment
                 segment_feature = (
                     feature_extractor.extract_video_segment_features(
@@ -980,15 +980,13 @@ def main(argv: list[str]):
                 )
                 pbar.update(1)
 
-            elif (
-                media_type == MediaType.IMAGE or media_type == MediaType.VIDEO
-            ):
+            elif modality_type in [ModalityType.IMAGE, ModalityType.VIDEO]:
                 segment_feature = feature_extractor.extract_image_features(
                     segment_tensor
                 )
                 pbar.update(segment_tensor.shape[0])
 
-            elif media_type == MediaType.AUDIO:
+            elif modality_type is ModalityType.AUDIO:
                 if segment_tensor.shape[2] < audio_frames_per_chunk:
                     # we discard any malformed audio segments
                     return
@@ -997,15 +995,15 @@ def main(argv: list[str]):
                 )
                 pbar.update(segment_tensor.shape[0])
             else:
-                raise ValueError(f"Unknown media_type {media_type}")
+                raise ValueError(f"Unhandled modality_type {modality_type}")
 
             # TODO: Update based on model - internvideo might need end timestamp, whereas clip might not
-            if _segment_level_run and media_type == MediaType.VIDEO:
+            if _segment_level_run and modality_type is ModalityType.VIDEO:
                 # Store one vector for the whole segment with (timestamp, end_timestamp)
                 feature_metadata = VectorRepo.create(
                     conn,
                     data=VectorMetadata(
-                        modality=media_type,
+                        modality=modality_type,
                         feature_extractor_id=feature_extractor_id,
                         media_id=mid,
                         timestamp=segment_pts,
@@ -1013,9 +1011,7 @@ def main(argv: list[str]):
                     ),
                 )
                 feature_store.add(feature_metadata.id, segment_feature.vectors)
-            elif (
-                media_type == MediaType.IMAGE or media_type == MediaType.VIDEO
-            ):
+            elif modality_type in [ModalityType.IMAGE, ModalityType.VIDEO]:
                 # Frame-level: one vector per frame (image or frame-level video)
                 for frame_idx, frame_features in enumerate(segment_feature):
                     vector_ids: list[int] = []
@@ -1030,7 +1026,7 @@ def main(argv: list[str]):
                         feature_metadata = VectorRepo.create(
                             conn,
                             data=VectorMetadata(
-                                modality=media_type,
+                                modality=modality_type,
                                 feature_extractor_id=feature_extractor_id,
                                 media_id=mid,
                                 timestamp=frame_timestamp,
@@ -1051,7 +1047,7 @@ def main(argv: list[str]):
                 feature_metadata = VectorRepo.create(
                     conn,
                     data=VectorMetadata(
-                        modality=media_type,
+                        modality=modality_type,
                         feature_extractor_id=feature_extractor_id,
                         media_id=mid,
                         timestamp=_start_time,
@@ -1061,38 +1057,41 @@ def main(argv: list[str]):
                 feature_store.add(feature_metadata.id, segment_feature)
 
         for idx, (mid, chunks) in enumerate(av_data_loader):
-            for media_type in chunks:
+            for media_chunk_type in chunks:
+                if media_chunk_type is MediaChunkType.THUMBNAILS:
+                    continue
+                modality_type = ModalityType.from_media(media_chunk_type)
                 if (
-                    media_type not in feature_extractors
-                    or chunks[media_type] is None
+                    modality_type not in feature_extractors
+                    or chunks[media_chunk_type] is None
                 ):
                     # This is a single chunk, not a dictionary of chunks
                     logger.debug(
                         "Skipping empty / irrelevant chunk for media_id=%d,"
-                        " media_type=%s",
+                        " media_chunk_type=%s",
                         mid,
-                        media_type,
+                        media_chunk_type,
                     )
                     continue
-                if isinstance(chunks[media_type], MediaChunk):
+                chunk_feature_extractors = feature_extractors[modality_type]
+                if isinstance(chunks[media_chunk_type], MediaChunk):
                     # We are somehow reading a chunk without any feature extractor ids - must be thumbnails or reading audio / video while only requesting video / audio features
                     continue
-                for feature_extractor_id in chunks[media_type]:
-                    _chunk = chunks[media_type][feature_extractor_id]
+                for feature_extractor_id in chunks[media_chunk_type]:
+                    _chunk = chunks[media_chunk_type][feature_extractor_id]
                     if (
                         _chunk is None
-                        or feature_extractor_id
-                        not in feature_extractors[media_type]
+                        or feature_extractor_id not in chunk_feature_extractors
                     ):
                         logger.debug(
                             "Skipping empty / irrelevant chunk for media_id=%d,"
-                            " media_type=%s, feature_extractor_id=%s",
+                            " media_chunk_type=%s, feature_extractor_id=%s",
                             mid,
-                            media_type,
+                            media_chunk_type,
                             feature_extractor_id,
                         )
                         continue
-                    handle_chunk(_chunk, media_type, feature_extractor_id)
+                    handle_chunk(_chunk, modality_type, feature_extractor_id)
 
             if "thumbnails" in chunks and chunks["thumbnails"] is not None:
                 # Handle thumbnails

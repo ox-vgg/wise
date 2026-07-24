@@ -29,7 +29,7 @@ from wise.api.services.project.exceptions import (
     ThumbnailNotFoundException,
 )
 from wise.config import APIConfig
-from wise.data_models import MediaType, VectorAndMediaMetadata
+from wise.data_models import ModalityType, VectorAndMediaMetadata
 from wise.repository import get_featured_images
 from wise.utils import convert_uint8array_to_base64
 from wise.wise_project import WiseProject
@@ -169,10 +169,12 @@ class LocalWiseProjectService(WiseProjectService):
     def related_vectors(self, vector_id: int) -> list:
         return self.wise_project.related_vectors(vector_id)
 
-    def featured_vectors_for_targets(self) -> dict[str, dict[str, list[int]]]:
+    def featured_vectors_for_targets(
+        self,
+    ) -> dict[ModalityType, dict[str, list[int]]]:
         project_engine = self.wise_project.db_engine
         # Generate a list of random featured images for each modality and feature extractor
-        ids: dict[str : dict[str : list[int]]] = {}
+        ids: dict[ModalityType, dict[str, list[int]]] = {}
         search_targets = self.search_indices
         with project_engine.connect() as conn:
             for modality in search_targets:
@@ -265,9 +267,9 @@ class LocalWiseProjectService(WiseProjectService):
 
     def get_active_search_targets(
         self, search_target_order: list[str] | None = None
-    ):
+    ) -> dict[ModalityType, list[str]]:
 
-        active_search_targets: dict[str, list[str]] = {
+        active_search_targets: dict[ModalityType, list[str]] = {
             k: list(self.search_indices[k].keys()) for k in self.search_indices
         }
 
@@ -283,7 +285,7 @@ class LocalWiseProjectService(WiseProjectService):
         )
 
         # sort active search targets based on user defined order in config.search_target_order
-        for media_type in active_search_targets:
+        for modality_type in active_search_targets:
 
             def sort_key(x):
                 for i, partial in enumerate(_search_target_order):
@@ -291,9 +293,13 @@ class LocalWiseProjectService(WiseProjectService):
                         return i
                 return len(_search_target_order)
 
-            active_search_targets[media_type].sort(key=sort_key)
+            active_search_targets[modality_type].sort(key=sort_key)
 
-        preferred_order = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO]
+        preferred_order = [
+            ModalityType.IMAGE,
+            ModalityType.VIDEO,
+            ModalityType.AUDIO,
+        ]
         active_search_targets = {
             x: active_search_targets[x]
             for x in sorted(
@@ -301,7 +307,6 @@ class LocalWiseProjectService(WiseProjectService):
                 key=lambda x: preferred_order.index(x),
             )
         }
-
         return active_search_targets
 
     def get_vector_and_media_metadata_for_ids(

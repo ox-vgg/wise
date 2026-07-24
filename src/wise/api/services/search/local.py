@@ -24,7 +24,7 @@ from wise.api.services.embedding import EmbeddingConfig, EmbeddingService
 from wise.api.services.project import LocalWiseProjectService
 from wise.api.services.search.base import SearchOutput
 from wise.api.services.search.exceptions import UnknownSearchIndexError
-from wise.data_models import MediaType
+from wise.data_models import ModalityType
 from wise.feature.feature_extractor import FeatureExtMetadata
 from wise.search.fts import WISEFTSQuery
 from wise.wise_project import WiseProject
@@ -47,21 +47,24 @@ class LocalSearchService:
         self._featured_ids = project_service.featured_vectors_for_targets()
 
     def is_internal_search_supported(
-        self, media_type: MediaType, feature_id: str
+        self, modality_type: ModalityType, feature_id: str
     ) -> bool:
-        search_index = self.search_indices[media_type][feature_id]
+        search_index = self.search_indices[modality_type][feature_id]
         return search_index.is_internal_search_supported
 
     def get_search_index_type(
-        self, media_type: MediaType, feature_id: str
+        self, modality_type: ModalityType, feature_id: str
     ) -> str:
-        search_index = self.search_indices[media_type][feature_id]
+        search_index = self.search_indices[modality_type][feature_id]
         return search_index.index_type
 
     def reconstruct_vectors(
-        self, media_type: MediaType, feature_id: str, vector_ids: list[int]
+        self,
+        modality_type: ModalityType,
+        feature_id: str,
+        vector_ids: list[int],
     ) -> list[np.ndarray]:
-        search_index = self.search_indices[media_type][feature_id]
+        search_index = self.search_indices[modality_type][feature_id]
         reconstructed_features = search_index.index.reconstruct_batch(
             vector_ids
         )
@@ -75,7 +78,7 @@ class LocalSearchService:
     def search_with_feature(
         self,
         features: np.ndarray,
-        media_type: MediaType,
+        modality_type: ModalityType,
         feature_extractor_id: str,
         start: int,
         end: int,
@@ -83,12 +86,12 @@ class LocalSearchService:
         vector_id_constraint: np.ndarray | None = None,
         nprobe_override: int | None = None,
     ):
-        search_index = self.search_indices[media_type][feature_extractor_id]
+        search_index = self.search_indices[modality_type][feature_extractor_id]
         if not filter_specs and vector_id_constraint is None:
             # search on full index without any filtering
             logger.info(
-                "Performing search - media_type=%s, feature_extractor_id=%s",
-                media_type,
+                "Performing search - modality_type=%s, feature_extractor_id=%s",
+                modality_type,
                 feature_extractor_id,
             )
             dist, ids = search_index.index.search(features, end)
@@ -97,18 +100,18 @@ class LocalSearchService:
             filtered_ids = None
             if filter_specs:
                 logger.info(
-                    "Applying filters for search - media_type=%s, feature_extractor_id=%s, filter_specs=%s",
-                    media_type,
+                    "Applying filters for search - modality_type=%s, feature_extractor_id=%s, filter_specs=%s",
+                    modality_type,
                     feature_extractor_id,
                     filter_specs,
                 )
                 filtered_ids = self.filter_vectors(
-                    media_type, feature_extractor_id, filter_specs
+                    modality_type, feature_extractor_id, filter_specs
                 )
             if vector_id_constraint is not None:
                 logger.info(
-                    "Applying vector ID constraint for search - media_type=%s, feature_extractor_id=%s, num_ids=%d",
-                    media_type,
+                    "Applying vector ID constraint for search - modality_type=%s, feature_extractor_id=%s, num_ids=%d",
+                    modality_type,
                     feature_extractor_id,
                     len(vector_id_constraint),
                 )
@@ -143,8 +146,8 @@ class LocalSearchService:
                     f"Unknown index type: {search_index.index_type}"
                 )
             logger.info(
-                "Performing filtered search - media_type=%s, feature_extractor_id=%s, num_filtered_ids=%d",
-                media_type,
+                "Performing filtered search - modality_type=%s, feature_extractor_id=%s, num_filtered_ids=%d",
+                modality_type,
                 feature_extractor_id,
                 len(filtered_ids),
             )
@@ -185,7 +188,7 @@ class LocalSearchService:
         self,
         q: Query,
         embedding_config: EmbeddingConfig,
-        media_type: MediaType,
+        modality_type: ModalityType,
         feature_extractor_id: str,
         start: int,
         end: int,
@@ -197,7 +200,7 @@ class LocalSearchService:
         )
         return self.search_with_feature(
             features,
-            media_type,
+            modality_type,
             feature_extractor_id,
             start,
             end,
@@ -206,9 +209,13 @@ class LocalSearchService:
         )
 
     def asr_search(
-        self, q: WISEFTSQuery, media_type: MediaType, start: int, end: int
+        self,
+        q: WISEFTSQuery,
+        modality_type: ModalityType,
+        start: int,
+        end: int,
     ):
-        search_index = self.search_indices[media_type]["wise/metadata"]
+        search_index = self.search_indices[modality_type]["wise/metadata"]
         project_engine = self.wise_project.db_engine
         with project_engine.connect() as conn:
             all_metadata = search_index.search(conn, q, start, end)
@@ -224,7 +231,7 @@ class LocalSearchService:
 
     def filter_vectors(
         self,
-        media_type: MediaType,
+        modality_type: ModalityType,
         feature_extractor_id: str,
         filter_spec: dict,
     ) -> np.ndarray:
@@ -234,14 +241,14 @@ class LocalSearchService:
         metadata_query = filter_spec.get("metadata_query", None)
         if metadata_query:
             with project_engine.connect() as conn:
-                media_ids = self.search_indices[media_type][
+                media_ids = self.search_indices[modality_type][
                     "wise/metadata"
                 ].search(conn, metadata_query, ids_only=True)
                 if not media_ids:
                     return id_constraint
 
                 vector_ids = self.wise_project.get_vector_ids(
-                    media_ids, media_type, feature_extractor_id
+                    media_ids, modality_type, feature_extractor_id
                 )
                 id_constraint = np.array(vector_ids, dtype=np.int64)
 
@@ -252,7 +259,7 @@ class LocalSearchService:
 
                 result = self.wise_project.get_vector_ids_for_shot_scale(
                     shot_scales,
-                    media_type,
+                    modality_type,
                     feature_extractor_id,
                 )
                 shot_scale_constraint = np.array(result, dtype=np.int64)
@@ -265,7 +272,7 @@ class LocalSearchService:
 
     def featured(
         self,
-        media_type: MediaType,
+        modality_type: ModalityType,
         feature_extractor_id: str,
         start: int,
         end: int,
@@ -278,17 +285,17 @@ class LocalSearchService:
             # is a FTS search index and it does not support "feature_extractor.get_vector_metadata()"
             other_ids = [
                 fid
-                for fid in self._featured_ids[media_type]
+                for fid in self._featured_ids[modality_type]
                 if fid != "wise/metadata"
             ]
             if not other_ids:
                 selected_ids = []  # i.e featured images not available
             else:
-                selected_ids = self._featured_ids[media_type][
+                selected_ids = self._featured_ids[modality_type][
                     other_ids[0]
                 ].copy()
         else:
-            selected_ids = self._featured_ids[media_type][
+            selected_ids = self._featured_ids[modality_type][
                 feature_extractor_id
             ].copy()
 

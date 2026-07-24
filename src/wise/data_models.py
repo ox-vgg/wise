@@ -27,18 +27,33 @@ class SourceCollectionType(Enum):
     WEBDATASET = "webdataset"
 
 
-class MediaType(str, Enum):
+class MediaChunkType(Enum):
+    AUDIO = "audio"
+    VIDEO = "video"
+    THUMBNAILS = "thumbnails"
+    IMAGE = "image"
+
+
+class MediaType(Enum):
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
     AV = "av"
 
+    @classmethod
+    def from_modality(cls, modality_type: "ModalityType"):
+        return cls[modality_type.name]
 
-class ModalityType(str, Enum):
+
+class ModalityType(Enum):
     TEXT = "text"
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+
+    @classmethod
+    def from_media(cls, media_type: MediaType | MediaChunkType):
+        return cls[media_type.name]
 
 
 class SourceCollection(BaseModel):
@@ -107,13 +122,6 @@ class VideoShot(BaseModel):
     shot_scale: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class MediaChunkType(str, Enum):
-    AUDIO = "audio"
-    VIDEO = "video"
-    THUMBNAILS = "thumbnails"
-    IMAGE = "image"
 
 
 @dataclasses.dataclass

@@ -15,14 +15,14 @@
 from typing import Hashable, Iterable, TypeVar
 
 from wise.api.common import MediaQueryTerm, Query, TextQueryTerm
-from wise.data_models import MediaType
+from wise.data_models import ModalityType
 
 T = TypeVar("T")
 
 
 def get_face_text_embedder_id(
-    media_type: MediaType,
-    search_targets: dict[MediaType, list[str]],
+    modality_type: ModalityType,
+    search_targets: dict[ModalityType, list[str]],
     embedding_service,
     preferred_id: str | None = None,
     excluded_ids: set[str] | None = None,
@@ -37,7 +37,7 @@ def get_face_text_embedder_id(
         ):
             return preferred_id
 
-    for candidate_id in search_targets.get(media_type, []):
+    for candidate_id in search_targets.get(modality_type, []):
         if candidate_id in excluded_ids or candidate_id == "wise/metadata":
             continue
         if "clip" not in candidate_id.lower():
@@ -173,7 +173,7 @@ def fuse_face_text_frame_results(
 async def run_face_text_search(
     q: Query | None = None,
     *,
-    media_type: MediaType,
+    modality_type: ModalityType,
     feature_extractor_id: str,
     text_feature_extractor_id: str,
     embedding_config,

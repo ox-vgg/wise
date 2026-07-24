@@ -560,16 +560,18 @@ class FTSSearch:
                     m = vector_media_metadata.model_copy(
                         update={
                             "modality": (
-                                media_metadata.media_type
-                                if media_metadata.media_type != MediaType.AV
-                                else MediaType.VIDEO
+                                ModalityType.VIDEO
+                                if media_metadata.media_type is MediaType.AV
+                                else ModalityType.from_media(
+                                    media_metadata.media_type
+                                )
                             ),
                             "timestamp": s["start"],
                             "end_timestamp": s["end"],
                         }
                     )
                     responses.append(m)
-                    if media_metadata.media_type == MediaType.AV:
+                    if media_metadata.media_type is MediaType.AV:
                         m_audio = m.model_copy(
                             update={"modality": ModalityType.AUDIO}
                         )
@@ -579,16 +581,18 @@ class FTSSearch:
                 m = vector_media_metadata.model_copy(
                     update={
                         "modality": (
-                            media_metadata.media_type
-                            if media_metadata.media_type != MediaType.AV
-                            else MediaType.VIDEO
+                            ModalityType.VIDEO
+                            if media_metadata.media_type is MediaType.AV
+                            else ModalityType.from_media(
+                                media_metadata.media_type
+                            )
                         ),
                         "timestamp": 0,
                         "end_timestamp": None,
                     }
                 )
                 responses.append(m)
-                if media_metadata.media_type == MediaType.AV:
+                if media_metadata.media_type is MediaType.AV:
                     m_audio = m.model_copy(
                         update={"modality": ModalityType.AUDIO}
                     )
