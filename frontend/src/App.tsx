@@ -31,6 +31,7 @@ import {
 import { fetchWithTimeout, is_metadata_supported } from './misc/utils.ts';
 import { useDataService } from './DataService.ts';
 
+import config from './config';
 
 export const App: React.FunctionComponent = () => {
   const [multimodalQueries, setMultimodalQueries] = useState<Query[]>([]); // Stores the file, URL, and text queries
@@ -64,7 +65,26 @@ export const App: React.FunctionComponent = () => {
         return response.json();
       })
       .then((data: ProjectInfo) => {
-        data.is_metadata_supported = is_metadata_supported(data);; // Add is_metadata_supported to projectInfo
+        data.is_metadata_supported = is_metadata_supported(data); // Add is_metadata_supported to projectInfo
+        // Display maybe only selected search targets
+        if (config.DISPLAYED_SEARCH_TARGETS !== undefined
+            && data.search_targets !== undefined) {
+          for (const [key, values] of Object.entries(data.search_targets)) {
+            const media_type = key as keyof typeof data.search_targets;
+            if (media_type in config.DISPLAYED_SEARCH_TARGETS) {
+              // Extract the value out to use inside the filter anonymous function
+              // So that when the filter runs, we are sure the targes are not
+              // undefined (Even though we dont change config typically)
+              // See [MR-148](https://gitlab.com/vgg/wise/wise/-/merge_requests/148)
+              const targets = config.DISPLAYED_SEARCH_TARGETS[media_type];
+              data.search_targets[media_type] = values.filter(
+                x => targets.includes(x)
+              );
+            } else {
+              delete data.search_targets[media_type];
+            }
+          }
+        }
         setProjectInfo(data);
       })
       .catch((err) => {

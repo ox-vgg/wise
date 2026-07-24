@@ -37,6 +37,7 @@ type ConfigType = {
   METADATA_TABLE_COLUMNS?: string[];
   METADATA_FILTER_PLACEHOLDER?: string;
   METADATA_FILTER_HELP?: string;
+  DISPLAYED_SEARCH_TARGETS?: Record<string, string[]>;
   PREFERRED_SEARCH_TARGETS_NAME: Record<string, string>;
 };
 
