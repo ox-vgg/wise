@@ -73,6 +73,29 @@ const productionConfig = {
   METADATA_TABLE_COLUMNS: [],
   METADATA_FILTER_PLACEHOLDER: "",
   METADATA_FILTER_HELP: "Use AND/OR to combine filters, Ctrl + Space key to show metadata columns.",
+
+  // Select which of search targets to be displayed on the frontend
+  // for each media type.  If DISPLAYED_SEARCH_TARGETS is undefined
+  // then all search targets announced by the backend will be
+  // displayed.
+  //
+  // NB 1: *undefined* DISPLAYED_SEARCH_TARGETS is different from
+  // empty.  If DISPLAYED_SEARCH_TARGETS is empty it means none of the
+  // search targets will be displayed.
+  //
+  // NB 2: this option only affects what search targets are displayed
+  // on the frontend.  All search targets announced by the backend
+  // remain available for people to directly make queries against,
+  // i.e., this option provides no security against abuse or privacy.
+  // DISPLAYED_SEARCH_TARGETS: {
+  //   "image" : [
+  //     "mlfoundations/open_clip/ViT-B-16-SigLIP2-512/webli",
+  //     "deepinsight/insightface/buffalo_l/_",
+  //     "wise/metadata"
+  //   ],
+  //   "video": [],
+  //   "audio":[]
+  // },
   PREFERRED_SEARCH_TARGETS_NAME: {
     "mlfoundations/open_clip/": "Visual",
     "deepinsight/insightface/": "Faces",
