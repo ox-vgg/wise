@@ -199,14 +199,14 @@ def construct_video_search_response(
 
     shots = get_shots_from_segments(segments, merge_function=merge_function)
 
-    if search_in == MediaType.VIDEO:
+    if search_in is MediaType.VIDEO:
         return common.VideoResults(
             total=300,  # TODO change this
             unmerged_windows=segments,
             merged_windows=shots,
             videos=videos,
         )
-    elif search_in == MediaType.AV:
+    elif search_in is MediaType.AV:
         return common.VideoAudioResults(
             total=300,  # TODO change this
             unmerged_windows=segments,
@@ -277,11 +277,11 @@ def construct_search_response(
     video_audio_results = None
     video_results = None
     image_results = None
-    if search_in is None or search_in == MediaType.IMAGE:
+    if search_in is None or search_in is MediaType.IMAGE:
         image_indices = [
             i
             for i, x in enumerate(all_metadata)
-            if x.modality == ModalityType.IMAGE
+            if x.modality is ModalityType.IMAGE
         ]
         if len(image_indices) > 0:
             image_top_dist = [top_dist[i] for i in image_indices]
@@ -294,11 +294,11 @@ def construct_search_response(
                 image_ext_metadata,
                 image_thumbs,
             )
-    if search_in is None or search_in == MediaType.VIDEO:
+    if search_in is None or search_in is MediaType.VIDEO:
         video_indices = [
             i
             for i, x in enumerate(all_metadata)
-            if x.modality == ModalityType.VIDEO
+            if x.modality is ModalityType.VIDEO
         ]
         if len(video_indices) > 0:
             video_top_dist = [top_dist[i] for i in video_indices]
@@ -313,12 +313,12 @@ def construct_search_response(
                 video_thumbs,
                 merge_function,
             )
-    if search_in is None or search_in == MediaType.AV:
+    if search_in is None or search_in is MediaType.AV:
         av_indices = [
             i
             for i, x in enumerate(all_metadata)
-            if x.modality == ModalityType.AUDIO
-            and x.media_type == MediaType.AV
+            if x.modality is ModalityType.AUDIO
+            and x.media_type is MediaType.AV
         ]
         if len(av_indices) > 0:
             av_top_dist = [top_dist[i] for i in av_indices]
@@ -360,22 +360,26 @@ def get_prefix(config: APIConfig):
     }
 
 
-def get_media_type(search_in: Annotated[MediaType, fastapi.Query()]):
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
-    return media_type
+def get_modality_type(
+    search_in: Annotated[MediaType, fastapi.Query()],
+) -> ModalityType:
+    if search_in is MediaType.AV:
+        return ModalityType.AUDIO
+    else:
+        return ModalityType.from_media(search_in)
 
 
 def validate_search_targets(
     search_in: Annotated[MediaType, fastapi.Query()],
     project_info: ProjectInfoDep,
 ):
-    media_type = get_media_type(search_in)
     search_targets = project_info.search_targets
-    if media_type not in search_targets:
+    modality_type = get_modality_type(search_in)
+    if modality_type not in search_targets:
         raise HTTPException(
             400,
             {
-                "message": f"No search index exists for this modality: {media_type}"
+                "message": f"No search index exists for this modality: {search_in}"
             },
         )
     return search_in
@@ -401,21 +405,21 @@ def reconstruct_vectors(
         default=[]
     ),  # ids to internal images
 ):
-    media_type = get_media_type(search_in)
+    modality_type = get_modality_type(search_in)
     if not internal_ids:
         vectors = np.array([])
         response = common.NPArray.from_array(vectors)
         return response
 
     if cast(LocalSearchService, search_service).is_internal_search_supported(
-        media_type, feature_extractor_id
+        modality_type, feature_extractor_id
     ):
         try:
             # reconstruct features from faiss index
             vectors = cast(
                 LocalSearchService, search_service
             ).reconstruct_vectors(
-                media_type, feature_extractor_id, internal_ids
+                modality_type, feature_extractor_id, internal_ids
             )
         except Exception as e:
             logger.exception(e)
@@ -426,14 +430,14 @@ def reconstruct_vectors(
     else:
         index_type = cast(
             LocalSearchService, search_service
-        ).get_search_index_type(media_type, feature_extractor_id)
+        ).get_search_index_type(modality_type, feature_extractor_id)
         logger.exception(
             "This faiss index does not support internal search.  To enable"
             " internal search, please re-create the index by running"
-            " `python -m wise create-index --project-dir '%s' --media-type %s"
-            " --index-type %s --overwrite`",
+            " `python -m wise create-index --project-dir '%s'"
+            "  --modality-type %s --index-type %s --overwrite`",
             config.project_dir,
-            media_type,
+            modality_type,
             index_type,
         )
         return PlainTextResponse(
@@ -460,7 +464,7 @@ def build_filter_specs(shot_scale: list[int], metadata_filter: list[str]):
 def replace_vector_ids_with_search_embeddings(
     search_service,
     embedding_service,
-    media_type,
+    modality_type: ModalityType,
     feature_extractor_id,
     q: Query,
 ) -> Query:
@@ -476,7 +480,7 @@ def replace_vector_ids_with_search_embeddings(
 
     ## Reconstruct features from faiss index
     embeddings = search_service.reconstruct_vectors(
-        media_type, feature_extractor_id, vector_ids
+        modality_type, feature_extractor_id, vector_ids
     )
     ## Apply hook to transform internal image query vectors
     search_embeddings = [
@@ -520,7 +524,7 @@ def search_output_to_response(
     merge_function = merge_close_segments
 
     # supports shots
-    is_shot_merge_supported = config.use_shots and search_in == MediaType.VIDEO
+    is_shot_merge_supported = config.use_shots and search_in is MediaType.VIDEO
     if merge_shots_if_supported and is_shot_merge_supported:
         merge_function = functools.partial(
             get_shots_from_keyframes, project_service.wise_project
@@ -562,12 +566,12 @@ def _search_metadata(
             400, {"message": "'start' cannot be greater than 'end'"}
         )
 
-    media_type = get_media_type(search_in)
+    modality_type = get_modality_type(search_in)
     text_queries = [x.txt for x in q]
     # TODO escape special characters
     text = " ".join(text_queries)
     fts_q = WISEFTSQuery.model_validate({"$match": text})
-    search_output = search_service.asr_search(fts_q, media_type, start, end)
+    search_output = search_service.asr_search(fts_q, modality_type, start, end)
 
     return search_output_to_response(
         config,
@@ -587,7 +591,7 @@ async def _search_rrf(
     embedding_service: EmbeddingServiceDep,
     search_service: LocalSearchService,
     search_in: MediaType,
-    media_type: MediaType,
+    modality_type: ModalityType,
     feature_extractor_id: str,
     text_feature_extractor_id: str,
     q: Query,
@@ -626,7 +630,7 @@ async def _search_rrf(
         fused,
     ) = await run_face_text_search_standalone(
         q,
-        media_type=media_type,
+        modality_type=modality_type,
         feature_extractor_id=feature_extractor_id,
         text_feature_extractor_id=text_feature_extractor_id,
         embedding_config=embedding_config,
@@ -726,10 +730,10 @@ async def _search_multimodal(
     )
 
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
-    media_type = get_media_type(search_in)
+    modality_type = get_modality_type(search_in)
     search_output = search_service.search_with_feature(
         features,
-        media_type=media_type,
+        modality_type=modality_type,
         feature_extractor_id=feature_extractor_id,
         start=start,
         end=end,
@@ -806,23 +810,23 @@ async def _search(
                 400, {"message": "Cannot search on audio using a visual query"}
             )
 
-    media_type = get_media_type(search_in)
+    modality_type = get_modality_type(search_in)
 
     if any(
         [isinstance(x, VectorIdQueryTerm) for x in q]
     ) and not search_service.is_internal_search_supported(
-        media_type, feature_extractor_id
+        modality_type, feature_extractor_id
     ):
         index_type = search_service.get_search_index_type(
-            media_type, feature_extractor_id
+            modality_type, feature_extractor_id
         )
         logger.exception(
             "This faiss index does not support internal search.  To enable"
             " internal search, please re-create the index by running"
-            " `python -m wise create-index --project-dir '%s' --media-type %s"
-            " --index-type %s --overwrite`",
+            " `python -m wise create-index --project-dir '%s'"
+            "  --modality-type %s --index-type %s --overwrite`",
             config.project_dir,
-            media_type,
+            modality_type,
             index_type,
         )
         raise HTTPException(
@@ -836,7 +840,7 @@ async def _search(
         q = replace_vector_ids_with_search_embeddings(
             search_service,
             embedding_service,
-            media_type,
+            modality_type,
             feature_extractor_id,
             q,
         )
@@ -856,7 +860,7 @@ async def _search(
         supports_text,
     ) = resolve_face_text_embedder(
         q,
-        media_type=media_type,
+        modality_type=modality_type,
         feature_extractor_id=feature_extractor_id,
         search_targets=search_targets,
         embedding_service=embedding_service,
@@ -880,7 +884,7 @@ async def _search(
             embedding_service,
             search_service,
             search_in,
-            media_type,
+            modality_type,
             feature_extractor_id,
             text_feature_extractor_id,
             q,
@@ -945,13 +949,13 @@ async def handle_post_search_feature(
     start, end = common.clamp_search_window(start, end, max_end)
 
     filter_specs = build_filter_specs(shot_scale, metadata_filter)
-    media_type = get_media_type(search_in)
+    modality_type = get_modality_type(search_in)
 
     search_output = cast(
         LocalSearchService, search_service
     ).search_with_feature(
         vector_qterm.vector,
-        media_type=media_type,
+        modality_type=modality_type,
         feature_extractor_id=feature_extractor_id,
         start=start,
         end=end,
@@ -1134,13 +1138,9 @@ async def handle_get_featured(
     start, end = common.clamp_search_window(
         start, end, config.max_search_results
     )
-    modality = (
-        ModalityType.AUDIO
-        if featured_in == MediaType.AV
-        else ModalityType(featured_in)
-    )
+    modality_type = get_modality_type(featured_in)
     search_output = search_service.featured(
-        modality, feature_extractor_id, start, end, random_seed
+        modality_type, feature_extractor_id, start, end, random_seed
     )
     all_thumbs = project_service.get_thumbnail_reader(thumbnails_to_send)(
         search_output.metadata

@@ -51,6 +51,10 @@ Next version (unreleased)
 * There is now a `featured` table in the internal database which can
   be used to select which vectors/files to shown on the landing page.
 
+* The `--media-type` option for create-index entrypoint has been
+  corrected to `--modality-type`.  The old option name will be kept
+  for backwards compatibility but should be updated.
+
 
 2.1.0 (2025-02-04)
 ------------------

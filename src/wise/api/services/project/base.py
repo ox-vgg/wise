@@ -19,7 +19,7 @@ from functools import reduce
 
 from pydantic import BaseModel, Field
 
-from wise.data_models import MediaType
+from wise.data_models import MediaType, ModalityType
 
 
 class Filter(BaseModel):
@@ -45,7 +45,7 @@ class ProjectInfo(BaseModel):
     ]  # e.g., {"image": 100, "video": 50, "audio": 20}
     total_duration: float  # in seconds
     shot_based_filters: ShotBasedFilters | None = None
-    search_targets: dict[MediaType, list[str]] = {}
+    search_targets: dict[ModalityType, list[str]] = {}
     enable_facets: bool = False
 
     def normalized(self) -> "ProjectInfo":
@@ -54,8 +54,8 @@ class ProjectInfo(BaseModel):
         # Do not sort search_targets here, as their order is explicitly
         # defined by config.search_target_order and sorted in the LocalProjectService.
         info.search_targets = {
-            media_type: targets
-            for media_type, targets in info.search_targets.items()
+            modality_type: targets
+            for modality_type, targets in info.search_targets.items()
         }
         return info
 
@@ -75,13 +75,15 @@ class ProjectInfo(BaseModel):
                     a.media_file_counts[media_type] += count
                 else:
                     a.media_file_counts[media_type] = count
-            for media_type, targets in b.search_targets.items():
-                if media_type in a.search_targets:
-                    a.search_targets[media_type] = list(
-                        dict.fromkeys(a.search_targets[media_type] + targets)
+            for modality_type, targets in b.search_targets.items():
+                if modality_type in a.search_targets:
+                    a.search_targets[modality_type] = list(
+                        dict.fromkeys(
+                            a.search_targets[modality_type] + targets
+                        )
                     )
                 else:
-                    a.search_targets[media_type] = targets
+                    a.search_targets[modality_type] = targets
 
             a.shot_based_filters = a.shot_based_filters or b.shot_based_filters
             a.enable_facets = a.enable_facets or b.enable_facets

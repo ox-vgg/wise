@@ -14,8 +14,8 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-import json
 import logging
+import pprint
 from pathlib import Path
 from typing import Annotated
 
@@ -126,16 +126,16 @@ def get_embedding_service(config: ConfigDep, project_info: ProjectInfoDep):
             active_search_targets = project_info.search_targets
             logger.info(
                 "Loaded the following search indices:\n%s",
-                json.dumps(active_search_targets, indent=4),
+                pprint.pformat(active_search_targets),
             )
 
             feature_extractor_ids = list(
                 dict.fromkeys(
                     [
                         x
-                        for media_type in active_search_targets
-                        for x in active_search_targets[media_type]
-                        if "metadata" not in x
+                        for modality_type in active_search_targets
+                        for x in active_search_targets[modality_type]
+                        if x != "wise/metadata"
                     ]
                 )
             )  # unique values

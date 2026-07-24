@@ -34,11 +34,11 @@ class FeatureSearchIndex(SearchIndex):
 
     def __init__(
         self,
-        modality_type: str,
+        modality_type: ModalityType,
         asset_id,
         asset,
     ):
-        self.modality_type = ModalityType(modality_type)
+        self.modality_type = modality_type
         self.feature_extractor_id = asset_id
 
         assert "features_dir" in asset, "features_dir missing in assets"

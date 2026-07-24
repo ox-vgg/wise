@@ -75,7 +75,6 @@ async def handle_get_featured(
     start, end = common.clamp_search_window(
         start, end, config.max_search_results
     )
-    # modality = ModalityType.AUDIO if featured_in == MediaType.AV else ModalityType(featured_in)
     response = await cast(RemoteSearchService, search_service).featured(
         featured_in, feature_extractor_id, start, end, random_seed
     )
@@ -142,7 +141,7 @@ async def _search(
     add_prefix: bool,
     search_endpoint: Literal["/search", "/search2"] = "/search",
 ):
-    if search_in == MediaType.IMAGE:
+    if search_in is MediaType.IMAGE:
         if any(
             [isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]
         ):
@@ -150,7 +149,7 @@ async def _search(
                 400,
                 {"message": "Cannot search on images using an audio query"},
             )
-    elif search_in == MediaType.VIDEO:
+    elif search_in is MediaType.VIDEO:
         if any(
             [isinstance(x, MediaQueryTerm) and x.qtype == "audio" for x in q]
         ):
@@ -160,7 +159,7 @@ async def _search(
                     "message": "Cannot search on visual stream of video files using an audio query"
                 },
             )
-    elif search_in == MediaType.AUDIO or search_in == MediaType.AV:
+    elif search_in in [MediaType.AUDIO, MediaType.AV]:
         if any(
             [isinstance(x, MediaQueryTerm) and x.qtype == "visual" for x in q]
         ):
@@ -174,7 +173,7 @@ async def _search(
         )
         return response
 
-    media_type = MediaType.AUDIO if search_in == MediaType.AV else search_in
+    media_type = MediaType.AUDIO if search_in is MediaType.AV else search_in
 
     q = await replace_vector_ids_with_search_embeddings(
         search_service, embedding_service, media_type, feature_extractor_id, q

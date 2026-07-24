@@ -19,7 +19,7 @@ from wise.api.common import (
     VectorIdQueryTerm,
 )
 from wise.api.services.search.face_text import run_face_text_search
-from wise.data_models import MediaType
+from wise.data_models import ModalityType
 
 
 def describe_face_text_query(
@@ -44,9 +44,9 @@ def describe_face_text_query(
 def resolve_face_text_embedder(
     q: Query,
     *,
-    media_type: MediaType,
+    modality_type: ModalityType,
     feature_extractor_id: str,
-    search_targets: dict[MediaType, list[str]],
+    search_targets: dict[ModalityType, list[str]],
     embedding_service,
     preferred_id: str | None,
 ) -> tuple[str | None, bool, bool, bool]:
@@ -63,7 +63,7 @@ def resolve_face_text_embedder(
     from wise.api.services.search.face_text import get_face_text_embedder_id
 
     text_feature_extractor_id = get_face_text_embedder_id(
-        media_type,
+        modality_type,
         search_targets,
         embedding_service,
         preferred_id=preferred_id,
@@ -80,7 +80,7 @@ def resolve_face_text_embedder(
 async def run_face_text_search_standalone(
     q: Query,
     *,
-    media_type: MediaType,
+    modality_type: ModalityType,
     feature_extractor_id: str,
     text_feature_extractor_id: str,
     embedding_config,
@@ -100,7 +100,7 @@ async def run_face_text_search_standalone(
     async def _search_face(features, start_idx, end_idx, _filter_specs):
         return search_service.search_with_feature(
             features,
-            media_type=media_type,
+            modality_type=modality_type,
             feature_extractor_id=feature_extractor_id,
             start=start_idx,
             end=end_idx,
@@ -112,7 +112,7 @@ async def run_face_text_search_standalone(
     ):
         return search_service.search_with_feature(
             features,
-            media_type=media_type,
+            modality_type=modality_type,
             feature_extractor_id=text_feature_extractor_id,
             start=start_idx,
             end=end_idx,
@@ -122,7 +122,7 @@ async def run_face_text_search_standalone(
         )
 
     def _resolve_text_vector_ids(face_search_output):
-        if media_type == MediaType.VIDEO:
+        if modality_type is ModalityType.VIDEO:
             face_media_ts_pairs = list(
                 dict.fromkeys(
                     (meta.media_id, meta.timestamp)
@@ -134,7 +134,7 @@ async def run_face_text_search_standalone(
                 face_media_ids, face_timestamps = zip(*face_media_ts_pairs)
                 return project_service.wise_project.get_vector_ids(
                     list(face_media_ids),
-                    media_type,
+                    modality_type,
                     text_feature_extractor_id,
                     timestamps=list(face_timestamps),
                 )
@@ -144,7 +144,7 @@ async def run_face_text_search_standalone(
         ]
         unique_media_ids = list(dict.fromkeys(face_media_ids))
         return project_service.wise_project.get_vector_ids(
-            unique_media_ids, media_type, text_feature_extractor_id
+            unique_media_ids, modality_type, text_feature_extractor_id
         )
 
     def _build_text_ranked_keys(text_search_output):
@@ -171,7 +171,7 @@ async def run_face_text_search_standalone(
 
     return await run_face_text_search(
         q,
-        media_type=media_type,
+        modality_type=modality_type,
         feature_extractor_id=feature_extractor_id,
         text_feature_extractor_id=text_feature_extractor_id,
         embedding_config=embedding_config,
