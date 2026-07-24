@@ -72,7 +72,7 @@ def main(argv: list[str]):
         type=str,
         default="",
         help="The root path where the app is being served behind a proxy",
-    ),
+    )
     parser.add_argument(
         "--project-dir",
         type=_arg_type_dir,
