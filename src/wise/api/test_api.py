@@ -36,7 +36,8 @@ class TestWithEmptyProject(unittest.TestCase):
         ## project_dir is a subdir of tmp_dir because it must not
         ## exist before creating WiseProject (otherwise the
         ## subdirectories will not be created).
-        self.project_dir = os.path.join(self.tmp_dir.name, "wise-test-project")
+        self.project_name = "wise-test-project"
+        self.project_dir = os.path.join(self.tmp_dir.name, self.project_name)
 
         project = WiseProject(
             self.project_dir, create_project=True, read_only=False
@@ -48,13 +49,16 @@ class TestWithEmptyProject(unittest.TestCase):
         self.app = create_app(self.api_config, self.project_dir)
         self.client = TestClient(self.app)
 
+    def get_request(self, path: str):
+        return self.client.get(f"/{self.project_name}/{path}")
+
     def test_get_info(self):
-        response = self.client.get("/wise-test-project/info")
+        response = self.get_request("info")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
             {
-                "project_name": "wise-test-project",
+                "project_name": self.project_name,
                 "num_vectors": 0,
                 "num_media_files": 0,
                 "num_thumbnails": 0,
@@ -69,25 +73,25 @@ class TestWithEmptyProject(unittest.TestCase):
         )
 
     def test_get_nonexistent_media(self):
-        resp = self.client.get("/wise-test-project/media/1")
+        resp = self.get_request("media/1")
         self.assertEqual(resp.status_code, 404)
         ## XXX: this returns plain text but maybe should return json
         ## like the others when it errors?
         self.assertEqual(resp.content, b"1 not found!")
 
     def test_get_related_vectors_to_nonexistent_vector(self):
-        resp = self.client.get("/wise-test-project/related-vectors/1")
+        resp = self.get_request("related-vectors/1")
         ## XXX: this succeeds but maybe it should 404?
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json(), [])
 
     def test_get_metadata_to_nonexistent_media(self):
-        resp = self.client.get("/wise-test-project/metadata/1")
+        resp = self.get_request("metadata/1")
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.json()["detail"], "Metadata not found!")
 
     def test_get_thumbnail_to_nonexistent_media(self):
-        resp = self.client.get("/wise-test-project/thumbnail/1")
+        resp = self.get_request("thumbnail/1")
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.json()["detail"], "Not Found")
 
