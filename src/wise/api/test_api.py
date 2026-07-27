@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 
 import wise.api.common
+import wise.api.dependencies
 from wise.api import create_app
 from wise.api.common import MediaQueryTerm, TextQueryTerm
 from wise.config import APIConfig
@@ -97,6 +98,12 @@ class TestWithEmptyProject(unittest.TestCase):
 
     def tearDown(self):
         self.tmp_dir.cleanup()
+        # HACK: need to destroy the app services which are global
+        # variables and created by the first app (see #252)
+        wise.api.dependencies.project_service = None
+        wise.api.dependencies.project_info = None
+        wise.api.dependencies.serch_service = None
+        wise.api.dependencies.embedding_service = None
 
 
 class TestHandlingMultipartForm(unittest.TestCase):
