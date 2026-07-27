@@ -30,6 +30,13 @@ from pydantic import BaseModel, ConfigDict
 from torch import Tensor, nn
 from torchvision.ops import box_iou
 
+try:
+    ## Importing torch_tensorrt registers 'tensorrt' as a custom torch
+    ## compile backend which we use as the default if available.
+    import torch_tensorrt  # pylint: disable=unused-import
+except ModuleNotFoundError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 
@@ -192,6 +199,10 @@ class MultiModalModel(ABC):
             if "tensorrt" in available_backends:
                 backend = "tensorrt"
             else:
+                logger.warning(
+                    "torch_tensorrt is not installed.  Models will be compiled"
+                    " with inductor backend which may be less performant."
+                )
                 backend = "inductor"
             logger.info("Compiling model with backend %s", backend)
             model.compile(mode="reduce-overhead", backend=backend)

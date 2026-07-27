@@ -19,15 +19,6 @@ import os
 
 logger = logging.getLogger(__name__)
 
-try:
-    # must import torch tensorrt before compile calls
-    import torch_tensorrt
-except:
-    logger.warning(
-        "torch_tensorrt is not installed. Models will be compiled with inductor backend."
-    )
-    pass
-
 # TODO move this to pydantic settings and inject it
 default_triton_url = os.environ.get("WISE_TRITON_URL", "localhost:8001")
 
