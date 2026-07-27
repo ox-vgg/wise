@@ -488,7 +488,7 @@ def validate_args(args):
 
 def get_mode(args):
     mode = None
-    if not Path(args.project_dir).exists():
+    if not args.project_dir.exists():
         mode = ExtractFeatureMode.create
     else:
         logger.info("Project directory '%s' already exists.", args.project_dir)
@@ -748,7 +748,7 @@ def main(argv: list[str]):
     parser.add_argument(
         "--project-dir",
         required=True,
-        type=str,
+        type=Path,
         help="folder where all project assets are stored",
     )
 
@@ -780,7 +780,7 @@ def main(argv: list[str]):
     root_logger.setLevel(getattr(logging, args.logging_level.upper()))
 
     config = APIConfig(
-        project_dir=Path(args.project_dir), command="extract_features"
+        project_dir=args.project_dir, command="extract_features"
     )
 
     feature_extractor_config = config.feature_extractor_config
