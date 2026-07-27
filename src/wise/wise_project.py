@@ -19,7 +19,6 @@ import itertools
 import logging
 import os
 import shutil
-import sqlite3
 from collections import defaultdict
 from functools import cached_property, partial
 from pathlib import Path
