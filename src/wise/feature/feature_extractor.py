@@ -14,7 +14,9 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
+import functools
 import inspect
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, NamedTuple, Optional, Type
@@ -25,8 +27,10 @@ import torch
 import torchvision.transforms.v2.functional as F
 from PIL import Image
 from pydantic import BaseModel, ConfigDict
-from torch import Tensor
+from torch import Tensor, nn
 from torchvision.ops import box_iou
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureExtractorConfig(BaseModel):
@@ -160,6 +164,43 @@ class MultiModalModel(ABC):
         self.DEVICE = get_torch_device(device)
         self.compile = compile
         self.model_kwargs = kwargs
+
+    def _load_torch_model(self) -> nn.Module:
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    ## TODO: instead of having _*_torch_model (to handle cases where
+    ## model is not a nn.Module), maybe have a separate class for
+    ## those.  Or maybe, those classes should be returning nn.Module
+    ## (currently, this is only insightface).
+    @functools.cache
+    def _build_torch_model(self) -> nn.Module:
+        """Template method for models that are `torch.nn.Module`.
+
+        Models that are nn.Module need to overload `_load_torch_model`
+        method and its `model` property only needs to call this
+        method.
+
+        """
+        logger.info(
+            "Initialising model %s on device '%s'", self.model_id, self.DEVICE
+        )
+        model = self._load_torch_model()
+        model = model.to(self.DEVICE)
+        model.eval()
+        if self.compile:
+            available_backends = torch._dynamo.list_backends()
+            if "tensorrt" in available_backends:
+                backend = "tensorrt"
+            else:
+                backend = "inductor"
+            logger.info("Compiling model with backend %s", backend)
+            model.compile(mode="reduce-overhead", backend=backend)
+        return model
+
+    @property
+    @abstractmethod
+    def model(self):
+        raise NotImplementedError("Subclasses must implement this property.")
 
     @abstractmethod
     def get_image_features(self, **kwargs):

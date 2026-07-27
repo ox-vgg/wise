@@ -257,28 +257,18 @@ class TransformersOWLv2Model(MultiModalModel):
     This class is used to load the OWLv2 model and perform inference on it.
     """
 
-    @cached_property
-    def model(self) -> Owlv2ForObjectDetection:
+    def _load_torch_model(self) -> Owlv2ForObjectDetection:
         """
         Returns the OWLv2ForObjectDetection model instance.
         """
-        logger.info(
-            "Initialising OWLv2 model %s on device %s",
-            self.model_id,
-            self.DEVICE,
-        )
-        _model = Owlv2ForObjectDetection.from_pretrained(
+        model = Owlv2ForObjectDetection.from_pretrained(
             self.model_id, **self.model_kwargs
-        ).to(self.DEVICE)
-        _model.eval()
-        if self.compile:
-            available_backends = torch._dynamo.list_backends()
-            backend = "inductor"
-            if "tensorrt" in available_backends:
-                backend = "tensorrt"
-            logger.info("Compiling model with backend %s", backend)
-            _model.compile(mode="reduce-overhead", backend=backend)
-        return _model
+        )
+        return model
+
+    @property
+    def model(self):
+        return self._build_torch_model()
 
     def get_image_features(self, **kwargs):
         images = kwargs.get("images", None)

@@ -52,29 +52,18 @@ def _load_openclip_model(
 
 class MlfoundationsOpenClipModel(MultiModalModel):
 
-    @cached_property
-    def model(self):
-        logger.info(
-            "Initialising model mlfoundations/openclip model - %s (%s, device=%s)",
-            self.model_id,
-            self.pretraining_dataset,
-            self.DEVICE,
-        )
+    def _load_torch_model(self):
         model, _ = _load_openclip_model(
             self.model_id,
             pretrained=self.pretraining_dataset,
             device=self.DEVICE,
             **self.model_kwargs,
         )
-        model.eval()
-        if self.compile:
-            available_backends = torch._dynamo.list_backends()
-            backend = "inductor"
-            if "tensorrt" in available_backends:
-                backend = "tensorrt"
-            logger.info("Compiling model with backend %s", backend)
-            model.compile(mode="reduce-overhead", backend=backend)
         return model
+
+    @property
+    def model(self):
+        return self._build_torch_model()
 
     @property
     def input_image_size(self):

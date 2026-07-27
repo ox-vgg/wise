@@ -96,29 +96,16 @@ def default_collate(batch):
 
 class MicrosoftClapModel(MultiModalModel):
 
-    @cached_property
-    def _clap_wrapper(self):
+    def _load_torch_model(self):
         use_cuda = self.DEVICE.type == "cuda"
-        logger.info(
-            "Initialising microsoft/clap (version=%s, use_cuda=%s)",
-            self.model_id,
-            use_cuda,
-        )
         instance = CLAP(version=self.model_id, use_cuda=use_cuda)
-        instance.clap.to(self.DEVICE)
         # TODO get it from config along with options?
-        if self.compile:
-            available_backends = torch._dynamo.list_backends()
-            backend = "inductor"
-            if "tensorrt" in available_backends:
-                backend = "tensorrt"
-            logger.info("Compiling model with backend %s", backend)
-            instance.clap.compile(mode="reduce-overhead", backend=backend)
-        return instance
+        instance.clap.to(self.DEVICE)
+        return instance.clap
 
     @property
     def model(self):
-        return self._clap_wrapper.clap
+        return self._build_torch_model()
 
     @torch.inference_mode()
     def get_audio_features(self, **kwargs) -> torch.Tensor:
