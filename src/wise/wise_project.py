@@ -157,19 +157,30 @@ class WiseProject:
                 "options create_project and read_only are mutually exclusive"
             )
 
-        if not self._project_dir.exists():
-            if create_project:
-                # create the root folders
-                self._store_dir.mkdir(parents=True, exist_ok=True)
-                self._media_dir.mkdir(parents=True, exist_ok=True)
-                self._metadata_dir.mkdir(parents=True, exist_ok=True)
-                # and databases (access implicitly creates them)
-                _ = self.db_engine
-                _ = self.thumbsdb_engine
-            else:
+        if create_project:
+            if not self._project_dir.parent.exists():
                 raise ValueError(
-                    f"project folder {self._project_dir} does not exist"
+                    f"project directory parent '{self._project_dir.parent}' does not exist"
                 )
+            elif self._project_dir.exists() and any(
+                self._project_dir.iterdir()
+            ):
+                raise ValueError(
+                    f"project directory '{self._project_dir}' is not empty"
+                )
+            # create the root folders
+            self._project_dir.mkdir(exist_ok=True)
+            self._store_dir.mkdir()
+            self._media_dir.mkdir()
+            self._metadata_dir.mkdir()
+            # and databases (access implicitly creates them)
+            _ = self.db_engine
+            _ = self.thumbsdb_engine
+
+        elif not self._project_dir.exists():
+            raise ValueError(
+                f"project directory {self._project_dir} does not exist"
+            )
 
     @property
     def name(self) -> str:

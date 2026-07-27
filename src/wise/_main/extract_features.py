@@ -488,7 +488,7 @@ def validate_args(args):
 
 def get_mode(args):
     mode = None
-    if not args.project_dir.exists():
+    if not args.project_dir.exists() or not any(args.project_dir.iterdir()):
         mode = ExtractFeatureMode.create
     else:
         logger.info("Project directory '%s' already exists.", args.project_dir)
@@ -822,7 +822,7 @@ def main(argv: list[str]):
 
     project = WiseProject(
         args.project_dir,
-        create_project=True,
+        create_project=True if mode is ExtractFeatureMode.create else False,
         db_kwargs={"echo": False},
         thumbsdb_kwargs={"echo": False},
     )

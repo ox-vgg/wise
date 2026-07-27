@@ -33,12 +33,9 @@ from wise.wise_project import WiseProject
 
 class TestWithEmptyProject(unittest.TestCase):
     def setUp(self):
-        self.tmp_dir = tempfile.TemporaryDirectory()
-        ## project_dir is a subdir of tmp_dir because it must not
-        ## exist before creating WiseProject (otherwise the
-        ## subdirectories will not be created).
-        self.project_name = "wise-test-project"
-        self.project_dir = os.path.join(self.tmp_dir.name, self.project_name)
+        self.tmp_dir = tempfile.TemporaryDirectory(prefix="wise-test-")
+        self.project_dir = self.tmp_dir.name
+        self.project_name = os.path.basename(self.project_dir)
 
         project = WiseProject(
             self.project_dir, create_project=True, read_only=False

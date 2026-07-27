@@ -150,4 +150,5 @@ python -m unittest wise/api/test_api.py
 python -m unittest wise/feature/test_feature_extractor.py
 python -m unittest wise/feature/store/test_feature_store.py
 python -m unittest wise/search/test_query_parser.py
+python -m unittest wise/test_wise_project.py
 ```
