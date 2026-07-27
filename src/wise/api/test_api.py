@@ -99,7 +99,7 @@ class TestWithEmptyProject(unittest.TestCase):
         # variables and created by the first app (see #252)
         wise.api.dependencies.project_service = None
         wise.api.dependencies.project_info = None
-        wise.api.dependencies.serch_service = None
+        wise.api.dependencies.search_service = None
         wise.api.dependencies.embedding_service = None
 
 
