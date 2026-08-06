@@ -98,9 +98,7 @@ For any queries or feedback related to the WISE software, contact [Prasanna Srid
 ## Citation
 The WISE software can be cited as follows:
 
-Prasanna Sridhar, Horace Lee, David M. S. Pinto, Andrew Zisserman, and Abhishek Dutta. (2026). WISE: A Multimodal Search Engine for Visual Scenes, Audio, Objects, Faces, Speech, and Metadata. [arXiv:2602.12819](https://arxiv.org/abs/2602.12819)
-
-> To appear in Proceedings of the 49th International ACM SIGIR Conference on Research and Development in Information Retrieval (SIGIR ’26), July 20–24, 2026, Melbourne, VIC, Australia
+Prasanna Sridhar, Horace Lee, David M. S. Pinto, Andrew Zisserman, and Abhishek Dutta. 2026. WISE: A Multimodal Search Engine for Visual Scenes, Audio, Objects, Faces, Speech, and Metadata. In Proceedings of the 49th International ACM SIGIR Conference on Research and Development in Information Retrieval (SIGIR '26). Association for Computing Machinery, New York, NY, USA, 5230–5234. ( [doi](https://doi.org/10.1145/3805712.3808375), [pdf](https://www.robots.ox.ac.uk/~vgg/publications/2026/sridhar2026wise/sridhar2026wise.pdf) )
 
 ## Acknowledgements
 
